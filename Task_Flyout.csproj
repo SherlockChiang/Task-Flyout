@@ -19,10 +19,6 @@
         <None Remove="credentials.json" />
         <None Remove="FlyoutWindow.xaml" />
         </ItemGroup>
-    
-    <ItemGroup>
-      <Compile Include=".gitignore" />
-    </ItemGroup>
 
     <ItemGroup>
         <Content Include="Assets\SplashScreen.scale-200.png" />

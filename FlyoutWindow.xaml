@@ -14,6 +14,9 @@
         <Grid.Resources>
             <local:BoolToBrushConverter x:Key="BoolToBrushConverter"/>
             <local:BoolToStrikethroughConverter x:Key="BoolToStrikethroughConverter"/>
+
+            <CornerRadius x:Key="CalendarViewDayItemCornerRadius">8</CornerRadius>
+            <CornerRadius x:Key="CalendarViewDayItemTodayBackgroundCornerRadius">8</CornerRadius>
         </Grid.Resources>
 
         <Grid.RowDefinitions>
@@ -26,7 +29,6 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <Button Grid.Row="0" Margin="16,0,16,12" Background="Transparent" BorderThickness="0" 
@@ -37,157 +39,20 @@
                 </StackPanel>
             </Button>
 
-            <Grid Grid.Row="1" Margin="16,4,16,8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <Button x:Name="BtnViewDrill" Content="2023年10月" VerticalAlignment="Center" 
-                        FontWeight="SemiBold" FontSize="16" Background="Transparent" BorderThickness="0"
-                        Margin="0,0,0,0" Click="BtnViewDrill_Click" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
-
-                <Button Grid.Column="1" Background="Transparent" BorderThickness="0" Width="36" Height="36" Click="BtnPrev_Click" Foreground="{ThemeResource TextFillColorPrimaryBrush}">
-                    <FontIcon Glyph="&#xEDDB;" FontSize="12"/>
-                </Button>
-                <Button Grid.Column="2" Background="Transparent" BorderThickness="0" Width="36" Height="36" Click="BtnNext_Click" Foreground="{ThemeResource TextFillColorPrimaryBrush}">
-                    <FontIcon Glyph="&#xEDDC;" FontSize="12"/>
-                </Button>
-            </Grid>
-
-            <Border Grid.Row="2" Margin="0,0,0,12" HorizontalAlignment="Stretch" PointerWheelChanged="CalendarArea_PointerWheelChanged">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <Grid x:Name="WeekHeaderGrid" Grid.Row="0" Margin="0,0,0,8" HorizontalAlignment="Center">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="50"/>
-                            <ColumnDefinition Width="50"/>
-                            <ColumnDefinition Width="50"/>
-                            <ColumnDefinition Width="50"/>
-                            <ColumnDefinition Width="50"/>
-                            <ColumnDefinition Width="50"/>
-                            <ColumnDefinition Width="50"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Su" Grid.Column="0" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/>
-                        <TextBlock Text="Mo" Grid.Column="1" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/>
-                        <TextBlock Text="Tu" Grid.Column="2" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/>
-                        <TextBlock Text="We" Grid.Column="3" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/>
-                        <TextBlock Text="Th" Grid.Column="4" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/>
-                        <TextBlock Text="Fr" Grid.Column="5" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/>
-                        <TextBlock Text="Sa" Grid.Column="6" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/>
-                    </Grid>
-
-                    <Grid x:Name="CalendarTransitionContainer" Grid.Row="1" Background="Transparent">
-                        <Grid.RenderTransform>
-                            <TranslateTransform x:Name="CalendarTranslateTransform"/>
-                        </Grid.RenderTransform>
-
-                        <GridView x:Name="CustomCalendarGrid" 
-                                  ScrollViewer.VerticalScrollMode="Disabled" 
-                                  ScrollViewer.VerticalScrollBarVisibility="Hidden"
-                                  SelectionMode="None" 
-                                  IsItemClickEnabled="True" 
-                                  ItemClick="CustomCalendarGrid_ItemClick" 
-                                  HorizontalAlignment="Center">
-                            <GridView.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <ItemsWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="7"/>
-                                </ItemsPanelTemplate>
-                            </GridView.ItemsPanel>
-                            <GridView.ItemContainerStyle>
-                                <Style TargetType="GridViewItem">
-                                    <Setter Property="Margin" Value="0"/>
-                                    <Setter Property="Padding" Value="0"/>
-                                    <Setter Property="Width" Value="50"/>
-                                    <Setter Property="Height" Value="46"/>
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="GridViewItem">
-                                                <ListViewItemPresenter CornerRadius="22" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" ContentMargin="0"/>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
-                            </GridView.ItemContainerStyle>
-                            <GridView.ItemTemplate>
-                                <DataTemplate x:DataType="models:CalendarDay">
-                                    <Grid Width="44" Height="44" CornerRadius="22" Background="{Binding IsSelected, Converter={StaticResource BoolToBrushConverter}}">
-                                        <Border BorderBrush="{ThemeResource SystemAccentColor}" BorderThickness="1" CornerRadius="22" Visibility="{x:Bind TodayVisibility, Mode=OneWay}"/>
-                                        <TextBlock Text="{x:Bind DayText, Mode=OneWay}" HorizontalAlignment="Center" VerticalAlignment="Center" TextLineBounds="Tight" Opacity="{x:Bind TextOpacity, Mode=OneWay}" FontWeight="{x:Bind TodayFontWeight, Mode=OneWay}"/>
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,4" Spacing="2">
-                                            <Rectangle Width="6" Height="3" RadiusX="1.5" RadiusY="1.5" Fill="{ThemeResource SystemAccentColor}" Visibility="{x:Bind Dot1Vis, Mode=OneWay}"/>
-                                            <Rectangle Width="6" Height="3" RadiusX="1.5" RadiusY="1.5" Fill="{ThemeResource SystemAccentColor}" Visibility="{x:Bind Dot2Vis, Mode=OneWay}"/>
-                                            <Rectangle Width="6" Height="3" RadiusX="1.5" RadiusY="1.5" Fill="{ThemeResource SystemAccentColor}" Visibility="{x:Bind Dot3Vis, Mode=OneWay}"/>
-                                            <Rectangle Width="6" Height="3" RadiusX="1.5" RadiusY="1.5" Fill="{ThemeResource SystemAccentColor}" Visibility="{x:Bind Dot4Vis, Mode=OneWay}"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </DataTemplate>
-                            </GridView.ItemTemplate>
-                        </GridView>
-
-                        <GridView x:Name="MonthViewPanel" SelectionMode="None" IsItemClickEnabled="True" ItemClick="MonthViewPanel_ItemClick" HorizontalAlignment="Center" Visibility="Collapsed">
-                            <GridView.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <ItemsWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="4"/>
-                                </ItemsPanelTemplate>
-                            </GridView.ItemsPanel>
-                            <GridView.ItemContainerStyle>
-                                <Style TargetType="GridViewItem">
-                                    <Setter Property="Margin" Value="4"/>
-                                    <Setter Property="Padding" Value="0"/>
-                                    <Setter Property="Width" Value="80"/>
-                                    <Setter Property="Height" Value="56"/>
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="GridViewItem">
-                                                <ListViewItemPresenter CornerRadius="8" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
-                            </GridView.ItemContainerStyle>
-                            <GridView.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding}" FontWeight="Medium" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </DataTemplate>
-                            </GridView.ItemTemplate>
-                        </GridView>
-
-                        <GridView x:Name="YearViewPanel" SelectionMode="None" IsItemClickEnabled="True" ItemClick="YearViewPanel_ItemClick" HorizontalAlignment="Center" Visibility="Collapsed">
-                            <GridView.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <ItemsWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="4"/>
-                                </ItemsPanelTemplate>
-                            </GridView.ItemsPanel>
-                            <GridView.ItemContainerStyle>
-                                <Style TargetType="GridViewItem">
-                                    <Setter Property="Margin" Value="4"/>
-                                    <Setter Property="Padding" Value="0"/>
-                                    <Setter Property="Width" Value="80"/>
-                                    <Setter Property="Height" Value="56"/>
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="GridViewItem">
-                                                <ListViewItemPresenter CornerRadius="8" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
-                            </GridView.ItemContainerStyle>
-                            <GridView.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding}" FontWeight="Medium" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </DataTemplate>
-                            </GridView.ItemTemplate>
-                        </GridView>
-                    </Grid>
-                </Grid>
-            </Border>
+            <CalendarView x:Name="MainCalendar" 
+                          Grid.Row="1"
+                          HorizontalAlignment="Center"
+                          Margin="0,0,0,12"
+                          Width="320" Height="340"
+                          CalendarViewDayItemChanging="MainCalendar_CalendarViewDayItemChanging"
+                          SelectedDatesChanged="MainCalendar_SelectedDatesChanged">
+                <CalendarView.CalendarViewDayItemStyle>
+                    <Style TargetType="CalendarViewDayItem">
+                        <Setter Property="CornerRadius" Value="8"/>
+                        <Setter Property="Margin" Value="1"/>
+                    </Style>
+                </CalendarView.CalendarViewDayItemStyle>
+            </CalendarView>
         </Grid>
 
         <Grid Grid.Row="1" Margin="16,0,16,0">
@@ -195,11 +60,9 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-
             <TextBlock x:Name="TxtSelectedDateHeader" Grid.Row="0" Text="2023年10月24日" 
                        FontSize="14" FontWeight="SemiBold" Margin="4,0,0,8"
                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-
             <Border Grid.Row="1" Background="{ThemeResource ControlFillColorDefaultBrush}" 
                     CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                 <ListView x:Name="AgendaListControl" SelectionMode="None" Padding="0,8"
@@ -213,26 +76,22 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-
                                 <Border Grid.Column="0" Width="4" Background="{ThemeResource SystemAccentColor}" 
                                         CornerRadius="2" Margin="0,0,12,0" 
                                         Visibility="{x:Bind IsEvent, Mode=OneWay}"/>
-
                                 <CheckBox Grid.Column="0" IsChecked="{x:Bind IsCompleted, Mode=TwoWay}" 
                                           MinWidth="0" Padding="0" Margin="0,0,12,0" 
                                           VerticalAlignment="Center" HorizontalAlignment="Left"
                                           Visibility="{x:Bind IsTask, Mode=OneWay}" Click="TaskCheckBox_Click"/>
-
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
                                     <TextBlock Text="{x:Bind Title, Mode=OneWay}" FontWeight="SemiBold" FontSize="14" 
-           TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Title, Mode=OneWay}"
-           TextDecorations="{Binding IsCompleted, Converter={StaticResource BoolToStrikethroughConverter}}"/>
+                                               TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Title, Mode=OneWay}"
+                                               TextDecorations="{Binding IsCompleted, Converter={StaticResource BoolToStrikethroughConverter}}"/>
                                     <StackPanel Orientation="Horizontal" Spacing="4" Visibility="{x:Bind HasLocation, Mode=OneWay}" Margin="0,2,0,0">
                                         <FontIcon Glyph="&#xE710;" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         <TextBlock Text="{x:Bind Location, Mode=OneWay}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
                                     </StackPanel>
                                 </StackPanel>
-
                                 <Border Grid.Column="2" Background="{ThemeResource LayerFillColorAltBrush}" 
                                         CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
                                     <TextBlock Text="{x:Bind Subtitle, Mode=OneWay}" FontSize="12" FontWeight="Medium" 
@@ -252,15 +111,12 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-
             <Button Grid.Column="0" ToolTipService.ToolTip="设置" Background="Transparent" BorderThickness="0" Foreground="{ThemeResource TextFillColorPrimaryBrush}">
                 <SymbolIcon Symbol="Setting"/>
             </Button>
-
             <Button Grid.Column="1" Click="BtnRefresh_Click" ToolTipService.ToolTip="强制同步云端" Background="Transparent" BorderThickness="0" Margin="4,0,0,0" Foreground="{ThemeResource TextFillColorPrimaryBrush}">
                 <SymbolIcon Symbol="Refresh"/>
             </Button>
-
             <Button Grid.Column="3" Style="{StaticResource AccentButtonStyle}" Padding="12,4">
                 <Button.Flyout>
                     <Flyout x:Name="AddTaskFlyout">
@@ -282,7 +138,6 @@
                         </StackPanel>
                     </Flyout>
                 </Button.Flyout>
-
                 <StackPanel Orientation="Horizontal">
                     <SymbolIcon Symbol="Add" Margin="0,0,8,0"/>
                     <TextBlock Text="添加任务"/>

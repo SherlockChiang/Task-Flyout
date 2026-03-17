@@ -20,7 +20,7 @@ namespace Task_Flyout
         private H.NotifyIcon.TaskbarIcon? _trayIcon;
         public static FlyoutWindow? MyFlyoutWindow { get; private set; }
         public static MainWindow? MyMainWindow { get; private set; }
-
+        public static Microsoft.UI.Dispatching.DispatcherQueue MainDispatcherQueue { get; private set; }
         public App()
         {
             this.InitializeComponent();
@@ -28,39 +28,53 @@ namespace Task_Flyout
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
-            // 💡 核心修复：提前把窗口 new 出来，但不调用 ToggleFlyout()，它就会在后台隐身待命。
-            // 这样既能秒开，又能为托盘插件提供 UI 线程和 XamlRoot 的支持。
+            MainDispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
             MyFlyoutWindow = new FlyoutWindow();
 
-            // 1. 获取托盘图标资源
             _trayIcon = (H.NotifyIcon.TaskbarIcon)Resources["MyTrayIcon"];
             _trayIcon.ForceCreate();
 
-            // 2. 绑定左键点击命令
-            _trayIcon.LeftClickCommand = new RelayCommand(() =>
-            {
-                // 因为上面已经 new 过了，这里直接呼出即可
-                MyFlyoutWindow.ToggleFlyout();
-            });
+            // 左键点击保持不变
+            _trayIcon.LeftClickCommand = new RelayCommand(() => MyFlyoutWindow.ToggleFlyout());
 
-            // 3. 挂载右键菜单点击事件
+            // 👉 重点修改：改用 Command 属性
             if (_trayIcon.ContextFlyout is MenuFlyout menu)
             {
                 foreach (var item in menu.Items.OfType<MenuFlyoutItem>())
                 {
-                    if (item.Text == "显示主页面") item.Click += ShowMainWindow_Click;
-                    else if (item.Text == "退出") item.Click += ExitApp_Click;
+                    if (item.Text.Contains("主页面"))
+                    {
+                        // 使用 Command 而非 Click 事件
+                        item.Command = new RelayCommand(() => OpenMainWindowInternal());
+                    }
+                    else if (item.Text.Contains("退出"))
+                    {
+                        item.Command = new RelayCommand(() => ExitAppInternal());
+                    }
                 }
             }
         }
 
-        private void ShowMainWindow_Click(object sender, RoutedEventArgs e)
+        // 👉 抽取逻辑到独立方法，确保逻辑清晰
+        private void OpenMainWindowInternal()
         {
-            MyMainWindow ??= new MainWindow();
-            MyMainWindow.Activate();
+            System.Diagnostics.Debug.WriteLine("=== Command triggered: Opening MainWindow ===");
+
+            MainDispatcherQueue.TryEnqueue(() =>
+            {
+                if (MyMainWindow == null)
+                {
+                    MyMainWindow = new MainWindow();
+                    MyMainWindow.Closed += (s, args) => { MyMainWindow = null; };
+                }
+
+                MyMainWindow.Activate();
+                MyMainWindow.AppWindow.Show();
+                System.Diagnostics.Debug.WriteLine("=== MainWindow state: Shown ===");
+            });
         }
 
-        private void ExitApp_Click(object sender, RoutedEventArgs e)
+        private void ExitAppInternal()
         {
             _trayIcon?.Dispose();
             MyFlyoutWindow?.Close();

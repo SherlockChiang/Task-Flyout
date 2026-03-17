@@ -22,15 +22,30 @@ namespace Task_Flyout
         // UI 绑定的数据源
         public ObservableCollection<EventViewModel> SelectedDayEvents { get; set; } = new();
         public ObservableCollection<TaskViewModel> GoogleTasks { get; set; } = new();
-
+        private bool _isDataLoaded = false;
         public MainWindow()
         {
             this.InitializeComponent();
+
+            this.AppWindow.Closing += (s, e) =>
+            {
+                e.Cancel = true;
+                this.AppWindow.Hide();
+            };
+
             EventsListView.ItemsSource = SelectedDayEvents;
             TasksListView.ItemsSource = GoogleTasks;
 
             _authService = new GoogleAuthService();
-            _ = InitializeGoogleDataAsync();
+
+            this.Activated += (s, e) =>
+            {
+                if (!_isDataLoaded)
+                {
+                    _ = InitializeGoogleDataAsync();
+                    _isDataLoaded = true;
+                }
+            };
         }
 
         private async Task InitializeGoogleDataAsync()
