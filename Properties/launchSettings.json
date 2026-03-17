@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "task flyout winui3 (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "task flyout winui3 (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

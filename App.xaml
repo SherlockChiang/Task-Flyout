@@ -1,0 +1,34 @@
+<Application
+    x:Class="Task_Flyout.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:tb="using:H.NotifyIcon"
+    xmlns:local="using:Task_Flyout">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <tb:TaskbarIcon x:Key="MyTrayIcon"
+                            IconSource="ms-appx:///Assets/AppIcon.ico" 
+                            ToolTipText="Task Flyout">
+                <tb:TaskbarIcon.ContextFlyout>
+                    <MenuFlyout x:Name="TrayMenu">
+                        <MenuFlyoutItem x:Name="MenuShowMain" Text="显示主页面">
+                            <MenuFlyoutItem.Icon>
+                                <SymbolIcon Symbol="Setting"/>
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem x:Name="MenuExit" Text="退出">
+                            <MenuFlyoutItem.Icon>
+                                <SymbolIcon Symbol="Cancel"/>
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                    </MenuFlyout>
+                </tb:TaskbarIcon.ContextFlyout>
+            </tb:TaskbarIcon>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
