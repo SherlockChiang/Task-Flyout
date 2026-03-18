@@ -31,6 +31,8 @@ namespace Task_Flyout.Models // 建议放在 Models 文件夹下
             get => _location;
             set { _location = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasLocation)); }
         }
+        public string Provider { get; set; } = "Local";
+        public string DateKey { get; set; }
 
         public Microsoft.UI.Xaml.Visibility HasLocation => string.IsNullOrWhiteSpace(Location) ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
 

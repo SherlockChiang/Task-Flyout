@@ -7,53 +7,30 @@
     mc:Ignorable="d"
     Title="Task Flyout">
 
-    <Grid Padding="20" ColumnSpacing="20">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
+    <Window.SystemBackdrop>
+        <MicaBackdrop Kind="BaseAlt"/>
+    </Window.SystemBackdrop>
 
-        <StackPanel Grid.Column="0" Spacing="10">
-            <TextBlock Text="我的日历" Style="{StaticResource SubtitleTextBlockStyle}" FontWeight="Bold"/>
-            <CalendarView x:Name="MainCalendar" 
-                          CalendarViewDayItemChanging="MainCalendar_CalendarViewDayItemChanging"
-                          SelectedDatesChanged="MainCalendar_SelectedDatesChanged"
-                          Width="300" Height="350"/>
-            <ProgressRing x:Name="LoadingRing" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Center"/>
-        </StackPanel>
+    <Grid>
+        <NavigationView x:Name="MainNav"
+                        PaneDisplayMode="Left"
+                        IsSettingsVisible="True"
+                        ItemInvoked="MainNav_ItemInvoked">
+            <NavigationView.MenuItems>
+                <NavigationViewItemHeader Content="账户"/>
+                <NavigationViewItem Content="Google Calendar" Tag="GoogleAccount">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE77B;" Foreground="#4285F4"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Outlook" Tag="OutlookAccount" IsEnabled="False">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE77B;" Foreground="#0078D4"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
 
-        <Grid Grid.Column="1" RowSpacing="20">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <StackPanel Grid.Row="0" Spacing="10">
-                <TextBlock x:Name="SelectedDateText" Text="选中日期的日程" Style="{StaticResource SubtitleTextBlockStyle}" FontWeight="Bold"/>
-                <ListView x:Name="EventsListView" BorderBrush="LightGray" BorderThickness="1" CornerRadius="4" Height="200">
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="0,5">
-                                <TextBlock Text="{Binding Summary}" FontWeight="SemiBold"/>
-                                <TextBlock Text="{Binding DisplayTime}" FontSize="12" Foreground="Gray"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
-            </StackPanel>
-
-            <StackPanel Grid.Row="1" Spacing="10">
-                <TextBlock Text="我的任务 (Google Tasks)" Style="{StaticResource SubtitleTextBlockStyle}" FontWeight="Bold"/>
-                <ListView x:Name="TasksListView" BorderBrush="LightGray" BorderThickness="1" CornerRadius="4" Height="200">
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <CheckBox Content="{Binding Title}" IsChecked="{Binding IsCompleted}" 
-                                      Checked="TaskCheckBox_Checked" Unchecked="TaskCheckBox_Unchecked"
-                                      Tag="{Binding Id}"/>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
-            </StackPanel>
-        </Grid>
+            <Frame x:Name="ContentFrame"/>
+        </NavigationView>
     </Grid>
 </Window>

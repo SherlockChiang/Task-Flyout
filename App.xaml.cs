@@ -2,6 +2,7 @@
 using Microsoft.UI.Xaml.Controls;
 using System.Linq;
 using System;
+using Task_Flyout.Services;
 
 namespace Task_Flyout
 {
@@ -21,9 +22,11 @@ namespace Task_Flyout
         public static FlyoutWindow? MyFlyoutWindow { get; private set; }
         public static MainWindow? MyMainWindow { get; private set; }
         public static Microsoft.UI.Dispatching.DispatcherQueue MainDispatcherQueue { get; private set; }
+        public SyncManager SyncManager { get; } = new SyncManager();
         public App()
         {
             this.InitializeComponent();
+            SyncManager.RegisterProvider(new GoogleSyncProvider());
         }
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)

@@ -18,6 +18,8 @@
         <None Remove="AppIcon.ico" />
         <None Remove="credentials.json" />
         <None Remove="FlyoutWindow.xaml" />
+        <None Remove="Views\CalendarPage.xaml" />
+        <None Remove="Views\SettingsPage.xaml" />
         </ItemGroup>
 
     <ItemGroup>
@@ -56,7 +58,19 @@
     </ItemGroup>
     
     <ItemGroup>
+      <Page Update="Views\SettingsPage.xaml">
+        <Generator>MSBuild:Compile</Generator>
+      </Page>
+    </ItemGroup>
+    
+    <ItemGroup>
       <Page Update="FlyoutWindow.xaml">
+        <Generator>MSBuild:Compile</Generator>
+      </Page>
+    </ItemGroup>
+    
+    <ItemGroup>
+      <Page Update="Views\CalendarPage.xaml">
         <Generator>MSBuild:Compile</Generator>
       </Page>
     </ItemGroup>
