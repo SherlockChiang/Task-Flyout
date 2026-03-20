@@ -360,5 +360,48 @@ namespace Task_Flyout.Views
                 }
             }
         }
+
+        public void OpenEditDialogFromExternal(AgendaItem item)
+        {
+            Action showDialog = async () =>
+            {
+                _itemBeingEdited = item;
+
+                EditTxtTitle.Text = item.Title;
+                EditTxtLocation.Text = item.Location;
+                EditTxtDescription.Text = item.Description;
+
+                if (DateTime.TryParse(item.DateKey, out var d)) EditDatePicker.Date = d;
+
+                var timePart = item.Subtitle?.Split('\n').LastOrDefault()?.Trim();
+                if (timePart == "全天" || string.IsNullOrEmpty(timePart))
+                {
+                    EditChkAllDay.IsChecked = true;
+                    EditStartTimePicker.SelectedTime = null;
+                    EditEndTimePicker.SelectedTime = null;
+                }
+                else
+                {
+                    EditChkAllDay.IsChecked = false;
+                    var times = timePart.Split('-');
+                    if (times.Length >= 1 && TimeSpan.TryParse(times[0].Trim(), out var st)) EditStartTimePicker.SelectedTime = st;
+                    if (times.Length >= 2 && TimeSpan.TryParse(times[1].Trim(), out var et)) EditEndTimePicker.SelectedTime = et;
+                }
+
+                // 强制绑定图层并安全显示 (捕获异常防止重复弹窗崩溃)
+                EditDialog.XamlRoot = this.XamlRoot;
+                try { await EditDialog.ShowAsync(); } catch { }
+            };
+
+            // 如果页面还没挂载到屏幕上，就等它 Loaded 完毕再执行弹窗
+            if (this.XamlRoot == null)
+            {
+                this.Loaded += (s, e) => showDialog();
+            }
+            else
+            {
+                showDialog();
+            }
+        }
     }
 }

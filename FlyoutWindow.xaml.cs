@@ -382,7 +382,7 @@ namespace Task_Flyout
 
             _appWindow.Resize(new SizeInt32(physicalWidth, physicalHeight));
 
-            int physicalMargin = (int)(32 * scaleFactor);
+            int physicalMargin = (int)(12 * scaleFactor);
             int targetX = workArea.X + workArea.Width - physicalWidth - physicalMargin;
             int targetY = workArea.Y + workArea.Height - physicalHeight - physicalMargin;
 
@@ -430,7 +430,23 @@ namespace Task_Flyout
         private void ChkAllDay_Unchecked(object sender, RoutedEventArgs e) { if (TimePanel != null) TimePanel.Visibility = Visibility.Visible; }
         private async void BtnRefresh_Click(object sender, RoutedEventArgs e) => await SyncAllDataAsync(silent: false);
 
-        // 👉 互斥显示：点开添加时，彻底隐藏日程容器，关闭时恢复
+        private void BtnSettings_Click(object sender, RoutedEventArgs e)
+        {
+            _appWindow.Hide();
+            App.OpenMainWindowInternal(win => win.NavigateToSettings());
+        }
+
+        private void AgendaListControl_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            if (e.ClickedItem is AgendaItem item)
+            {
+                if (item.Title != null && item.Title.Contains("没有安排")) return;
+
+                _appWindow.Hide();
+                App.OpenMainWindowInternal(win => win.NavigateToCalendarAndEdit(item));
+            }
+        }
+
         private void BtnToggleAddPanel_Click(object sender, RoutedEventArgs e)
         {
             if (AddPanel.Visibility == Visibility.Visible)

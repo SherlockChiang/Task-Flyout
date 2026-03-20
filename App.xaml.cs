@@ -6,7 +6,6 @@ using Task_Flyout.Services;
 
 namespace Task_Flyout
 {
-    // 💡 1. 把 RelayCommand 提出来，放在 App 类的外面！
     public class RelayCommand : System.Windows.Input.ICommand
     {
         private readonly System.Action _execute;
@@ -23,6 +22,7 @@ namespace Task_Flyout
         public static MainWindow? MyMainWindow { get; private set; }
         public static Microsoft.UI.Dispatching.DispatcherQueue MainDispatcherQueue { get; private set; }
         public SyncManager SyncManager { get; } = new SyncManager();
+
         public App()
         {
             this.InitializeComponent();
@@ -37,17 +37,16 @@ namespace Task_Flyout
             _trayIcon = (H.NotifyIcon.TaskbarIcon)Resources["MyTrayIcon"];
             _trayIcon.ForceCreate();
 
-            // 左键点击保持不变
             _trayIcon.LeftClickCommand = new RelayCommand(() => MyFlyoutWindow.ToggleFlyout());
 
-            // 👉 重点修改：改用 Command 属性
+            _trayIcon.DoubleClickCommand = new RelayCommand(() => OpenMainWindowInternal());
+
             if (_trayIcon.ContextFlyout is MenuFlyout menu)
             {
                 foreach (var item in menu.Items.OfType<MenuFlyoutItem>())
                 {
                     if (item.Text.Contains("主页面"))
                     {
-                        // 使用 Command 而非 Click 事件
                         item.Command = new RelayCommand(() => OpenMainWindowInternal());
                     }
                     else if (item.Text.Contains("退出"))
@@ -58,11 +57,8 @@ namespace Task_Flyout
             }
         }
 
-        // 👉 抽取逻辑到独立方法，确保逻辑清晰
-        private void OpenMainWindowInternal()
+        public static void OpenMainWindowInternal(Action<MainWindow> onOpened = null)
         {
-            System.Diagnostics.Debug.WriteLine("=== Command triggered: Opening MainWindow ===");
-
             MainDispatcherQueue.TryEnqueue(() =>
             {
                 if (MyMainWindow == null)
@@ -73,7 +69,8 @@ namespace Task_Flyout
 
                 MyMainWindow.Activate();
                 MyMainWindow.AppWindow.Show();
-                System.Diagnostics.Debug.WriteLine("=== MainWindow state: Shown ===");
+
+                onOpened?.Invoke(MyMainWindow);
             });
         }
 

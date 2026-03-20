@@ -3,6 +3,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
+using System.Linq;
+using Task_Flyout.Models;
 using Task_Flyout.Views; // 假设你会创建一个 Views 文件夹
 
 namespace Task_Flyout
@@ -39,6 +41,27 @@ namespace Task_Flyout
                         break;
                 }
             }
+        }
+        public void NavigateToSettings()
+        {
+            MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Settings");
+            ContentFrame.Navigate(typeof(Views.SettingsPage));
+        }
+
+        public void NavigateToCalendarAndEdit(AgendaItem itemToEdit)
+        {
+            var calendarItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault();
+            if (calendarItem != null) MainNav.SelectedItem = calendarItem;
+
+            ContentFrame.Navigate(typeof(Views.CalendarPage));
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (ContentFrame.Content is Views.CalendarPage calendarPage)
+                {
+                    calendarPage.OpenEditDialogFromExternal(itemToEdit);
+                }
+            });
         }
     }
 }
