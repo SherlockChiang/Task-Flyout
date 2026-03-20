@@ -6,12 +6,12 @@ using Microsoft.UI.Xaml.Media;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
 using Task_Flyout.Services;
-using System.IO;
-using System.Text.Json;
 
 namespace Task_Flyout.Views
 {
@@ -122,34 +122,18 @@ namespace Task_Flyout.Views
             catch { }
             finally { SyncProgress.IsActive = false; }
         }
-        // 👉 核心：无视层级的全局滚轮翻页
+
         private void Global_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
         {
-            // 只有当鼠标处于没有垂直滚动条的区域，或者按住 Ctrl (一般用于缩放但不常用) 时才翻页
-            // 如果右侧的 ListView 真的超长出现了滚动条，我们希望用户鼠标放在右侧时是滚动列表，而不是翻页
-            // 所以我们可以加一个判断：如果鼠标在日历网格区域，才进行翻页
-
             var point = e.GetCurrentPoint(CalendarGrid);
-
-            // 判断鼠标是否在左侧的日历网格区域内
             if (point.Position.X >= 0 && point.Position.X <= CalendarGrid.ActualWidth &&
                 point.Position.Y >= 0 && point.Position.Y <= CalendarGrid.ActualHeight)
             {
                 var delta = e.GetCurrentPoint(this).Properties.MouseWheelDelta;
-
-                if (delta > 0) BtnPrevMonth_Click(null, null); // 向上滚，上个月
-                else if (delta < 0) BtnNextMonth_Click(null, null); // 向下滚，下个月
-
-                e.Handled = true; // 告诉系统：我翻页了，底下的控件别滚动了
+                if (delta > 0) BtnPrevMonth_Click(null, null);
+                else if (delta < 0) BtnNextMonth_Click(null, null);
+                e.Handled = true;
             }
-        }
-        // 👉 核心：全局鼠标滚轮翻页
-        private void Grid_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
-        {
-            var delta = e.GetCurrentPoint((UIElement)sender).Properties.MouseWheelDelta;
-            if (delta > 0) BtnPrevMonth_Click(null, null); // 向上滚，上个月
-            else BtnNextMonth_Click(null, null);           // 向下滚，下个月
-            e.Handled = true;
         }
 
         private void CalendarGrid_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -160,28 +144,24 @@ namespace Task_Flyout.Views
                 wrapGrid.ItemHeight = Math.Max(80, e.NewSize.Height / 6.0);
             }
         }
-        private int _flyoutYear;
 
+        private int _flyoutYear;
         private void MonthYearFlyout_Opened(object sender, object e)
         {
-            // 每次点开弹出层时，初始化为当前的年份，并灌入 12 个月份
             _flyoutYear = _viewDate.Year;
             FlyoutYearText.Text = $"{_flyoutYear}年";
             FlyoutMonthGrid.ItemsSource = new string[] { "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月" };
         }
-
         private void FlyoutPrevYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = $"{--_flyoutYear}年";
         private void FlyoutNextYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = $"{++_flyoutYear}年";
-
         private void FlyoutMonthGrid_ItemClick(object sender, ItemClickEventArgs e)
         {
             if (e.ClickedItem is string monthStr)
             {
-                // 把 "3月" 这种文字拆出数字，并直接跳转！
                 int month = int.Parse(monthStr.Replace("月", ""));
                 _viewDate = new DateTime(_flyoutYear, month, 1);
                 LoadCalendar(_viewDate);
-                MonthYearFlyout.Hide(); // 选完月份，自动收起弹窗，体验拉满
+                MonthYearFlyout.Hide();
             }
         }
 
@@ -194,7 +174,6 @@ namespace Task_Flyout.Views
             if (e.ClickedItem is DayCellViewModel cell) UpdateSideBar(cell);
         }
 
-        // 👉 核心：瀑布流侧边栏（抓取自选中日期起的所有事件）
         private void UpdateSideBar(DayCellViewModel cell)
         {
             TxtSideBarDate.Text = cell.Date.ToString("M月d日起");
@@ -211,13 +190,13 @@ namespace Task_Flyout.Views
                 var sortedItems = _localCache.DayItems[dateKey].OrderBy(i => i.Subtitle == "全天" ? 0 : 1).ThenBy(i => i.Subtitle);
                 foreach (var item in sortedItems)
                 {
-                    // 为了保证列表里的副标题包含具体日期，克隆一个新对象做展示
                     var displayItem = new AgendaItem
                     {
                         Id = item.Id,
                         Title = item.Title,
-                        Subtitle = $"{DateTime.Parse(dateKey):M月d日}\n{item.Subtitle}", // 第一行日期，第二行时间
+                        Subtitle = $"{DateTime.Parse(dateKey):M月d日}\n{item.Subtitle}",
                         Location = item.Location,
+                        Description = item.Description,
                         IsEvent = item.IsEvent,
                         IsTask = item.IsTask,
                         IsCompleted = item.IsCompleted,
@@ -251,70 +230,133 @@ namespace Task_Flyout.Views
             }
         }
 
-        // 👉 核心：呼出编辑面板
-        private async void EditItem_Click(object sender, RoutedEventArgs e)
+        private void EditChkAllDay_Changed(object sender, RoutedEventArgs e)
         {
+            if (EditTimePanel != null)
+            {
+                EditTimePanel.Visibility = EditChkAllDay.IsChecked == true ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+        private async void AgendaCard_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            if (e.OriginalSource is FrameworkElement src && (src is CheckBox || src.Parent is CheckBox)) return;
+
             if ((sender as FrameworkElement)?.DataContext is AgendaItem item)
             {
+                if (item.Title != null && item.Title.Contains("没有安排")) return;
+
                 _itemBeingEdited = item;
                 EditTxtTitle.Text = item.Title;
                 EditTxtLocation.Text = item.Location;
+                EditTxtDescription.Text = item.Description;
+
                 if (DateTime.TryParse(item.DateKey, out var d)) EditDatePicker.Date = d;
 
+                // 智能提取已设置的时间 (支持解析 "14:00 - 15:30")
+                var timePart = item.Subtitle?.Split('\n').LastOrDefault()?.Trim();
+                if (timePart == "全天" || string.IsNullOrEmpty(timePart))
+                {
+                    EditChkAllDay.IsChecked = true;
+                    EditStartTimePicker.SelectedTime = null;
+                    EditEndTimePicker.SelectedTime = null;
+                }
+                else
+                {
+                    EditChkAllDay.IsChecked = false;
+                    var times = timePart.Split('-');
+
+                    if (times.Length >= 1 && TimeSpan.TryParse(times[0].Trim(), out var st))
+                        EditStartTimePicker.SelectedTime = st;
+
+                    if (times.Length >= 2 && TimeSpan.TryParse(times[1].Trim(), out var et))
+                        EditEndTimePicker.SelectedTime = et;
+                    else if (EditStartTimePicker.SelectedTime.HasValue)
+                        EditEndTimePicker.SelectedTime = EditStartTimePicker.SelectedTime.Value.Add(TimeSpan.FromHours(1));
+                }
+
+                EditDialog.XamlRoot = this.XamlRoot;
                 await EditDialog.ShowAsync();
             }
         }
 
-        // 👉 核心：应用编辑 (乐观 UI 更新机制，提供瞬时反馈)
-        private void EditDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private async void EditDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
         {
             if (_itemBeingEdited == null || string.IsNullOrWhiteSpace(EditTxtTitle.Text)) return;
 
             var newDateKey = EditDatePicker.Date.ToString("yyyy-MM-dd");
 
-            // 1. 本地缓存大搬迁与更新
+            TimeSpan? newStartTime = EditChkAllDay.IsChecked == true ? null : EditStartTimePicker.SelectedTime;
+            TimeSpan? newEndTime = EditChkAllDay.IsChecked == true ? null : EditEndTimePicker.SelectedTime;
+
+            string newSubtitleText = "全天";
+            if (newStartTime.HasValue && newEndTime.HasValue)
+                newSubtitleText = $"{newStartTime.Value:hh\\:mm} - {newEndTime.Value:hh\\:mm}";
+            else if (newStartTime.HasValue)
+                newSubtitleText = $"{newStartTime.Value:hh\\:mm}";
+
+            // 更新本地缓存
             if (_localCache.DayItems.TryGetValue(_itemBeingEdited.DateKey, out var oldList))
             {
                 var orig = oldList.FirstOrDefault(x => x.Id == _itemBeingEdited.Id);
                 if (orig != null)
                 {
-                    oldList.Remove(orig); // 从老日期移除
-
-                    // 应用新属性
+                    oldList.Remove(orig);
                     orig.Title = EditTxtTitle.Text;
                     orig.Location = EditTxtLocation.Text;
+                    orig.Description = EditTxtDescription.Text;
                     orig.DateKey = newDateKey;
+                    orig.Subtitle = newSubtitleText;
 
-                    // 加入新日期
                     if (!_localCache.DayItems.ContainsKey(newDateKey)) _localCache.DayItems[newDateKey] = new List<AgendaItem>();
                     _localCache.DayItems[newDateKey].Add(orig);
                 }
             }
-
-            // 2. 刷新界面
             LoadCalendar(_viewDate);
 
+            // 推送云端
+            if (_syncManager != null && !string.IsNullOrEmpty(_itemBeingEdited.Id))
+            {
+                try
+                {
+                    await _syncManager.UpdateItemAsync(
+                        _itemBeingEdited.Provider,
+                        _itemBeingEdited.Id,
+                        _itemBeingEdited.IsEvent,
+                        EditTxtTitle.Text,
+                        EditTxtLocation.Text,
+                        EditTxtDescription.Text,
+                        EditDatePicker.Date.DateTime,
+                        newStartTime,
+                        newEndTime // 👉 把结束时间传给云端
+                    );
+
+                    _ = SyncMonthDataAsync();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"更新失败: {ex.Message}");
+                }
+            }
         }
 
-        private async void DeleteItem_Click(object sender, RoutedEventArgs e)
+        private async void EditDialog_SecondaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
         {
-            if ((sender as FrameworkElement)?.DataContext is AgendaItem item)
+            if (_itemBeingEdited != null)
             {
-                if (_localCache.DayItems.TryGetValue(item.DateKey, out var list))
+                if (_localCache.DayItems.TryGetValue(_itemBeingEdited.DateKey, out var list))
                 {
-                    list.RemoveAll(x => x.Id == item.Id);
+                    list.RemoveAll(x => x.Id == _itemBeingEdited.Id);
                 }
                 LoadCalendar(_viewDate);
 
-                if (_syncManager != null && !string.IsNullOrEmpty(item.Id))
+                if (_syncManager != null && !string.IsNullOrEmpty(_itemBeingEdited.Id))
                 {
                     try
                     {
-                        await _syncManager.DeleteItemAsync(item.Provider, item.Id, item.IsEvent);
+                        await _syncManager.DeleteItemAsync(_itemBeingEdited.Provider, _itemBeingEdited.Id, _itemBeingEdited.IsEvent);
                     }
-                    catch
-                    {
-                    }
+                    catch { }
                 }
             }
         }

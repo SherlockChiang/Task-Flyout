@@ -65,6 +65,7 @@ namespace Task_Flyout.Services
                             Title = ev.Summary,
                             Subtitle = ev.Start?.DateTime == null ? "全天" : ev.Start.DateTime.Value.ToString("HH:mm"),
                             Location = ev.Location,
+                            Description = ev.Description,
                             IsEvent = true,
                             Provider = ProviderName,
                             DateKey = date.Value.ToString("yyyy-MM-dd")
@@ -98,6 +99,7 @@ namespace Task_Flyout.Services
                             IsEvent = false,
                             IsTask = true,
                             IsCompleted = isDone,
+                            Description = t.Notes,
                             Provider = ProviderName,
                             DateKey = taskDate.ToString("yyyy-MM-dd")
                         });
@@ -107,6 +109,44 @@ namespace Task_Flyout.Services
             } while (taskPageToken != null);
 
             return items;
+        }
+
+        public async Task UpdateItemAsync(string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime)
+        {
+            if (isEvent)
+            {
+                var ev = await CalendarSvc.Events.Get("primary", itemId).ExecuteAsync();
+                ev.Summary = title;
+                ev.Location = location;
+                ev.Description = description;
+
+                if (startTime.HasValue)
+                {
+                    DateTime exactStart = targetDate.Add(startTime.Value);
+                    // 👉 如果没填结束时间，默认会议长为1小时
+                    DateTime exactEnd = endTime.HasValue ? targetDate.Add(endTime.Value) : exactStart.AddHours(1);
+
+                    // 防呆：如果跨天了（比如结束时间早于开始时间），自动加一天
+                    if (exactEnd < exactStart) exactEnd = exactEnd.AddDays(1);
+
+                    ev.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = exactStart };
+                    ev.End = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = exactEnd };
+                }
+                else
+                {
+                    ev.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { Date = targetDate.ToString("yyyy-MM-dd") };
+                    ev.End = new Google.Apis.Calendar.v3.Data.EventDateTime { Date = targetDate.AddDays(1).ToString("yyyy-MM-dd") };
+                }
+                await CalendarSvc.Events.Update(ev, "primary", itemId).ExecuteAsync();
+            }
+            else
+            {
+                var task = await TasksSvc.Tasks.Get("@default", itemId).ExecuteAsync();
+                task.Title = title;
+                task.Notes = description; // Google Task 的备注叫 Notes
+                task.Due = targetDate.ToString("yyyy-MM-dd'T'00:00:00.000'Z'");
+                await TasksSvc.Tasks.Update(task, "@default", itemId).ExecuteAsync();
+            }
         }
 
         public async Task UpdateTaskStatusAsync(string taskId, bool isCompleted)

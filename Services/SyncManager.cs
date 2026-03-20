@@ -37,6 +37,12 @@ namespace Task_Flyout.Services
             if (provider != null) await provider.UpdateTaskStatusAsync(taskId, isCompleted);
         }
 
+        public async Task UpdateItemAsync(string providerName, string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime)
+        {
+            var provider = _providers.FirstOrDefault(p => p.ProviderName == providerName);
+            if (provider != null) await provider.UpdateItemAsync(itemId, isEvent, title, location, description, targetDate, startTime, endTime);
+        }
+
         public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, string providerName = null)
         {
             var provider = providerName != null ? _providers.FirstOrDefault(p => p.ProviderName == providerName) : _providers.FirstOrDefault();

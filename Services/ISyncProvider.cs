@@ -11,6 +11,7 @@ namespace Task_Flyout.Services
         Task EnsureAuthorizedAsync();
         Task<List<AgendaItem>> FetchDataAsync(DateTime min, DateTime max);
         Task UpdateTaskStatusAsync(string taskId, bool isCompleted);
+        Task UpdateItemAsync(string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime);
 
         Task CreateEventAsync(string title, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, bool isAllDay);
 
