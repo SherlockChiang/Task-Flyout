@@ -46,11 +46,11 @@ namespace Task_Flyout
             {
                 foreach (var item in menu.Items.OfType<MenuFlyoutItem>())
                 {
-                    if (item.Text.Contains("主页面"))
+                    if (item.Name == "MenuShowMain")
                     {
                         item.Command = new RelayCommand(() => OpenMainWindowInternal());
                     }
-                    else if (item.Text.Contains("退出"))
+                    else if (item.Name == "MenuExit")
                     {
                         item.Command = new RelayCommand(() => ExitAppInternal());
                     }

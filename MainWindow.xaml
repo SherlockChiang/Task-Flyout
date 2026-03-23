@@ -11,7 +11,7 @@
     <Grid>
         <NavigationView x:Name="MainNav" PaneDisplayMode="Left" IsSettingsVisible="True" ItemInvoked="MainNav_ItemInvoked">
             <NavigationView.MenuItems>
-                <NavigationViewItem Content="主日历视图" Tag="Calendar">
+                <NavigationViewItem x:Uid="MainWindow_NavCalendar" Content="主日历视图" Tag="Calendar">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE787;"/>
                     </NavigationViewItem.Icon>
@@ -24,28 +24,27 @@
                         <StackPanel Spacing="8">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE77B;" Foreground="#EA4335" FontSize="14"/>
-                                <TextBlock Text="Google 账户" FontWeight="SemiBold" FontSize="13"/>
+                                <TextBlock x:Uid="MainWindow_GoogleAccount" Text="Google 账户" FontWeight="SemiBold" FontSize="13"/>
                             </StackPanel>
-                            <Button x:Name="BtnConnectGoogle" Content="连接与授权" FontSize="12" HorizontalAlignment="Stretch" Click="BtnConnectGoogle_Click"/>
+                            <Button x:Uid="MainWindow_BtnConnectGoogle" x:Name="BtnConnectGoogle" Content="连接与授权" FontSize="12" HorizontalAlignment="Stretch" Click="BtnConnectGoogle_Click"/>
                             <StackPanel x:Name="PanelGoogleToggles" Spacing="4" Visibility="Collapsed">
-                                <ToggleSwitch x:Name="TglGoogleEvents" Header="显示日程" IsOn="True" MinWidth="0" Toggled="Filter_Toggled"/>
-                                <ToggleSwitch x:Name="TglGoogleTasks" Header="显示任务" IsOn="True" MinWidth="0" Toggled="Filter_Toggled"/>
+                                <ToggleSwitch x:Uid="MainWindow_TglGoogleEvents" x:Name="TglGoogleEvents" Header="显示日程" IsOn="True" MinWidth="0" Toggled="Filter_Toggled"/>
+                                <ToggleSwitch x:Uid="MainWindow_TglGoogleTasks" x:Name="TglGoogleTasks" Header="显示任务" IsOn="True" MinWidth="0" Toggled="Filter_Toggled"/>
                             </StackPanel>
                         </StackPanel>
 
                         <StackPanel Spacing="8">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE77B;" Foreground="#0078D4" FontSize="14"/>
-                                <TextBlock Text="Microsoft 账户" FontWeight="SemiBold" FontSize="13"/>
+                                <TextBlock x:Uid="MainWindow_MSAccount" Text="Microsoft 账户" FontWeight="SemiBold" FontSize="13"/>
                             </StackPanel>
-                            <Button x:Name="BtnConnectMS" Content="连接与授权" FontSize="12" HorizontalAlignment="Stretch" Click="BtnConnectMS_Click"/>
+                            <Button x:Uid="MainWindow_BtnConnectMS" x:Name="BtnConnectMS" Content="连接与授权" FontSize="12" HorizontalAlignment="Stretch" Click="BtnConnectMS_Click"/>
                             <StackPanel x:Name="PanelMSToggles" Spacing="4" Visibility="Collapsed">
-                                <ToggleSwitch x:Name="TglMSEvents" Header="显示日程" IsOn="True" MinWidth="0" Toggled="Filter_Toggled"/>
-                                <ToggleSwitch x:Name="TglMSTasks" Header="显示任务" IsOn="True" MinWidth="0" Toggled="Filter_Toggled"/>
+                                <ToggleSwitch x:Uid="MainWindow_TglMSEvents" x:Name="TglMSEvents" Header="显示日程" IsOn="True" MinWidth="0" Toggled="Filter_Toggled"/>
+                                <ToggleSwitch x:Uid="MainWindow_TglMSTasks" x:Name="TglMSTasks" Header="显示任务" IsOn="True" MinWidth="0" Toggled="Filter_Toggled"/>
                             </StackPanel>
                         </StackPanel>
-
-                        <Button Content="强制立即同步" HorizontalAlignment="Stretch" Click="BtnForceSync_Click"/>
+                        <Button x:Uid="MainWindow_BtnForceSync" Content="强制立即同步" HorizontalAlignment="Stretch" Click="BtnForceSync_Click"/>
                     </StackPanel>
                 </Grid>
             </NavigationView.PaneFooter>

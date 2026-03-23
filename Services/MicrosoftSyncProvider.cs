@@ -1,20 +1,21 @@
 ﻿using Azure.Core;
 using Azure.Identity;
 using Microsoft.Graph;
-using Microsoft.Graph.Models; // 必须引入 Graph.Models 才能使用 Event, TodoTask 等模型
+using Microsoft.Graph.Models; 
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
+using Microsoft.Windows.ApplicationModel.Resources;
 
 namespace Task_Flyout.Services
 {
     public class MicrosoftSyncProvider : ISyncProvider
     {
         public string ProviderName => "Microsoft";
-
+        private ResourceLoader _loader = new ResourceLoader();
         private GraphServiceClient _graphClient;
 
         private string _defaultTodoListId;
@@ -39,7 +40,7 @@ namespace Task_Flyout.Services
                     authRecord = await AuthenticationRecord.DeserializeAsync(stream);
                 }
             }
-            catch { /* 如果文件损坏则忽略，当作没登录过 */ }
+            catch {}
 
             var options = new InteractiveBrowserCredentialOptions
             {
@@ -48,7 +49,7 @@ namespace Task_Flyout.Services
                 AuthorityHost = AzureAuthorityHosts.AzurePublicCloud,
                 RedirectUri = new Uri("http://localhost"),
                 TokenCachePersistenceOptions = new TokenCachePersistenceOptions { Name = "TaskFlyout_MSAL_Cache" },
-                AuthenticationRecord = authRecord // 👉 关键：把钥匙插进去
+                AuthenticationRecord = authRecord 
             };
 
             var credential = new InteractiveBrowserCredential(options);
@@ -111,7 +112,6 @@ namespace Task_Flyout.Services
             await EnsureAuthorizedAsync();
             var results = new List<AgendaItem>();
 
-            // A. 拉取日历
             try
             {
                 var events = await _graphClient.Me.CalendarView.GetAsync(req =>
@@ -131,7 +131,7 @@ namespace Task_Flyout.Services
                         {
                             Id = ev.Id,
                             Title = ev.Subject,
-                            Subtitle = ev.IsAllDay == true ? "全天" : start.ToString("HH:mm"),
+                            Subtitle = ev.IsAllDay == true ? _loader.GetString("TextAllDay") : start.ToString("HH:mm"),
                             Location = ev.Location?.DisplayName ?? "",
                             Description = ev.BodyPreview ?? "",
                             IsEvent = true,
@@ -151,13 +151,11 @@ namespace Task_Flyout.Services
                 System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] 拉取日历其他错误: {ex.Message}");
             }
 
-            // B. 拉取待办任务
             try
             {
                 var listId = await GetDefaultTodoListIdAsync();
                 if (!string.IsNullOrEmpty(listId))
                 {
-                    // 关键修复 1：扩大请求数量，突破默认 50 个的限制！
                     var tasks = await _graphClient.Me.Todo.Lists[listId].Tasks.GetAsync(req =>
                     {
                         req.QueryParameters.Top = 500;
@@ -174,7 +172,6 @@ namespace Task_Flyout.Services
                             if (task.DueDateTime != null)
                             {
                                 DateTime.TryParse(task.DueDateTime.DateTime, out targetDate);
-                                // 关键修复 2：将微软返回的 UTC 时间转为本地时间，防止任务跑到“昨天”
                                 if (task.DueDateTime.TimeZone == "UTC" || task.DueDateTime.TimeZone == "Utc")
                                 {
                                     targetDate = targetDate.ToLocalTime();
@@ -194,7 +191,7 @@ namespace Task_Flyout.Services
                             {
                                 Id = task.Id,
                                 Title = task.Title,
-                                Subtitle = "任务",
+                                Subtitle = _loader.GetString("TextTask"),
                                 Description = task.Body?.Content ?? "",
                                 IsEvent = false,
                                 IsTask = true,
@@ -220,7 +217,6 @@ namespace Task_Flyout.Services
             return results;
         }
 
-        // 3. 实现 UpdateItemAsync (应用内编辑事件/任务同步到云端)
         public async Task UpdateItemAsync(string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime)
         {
             await EnsureAuthorizedAsync();
@@ -266,7 +262,6 @@ namespace Task_Flyout.Services
             }
         }
 
-        // 4. 实现 UpdateTaskStatusAsync (左侧勾选任务框)
         public async Task UpdateTaskStatusAsync(string taskId, bool isCompleted)
         {
             await EnsureAuthorizedAsync();
@@ -280,7 +275,6 @@ namespace Task_Flyout.Services
             await _graphClient.Me.Todo.Lists[listId].Tasks[taskId].PatchAsync(updateTask);
         }
 
-        // 5. 实现 CreateEventAsync (新建日程)
         public async Task CreateEventAsync(string title, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, bool isAllDay)
         {
             await EnsureAuthorizedAsync();
@@ -308,7 +302,6 @@ namespace Task_Flyout.Services
             await _graphClient.Me.Events.PostAsync(newEvent);
         }
 
-        // 6. 实现 CreateTaskAsync (新建任务)
         public async Task CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay)
         {
             await EnsureAuthorizedAsync();
@@ -323,7 +316,6 @@ namespace Task_Flyout.Services
             await _graphClient.Me.Todo.Lists[listId].Tasks.PostAsync(newTask);
         }
 
-        // 7. 实现 DeleteItemAsync (在弹窗里点击红色的删除)
         public async Task DeleteItemAsync(string itemId, bool isEvent)
         {
             await EnsureAuthorizedAsync();

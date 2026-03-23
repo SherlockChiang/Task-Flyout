@@ -9,6 +9,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
+using Microsoft.Windows.ApplicationModel.Resources;
 
 namespace Task_Flyout.Services
 {
@@ -17,7 +18,7 @@ namespace Task_Flyout.Services
         public string ProviderName => "Google";
         public CalendarService? CalendarSvc { get; private set; }
         public TasksService? TasksSvc { get; private set; }
-
+        private ResourceLoader _loader = new ResourceLoader();
         public async Task EnsureAuthorizedAsync()
         {
             if (CalendarSvc != null && TasksSvc != null) return;
@@ -37,7 +38,7 @@ namespace Task_Flyout.Services
             }
             catch (FileNotFoundException)
             {
-                throw new Exception("找不到 credentials.json");
+                throw new Exception(_loader.GetString("TextCredNotFound"));
             }
 
             CalendarSvc = new CalendarService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
@@ -63,7 +64,7 @@ namespace Task_Flyout.Services
                         items.Add(new AgendaItem
                         {
                             Title = ev.Summary,
-                            Subtitle = ev.Start?.DateTime == null ? "全天" : ev.Start.DateTime.Value.ToString("HH:mm"),
+                            Subtitle = ev.Start?.DateTime == null ? _loader.GetString("TextAllDay") : ev.Start.DateTime.Value.ToString("HH:mm"),
                             Location = ev.Location,
                             Description = ev.Description,
                             IsEvent = true,
@@ -95,7 +96,7 @@ namespace Task_Flyout.Services
                         {
                             Id = t.Id,
                             Title = t.Title,
-                            Subtitle = "任务",
+                            Subtitle = _loader.GetString("TextTask"),
                             IsEvent = false,
                             IsTask = true,
                             IsCompleted = isDone,

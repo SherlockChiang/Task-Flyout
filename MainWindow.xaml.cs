@@ -6,15 +6,19 @@ using System;
 using System.Linq;
 using Task_Flyout.Models;
 using Task_Flyout.Views;
-using Windows.Storage; // 引入 LocalSettings
+using Windows.Storage;
+using Microsoft.Windows.ApplicationModel.Resources;
 
 namespace Task_Flyout
 {
     public sealed partial class MainWindow : Window
     {
+        private ResourceLoader _loader;
         public MainWindow()
         {
             this.InitializeComponent();
+            _loader = new ResourceLoader(); 
+
             SystemBackdrop = new MicaBackdrop() { Kind = MicaKind.BaseAlt };
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(null);
@@ -27,10 +31,9 @@ namespace Task_Flyout
 
             var calendarItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault();
             if (calendarItem != null) MainNav.SelectedItem = calendarItem;
-            ContentFrame.Navigate(typeof(CalendarPage));
+            ContentFrame.Navigate(typeof(Views.CalendarPage));
         }
 
-        // 👉 加载：按是否已连接，决定显示大按钮还是小开关
         private void LoadAccountStates()
         {
             var settings = ApplicationData.Current.LocalSettings;
@@ -50,46 +53,44 @@ namespace Task_Flyout
             TglMSTasks.IsOn = settings.Values["ShowMSTasks"] as bool? ?? true;
         }
 
-        // 👉 交互：点击授权，成功后打上已连接标签并变身
         private async void BtnConnectGoogle_Click(object sender, RoutedEventArgs e)
         {
-            BtnConnectGoogle.Content = "授权中...";
+            BtnConnectGoogle.Content = _loader.GetString("TextAuthorizing"); // 👉 替换
             try
             {
                 if (App.Current is App app)
                 {
-                    // 显式触发授权并等待弹窗结果
                     var provider = app.SyncManager.Providers.FirstOrDefault(p => p.ProviderName == "Google");
                     if (provider != null) await provider.EnsureAuthorizedAsync();
                     await app.SyncManager.GetAllDataAsync(DateTime.Today, DateTime.Today.AddDays(1));
                 }
                 Windows.Storage.ApplicationData.Current.LocalSettings.Values["IsGoogleConnected"] = true;
                 LoadAccountStates();
-                if (ContentFrame.Content is CalendarPage page) page.ForceSync();
+                if (ContentFrame.Content is Views.CalendarPage page) page.ForceSync();
             }
-            catch { BtnConnectGoogle.Content = "授权失败"; }
+            catch { BtnConnectGoogle.Content = _loader.GetString("TextAuthFailed"); } // 👉 替换
         }
 
         private async void BtnConnectMS_Click(object sender, RoutedEventArgs e)
         {
-            BtnConnectMS.Content = "授权中...";
+            BtnConnectMS.Content = _loader.GetString("TextAuthorizing"); // 👉 替换
             try
             {
                 if (App.Current is App app)
                 {
                     var provider = app.SyncManager.Providers.FirstOrDefault(p => p.ProviderName == "Microsoft");
-                    if (provider == null) throw new Exception("在 App.xaml.cs 中未注册 MicrosoftSyncProvider！");
+                    if (provider == null) throw new Exception("未注册 MicrosoftSyncProvider");
 
                     await provider.EnsureAuthorizedAsync();
                     await app.SyncManager.GetAllDataAsync(DateTime.Today, DateTime.Today.AddDays(1));
                 }
                 Windows.Storage.ApplicationData.Current.LocalSettings.Values["IsMSConnected"] = true;
                 LoadAccountStates();
-                if (ContentFrame.Content is CalendarPage page) page.ForceSync();
+                if (ContentFrame.Content is Views.CalendarPage page) page.ForceSync();
             }
             catch (Exception ex)
             {
-                BtnConnectMS.Content = "授权失败";
+                BtnConnectMS.Content = _loader.GetString("TextAuthFailed"); // 👉 替换
                 System.Diagnostics.Debug.WriteLine($"============== 微软授权失败 ==============");
                 System.Diagnostics.Debug.WriteLine(ex.ToString());
             }

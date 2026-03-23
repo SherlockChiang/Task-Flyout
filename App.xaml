@@ -15,13 +15,13 @@
                 ToolTipText="Task Flyout">
                 <tb:TaskbarIcon.ContextFlyout>
                     <MenuFlyout x:Name="TrayMenu">
-                        <MenuFlyoutItem x:Name="MenuShowMain" Text="显示主页面">
+                        <MenuFlyoutItem x:Uid="TrayMenu_ShowMain" x:Name="MenuShowMain" Text="显示主页面">
                             <MenuFlyoutItem.Icon>
                                 <SymbolIcon Symbol="Setting"/>
                             </MenuFlyoutItem.Icon>
                         </MenuFlyoutItem>
                         <MenuFlyoutSeparator/>
-                        <MenuFlyoutItem x:Name="MenuExit" Text="退出">
+                        <MenuFlyoutItem x:Uid="TrayMenu_Exit" x:Name="MenuExit" Text="退出">
                             <MenuFlyoutItem.Icon>
                                 <SymbolIcon Symbol="Cancel"/>
                             </MenuFlyoutItem.Icon>

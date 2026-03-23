@@ -37,7 +37,6 @@ namespace Task_Flyout.Models
             }
         }
 
-        // 👉 新增：详情/备注字段，并实现双向绑定通知
         private string _description;
         public string Description
         {
@@ -55,7 +54,6 @@ namespace Task_Flyout.Models
 
         public Microsoft.UI.Xaml.Visibility HasLocation => string.IsNullOrWhiteSpace(Location) ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
 
-        // 👉 新增：控制详情 UI 显隐的属性，保持与 HasLocation 一致的代码风格
         public Microsoft.UI.Xaml.Visibility HasDescription => string.IsNullOrWhiteSpace(Description) ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
 
 

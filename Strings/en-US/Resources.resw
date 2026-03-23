@@ -1,0 +1,201 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+	<data name="SettingsPage_Title.Text" xml:space="preserve"><value>Settings</value></data>
+	<data name="SettingsPage_Appearance.Text" xml:space="preserve"><value>Appearance &amp; Language</value></data>
+	<data name="SettingsPage_ThemeMode.Header" xml:space="preserve"><value>App Theme</value></data>
+	<data name="Theme_System.Content" xml:space="preserve"><value>System Default</value></data>
+	<data name="Theme_Light.Content" xml:space="preserve"><value>Light</value></data>
+	<data name="Theme_Dark.Content" xml:space="preserve"><value>Dark</value></data>
+	<data name="SettingsPage_Language.Header" xml:space="preserve"><value>App Language (Requires Restart)</value></data>
+	<data name="Lang_System.Content" xml:space="preserve"><value>System Default</value></data>
+	<data name="RestartRequired_Title" xml:space="preserve"><value>Restart Required</value></data>
+	<data name="RestartRequired_Content" xml:space="preserve"><value>Please restart the app to fully apply the language changes.</value></data>
+	<data name="RestartRequired_Close" xml:space="preserve"><value>Got it</value></data>
+	<data name="CalendarPage_BtnToday.Content" xml:space="preserve"><value>Today</value></data>
+	<data name="CalendarPage_Sun.Text" xml:space="preserve"><value>Sun</value></data>
+	<data name="CalendarPage_Mon.Text" xml:space="preserve"><value>Mon</value></data>
+	<data name="CalendarPage_Tue.Text" xml:space="preserve"><value>Tue</value></data>
+	<data name="CalendarPage_Wed.Text" xml:space="preserve"><value>Wed</value></data>
+	<data name="CalendarPage_Thu.Text" xml:space="preserve"><value>Thu</value></data>
+	<data name="CalendarPage_Fri.Text" xml:space="preserve"><value>Fri</value></data>
+	<data name="CalendarPage_Sat.Text" xml:space="preserve"><value>Sat</value></data>
+	<data name="CalendarPage_AllAgendas.Text" xml:space="preserve"><value>All Agendas</value></data>
+	<data name="CalendarDialog.Title" xml:space="preserve"><value>Edit Event / Task</value></data>
+	<data name="CalendarDialog.PrimaryButtonText" xml:space="preserve"><value>Save</value></data>
+	<data name="CalendarDialog.SecondaryButtonText" xml:space="preserve"><value>Delete</value></data>
+	<data name="CalendarDialog.CloseButtonText" xml:space="preserve"><value>Cancel</value></data>
+	<data name="CalendarDialog_TitleInput.Header" xml:space="preserve"><value>Title</value></data>
+	<data name="CalendarDialog_TitleInput.PlaceholderText" xml:space="preserve"><value>Event / Task title</value></data>
+	<data name="CalendarDialog_LocationInput.Header" xml:space="preserve"><value>Location (Optional)</value></data>
+	<data name="CalendarDialog_LocationInput.PlaceholderText" xml:space="preserve"><value>Add location</value></data>
+	<data name="CalendarDialog_DescInput.Header" xml:space="preserve"><value>Description (Optional)</value></data>
+	<data name="CalendarDialog_DescInput.PlaceholderText" xml:space="preserve"><value>Add details...</value></data>
+	<data name="CalendarDialog_DateInput.Header" xml:space="preserve"><value>Date</value></data>
+	<data name="CalendarDialog_AllDayInput.Content" xml:space="preserve"><value>All day</value></data>
+	<data name="CalendarDialog_StartTimeInput.Header" xml:space="preserve"><value>Start time</value></data>
+	<data name="CalendarDialog_EndTimeInput.Header" xml:space="preserve"><value>End time</value></data>
+	<data name="TextAllDay" xml:space="preserve"><value>All Day</value></data>
+	<data name="TextNoAgendaTitle" xml:space="preserve"><value>No upcoming events</value></data>
+	<data name="TextNoAgendaSub" xml:space="preserve"><value>Take a break</value></data>
+	<data name="TextOnwards" xml:space="preserve"><value>onwards</value></data>
+	<data name="TextTask" xml:space="preserve"><value>Task</value></data>
+	<data name="TextSyncing" xml:space="preserve"><value>Syncing...</value></data>
+	<data name="TextSyncFailed" xml:space="preserve"><value>Sync failed</value></data>
+	<data name="TextAddFailed" xml:space="preserve"><value>❌ Failed to add task</value></data>
+	<data name="TextUpcoming" xml:space="preserve"><value>Upcoming</value></data>
+	<data name="TextTomorrow" xml:space="preserve"><value>Tomorrow</value></data>
+	<data name="TextDayAfterTomorrow" xml:space="preserve"><value>The day after tomorrow</value></data>
+	<data name="TextFullSyncTitle" xml:space="preserve"><value>Full Syncing...</value></data>
+	<data name="TextFullSyncSub" xml:space="preserve"><value>Fetching all your events and tasks</value></data>
+	<data name="MainWindow_NavCalendar.Content" xml:space="preserve"><value>Main Calendar</value></data>
+	<data name="MainWindow_GoogleAccount.Text" xml:space="preserve"><value>Google Account</value></data>
+	<data name="MainWindow_BtnConnectGoogle.Content" xml:space="preserve"><value>Connect &amp; Authorize</value></data>
+	<data name="MainWindow_TglGoogleEvents.Header" xml:space="preserve"><value>Show Events</value></data>
+	<data name="MainWindow_TglGoogleTasks.Header" xml:space="preserve"><value>Show Tasks</value></data>
+	<data name="MainWindow_MSAccount.Text" xml:space="preserve"><value>Microsoft Account</value></data>
+	<data name="MainWindow_BtnConnectMS.Content" xml:space="preserve"><value>Connect &amp; Authorize</value></data>
+	<data name="MainWindow_TglMSEvents.Header" xml:space="preserve"><value>Show Events</value></data>
+	<data name="MainWindow_TglMSTasks.Header" xml:space="preserve"><value>Show Tasks</value></data>
+	<data name="MainWindow_BtnForceSync.Content" xml:space="preserve"><value>Force Sync Now</value></data>
+	<data name="TextAuthorizing" xml:space="preserve"><value>Authorizing...</value></data>
+	<data name="TextAuthFailed" xml:space="preserve"><value>Auth Failed</value></data>
+	<data name="Flyout_BtnGoToToday.ToolTipService.ToolTip" xml:space="preserve"><value>Go to Today</value></data>
+	<data name="Flyout_BtnSettings.ToolTipService.ToolTip" xml:space="preserve"><value>Settings</value></data>
+	<data name="Flyout_BtnRefresh.ToolTipService.ToolTip" xml:space="preserve"><value>Force cloud sync</value></data>
+	<data name="Flyout_TextAdd.Text" xml:space="preserve"><value>Add</value></data>
+	<data name="Flyout_TextNew.Text" xml:space="preserve"><value>New</value></data>
+	<data name="Flyout_RadioEvent.Content" xml:space="preserve"><value>Event</value></data>
+	<data name="Flyout_RadioTask.Content" xml:space="preserve"><value>Task</value></data>
+	<data name="Flyout_TxtNewTitle.PlaceholderText" xml:space="preserve"><value>Enter title...</value></data>
+	<data name="Flyout_TxtLocation.PlaceholderText" xml:space="preserve"><value>Add location (optional)</value></data>
+	<data name="Flyout_ChkAllDay.Content" xml:space="preserve"><value>All day</value></data>
+	<data name="Flyout_TimePickerStart.Header" xml:space="preserve"><value>Start time</value></data>
+	<data name="Flyout_TxtTimeSeparator.Text" xml:space="preserve"><value>to</value></data>
+	<data name="Flyout_TimePickerEnd.Header" xml:space="preserve"><value>End time</value></data>
+	<data name="Flyout_BtnCancel.Content" xml:space="preserve"><value>Cancel</value></data>
+	<data name="Flyout_BtnSave.Content" xml:space="preserve"><value>Save</value></data>
+	<data name="TrayMenu_ShowMain.Text" xml:space="preserve"><value>Show Main Window</value></data>
+	<data name="TrayMenu_Exit.Text" xml:space="preserve"><value>Exit</value></data>
+	<data name="TextWelcomeTitle" xml:space="preserve"><value>Welcome to Task Flyout</value></data>
+	<data name="TextWelcomeSub" xml:space="preserve"><value>Double click tray icon to open settings and link accounts</value></data>
+	<data name="TextStartTime" xml:space="preserve"><value>Start time</value></data>
+	<data name="TextDueTime" xml:space="preserve"><value>Due time</value></data>
+	<data name="TextCredNotFound" xml:space="preserve"><value>credentials.json not found. Please check your configuration!</value></data>
+</root>

@@ -12,6 +12,8 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
 using Task_Flyout.Services;
+using Microsoft.Windows.ApplicationModel.Resources;
+using System.Globalization;
 
 namespace Task_Flyout.Views
 {
@@ -22,11 +24,9 @@ namespace Task_Flyout.Views
         {
             string provider = (value as string)?.ToLower() ?? "";
 
-            // 莫奈睡莲蓝
             if (provider.Contains("google"))
                 return new SolidColorBrush(Windows.UI.Color.FromArgb(255, 89, 118, 186));
 
-            // 莫奈干草堆黄 (也适配微软 Todo 任务)
             if (provider.Contains("microsoft") || provider.Contains("todo"))
                 return new SolidColorBrush(Windows.UI.Color.FromArgb(255, 230, 175, 115));
 
@@ -35,7 +35,6 @@ namespace Task_Flyout.Views
         public object ConvertBack(object v, Type t, object p, string l) => throw new NotImplementedException();
     }
 
-    // 莫奈文字反色转换器 (深蓝背景配白字，浅黄背景配黑字)
     public class ProviderToTextBrushConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
@@ -55,7 +54,6 @@ namespace Task_Flyout.Views
         public object ConvertBack(object v, Type t, object p, string l) => throw new NotImplementedException();
     }
 
-    // 修复 Bug：原版代码这里错误地复制了 Provider 逻辑，现已修正为判断 Bool
     public class BoolToTodayBrushConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
@@ -101,6 +99,7 @@ namespace Task_Flyout.Views
         private SyncManager _syncManager;
         private AppCache _localCache = new();
         private AgendaItem _itemBeingEdited;
+        private ResourceLoader _loader;
 
         private readonly string CacheFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TaskFlyout", "local_cache_winui3.json");
 
@@ -111,6 +110,7 @@ namespace Task_Flyout.Views
         public CalendarPage()
         {
             this.InitializeComponent();
+            _loader = new ResourceLoader();
             if (Application.Current is App app) _syncManager = app.SyncManager;
             this.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(Global_PointerWheelChanged), handledEventsToo: true);
             LoadCache();
@@ -131,7 +131,7 @@ namespace Task_Flyout.Views
             if (BtnMonthYear == null || CalendarGrid == null) return;
 
             DayCells.Clear();
-            BtnMonthYear.Content = date.ToString("yyyy年 M月");
+            BtnMonthYear.Content = date.ToString("Y", CultureInfo.CurrentUICulture);
 
             DateTime firstOfEntry = new DateTime(date.Year, date.Month, 1);
             int offset = (int)firstOfEntry.DayOfWeek;
@@ -140,7 +140,6 @@ namespace Task_Flyout.Views
             int daysInMonth = DateTime.DaysInMonth(date.Year, date.Month);
             int totalCells = offset + daysInMonth;
 
-            // 性能优化：动态计算需要生成的格子数（通常是 35 或 42 天），摆脱死板的 42 循环
             int cellsToGenerate = (int)Math.Ceiling(totalCells / 7.0) * 7;
 
             for (int i = 0; i < cellsToGenerate; i++)
@@ -256,8 +255,10 @@ namespace Task_Flyout.Views
         private void MonthYearFlyout_Opened(object sender, object e)
         {
             _flyoutYear = _viewDate.Year;
-            FlyoutYearText.Text = $"{_flyoutYear}年";
-            FlyoutMonthGrid.ItemsSource = new string[] { "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月" };
+            FlyoutYearText.Text = _flyoutYear.ToString();
+
+            FlyoutMonthGrid.ItemsSource = CultureInfo.CurrentUICulture.DateTimeFormat.MonthNames
+                .Where(m => !string.IsNullOrEmpty(m)).ToArray();
         }
         private void FlyoutPrevYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = $"{--_flyoutYear}年";
         private void FlyoutNextYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = $"{++_flyoutYear}年";
@@ -265,7 +266,8 @@ namespace Task_Flyout.Views
         {
             if (e.ClickedItem is string monthStr)
             {
-                int month = int.Parse(monthStr.Replace("月", ""));
+                var months = CultureInfo.CurrentUICulture.DateTimeFormat.MonthNames;
+                int month = Array.IndexOf(months, monthStr) + 1;
                 _viewDate = new DateTime(_flyoutYear, month, 1);
                 LoadCalendar(_viewDate);
                 MonthYearFlyout.Hide();
@@ -283,7 +285,7 @@ namespace Task_Flyout.Views
 
         private void UpdateSideBar(DayCellViewModel cell)
         {
-            TxtSideBarDate.Text = cell.Date.ToString("M月d日起");
+            TxtSideBarDate.Text = cell.Date.ToString("M", CultureInfo.CurrentUICulture) + " " + _loader.GetString("TextOnwards");
             SelectedDayItems.Clear();
 
             string selectedDateKey = cell.Date.ToString("yyyy-MM-dd");
@@ -304,7 +306,7 @@ namespace Task_Flyout.Views
                     {
                         Id = item.Id,
                         Title = item.Title,
-                        Subtitle = $"{DateTime.Parse(dateKey):M月d日}\n{item.Subtitle}",
+                        Subtitle = $"{DateTime.Parse(dateKey).ToString("M", CultureInfo.CurrentUICulture)}\n{(item.Subtitle == "全天" ? _loader.GetString("TextAllDay") : item.Subtitle)}",
                         Location = item.Location,
                         Description = item.Description,
                         IsEvent = item.IsEvent,
@@ -315,6 +317,15 @@ namespace Task_Flyout.Views
                     };
                     SelectedDayItems.Add(displayItem);
                     hasItems = true;
+                }
+                if (!hasItems)
+                {
+                    SelectedDayItems.Add(new AgendaItem
+                    {
+                        Title = _loader.GetString("TextNoAgendaTitle"),
+                        Subtitle = "-",
+                        IsEvent = true
+                    });
                 }
             }
 

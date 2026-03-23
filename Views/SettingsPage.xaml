@@ -6,17 +6,19 @@
 
     <ScrollViewer Padding="40">
         <StackPanel Spacing="28" MaxWidth="800" HorizontalAlignment="Left">
-            <TextBlock Text="设置" Style="{StaticResource TitleTextBlockStyle}"/>
+            <TextBlock x:Uid="SettingsPage_Title" Text="设置" Style="{StaticResource TitleTextBlockStyle}"/>
 
             <StackPanel Spacing="8">
-                <TextBlock Text="外观与语言" FontWeight="SemiBold" FontSize="16"/>
-                <ComboBox x:Name="ThemeComboBox" Header="应用主题" SelectedIndex="0" Width="200" SelectionChanged="ThemeComboBox_SelectionChanged">
-                    <ComboBoxItem Content="跟随系统"/>
-                    <ComboBoxItem Content="浅色"/>
-                    <ComboBoxItem Content="深色"/>
+                <TextBlock x:Uid="SettingsPage_Appearance" Text="外观与语言" FontWeight="SemiBold" FontSize="16"/>
+
+                <ComboBox x:Uid="SettingsPage_ThemeMode" x:Name="ThemeComboBox" Header="应用主题" SelectedIndex="0" Width="200" SelectionChanged="ThemeComboBox_SelectionChanged">
+                    <ComboBoxItem x:Uid="Theme_System" Content="跟随系统"/>
+                    <ComboBoxItem x:Uid="Theme_Light" Content="浅色"/>
+                    <ComboBoxItem x:Uid="Theme_Dark" Content="深色"/>
                 </ComboBox>
-                <ComboBox x:Name="LanguageComboBox" Header="界面语言 (重启生效)" SelectedIndex="0" Width="200" SelectionChanged="LanguageComboBox_SelectionChanged">
-                    <ComboBoxItem Content="跟随系统"/>
+
+                <ComboBox x:Uid="SettingsPage_Language" x:Name="LanguageComboBox" Header="界面语言 (重启生效)" SelectedIndex="0" Width="200" SelectionChanged="LanguageComboBox_SelectionChanged">
+                    <ComboBoxItem x:Uid="Lang_System" Content="跟随系统"/>
                     <ComboBoxItem Content="简体中文" Tag="zh-Hans"/>
                     <ComboBoxItem Content="English" Tag="en-US"/>
                 </ComboBox>
