@@ -3,6 +3,8 @@ using Microsoft.UI.Xaml.Controls;
 using System.Linq;
 using System;
 using Task_Flyout.Services;
+using Windows.UI.ViewManagement;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace Task_Flyout
 {
@@ -18,6 +20,7 @@ namespace Task_Flyout
     public partial class App : Application
     {
         private H.NotifyIcon.TaskbarIcon? _trayIcon;
+        private UISettings _uiSettings;
         public static FlyoutWindow? MyFlyoutWindow { get; private set; }
         public static MainWindow? MyMainWindow { get; private set; }
         public static Microsoft.UI.Dispatching.DispatcherQueue MainDispatcherQueue { get; private set; }
@@ -36,6 +39,9 @@ namespace Task_Flyout
             MyFlyoutWindow = new FlyoutWindow();
 
             _trayIcon = (H.NotifyIcon.TaskbarIcon)Resources["MyTrayIcon"];
+            _uiSettings = new UISettings();
+            _uiSettings.ColorValuesChanged += UiSettings_ColorValuesChanged;
+            UpdateTrayIconTheme();
             _trayIcon.ForceCreate();
 
             _trayIcon.LeftClickCommand = new RelayCommand(() => MyFlyoutWindow.ToggleFlyout());
@@ -56,6 +62,23 @@ namespace Task_Flyout
                     }
                 }
             }
+        }
+
+        private void UiSettings_ColorValuesChanged(UISettings sender, object args)
+        {
+            MainDispatcherQueue.TryEnqueue(() => UpdateTrayIconTheme());
+        }
+
+        private void UpdateTrayIconTheme()
+        {
+            if (_trayIcon == null) return;
+
+            var backgroundColor = _uiSettings.GetColorValue(UIColorType.Background);
+            bool isDarkTheme = backgroundColor == Windows.UI.Color.FromArgb(255, 0, 0, 0);
+
+            string iconName = isDarkTheme ? "TrayIcon_Dark.ico" : "TrayIcon_Light.ico";
+
+            _trayIcon.IconSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri($"ms-appx:///Assets/{iconName}"));
         }
 
         public static void OpenMainWindowInternal(Action<MainWindow> onOpened = null)
