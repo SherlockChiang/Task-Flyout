@@ -9,7 +9,7 @@ namespace Task_Flyout.Services
     public class SyncManager
     {
         private readonly List<ISyncProvider> _providers = new();
-
+        public IReadOnlyList<ISyncProvider> Providers => _providers;
         public void RegisterProvider(ISyncProvider provider) => _providers.Add(provider);
 
         public async Task<List<AgendaItem>> GetAllDataAsync(DateTime min, DateTime max)

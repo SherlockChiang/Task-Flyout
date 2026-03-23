@@ -30,9 +30,9 @@
         <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
         <Content Include="Assets\StoreLogo.png" />
         <Content Include="Assets\Wide310x150Logo.scale-200.png" />
-        <Content Include="credentials.json">
+        <EmbeddedResource Include="credentials.json">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </Content>
+        </EmbeddedResource>
     </ItemGroup>
 
     <ItemGroup>
@@ -44,9 +44,11 @@
     </ItemGroup>
     
     <ItemGroup>
+        <PackageReference Include="Azure.Identity" Version="1.19.0" />
         <PackageReference Include="Google.Apis.Calendar.v3" Version="1.73.0.4063" />
         <PackageReference Include="Google.Apis.Tasks.v1" Version="1.72.0.3958" />
         <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.1" />
+        <PackageReference Include="Microsoft.Graph" Version="5.103.0" />
         <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7705" />
         <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260209005" />
     </ItemGroup>

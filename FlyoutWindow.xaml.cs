@@ -73,8 +73,10 @@ namespace Task_Flyout
             Microsoft.UI.WindowId windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
             _appWindow = AppWindow.GetFromWindowId(windowId);
 
-            _syncManager = new SyncManager();
-            _syncManager.RegisterProvider(new GoogleSyncProvider());
+            if (Application.Current is App app)
+            {
+                _syncManager = app.SyncManager;
+            }
 
             ConfigureFlyoutStyle();
             LoadCache();
@@ -203,7 +205,17 @@ namespace Task_Flyout
             string key = date.ToString("yyyy-MM-dd");
             var tempAgenda = new List<AgendaItem>();
 
-            if (_localCache.DayItems.ContainsKey(key) && _localCache.DayItems[key].Count > 0)
+            if (_localCache.DayItems.Count == 0)
+            {
+                tempAgenda.Add(new AgendaItem
+                {
+                    Title = "欢迎使用 Task Flyout",
+                    Subtitle = "请双击右下角托盘图标打开主页面配置账号",
+                    IsEvent = false,
+                    IsTask = false
+                });
+            }
+            else if (_localCache.DayItems.ContainsKey(key) && _localCache.DayItems[key].Count > 0)
             {
                 tempAgenda.AddRange(_localCache.DayItems[key]);
             }

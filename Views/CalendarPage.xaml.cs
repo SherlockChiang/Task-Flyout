@@ -15,13 +15,58 @@ using Task_Flyout.Services;
 
 namespace Task_Flyout.Views
 {
+    // 莫奈背景色转换器
+    public class ProviderToBrushConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            string provider = (value as string)?.ToLower() ?? "";
+
+            // 莫奈睡莲蓝
+            if (provider.Contains("google"))
+                return new SolidColorBrush(Windows.UI.Color.FromArgb(255, 89, 118, 186));
+
+            // 莫奈干草堆黄 (也适配微软 Todo 任务)
+            if (provider.Contains("microsoft") || provider.Contains("todo"))
+                return new SolidColorBrush(Windows.UI.Color.FromArgb(255, 230, 175, 115));
+
+            return new SolidColorBrush(Windows.UI.Color.FromArgb(255, 150, 150, 150));
+        }
+        public object ConvertBack(object v, Type t, object p, string l) => throw new NotImplementedException();
+    }
+
+    // 莫奈文字反色转换器 (深蓝背景配白字，浅黄背景配黑字)
+    public class ProviderToTextBrushConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            string provider = (value as string)?.ToLower() ?? "";
+
+            // Google 深蓝色底 -> 返回白色文字
+            if (provider.Contains("google"))
+                return new SolidColorBrush(Microsoft.UI.Colors.White);
+
+            // Microsoft 浅黄色底 -> 返回黑色文字
+            if (provider.Contains("microsoft") || provider.Contains("todo"))
+                return new SolidColorBrush(Microsoft.UI.Colors.Black);
+
+            return new SolidColorBrush(Microsoft.UI.Colors.White);
+        }
+        public object ConvertBack(object v, Type t, object p, string l) => throw new NotImplementedException();
+    }
+
+    // 修复 Bug：原版代码这里错误地复制了 Provider 逻辑，现已修正为判断 Bool
     public class BoolToTodayBrushConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
         {
             if (value is bool isToday && isToday)
+            {
+                // 给“今天”一个轻微的底色强调，如取系统淡强调色
                 if (Application.Current.Resources.TryGetValue("SystemAccentColorLight3", out var res))
                     return new SolidColorBrush((Windows.UI.Color)res);
+            }
+            // 正常格子返回透明，消除空色块
             return new SolidColorBrush(Microsoft.UI.Colors.Transparent);
         }
         public object ConvertBack(object v, Type t, object p, string l) => throw new NotImplementedException();
@@ -40,6 +85,13 @@ namespace Task_Flyout.Views
         public object ConvertBack(object v, Type t, object p, string l) => throw new NotImplementedException();
     }
 
+    public class TaskCompletedOpacityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language) =>
+            (value is bool isCompleted && isCompleted) ? 0.5 : 1.0; // 完成后透明度变为50%(变灰)
+        public object ConvertBack(object v, Type t, object p, string l) => throw new NotImplementedException();
+    }
+
     public sealed partial class CalendarPage : Page
     {
         public ObservableCollection<DayCellViewModel> DayCells { get; set; } = new();
@@ -52,13 +104,20 @@ namespace Task_Flyout.Views
 
         private readonly string CacheFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TaskFlyout", "local_cache_winui3.json");
 
+        private void TaskCheckBox_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            e.Handled = true;
+        }
         public CalendarPage()
         {
             this.InitializeComponent();
             if (Application.Current is App app) _syncManager = app.SyncManager;
             this.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(Global_PointerWheelChanged), handledEventsToo: true);
             LoadCache();
-            LoadCalendar(_viewDate);
+            this.Loaded += (s, e) =>
+            {
+                LoadCalendar(_viewDate);
+            };
         }
 
         private void LoadCache()
@@ -69,6 +128,8 @@ namespace Task_Flyout.Views
 
         private void LoadCalendar(DateTime date)
         {
+            if (BtnMonthYear == null || CalendarGrid == null) return;
+
             DayCells.Clear();
             BtnMonthYear.Content = date.ToString("yyyy年 M月");
 
@@ -76,7 +137,13 @@ namespace Task_Flyout.Views
             int offset = (int)firstOfEntry.DayOfWeek;
             DateTime startDate = firstOfEntry.AddDays(-offset);
 
-            for (int i = 0; i < 42; i++)
+            int daysInMonth = DateTime.DaysInMonth(date.Year, date.Month);
+            int totalCells = offset + daysInMonth;
+
+            // 性能优化：动态计算需要生成的格子数（通常是 35 或 42 天），摆脱死板的 42 循环
+            int cellsToGenerate = (int)Math.Ceiling(totalCells / 7.0) * 7;
+
+            for (int i = 0; i < cellsToGenerate; i++)
             {
                 var current = startDate.AddDays(i);
                 var cell = new DayCellViewModel { Date = current, IsCurrentMonth = current.Month == date.Month };
@@ -84,7 +151,8 @@ namespace Task_Flyout.Views
                 string key = current.ToString("yyyy-MM-dd");
                 if (_localCache.DayItems.ContainsKey(key))
                 {
-                    foreach (var item in _localCache.DayItems[key]) cell.Items.Add(item);
+                    foreach (var item in _localCache.DayItems[key].Where(IsItemVisible))
+                        cell.Items.Add(item);
                 }
                 DayCells.Add(cell);
             }
@@ -99,28 +167,67 @@ namespace Task_Flyout.Views
             _ = SyncMonthDataAsync();
         }
 
+        private System.Threading.CancellationTokenSource _syncCts;
+
         private async Task SyncMonthDataAsync()
         {
-            if (_syncManager == null) return;
+            if (_syncManager == null || SyncProgress == null) return;
+
+            _syncCts?.Cancel();
+            _syncCts = new System.Threading.CancellationTokenSource();
+            var token = _syncCts.Token;
+
             SyncProgress.IsActive = true;
 
             try
             {
+                if (DayCells.Count == 0) return;
+
                 var start = DayCells.First().Date;
                 var end = DayCells.Last().Date.AddDays(1);
+
                 var allItems = await _syncManager.GetAllDataAsync(start, end);
+
+                if (token.IsCancellationRequested) return;
+
+                if (CalendarGrid == null) return;
+
+                for (var d = start; d < end; d = d.AddDays(1))
+                {
+                    _localCache.DayItems.Remove(d.ToString("yyyy-MM-dd"));
+                }
+
+                foreach (var item in allItems)
+                {
+                    if (!_localCache.DayItems.ContainsKey(item.DateKey))
+                        _localCache.DayItems[item.DateKey] = new List<AgendaItem>();
+
+                    var list = _localCache.DayItems[item.DateKey];
+                    list.RemoveAll(x => x.Id == item.Id);
+                    list.Add(item);
+                }
+
+                try { File.WriteAllText(CacheFilePath, JsonSerializer.Serialize(_localCache)); } catch { }
 
                 foreach (var cell in DayCells)
                 {
                     cell.Items.Clear();
-                    var dayItems = allItems.Where(it => it.DateKey == cell.Date.ToString("yyyy-MM-dd"));
+                    var dayItems = allItems.Where(it => it.DateKey == cell.Date.ToString("yyyy-MM-dd") && IsItemVisible(it));
                     foreach (var item in dayItems) cell.Items.Add(item);
                 }
 
-                if (CalendarGrid.SelectedItem is DayCellViewModel selectedCell) UpdateSideBar(selectedCell);
+                if (CalendarGrid.SelectedItem is DayCellViewModel selectedCell)
+                    UpdateSideBar(selectedCell);
             }
-            catch { }
-            finally { SyncProgress.IsActive = false; }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"数据同步异常: {ex.Message}");
+            }
+            finally
+            {
+                if (SyncProgress != null && !token.IsCancellationRequested)
+                    SyncProgress.IsActive = false;
+            }
         }
 
         private void Global_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
@@ -141,7 +248,7 @@ namespace Task_Flyout.Views
             if (CalendarGrid.ItemsPanelRoot is ItemsWrapGrid wrapGrid)
             {
                 wrapGrid.ItemWidth = Math.Max(80, e.NewSize.Width / 7.0);
-                wrapGrid.ItemHeight = Math.Max(80, e.NewSize.Height / 6.0);
+                wrapGrid.ItemHeight = Math.Max(80, e.NewSize.Height / 6.0); // 这里也可以随动态行数进一步修改，但目前 /6 是安全的兜底
             }
         }
 
@@ -187,7 +294,10 @@ namespace Task_Flyout.Views
             bool hasItems = false;
             foreach (var dateKey in upcomingDates)
             {
-                var sortedItems = _localCache.DayItems[dateKey].OrderBy(i => i.Subtitle == "全天" ? 0 : 1).ThenBy(i => i.Subtitle);
+                var sortedItems = _localCache.DayItems[dateKey]
+                    .Where(IsItemVisible) // 确保这里同步应用了开关和来源过滤
+                    .OrderBy(i => i.Subtitle == "全天" ? 0 : 1)
+                    .ThenBy(i => i.Subtitle);
                 foreach (var item in sortedItems)
                 {
                     var displayItem = new AgendaItem
@@ -238,6 +348,43 @@ namespace Task_Flyout.Views
             }
         }
 
+        private bool IsItemVisible(AgendaItem item)
+        {
+            if (item == null || string.IsNullOrEmpty(item.Provider)) return true; // 安全防空
+
+            var localSettings = Windows.Storage.ApplicationData.Current.LocalSettings;
+            bool showGE = localSettings.Values["ShowGoogleEvents"] as bool? ?? true;
+            bool showGT = localSettings.Values["ShowGoogleTasks"] as bool? ?? true;
+            bool showME = localSettings.Values["ShowMSEvents"] as bool? ?? true;
+            bool showMT = localSettings.Values["ShowMSTasks"] as bool? ?? true;
+
+            string provider = item.Provider.ToLower();
+
+            // 模糊匹配包含 google 字眼
+            if (provider.Contains("google"))
+            {
+                if (item.IsEvent && !showGE) return false;
+                if (item.IsTask && !showGT) return false;
+            }
+            // 模糊匹配包含 microsoft 或 todo 字眼 (适配 Microsoft To Do)
+            else if (provider.Contains("microsoft") || provider.Contains("todo"))
+            {
+                if (item.IsEvent && !showME) return false;
+                if (item.IsTask && !showMT) return false;
+            }
+            return true;
+        }
+
+        public void ReloadFilters()
+        {
+            LoadCalendar(_viewDate);
+        }
+
+        public void ForceSync()
+        {
+            _ = SyncMonthDataAsync();
+        }
+
         private async void AgendaCard_Tapped(object sender, TappedRoutedEventArgs e)
         {
             if (e.OriginalSource is FrameworkElement src && (src is CheckBox || src.Parent is CheckBox)) return;
@@ -253,7 +400,6 @@ namespace Task_Flyout.Views
 
                 if (DateTime.TryParse(item.DateKey, out var d)) EditDatePicker.Date = d;
 
-                // 智能提取已设置的时间 (支持解析 "14:00 - 15:30")
                 var timePart = item.Subtitle?.Split('\n').LastOrDefault()?.Trim();
                 if (timePart == "全天" || string.IsNullOrEmpty(timePart))
                 {
@@ -265,10 +411,8 @@ namespace Task_Flyout.Views
                 {
                     EditChkAllDay.IsChecked = false;
                     var times = timePart.Split('-');
-
                     if (times.Length >= 1 && TimeSpan.TryParse(times[0].Trim(), out var st))
                         EditStartTimePicker.SelectedTime = st;
-
                     if (times.Length >= 2 && TimeSpan.TryParse(times[1].Trim(), out var et))
                         EditEndTimePicker.SelectedTime = et;
                     else if (EditStartTimePicker.SelectedTime.HasValue)
@@ -285,7 +429,6 @@ namespace Task_Flyout.Views
             if (_itemBeingEdited == null || string.IsNullOrWhiteSpace(EditTxtTitle.Text)) return;
 
             var newDateKey = EditDatePicker.Date.ToString("yyyy-MM-dd");
-
             TimeSpan? newStartTime = EditChkAllDay.IsChecked == true ? null : EditStartTimePicker.SelectedTime;
             TimeSpan? newEndTime = EditChkAllDay.IsChecked == true ? null : EditEndTimePicker.SelectedTime;
 
@@ -295,7 +438,6 @@ namespace Task_Flyout.Views
             else if (newStartTime.HasValue)
                 newSubtitleText = $"{newStartTime.Value:hh\\:mm}";
 
-            // 更新本地缓存
             if (_localCache.DayItems.TryGetValue(_itemBeingEdited.DateKey, out var oldList))
             {
                 var orig = oldList.FirstOrDefault(x => x.Id == _itemBeingEdited.Id);
@@ -314,7 +456,6 @@ namespace Task_Flyout.Views
             }
             LoadCalendar(_viewDate);
 
-            // 推送云端
             if (_syncManager != null && !string.IsNullOrEmpty(_itemBeingEdited.Id))
             {
                 try
@@ -328,9 +469,8 @@ namespace Task_Flyout.Views
                         EditTxtDescription.Text,
                         EditDatePicker.Date.DateTime,
                         newStartTime,
-                        newEndTime // 👉 把结束时间传给云端
+                        newEndTime
                     );
-
                     _ = SyncMonthDataAsync();
                 }
                 catch (Exception ex)
@@ -366,7 +506,6 @@ namespace Task_Flyout.Views
             Action showDialog = async () =>
             {
                 _itemBeingEdited = item;
-
                 EditTxtTitle.Text = item.Title;
                 EditTxtLocation.Text = item.Location;
                 EditTxtDescription.Text = item.Description;
@@ -388,12 +527,10 @@ namespace Task_Flyout.Views
                     if (times.Length >= 2 && TimeSpan.TryParse(times[1].Trim(), out var et)) EditEndTimePicker.SelectedTime = et;
                 }
 
-                // 强制绑定图层并安全显示 (捕获异常防止重复弹窗崩溃)
                 EditDialog.XamlRoot = this.XamlRoot;
                 try { await EditDialog.ShowAsync(); } catch { }
             };
 
-            // 如果页面还没挂载到屏幕上，就等它 Loaded 完毕再执行弹窗
             if (this.XamlRoot == null)
             {
                 this.Loaded += (s, e) => showDialog();

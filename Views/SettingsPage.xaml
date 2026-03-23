@@ -9,28 +9,6 @@
             <TextBlock Text="设置" Style="{StaticResource TitleTextBlockStyle}"/>
 
             <StackPanel Spacing="8">
-                <TextBlock Text="账户管理" FontWeight="SemiBold" FontSize="16"/>
-                <Border Background="{ThemeResource ControlFillColorDefaultBrush}" 
-                        CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
-                    <StackPanel Padding="16" Spacing="12">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <FontIcon Glyph="&#xE77B;" Foreground="#4285F4" VerticalAlignment="Center" Margin="0,0,16,0"/>
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="Google Calendar" FontWeight="Medium"/>
-                                <TextBlock Text="已连接至 Google 日历与任务" FontSize="12" Opacity="0.7"/>
-                            </StackPanel>
-                            <ToggleSwitch Grid.Column="2" IsOn="True" Header="显示日程" OnContent="开" OffContent="关"/>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
-
-            <StackPanel Spacing="8">
                 <TextBlock Text="外观与语言" FontWeight="SemiBold" FontSize="16"/>
                 <ComboBox x:Name="ThemeComboBox" Header="应用主题" SelectedIndex="0" Width="200" SelectionChanged="ThemeComboBox_SelectionChanged">
                     <ComboBoxItem Content="跟随系统"/>

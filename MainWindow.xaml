@@ -2,9 +2,6 @@
     x:Class="Task_Flyout.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d"
     Title="Task Flyout">
 
     <Window.SystemBackdrop>
@@ -12,23 +9,46 @@
     </Window.SystemBackdrop>
 
     <Grid>
-        <NavigationView x:Name="MainNav"
-                        PaneDisplayMode="Left"
-                        IsSettingsVisible="True"
-                        ItemInvoked="MainNav_ItemInvoked">
+        <NavigationView x:Name="MainNav" PaneDisplayMode="Left" IsSettingsVisible="True" ItemInvoked="MainNav_ItemInvoked">
             <NavigationView.MenuItems>
-                <NavigationViewItemHeader Content="账户"/>
-                <NavigationViewItem Content="Google Calendar" Tag="GoogleAccount">
+                <NavigationViewItem Content="主日历视图" Tag="Calendar">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE77B;" Foreground="#4285F4"/>
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="Outlook" Tag="OutlookAccount" IsEnabled="False">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE77B;" Foreground="#0078D4"/>
+                        <FontIcon Glyph="&#xE787;"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
+
+            <NavigationView.PaneFooter>
+                <Grid>
+                    <StackPanel x:Name="FooterContentPanel" Padding="16,0,16,16" Spacing="24">
+                        <StackPanel Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE77B;" Foreground="#EA4335" FontSize="14"/>
+                                <TextBlock Text="Google 账户" FontWeight="SemiBold" FontSize="13"/>
+                            </StackPanel>
+                            <Button x:Name="BtnConnectGoogle" Content="连接与授权" FontSize="12" HorizontalAlignment="Stretch" Click="BtnConnectGoogle_Click"/>
+                            <StackPanel x:Name="PanelGoogleToggles" Spacing="4" Visibility="Collapsed">
+                                <ToggleSwitch x:Name="TglGoogleEvents" Header="显示日程" IsOn="True" MinWidth="0" Toggled="Filter_Toggled"/>
+                                <ToggleSwitch x:Name="TglGoogleTasks" Header="显示任务" IsOn="True" MinWidth="0" Toggled="Filter_Toggled"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE77B;" Foreground="#0078D4" FontSize="14"/>
+                                <TextBlock Text="Microsoft 账户" FontWeight="SemiBold" FontSize="13"/>
+                            </StackPanel>
+                            <Button x:Name="BtnConnectMS" Content="连接与授权" FontSize="12" HorizontalAlignment="Stretch" Click="BtnConnectMS_Click"/>
+                            <StackPanel x:Name="PanelMSToggles" Spacing="4" Visibility="Collapsed">
+                                <ToggleSwitch x:Name="TglMSEvents" Header="显示日程" IsOn="True" MinWidth="0" Toggled="Filter_Toggled"/>
+                                <ToggleSwitch x:Name="TglMSTasks" Header="显示任务" IsOn="True" MinWidth="0" Toggled="Filter_Toggled"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <Button Content="强制立即同步" HorizontalAlignment="Stretch" Click="BtnForceSync_Click"/>
+                    </StackPanel>
+                </Grid>
+            </NavigationView.PaneFooter>
 
             <Frame x:Name="ContentFrame"/>
         </NavigationView>

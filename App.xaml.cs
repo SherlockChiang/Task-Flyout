@@ -27,6 +27,7 @@ namespace Task_Flyout
         {
             this.InitializeComponent();
             SyncManager.RegisterProvider(new GoogleSyncProvider());
+            SyncManager.RegisterProvider(new Services.MicrosoftSyncProvider());
         }
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)

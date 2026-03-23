@@ -3,4 +3,5 @@ bin/
 obj/
 
 credentials.json
+Secrets.cs
 *.user
