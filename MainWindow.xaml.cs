@@ -17,6 +17,7 @@ namespace Task_Flyout
         public MainWindow()
         {
             this.InitializeComponent();
+            this.AppWindow.SetIcon(System.IO.Path.Combine(System.AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
             _loader = new ResourceLoader(); 
 
             SystemBackdrop = new MicaBackdrop() { Kind = MicaKind.BaseAlt };
