@@ -9,15 +9,15 @@
   IgnorableNamespaces="uap rescap systemai">
 
   <Identity
-    Name="c1ce7f1d-c2af-427f-bb25-8f41b6b85873"
-    Publisher="CN=vince"
+    Name="Uranus92.TaskFlyout"
+    Publisher="CN=FDE9F71C-A397-410B-81EE-36E18F4325E5"
     Version="1.0.0.0" />
 
-  <mp:PhoneIdentity PhoneProductId="c1ce7f1d-c2af-427f-bb25-8f41b6b85873" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+  <mp:PhoneIdentity PhoneProductId="2397882d-bfcd-481c-b217-774742fc81ff" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>task flyout winui3</DisplayName>
-    <PublisherDisplayName>vince</PublisherDisplayName>
+    <DisplayName>Task Flyout</DisplayName>
+    <PublisherDisplayName>Uranus92</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
