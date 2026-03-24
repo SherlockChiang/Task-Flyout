@@ -17,11 +17,17 @@
                     <ComboBoxItem x:Uid="Theme_Dark" Content="深色"/>
                 </ComboBox>
 
-                <ComboBox x:Uid="SettingsPage_Language" x:Name="LanguageComboBox" Header="界面语言 (重启生效)" SelectedIndex="0" Width="200" SelectionChanged="LanguageComboBox_SelectionChanged">
+                <ComboBox x:Uid="SettingsPage_Language" x:Name="LanguageComboBox" Header="界面语言" SelectedIndex="0" Width="200" SelectionChanged="LanguageComboBox_SelectionChanged">
                     <ComboBoxItem x:Uid="Lang_System" Content="跟随系统"/>
                     <ComboBoxItem Content="简体中文" Tag="zh-Hans"/>
                     <ComboBoxItem Content="English" Tag="en-US"/>
                 </ComboBox>
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+                <TextBlock x:Uid="SettingsPage_System" Text="系统与常规" FontWeight="SemiBold" FontSize="16"/>
+                <ToggleSwitch x:Uid="SettingsPage_Startup" x:Name="StartupToggle" Header="开机时自动启动" IsOn="False" Toggled="StartupToggle_Toggled"/>
+                <ToggleSwitch x:Uid="SettingsPage_Background" x:Name="BackgroundToggle" Header="关闭主窗口时最小化到托盘 (后台运行)" IsOn="True" Toggled="BackgroundToggle_Toggled"/>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

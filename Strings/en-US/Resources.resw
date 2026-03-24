@@ -384,4 +384,8 @@
   <data name="TextDaysAgo" xml:space="preserve">
     <value>{0} days ago</value>
   </data>
+	<data name="SettingsPage_System.Text" xml:space="preserve"><value>System &amp; General</value></data>
+	<data name="SettingsPage_Startup.Header" xml:space="preserve"><value>Launch on Windows startup</value></data>
+	<data name="SettingsPage_Background.Header" xml:space="preserve"><value>Keep running in background when window is closed (Recommended)</value></data>
+	<data name="RestartRequired_Primary" xml:space="preserve"><value>Restart Now</value></data>
 </root>

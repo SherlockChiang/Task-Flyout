@@ -3,6 +3,8 @@ using Microsoft.UI.Xaml.Controls;
 using Windows.Storage;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System;
+using Microsoft.Win32;
+using Microsoft.Windows.AppLifecycle; 
 
 namespace Task_Flyout.Views
 {
@@ -10,6 +12,9 @@ namespace Task_Flyout.Views
     {
         private ResourceLoader _loader;
         private bool _isInitializing = true;
+
+        private const string StartupRegistryKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        private const string AppName = "TaskFlyout";
 
         public SettingsPage()
         {
@@ -25,6 +30,16 @@ namespace Task_Flyout.Views
 
             var lang = ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
             LanguageComboBox.SelectedIndex = lang switch { "zh-Hans" => 1, "en-US" => 2, _ => 0 };
+
+            BackgroundToggle.IsOn = ApplicationData.Current.LocalSettings.Values["RunInBackground"] as bool? ?? true;
+
+            try
+            {
+                using RegistryKey key = Registry.CurrentUser.OpenSubKey(StartupRegistryKey, false);
+                StartupToggle.IsOn = key?.GetValue(AppName) != null;
+            }
+            catch { }
+
             _isInitializing = false;
         }
 
@@ -49,7 +64,7 @@ namespace Task_Flyout.Views
 
         private async void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (!this.IsLoaded) return; 
+            if (!this.IsLoaded || _isInitializing) return;
 
             if (LanguageComboBox.SelectedItem is ComboBoxItem item && item.Tag != null)
             {
@@ -67,11 +82,46 @@ namespace Task_Flyout.Views
             {
                 Title = _loader.GetString("RestartRequired_Title"),
                 Content = _loader.GetString("RestartRequired_Content"),
+                PrimaryButtonText = _loader.GetString("RestartRequired_Primary"), 
                 CloseButtonText = _loader.GetString("RestartRequired_Close"),
                 XamlRoot = this.XamlRoot
             };
 
-            await restartDialog.ShowAsync();
+            var result = await restartDialog.ShowAsync();
+
+            if (result == ContentDialogResult.Primary)
+            {
+                AppInstance.Restart(""); 
+            }
+        }
+
+        private void StartupToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+
+            try
+            {
+                using RegistryKey key = Registry.CurrentUser.OpenSubKey(StartupRegistryKey, true);
+                if (StartupToggle.IsOn)
+                {
+                    string exePath = $"\"{Environment.ProcessPath}\"";
+                    key?.SetValue(AppName, exePath);
+                }
+                else
+                {
+                    key?.DeleteValue(AppName, false);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"设置开机自启失败: {ex.Message}");
+            }
+        }
+
+        private void BackgroundToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            ApplicationData.Current.LocalSettings.Values["RunInBackground"] = BackgroundToggle.IsOn;
         }
     }
 }

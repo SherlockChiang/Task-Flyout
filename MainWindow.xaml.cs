@@ -22,6 +22,7 @@ namespace Task_Flyout
             SystemBackdrop = new MicaBackdrop() { Kind = MicaKind.BaseAlt };
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(null);
+            this.AppWindow.Closing += AppWindow_Closing;
 
             MainNav.PaneOpening += (s, e) => FooterContentPanel.Visibility = Visibility.Visible;
             MainNav.PaneClosing += (s, e) => FooterContentPanel.Visibility = Visibility.Collapsed;
@@ -32,6 +33,17 @@ namespace Task_Flyout
             var calendarItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault();
             if (calendarItem != null) MainNav.SelectedItem = calendarItem;
             ContentFrame.Navigate(typeof(Views.CalendarPage));
+        }
+
+        private void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
+        {
+            bool runInBackground = Windows.Storage.ApplicationData.Current.LocalSettings.Values["RunInBackground"] as bool? ?? true;
+
+            if (runInBackground)
+            {
+                args.Cancel = true; 
+                sender.Hide();
+            }
         }
 
         private void LoadAccountStates()
@@ -116,7 +128,6 @@ namespace Task_Flyout
             if (ContentFrame.Content is CalendarPage page) page.ForceSync();
         }
 
-        // (下方原有的 NavigateToSettings, NavigateToCalendarAndEdit 保持不变)
         private void MainNav_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
         {
             if (args.IsSettingsInvoked) ContentFrame.Navigate(typeof(SettingsPage));
