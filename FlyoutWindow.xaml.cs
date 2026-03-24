@@ -2,6 +2,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Data;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using System;
 using System.Collections.Generic;
@@ -187,7 +188,6 @@ namespace Task_Flyout
         {
             if (args.AddedDates.Count == 0) return;
 
-            // 👉 如果选择了新日期，自动收起新建面板，并恢复显示日程列表
             if (AddPanel != null && AddPanel.Visibility == Visibility.Visible)
             {
                 AddPanel.Visibility = Visibility.Collapsed;
@@ -199,11 +199,27 @@ namespace Task_Flyout
             ShowDataForDate(_selectedDay);
         }
 
+        // 👉 改进：常驻显示相对日期，当选择今天时隐藏后缀
         private void UpdateSelectedDateHeader()
         {
-            TxtSelectedDateHeader.Text = _selectedDay.Date == DateTime.Today
-                        ? _loader.GetString("CalendarPage_BtnToday/Content")
-                        : _selectedDay.ToString("D", CultureInfo.CurrentUICulture);
+            if (_selectedDay.Date == DateTime.Today)
+            {
+                TxtSelectedDateHeader.Text = _loader.GetString("CalendarPage_BtnToday/Content"); // 显示为"今天"
+                if (TxtRelativeDate != null) TxtRelativeDate.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                TxtSelectedDateHeader.Text = _selectedDay.ToString("D", CultureInfo.CurrentUICulture);
+
+                if (TxtRelativeDate != null)
+                {
+                    int days = (_selectedDay.Date - DateTime.Today).Days;
+                    string relativeStr = days > 0 ? string.Format(_loader.GetString("TextDaysLater"), days) : string.Format(_loader.GetString("TextDaysAgo"), -days);
+
+                    TxtRelativeDate.Text = $"({relativeStr})";
+                    TxtRelativeDate.Visibility = Visibility.Visible;
+                }
+            }
         }
 
         private void ShowDataForDate(DateTime date)
@@ -215,8 +231,8 @@ namespace Task_Flyout
             {
                 tempAgenda.Add(new AgendaItem
                 {
-                    Title = _loader.GetString("TextWelcomeTitle"), 
-                    Subtitle = _loader.GetString("TextWelcomeSub"), 
+                    Title = _loader.GetString("TextWelcomeTitle"),
+                    Subtitle = _loader.GetString("TextWelcomeSub"),
                     IsEvent = false,
                     IsTask = false
                 });
@@ -236,7 +252,7 @@ namespace Task_Flyout
                 });
 
                 var nextDayKey = _localCache.DayItems.Keys
-                    .Where(k => string.Compare(k, key) > 0) 
+                    .Where(k => string.Compare(k, key) > 0)
                     .OrderBy(k => k)
                     .FirstOrDefault(k => _localCache.DayItems[k].Count > 0);
 
@@ -252,7 +268,7 @@ namespace Task_Flyout
                     {
                         tempAgenda.Add(new AgendaItem
                         {
-                            Id = item.Id, 
+                            Id = item.Id,
                             Title = item.Title,
                             Subtitle = $"{_loader.GetString("TextUpcoming")} · {daysLaterText} {item.Subtitle}",
                             Location = item.Location,
@@ -365,36 +381,31 @@ namespace Task_Flyout
         {
             if (_appWindow == null) return;
 
-            int logicalBaseHeight = 490;
-            int logicalTargetHeight = logicalBaseHeight;
+            int logicalWidth = 360;
+            double targetLogicalHeight = 0;
 
             if (AddPanel != null && AddPanel.Visibility == Visibility.Visible)
             {
-                logicalTargetHeight += 400;
+                ContentRow.Height = GridLength.Auto;
+
+                RootGrid.UpdateLayout();
+                RootGrid.Measure(new Windows.Foundation.Size(logicalWidth, double.PositiveInfinity));
+
+                targetLogicalHeight = RootGrid.DesiredSize.Height;
             }
             else
             {
+                ContentRow.Height = new GridLength(1, GridUnitType.Star);
+
                 int listHeight = 0;
                 foreach (var item in AgendaItems)
                 {
-                    if (item.Title == _loader.GetString("TextNoAgendaTitle"))
-                    {
-                        listHeight += 50;
-                    }
-                    else if (item.Subtitle != null && item.Subtitle.Contains(_loader.GetString("TextUpcoming")))
-                    {
-                        listHeight += 65;
-                    }
-                    else
-                    {
-                        listHeight += !string.IsNullOrEmpty(item.Location) ? 75 : 65;
-                    }
+                    if (item.Title == _loader.GetString("TextNoAgendaTitle")) listHeight += 50;
+                    else if (item.Subtitle != null && item.Subtitle.Contains(_loader.GetString("TextUpcoming"))) listHeight += 65;
+                    else listHeight += !string.IsNullOrEmpty(item.Location) ? 75 : 65;
                 }
-
-                logicalTargetHeight += listHeight + 45;
+                targetLogicalHeight = 500 + listHeight + 45;
             }
-
-            int logicalWidth = 360;
 
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             double scaleFactor = GetDpiForWindow(hWnd) / 96.0;
@@ -404,12 +415,28 @@ namespace Task_Flyout
             var workArea = display.WorkArea;
 
             int physicalWidth = (int)(logicalWidth * scaleFactor);
-            int physicalHeight = (int)(logicalTargetHeight * scaleFactor);
+            int physicalHeight = (int)(targetLogicalHeight * scaleFactor);
 
             int maxPhysicalHeight = workArea.Height - 80;
+
             if (physicalHeight > maxPhysicalHeight)
             {
-                physicalHeight = maxPhysicalHeight;
+                physicalHeight = maxPhysicalHeight; 
+                AgendaListControl.SetValue(ScrollViewer.VerticalScrollModeProperty, ScrollMode.Enabled);
+
+                if (AddPanelScrollViewer != null)
+                {
+                    AddPanelScrollViewer.VerticalScrollMode = ScrollMode.Enabled;
+                }
+            }
+            else
+            {
+                AgendaListControl.SetValue(ScrollViewer.VerticalScrollModeProperty, ScrollMode.Disabled);
+
+                if (AddPanelScrollViewer != null)
+                {
+                    AddPanelScrollViewer.VerticalScrollMode = ScrollMode.Disabled;
+                }
             }
 
             _appWindow.Resize(new SizeInt32(physicalWidth, physicalHeight));
@@ -450,10 +477,20 @@ namespace Task_Flyout
             TxtTimeSeparator.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
 
             TimePickerStart.Header = isEvent ? _loader.GetString("TextStartTime") : _loader.GetString("TextDueTime");
-            if (TimePanel != null && TimePanel.ColumnDefinitions.Count >= 3)
+
+            if (isEvent)
             {
-                TimePanel.ColumnDefinitions[1].Width = isEvent ? new GridLength(10, GridUnitType.Star) : new GridLength(0);
-                TimePanel.ColumnDefinitions[2].Width = isEvent ? new GridLength(45, GridUnitType.Star) : new GridLength(0);
+                Grid.SetColumnSpan(TimePickerStart, 1);
+            }
+            else
+            {
+                Grid.SetColumnSpan(TimePickerStart, 3);
+            }
+
+            if (AddPanel != null && AddPanel.Visibility == Visibility.Visible)
+            {
+                RootGrid.UpdateLayout();
+                AdjustWindowHeight();
             }
         }
 
@@ -478,6 +515,28 @@ namespace Task_Flyout
             }
         }
 
+        private void SetupFlyoutProviderComboBox()
+        {
+            CmbAddProvider.Items.Clear();
+            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
+            bool isGoogle = settings.Values["IsGoogleConnected"] as bool? ?? false;
+            bool isMs = settings.Values["IsMSConnected"] as bool? ?? false;
+
+            if (isGoogle) CmbAddProvider.Items.Add(new ComboBoxItem { Content = "Google", Tag = "Google" });
+            if (isMs) CmbAddProvider.Items.Add(new ComboBoxItem { Content = "Microsoft", Tag = "Microsoft" });
+
+            if (CmbAddProvider.Items.Count > 1)
+            {
+                CmbAddProvider.Visibility = Visibility.Visible;
+                CmbAddProvider.SelectedIndex = 0;
+            }
+            else
+            {
+                CmbAddProvider.Visibility = Visibility.Collapsed;
+                if (CmbAddProvider.Items.Count > 0) CmbAddProvider.SelectedIndex = 0;
+            }
+        }
+
         private void BtnToggleAddPanel_Click(object sender, RoutedEventArgs e)
         {
             if (AddPanel.Visibility == Visibility.Visible)
@@ -487,6 +546,7 @@ namespace Task_Flyout
             }
             else
             {
+                SetupFlyoutProviderComboBox();
                 AddPanel.Visibility = Visibility.Visible;
                 if (AgendaContainer != null) AgendaContainer.Visibility = Visibility.Collapsed;
             }
@@ -514,6 +574,7 @@ namespace Task_Flyout
             bool isEvent = RadioTypeEvent.IsChecked == true;
             bool isAllDay = ChkAllDay.IsChecked == true;
             string location = TxtLocation.Text;
+            string providerName = (CmbAddProvider.SelectedItem as ComboBoxItem)?.Tag.ToString() ?? "Google";
 
             TimeSpan startTime = TimePickerStart.Time;
             TimeSpan endTime = TimePickerEnd.Time;
@@ -536,16 +597,17 @@ namespace Task_Flyout
                     Subtitle = $"{timeDisplay} ({_loader.GetString("TextSyncing")})",
                     Location = location,
                     IsTask = !isEvent,
-                    IsEvent = isEvent
+                    IsEvent = isEvent,
+                    Provider = providerName
                 });
                 AdjustWindowHeight();
 
-                await _syncManager.CreateItemAsync(title, isEvent, isAllDay, targetDate, startTime, endTime, location);
+                await _syncManager.CreateItemAsync(title, isEvent, isAllDay, targetDate, startTime, endTime, location, providerName);
                 _ = SyncAllDataAsync(true);
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("============== Google Sync Error ==============");
+                System.Diagnostics.Debug.WriteLine("============== Sync Error ==============");
                 System.Diagnostics.Debug.WriteLine(ex.ToString());
 
                 AgendaItems.Insert(0, new AgendaItem

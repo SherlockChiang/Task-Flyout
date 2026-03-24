@@ -11,7 +11,6 @@
             </ResourceDictionary.MergedDictionaries>
 
             <tb:TaskbarIcon x:Key="MyTrayIcon"
-                IconSource="ms-appx:///Assets/AppIcon.ico" 
                 ToolTipText="Task Flyout">
                 <tb:TaskbarIcon.ContextFlyout>
                     <MenuFlyout x:Name="TrayMenu">

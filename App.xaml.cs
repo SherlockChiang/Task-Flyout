@@ -75,7 +75,6 @@ namespace Task_Flyout
 
             var backgroundColor = _uiSettings.GetColorValue(UIColorType.Background);
             bool isDarkTheme = backgroundColor == Windows.UI.Color.FromArgb(255, 0, 0, 0);
-
             string iconName = isDarkTheme ? "TrayIcon_Dark.ico" : "TrayIcon_Light.ico";
 
             _trayIcon.IconSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri($"ms-appx:///Assets/{iconName}"));

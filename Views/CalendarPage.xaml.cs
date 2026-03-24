@@ -396,97 +396,185 @@ namespace Task_Flyout.Views
             _ = SyncMonthDataAsync();
         }
 
+        private void EditRadioType_Changed(object sender, RoutedEventArgs e)
+        {
+            if (EditTxtLocation == null || EditEndTimePicker == null) return;
+
+            bool isEvent = EditRadioEvent.IsChecked == true;
+            EditTxtLocation.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
+            EditEndTimePicker.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
+            EditStartTimePicker.Header = isEvent ? _loader.GetString("TextStartTime") : _loader.GetString("TextDueTime");
+        }
+        private void SetupEditProviderComboBox(string forceSelectProvider = null)
+        {
+            EditCmbProvider.Items.Clear();
+            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
+            bool isGoogle = settings.Values["IsGoogleConnected"] as bool? ?? false;
+            bool isMs = settings.Values["IsMSConnected"] as bool? ?? false;
+
+            if (isGoogle || forceSelectProvider == "Google")
+                EditCmbProvider.Items.Add(new ComboBoxItem { Content = "Google", Tag = "Google" });
+            if (isMs || forceSelectProvider == "Microsoft")
+                EditCmbProvider.Items.Add(new ComboBoxItem { Content = "Microsoft", Tag = "Microsoft" });
+
+            if (EditCmbProvider.Items.Count > 1)
+            {
+                EditCmbProvider.Visibility = Visibility.Visible;
+                if (forceSelectProvider != null)
+                {
+                    var item = EditCmbProvider.Items.OfType<ComboBoxItem>().FirstOrDefault(i => i.Tag.ToString() == forceSelectProvider);
+                    if (item != null) EditCmbProvider.SelectedItem = item;
+                }
+                else EditCmbProvider.SelectedIndex = 0;
+            }
+            else
+            {
+                EditCmbProvider.Visibility = Visibility.Collapsed;
+                if (EditCmbProvider.Items.Count > 0) EditCmbProvider.SelectedIndex = 0;
+            }
+        }
+        private void BtnAddNew_Click(object sender, RoutedEventArgs e)
+        {
+            _itemBeingEdited = null;
+            EditDialog.Title = _loader.GetString("TextNewItem");
+            EditDialog.SecondaryButtonText = "";
+            SetupEditProviderComboBox();
+            EditCmbProvider.IsEnabled = true; 
+            EditRadioEvent.IsEnabled = true; 
+            EditRadioTask.IsEnabled = true;
+
+            EditTxtTitle.Text = "";
+            EditTxtLocation.Text = "";
+            EditTxtDescription.Text = "";
+            EditDatePicker.Date = _viewDate.Year == DateTime.Today.Year && _viewDate.Month == DateTime.Today.Month ? DateTime.Today : new DateTime(_viewDate.Year, _viewDate.Month, 1);
+
+            EditChkAllDay.IsChecked = false;
+            EditStartTimePicker.SelectedTime = null;
+            EditEndTimePicker.SelectedTime = null;
+
+            EditDialog.XamlRoot = this.XamlRoot;
+            _ = EditDialog.ShowAsync();
+        }
+
+        private void PrepareDialogForEdit(AgendaItem item)
+        {
+            _itemBeingEdited = item;
+            EditDialog.Title = _loader.GetString("CalendarDialog/Title");
+            EditDialog.SecondaryButtonText = _loader.GetString("CalendarDialog/SecondaryButtonText"); // 显示"删除"按钮
+
+            EditTxtTitle.Text = item.Title;
+            EditTxtLocation.Text = item.Location;
+            EditTxtDescription.Text = item.Description;
+
+            SetupEditProviderComboBox(item.Provider);
+            EditCmbProvider.IsEnabled = false;
+
+            EditRadioEvent.IsChecked = item.IsEvent;
+            EditRadioTask.IsChecked = item.IsTask;
+            EditRadioEvent.IsEnabled = false;
+            EditRadioTask.IsEnabled = false;
+
+            if (DateTime.TryParse(item.DateKey, out var d)) EditDatePicker.Date = d;
+
+            var timePart = item.Subtitle?.Split('\n').LastOrDefault()?.Trim();
+            if (timePart == _loader.GetString("TextAllDay") || string.IsNullOrEmpty(timePart))
+            {
+                EditChkAllDay.IsChecked = true;
+                EditStartTimePicker.SelectedTime = null;
+                EditEndTimePicker.SelectedTime = null;
+            }
+            else
+            {
+                EditChkAllDay.IsChecked = false;
+                var times = timePart.Split('-');
+                if (times.Length >= 1 && TimeSpan.TryParse(times[0].Trim(), out var st)) EditStartTimePicker.SelectedTime = st;
+                if (times.Length >= 2 && TimeSpan.TryParse(times[1].Trim(), out var et)) EditEndTimePicker.SelectedTime = et;
+                else if (EditStartTimePicker.SelectedTime.HasValue) EditEndTimePicker.SelectedTime = EditStartTimePicker.SelectedTime.Value.Add(TimeSpan.FromHours(1));
+            }
+
+            EditRadioType_Changed(null, null); 
+        }
+
         private async void AgendaCard_Tapped(object sender, TappedRoutedEventArgs e)
         {
             if (e.OriginalSource is FrameworkElement src && (src is CheckBox || src.Parent is CheckBox)) return;
-
             if ((sender as FrameworkElement)?.DataContext is AgendaItem item)
             {
-                if (item.Title != null && item.Title.Contains("没有安排")) return;
-
-                _itemBeingEdited = item;
-                EditTxtTitle.Text = item.Title;
-                EditTxtLocation.Text = item.Location;
-                EditTxtDescription.Text = item.Description;
-
-                if (DateTime.TryParse(item.DateKey, out var d)) EditDatePicker.Date = d;
-
-                var timePart = item.Subtitle?.Split('\n').LastOrDefault()?.Trim();
-                if (timePart == "全天" || string.IsNullOrEmpty(timePart))
-                {
-                    EditChkAllDay.IsChecked = true;
-                    EditStartTimePicker.SelectedTime = null;
-                    EditEndTimePicker.SelectedTime = null;
-                }
-                else
-                {
-                    EditChkAllDay.IsChecked = false;
-                    var times = timePart.Split('-');
-                    if (times.Length >= 1 && TimeSpan.TryParse(times[0].Trim(), out var st))
-                        EditStartTimePicker.SelectedTime = st;
-                    if (times.Length >= 2 && TimeSpan.TryParse(times[1].Trim(), out var et))
-                        EditEndTimePicker.SelectedTime = et;
-                    else if (EditStartTimePicker.SelectedTime.HasValue)
-                        EditEndTimePicker.SelectedTime = EditStartTimePicker.SelectedTime.Value.Add(TimeSpan.FromHours(1));
-                }
-
+                if (item.Title != null && item.Title.Contains(_loader.GetString("TextNoAgendaTitle"))) return;
+                PrepareDialogForEdit(item);
                 EditDialog.XamlRoot = this.XamlRoot;
                 await EditDialog.ShowAsync();
             }
         }
 
+        public void OpenEditDialogFromExternal(AgendaItem item)
+        {
+            Action showDialog = async () =>
+            {
+                PrepareDialogForEdit(item);
+                EditDialog.XamlRoot = this.XamlRoot;
+                try { await EditDialog.ShowAsync(); } catch { }
+            };
+            if (this.XamlRoot == null) this.Loaded += (s, e) => showDialog(); else showDialog();
+        }
+
         private async void EditDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
         {
-            if (_itemBeingEdited == null || string.IsNullOrWhiteSpace(EditTxtTitle.Text)) return;
+            if (string.IsNullOrWhiteSpace(EditTxtTitle.Text)) return;
 
             var newDateKey = EditDatePicker.Date.ToString("yyyy-MM-dd");
             TimeSpan? newStartTime = EditChkAllDay.IsChecked == true ? null : EditStartTimePicker.SelectedTime;
             TimeSpan? newEndTime = EditChkAllDay.IsChecked == true ? null : EditEndTimePicker.SelectedTime;
 
-            string newSubtitleText = "全天";
-            if (newStartTime.HasValue && newEndTime.HasValue)
-                newSubtitleText = $"{newStartTime.Value:hh\\:mm} - {newEndTime.Value:hh\\:mm}";
-            else if (newStartTime.HasValue)
-                newSubtitleText = $"{newStartTime.Value:hh\\:mm}";
+            string newSubtitleText = _loader.GetString("TextAllDay");
+            if (newStartTime.HasValue && newEndTime.HasValue) newSubtitleText = $"{newStartTime.Value:hh\\:mm} - {newEndTime.Value:hh\\:mm}";
+            else if (newStartTime.HasValue) newSubtitleText = $"{newStartTime.Value:hh\\:mm}";
 
-            if (_localCache.DayItems.TryGetValue(_itemBeingEdited.DateKey, out var oldList))
-            {
-                var orig = oldList.FirstOrDefault(x => x.Id == _itemBeingEdited.Id);
-                if (orig != null)
-                {
-                    oldList.Remove(orig);
-                    orig.Title = EditTxtTitle.Text;
-                    orig.Location = EditTxtLocation.Text;
-                    orig.Description = EditTxtDescription.Text;
-                    orig.DateKey = newDateKey;
-                    orig.Subtitle = newSubtitleText;
+            bool isEvent = EditRadioEvent.IsChecked == true;
+            bool isAllDay = EditChkAllDay.IsChecked == true;
+            string providerName = (EditCmbProvider.SelectedItem as ComboBoxItem)?.Tag.ToString() ?? "Google";
 
-                    if (!_localCache.DayItems.ContainsKey(newDateKey)) _localCache.DayItems[newDateKey] = new List<AgendaItem>();
-                    _localCache.DayItems[newDateKey].Add(orig);
-                }
-            }
-            LoadCalendar(_viewDate);
-
-            if (_syncManager != null && !string.IsNullOrEmpty(_itemBeingEdited.Id))
+            if (_itemBeingEdited == null)
             {
                 try
                 {
-                    await _syncManager.UpdateItemAsync(
-                        _itemBeingEdited.Provider,
-                        _itemBeingEdited.Id,
-                        _itemBeingEdited.IsEvent,
-                        EditTxtTitle.Text,
-                        EditTxtLocation.Text,
-                        EditTxtDescription.Text,
-                        EditDatePicker.Date.DateTime,
-                        newStartTime,
-                        newEndTime
-                    );
+                    await _syncManager.CreateItemAsync(
+                        EditTxtTitle.Text, isEvent, isAllDay, EditDatePicker.Date.DateTime,
+                        newStartTime ?? TimeSpan.Zero, newEndTime ?? TimeSpan.Zero, EditTxtLocation.Text, providerName);
                     _ = SyncMonthDataAsync();
                 }
-                catch (Exception ex)
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"新建失败: {ex.Message}"); }
+            }
+            else
+            {
+                if (_localCache.DayItems.TryGetValue(_itemBeingEdited.DateKey, out var oldList))
                 {
-                    System.Diagnostics.Debug.WriteLine($"更新失败: {ex.Message}");
+                    var orig = oldList.FirstOrDefault(x => x.Id == _itemBeingEdited.Id);
+                    if (orig != null)
+                    {
+                        oldList.Remove(orig);
+                        orig.Title = EditTxtTitle.Text;
+                        orig.Location = EditTxtLocation.Text;
+                        orig.Description = EditTxtDescription.Text;
+                        orig.DateKey = newDateKey;
+                        orig.Subtitle = newSubtitleText;
+                        if (!_localCache.DayItems.ContainsKey(newDateKey)) _localCache.DayItems[newDateKey] = new List<AgendaItem>();
+                        _localCache.DayItems[newDateKey].Add(orig);
+                    }
+                }
+                LoadCalendar(_viewDate);
+
+                if (_syncManager != null && !string.IsNullOrEmpty(_itemBeingEdited.Id))
+                {
+                    try
+                    {
+                        await _syncManager.UpdateItemAsync(
+                            _itemBeingEdited.Provider, _itemBeingEdited.Id, _itemBeingEdited.IsEvent,
+                            EditTxtTitle.Text, EditTxtLocation.Text, EditTxtDescription.Text,
+                            EditDatePicker.Date.DateTime, newStartTime, newEndTime);
+                        _ = SyncMonthDataAsync();
+                    }
+                    catch { }
                 }
             }
         }
@@ -509,46 +597,6 @@ namespace Task_Flyout.Views
                     }
                     catch { }
                 }
-            }
-        }
-
-        public void OpenEditDialogFromExternal(AgendaItem item)
-        {
-            Action showDialog = async () =>
-            {
-                _itemBeingEdited = item;
-                EditTxtTitle.Text = item.Title;
-                EditTxtLocation.Text = item.Location;
-                EditTxtDescription.Text = item.Description;
-
-                if (DateTime.TryParse(item.DateKey, out var d)) EditDatePicker.Date = d;
-
-                var timePart = item.Subtitle?.Split('\n').LastOrDefault()?.Trim();
-                if (timePart == "全天" || string.IsNullOrEmpty(timePart))
-                {
-                    EditChkAllDay.IsChecked = true;
-                    EditStartTimePicker.SelectedTime = null;
-                    EditEndTimePicker.SelectedTime = null;
-                }
-                else
-                {
-                    EditChkAllDay.IsChecked = false;
-                    var times = timePart.Split('-');
-                    if (times.Length >= 1 && TimeSpan.TryParse(times[0].Trim(), out var st)) EditStartTimePicker.SelectedTime = st;
-                    if (times.Length >= 2 && TimeSpan.TryParse(times[1].Trim(), out var et)) EditEndTimePicker.SelectedTime = et;
-                }
-
-                EditDialog.XamlRoot = this.XamlRoot;
-                try { await EditDialog.ShowAsync(); } catch { }
-            };
-
-            if (this.XamlRoot == null)
-            {
-                this.Loaded += (s, e) => showDialog();
-            }
-            else
-            {
-                showDialog();
             }
         }
     }
