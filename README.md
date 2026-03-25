@@ -5,6 +5,7 @@
 # Task Flyout
 
 [English](#english) | [简体中文](#简体中文)
+
 [![Platform](https://img.shields.io/badge/Platform-Windows%2011-blue.svg?style=flat-square)](#)
 [![GitHub Release](https://img.shields.io/github/v/release/SherlockChiang/Task-Flyout?style=flat-square)](#)
 [![Tech Stack](https://img.shields.io/badge/Tech-WinUI%203%20%7C%20C%23-purple.svg?style=flat-square)](#)
