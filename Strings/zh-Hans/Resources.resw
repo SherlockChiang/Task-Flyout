@@ -349,7 +349,7 @@
     <value>欢迎使用 Task Flyout</value>
   </data>
   <data name="TextWelcomeSub" xml:space="preserve">
-    <value>请双击右下角托盘图标打开主页面配置账号</value>
+    <value>点击设置按钮绑定账号</value>
   </data>
   <data name="TextStartTime" xml:space="preserve">
     <value>开始时间</value>
@@ -384,8 +384,16 @@
   <data name="TextDaysAgo" xml:space="preserve">
     <value>{0}天前</value>
   </data>
-	<data name="SettingsPage_System.Text" xml:space="preserve"><value>系统与常规</value></data>
-	<data name="SettingsPage_Startup.Header" xml:space="preserve"><value>开机时自动启动</value></data>
-	<data name="SettingsPage_Background.Header" xml:space="preserve"><value>关闭主窗口时保持后台运行 (推荐)</value></data>
-	<data name="RestartRequired_Primary" xml:space="preserve"><value>立即重启</value></data>
+  <data name="SettingsPage_System.Text" xml:space="preserve">
+    <value>系统与常规</value>
+  </data>
+  <data name="SettingsPage_Startup.Header" xml:space="preserve">
+    <value>开机时自动启动</value>
+  </data>
+  <data name="SettingsPage_Background.Header" xml:space="preserve">
+    <value>关闭主窗口时保持后台运行 (推荐)</value>
+  </data>
+  <data name="RestartRequired_Primary" xml:space="preserve">
+    <value>立即重启</value>
+  </data>
 </root>

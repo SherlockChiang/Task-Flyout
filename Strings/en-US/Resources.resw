@@ -349,7 +349,7 @@
     <value>Welcome to Task Flyout</value>
   </data>
   <data name="TextWelcomeSub" xml:space="preserve">
-    <value>Double click tray icon to open settings and link accounts</value>
+    <value>Click setting icon to link accounts</value>
   </data>
   <data name="TextStartTime" xml:space="preserve">
     <value>Start time</value>
