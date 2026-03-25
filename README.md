@@ -40,7 +40,7 @@ This app is currently undergoing Google's official verification process. You mig
 
 ### 🔒 Privacy & Security
 **Your data belongs to you.**
-This software runs locally on your device as a "Public Client". All OAuth credentials and calendar data are saved on your local machine and are **NEVER** collected, stored, or uploaded to any third-party servers. Read our full [Privacy Policy](https://你的用户名.github.io/TaskFlyout-Website/#privacy).
+This software runs locally on your device as a "Public Client". All OAuth credentials and calendar data are saved on your local machine and are **NEVER** collected, stored, or uploaded to any third-party servers. Read our full [Privacy Policy](https://sherlockchiang.github.io/Task-Flyout/#privacy).
 
 ---
 
@@ -68,7 +68,7 @@ This software runs locally on your device as a "Public Client". All OAuth creden
 
 ### 🔒 隐私与安全
 **您的数据，只属于您。**
-本软件作为“公共客户端 (Public Client)”运行在您的本地设备上。所有的 OAuth 凭证与日程数据均保存在您的本地计算机中，**绝不会**收集、存储或上传任何敏感信息至任何第三方服务器。阅读完整的 [隐私政策 (Privacy Policy)](https://你的用户名.github.io/TaskFlyout-Website/#privacy)。
+本软件作为“公共客户端 (Public Client)”运行在您的本地设备上。所有的 OAuth 凭证与日程数据均保存在您的本地计算机中，**绝不会**收集、存储或上传任何敏感信息至任何第三方服务器。阅读完整的 [隐私政策 (Privacy Policy)](https://sherlockchiang.github.io/Task-Flyout/#privacy)。
 
 ---
 <div align="center">
