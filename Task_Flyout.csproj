@@ -54,6 +54,18 @@
     </ItemGroup>
     
     <ItemGroup>
+      <Content Update="Assets\AppIcon.ico">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Update="Assets\TrayIcon_Dark.ico">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Update="Assets\TrayIcon_Light.ico">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+    
+    <ItemGroup>
       <Page Update="Views\SettingsPage.xaml">
         <Generator>MSBuild:Compile</Generator>
       </Page>

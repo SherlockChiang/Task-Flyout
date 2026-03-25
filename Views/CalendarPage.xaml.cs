@@ -14,10 +14,10 @@ using Task_Flyout.Models;
 using Task_Flyout.Services;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System.Globalization;
+using Windows.UI; // 统一引入 Color
 
 namespace Task_Flyout.Views
 {
-    // 莫奈背景色转换器
     public class ProviderToBrushConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
@@ -25,12 +25,12 @@ namespace Task_Flyout.Views
             string provider = (value as string)?.ToLower() ?? "";
 
             if (provider.Contains("google"))
-                return new SolidColorBrush(Windows.UI.Color.FromArgb(255, 89, 118, 186));
+                return new SolidColorBrush(Color.FromArgb(255, 89, 118, 186));
 
             if (provider.Contains("microsoft") || provider.Contains("todo"))
-                return new SolidColorBrush(Windows.UI.Color.FromArgb(255, 230, 175, 115));
+                return new SolidColorBrush(Color.FromArgb(255, 230, 175, 115));
 
-            return new SolidColorBrush(Windows.UI.Color.FromArgb(255, 150, 150, 150));
+            return new SolidColorBrush(Color.FromArgb(255, 150, 150, 150));
         }
         public object ConvertBack(object v, Type t, object p, string l) => throw new NotImplementedException();
     }
@@ -41,11 +41,9 @@ namespace Task_Flyout.Views
         {
             string provider = (value as string)?.ToLower() ?? "";
 
-            // Google 深蓝色底 -> 返回白色文字
             if (provider.Contains("google"))
                 return new SolidColorBrush(Microsoft.UI.Colors.White);
 
-            // Microsoft 浅黄色底 -> 返回黑色文字
             if (provider.Contains("microsoft") || provider.Contains("todo"))
                 return new SolidColorBrush(Microsoft.UI.Colors.Black);
 
@@ -60,11 +58,9 @@ namespace Task_Flyout.Views
         {
             if (value is bool isToday && isToday)
             {
-                // 给“今天”一个轻微的底色强调，如取系统淡强调色
                 if (Application.Current.Resources.TryGetValue("SystemAccentColorLight3", out var res))
-                    return new SolidColorBrush((Windows.UI.Color)res);
+                    return new SolidColorBrush((Color)res);
             }
-            // 正常格子返回透明，消除空色块
             return new SolidColorBrush(Microsoft.UI.Colors.Transparent);
         }
         public object ConvertBack(object v, Type t, object p, string l) => throw new NotImplementedException();
@@ -107,6 +103,7 @@ namespace Task_Flyout.Views
         {
             e.Handled = true;
         }
+
         public CalendarPage()
         {
             this.InitializeComponent();
@@ -122,7 +119,11 @@ namespace Task_Flyout.Views
 
         private void LoadCache()
         {
-            try { if (File.Exists(CacheFilePath)) _localCache = JsonSerializer.Deserialize<AppCache>(File.ReadAllText(CacheFilePath)) ?? new(); }
+            try
+            {
+                if (File.Exists(CacheFilePath))
+                    _localCache = JsonSerializer.Deserialize<AppCache>(File.ReadAllText(CacheFilePath)) ?? new();
+            }
             catch { _localCache = new(); }
         }
 
@@ -172,6 +173,15 @@ namespace Task_Flyout.Views
         {
             if (_syncManager == null || SyncProgress == null) return;
 
+            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
+            bool isGoogle = settings.Values["IsGoogleConnected"] as bool? ?? false;
+            bool isMs = settings.Values["IsMSConnected"] as bool? ?? false;
+
+            if (!isGoogle && !isMs)
+            {
+                return;
+            }
+
             _syncCts?.Cancel();
             _syncCts = new System.Threading.CancellationTokenSource();
             var token = _syncCts.Token;
@@ -206,7 +216,13 @@ namespace Task_Flyout.Views
                     list.Add(item);
                 }
 
-                try { File.WriteAllText(CacheFilePath, JsonSerializer.Serialize(_localCache)); } catch { }
+                try
+                {
+                    var dir = Path.GetDirectoryName(CacheFilePath);
+                    if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                    File.WriteAllText(CacheFilePath, JsonSerializer.Serialize(_localCache));
+                }
+                catch (IOException) { /* 忽略文件被占用的写入失败，不影响运行 */ }
 
                 foreach (var cell in DayCells)
                 {
@@ -247,7 +263,7 @@ namespace Task_Flyout.Views
             if (CalendarGrid.ItemsPanelRoot is ItemsWrapGrid wrapGrid)
             {
                 wrapGrid.ItemWidth = Math.Max(80, e.NewSize.Width / 7.0);
-                wrapGrid.ItemHeight = Math.Max(80, e.NewSize.Height / 6.0); // 这里也可以随动态行数进一步修改，但目前 /6 是安全的兜底
+                wrapGrid.ItemHeight = Math.Max(80, e.NewSize.Height / 6.0);
             }
         }
 
@@ -297,7 +313,7 @@ namespace Task_Flyout.Views
             foreach (var dateKey in upcomingDates)
             {
                 var sortedItems = _localCache.DayItems[dateKey]
-                    .Where(IsItemVisible) // 确保这里同步应用了开关和来源过滤
+                    .Where(IsItemVisible)
                     .OrderBy(i => i.Subtitle == "全天" ? 0 : 1)
                     .ThenBy(i => i.Subtitle);
                 foreach (var item in sortedItems)
@@ -318,20 +334,16 @@ namespace Task_Flyout.Views
                     SelectedDayItems.Add(displayItem);
                     hasItems = true;
                 }
-                if (!hasItems)
-                {
-                    SelectedDayItems.Add(new AgendaItem
-                    {
-                        Title = _loader.GetString("TextNoAgendaTitle"),
-                        Subtitle = "-",
-                        IsEvent = true
-                    });
-                }
             }
 
             if (!hasItems)
             {
-                SelectedDayItems.Add(new AgendaItem { Title = "近期没有安排", Subtitle = "-", IsEvent = true });
+                SelectedDayItems.Add(new AgendaItem
+                {
+                    Title = _loader.GetString("TextNoAgendaTitle") ?? "近期没有安排",
+                    Subtitle = "-",
+                    IsEvent = true
+                });
             }
         }
 
@@ -361,7 +373,7 @@ namespace Task_Flyout.Views
 
         private bool IsItemVisible(AgendaItem item)
         {
-            if (item == null || string.IsNullOrEmpty(item.Provider)) return true; // 安全防空
+            if (item == null || string.IsNullOrEmpty(item.Provider)) return true;
 
             var localSettings = Windows.Storage.ApplicationData.Current.LocalSettings;
             bool showGE = localSettings.Values["ShowGoogleEvents"] as bool? ?? true;
@@ -371,13 +383,11 @@ namespace Task_Flyout.Views
 
             string provider = item.Provider.ToLower();
 
-            // 模糊匹配包含 google 字眼
             if (provider.Contains("google"))
             {
                 if (item.IsEvent && !showGE) return false;
                 if (item.IsTask && !showGT) return false;
             }
-            // 模糊匹配包含 microsoft 或 todo 字眼 (适配 Microsoft To Do)
             else if (provider.Contains("microsoft") || provider.Contains("todo"))
             {
                 if (item.IsEvent && !showME) return false;
@@ -405,6 +415,7 @@ namespace Task_Flyout.Views
             EditEndTimePicker.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
             EditStartTimePicker.Header = isEvent ? _loader.GetString("TextStartTime") : _loader.GetString("TextDueTime");
         }
+
         private void SetupEditProviderComboBox(string forceSelectProvider = null)
         {
             EditCmbProvider.Items.Clear();
@@ -433,14 +444,15 @@ namespace Task_Flyout.Views
                 if (EditCmbProvider.Items.Count > 0) EditCmbProvider.SelectedIndex = 0;
             }
         }
+
         private void BtnAddNew_Click(object sender, RoutedEventArgs e)
         {
             _itemBeingEdited = null;
-            EditDialog.Title = _loader.GetString("TextNewItem");
+            EditDialog.Title = _loader.GetString("TextNewItem") ?? "新建";
             EditDialog.SecondaryButtonText = "";
             SetupEditProviderComboBox();
-            EditCmbProvider.IsEnabled = true; 
-            EditRadioEvent.IsEnabled = true; 
+            EditCmbProvider.IsEnabled = true;
+            EditRadioEvent.IsEnabled = true;
             EditRadioTask.IsEnabled = true;
 
             EditTxtTitle.Text = "";
@@ -459,8 +471,8 @@ namespace Task_Flyout.Views
         private void PrepareDialogForEdit(AgendaItem item)
         {
             _itemBeingEdited = item;
-            EditDialog.Title = _loader.GetString("CalendarDialog/Title");
-            EditDialog.SecondaryButtonText = _loader.GetString("CalendarDialog/SecondaryButtonText"); // 显示"删除"按钮
+            EditDialog.Title = _loader.GetString("CalendarDialog/Title") ?? "编辑";
+            EditDialog.SecondaryButtonText = _loader.GetString("CalendarDialog/SecondaryButtonText") ?? "删除";
 
             EditTxtTitle.Text = item.Title;
             EditTxtLocation.Text = item.Location;
@@ -492,7 +504,7 @@ namespace Task_Flyout.Views
                 else if (EditStartTimePicker.SelectedTime.HasValue) EditEndTimePicker.SelectedTime = EditStartTimePicker.SelectedTime.Value.Add(TimeSpan.FromHours(1));
             }
 
-            EditRadioType_Changed(null, null); 
+            EditRadioType_Changed(null, null);
         }
 
         private async void AgendaCard_Tapped(object sender, TappedRoutedEventArgs e)
@@ -500,7 +512,7 @@ namespace Task_Flyout.Views
             if (e.OriginalSource is FrameworkElement src && (src is CheckBox || src.Parent is CheckBox)) return;
             if ((sender as FrameworkElement)?.DataContext is AgendaItem item)
             {
-                if (item.Title != null && item.Title.Contains(_loader.GetString("TextNoAgendaTitle"))) return;
+                if (item.Title != null && item.Title.Contains(_loader.GetString("TextNoAgendaTitle") ?? "无安排")) return;
                 PrepareDialogForEdit(item);
                 EditDialog.XamlRoot = this.XamlRoot;
                 await EditDialog.ShowAsync();
@@ -526,7 +538,7 @@ namespace Task_Flyout.Views
             TimeSpan? newStartTime = EditChkAllDay.IsChecked == true ? null : EditStartTimePicker.SelectedTime;
             TimeSpan? newEndTime = EditChkAllDay.IsChecked == true ? null : EditEndTimePicker.SelectedTime;
 
-            string newSubtitleText = _loader.GetString("TextAllDay");
+            string newSubtitleText = _loader.GetString("TextAllDay") ?? "全天";
             if (newStartTime.HasValue && newEndTime.HasValue) newSubtitleText = $"{newStartTime.Value:hh\\:mm} - {newEndTime.Value:hh\\:mm}";
             else if (newStartTime.HasValue) newSubtitleText = $"{newStartTime.Value:hh\\:mm}";
 

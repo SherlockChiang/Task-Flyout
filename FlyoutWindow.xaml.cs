@@ -293,6 +293,27 @@ namespace Task_Flyout
 
         private async Task SyncAllDataAsync(bool silent)
         {
+            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
+            bool isGoogle = settings.Values["IsGoogleConnected"] as bool? ?? false;
+            bool isMs = settings.Values["IsMSConnected"] as bool? ?? false;
+
+            if (!isGoogle && !isMs)
+            {
+                if (!silent)
+                {
+                    AgendaItems.Clear();
+                    AgendaItems.Add(new AgendaItem
+                    {
+                        Title = _loader.GetString("TextWelcomeTitle") ?? "未连接账户",
+                        Subtitle = _loader.GetString("TextWelcomeSub") ?? "请点击左下角设置，绑定您的日历账号",
+                        IsEvent = false,
+                        IsTask = false
+                    });
+                    AdjustWindowHeight();
+                }
+                return; 
+            }
+
             if (!silent)
             {
                 AgendaItems.Clear();

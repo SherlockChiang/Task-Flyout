@@ -14,11 +14,12 @@ namespace Task_Flyout
     public sealed partial class MainWindow : Window
     {
         private ResourceLoader _loader;
+
         public MainWindow()
         {
             this.InitializeComponent();
             this.AppWindow.SetIcon(System.IO.Path.Combine(System.AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
-            _loader = new ResourceLoader(); 
+            _loader = new ResourceLoader();
 
             SystemBackdrop = new MicaBackdrop() { Kind = MicaKind.BaseAlt };
             ExtendsContentIntoTitleBar = true;
@@ -42,7 +43,7 @@ namespace Task_Flyout
 
             if (runInBackground)
             {
-                args.Cancel = true; 
+                args.Cancel = true;
                 sender.Hide();
             }
         }
@@ -50,12 +51,13 @@ namespace Task_Flyout
         private void LoadAccountStates()
         {
             var settings = ApplicationData.Current.LocalSettings;
-
             bool isGoogleConnected = settings.Values["IsGoogleConnected"] as bool? ?? false;
+            bool isMSConnected = settings.Values["IsMSConnected"] as bool? ?? false;
+
+            // 👉 修正：移除了误粘贴的悬浮窗拦截代码，恢复主窗口正常的 UI 刷新逻辑
             BtnConnectGoogle.Visibility = isGoogleConnected ? Visibility.Collapsed : Visibility.Visible;
             PanelGoogleToggles.Visibility = isGoogleConnected ? Visibility.Visible : Visibility.Collapsed;
 
-            bool isMSConnected = settings.Values["IsMSConnected"] as bool? ?? false;
             BtnConnectMS.Visibility = isMSConnected ? Visibility.Collapsed : Visibility.Visible;
             PanelMSToggles.Visibility = isMSConnected ? Visibility.Visible : Visibility.Collapsed;
 
@@ -68,7 +70,7 @@ namespace Task_Flyout
 
         private async void BtnConnectGoogle_Click(object sender, RoutedEventArgs e)
         {
-            BtnConnectGoogle.Content = _loader.GetString("TextAuthorizing"); // 👉 替换
+            BtnConnectGoogle.Content = _loader.GetString("TextAuthorizing") ?? "授权中...";
             try
             {
                 if (App.Current is App app)
@@ -81,12 +83,12 @@ namespace Task_Flyout
                 LoadAccountStates();
                 if (ContentFrame.Content is Views.CalendarPage page) page.ForceSync();
             }
-            catch { BtnConnectGoogle.Content = _loader.GetString("TextAuthFailed"); } // 👉 替换
+            catch { BtnConnectGoogle.Content = _loader.GetString("TextAuthFailed") ?? "授权失败"; }
         }
 
         private async void BtnConnectMS_Click(object sender, RoutedEventArgs e)
         {
-            BtnConnectMS.Content = _loader.GetString("TextAuthorizing"); // 👉 替换
+            BtnConnectMS.Content = _loader.GetString("TextAuthorizing") ?? "授权中...";
             try
             {
                 if (App.Current is App app)
@@ -103,7 +105,7 @@ namespace Task_Flyout
             }
             catch (Exception ex)
             {
-                BtnConnectMS.Content = _loader.GetString("TextAuthFailed"); // 👉 替换
+                BtnConnectMS.Content = _loader.GetString("TextAuthFailed") ?? "授权失败";
                 System.Diagnostics.Debug.WriteLine($"============== 微软授权失败 ==============");
                 System.Diagnostics.Debug.WriteLine(ex.ToString());
             }

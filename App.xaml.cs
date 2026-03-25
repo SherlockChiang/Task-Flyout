@@ -29,6 +29,20 @@ namespace Task_Flyout
         public App()
         {
             this.InitializeComponent();
+            this.UnhandledException += (sender, e) =>
+            {
+                e.Handled = true;
+                string errorMsg = $"Fatal Error! Please contact us! \nTime：{DateTime.Now}\nError：{e.Exception.Message}\n\nStack:\n{e.Exception.StackTrace}";
+
+                string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                string logPath = System.IO.Path.Combine(desktopPath, "TaskFlyout_CrashLog.txt");
+
+                try
+                {
+                    System.IO.File.WriteAllText(logPath, errorMsg);
+                }
+                catch { }
+            };
             SyncManager.RegisterProvider(new GoogleSyncProvider());
             SyncManager.RegisterProvider(new Services.MicrosoftSyncProvider());
         }
