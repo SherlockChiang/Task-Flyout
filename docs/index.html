@@ -8,7 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
-            /* 统一使用深色背景，与海报底部的渐变完美融合 */
             background-color: #0f172a; 
             color: #f8fafc;
             font-family: 'Segoe UI', system-ui, sans-serif;
@@ -20,7 +19,6 @@
             -webkit-backdrop-filter: blur(16px);
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
-        /* 隐藏不同语言的类 */
         .hidden-lang { display: none !important; }
     </style>
 </head>
@@ -31,7 +29,7 @@
             <span class="text-blue-500">Task</span> Flyout
         </div>
         <div class="flex items-center space-x-4 md:space-x-6 text-sm font-medium">
-            <a href="#privacy" class="hover:text-blue-400 transition">
+            <a href="privacy.html" class="hover:text-blue-400 transition">
                 <span class="lang-zh">隐私政策</span>
                 <span class="lang-en hidden-lang">Privacy Policy</span>
             </a>
@@ -46,12 +44,10 @@
 
     <header class="relative w-full">
         <img src="poster.png" alt="Task Flyout Poster" class="w-full h-auto object-cover object-top max-h-[75vh]">
-        
         <div class="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none"></div>
     </header>
 
     <main class="flex-grow flex flex-col items-center text-center px-4 pt-12 pb-24 relative z-10">
-        
         <h1 class="text-4xl md:text-6xl font-extrabold mb-6 leading-tight">
             <span class="lang-zh">日程与任务，<br><span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">一触即达。</span></span>
             <span class="lang-en hidden-lang">Schedules and Tasks,<br><span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">Just a Click Away.</span></span>
@@ -71,70 +67,17 @@
         </div>
     </main>
 
-    <section id="privacy" class="py-20 px-4 md:px-10 bg-slate-800/30 border-t border-slate-800">
-        <div class="max-w-4xl mx-auto rounded-2xl">
-            
-            <div class="lang-zh">
-                <h2 class="text-3xl font-bold mb-6 border-b border-gray-700 pb-4">隐私政策</h2>
-                <div class="space-y-4 text-gray-300 leading-relaxed text-sm md:text-base">
-                    <p><strong>最后更新时间：</strong> 2026年3月</p>
-                    <p>Task Flyout（以下简称“本软件”）深知个人隐私的重要性。我们的核心理念是：<strong>您的数据，只属于您。</strong></p>
-                    <h3 class="text-lg text-white font-semibold mt-6">1. 我们收集什么数据？</h3>
-                    <p><strong>本软件不收集、不存储、不上传您的任何个人敏感信息至任何第三方服务器。</strong> 本软件仅作为连接您设备与官方日历服务（Google API、Microsoft Graph API）的本地桥梁。</p>
-                    <h3 class="text-lg text-white font-semibold mt-6">2. OAuth 授权与数据使用</h3>
-                    <p>当您授权本软件访问您的 Google 或 Microsoft 账户时：</p>
-                    <ul class="list-disc pl-6 space-y-2">
-                        <li>您的访问令牌（Token）仅通过系统级加密保存在您<strong>本地计算机的硬盘上</strong>。</li>
-                        <li>您的日程和任务数据仅在您的设备内存中进行加载和展示，关闭软件后即从内存释放。</li>
-                        <li>本软件遵守 <a href="https://developers.google.com/terms/api-services-user-data-policy" class="text-blue-400 hover:underline" target="_blank">Google API 服务用户数据政策</a>，仅请求实现日历读写功能所必需的最少权限。</li>
-                    </ul>
-                    <h3 class="text-lg text-white font-semibold mt-6">3. 联系我们</h3>
-                    <p>如果您对本隐私政策有任何疑问或安全担忧，请通过 GitHub Issues 联系开发者。</p>
-                </div>
-            </div>
-
-            <div class="lang-en hidden-lang">
-                <h2 class="text-3xl font-bold mb-6 border-b border-gray-700 pb-4">Privacy Policy</h2>
-                <div class="space-y-4 text-gray-300 leading-relaxed text-sm md:text-base">
-                    <p><strong>Last Updated:</strong> March 2026</p>
-                    <p>Task Flyout ("we", "our", or "the App") understands the importance of personal privacy. Our core philosophy is simple: <strong>Your data belongs to you.</strong></p>
-                    <h3 class="text-lg text-white font-semibold mt-6">1. What data do we collect?</h3>
-                    <p><strong>The App DOES NOT collect, store, or upload any of your personal or sensitive information to any third-party servers.</strong> It functions strictly as a local bridge connecting your device to official calendar services (Google API, Microsoft Graph API).</p>
-                    <h3 class="text-lg text-white font-semibold mt-6">2. OAuth Authorization and Data Usage</h3>
-                    <p>When you authorize the App to access your Google or Microsoft accounts:</p>
-                    <ul class="list-disc pl-6 space-y-2">
-                        <li>Your access tokens are encrypted and stored <strong>locally on your computer's hard drive</strong>.</li>
-                        <li>Your schedule and task data are loaded solely into your device's memory for display purposes and are released once the app is closed.</li>
-                        <li>The App complies fully with the <a href="https://developers.google.com/terms/api-services-user-data-policy" class="text-blue-400 hover:underline" target="_blank">Google API Services User Data Policy</a>, requesting only the minimum scopes necessary to provide calendar and task functionalities.</li>
-                    </ul>
-                    <h3 class="text-lg text-white font-semibold mt-6">3. Contact Us</h3>
-                    <p>If you have any questions or security concerns regarding this Privacy Policy, please contact the developer via GitHub Issues.</p>
-                </div>
-            </div>
-
-        </div>
-    </section>
-
     <footer class="py-8 text-center text-gray-500 text-sm mt-auto">
         &copy; 2026 Task Flyout. Built with ❤️ and WinUI 3.
     </footer>
 
     <script>
         let currentLang = navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
-
-        document.addEventListener('DOMContentLoaded', () => {
-            updateUI();
-        });
-
-        function toggleLang() {
-            currentLang = currentLang === 'zh' ? 'en' : 'zh';
-            updateUI();
-        }
-
+        document.addEventListener('DOMContentLoaded', () => { updateUI(); });
+        function toggleLang() { currentLang = currentLang === 'zh' ? 'en' : 'zh'; updateUI(); }
         function updateUI() {
             const zhElements = document.querySelectorAll('.lang-zh');
             const enElements = document.querySelectorAll('.lang-en');
-
             if (currentLang === 'zh') {
                 zhElements.forEach(el => el.classList.remove('hidden-lang'));
                 enElements.forEach(el => el.classList.add('hidden-lang'));

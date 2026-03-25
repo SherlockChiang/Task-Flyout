@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN" id="html-root">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="mAf3U9eFHsWBMOwjIkv5Fur_z89PNm73SMIXeJqyAzo" />
+    <title>Privacy Policy - Task Flyout</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0f172a; 
+            color: #f8fafc;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            scroll-behavior: smooth;
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .hidden-lang { display: none !important; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <nav class="fixed top-0 w-full flex justify-between items-center py-4 px-6 md:px-10 glass-card z-50">
+        <div class="text-xl font-bold tracking-wider flex items-center gap-3">
+            <span class="text-blue-500">Task</span> Flyout
+        </div>
+        <div class="flex items-center space-x-4 md:space-x-6 text-sm font-medium">
+            <a href="index.html" class="hover:text-blue-400 transition">
+                <span class="lang-zh">返回主页</span>
+                <span class="lang-en hidden-lang">Back to Home</span>
+            </a>
+            
+            <button onclick="toggleLang()" class="text-gray-300 hover:text-white transition p-2 rounded-full hover:bg-white/10" title="切换语言 / Toggle Language">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802" />
+                </svg>
+            </button>
+        </div>
+    </nav>
+
+    <main class="flex-grow pt-24 pb-20 px-4 md:px-10">
+        <div class="max-w-4xl mx-auto rounded-2xl bg-slate-800/30 border border-slate-700 p-8 md:p-12">
+            
+            <div class="lang-zh">
+                <h1 class="text-3xl font-bold mb-6 border-b border-gray-700 pb-4">隐私政策</h1>
+                <div class="space-y-4 text-gray-300 leading-relaxed text-sm md:text-base">
+                    <p><strong>最后更新时间：</strong> 2026年3月</p>
+                    <p>Task Flyout（以下简称“本软件”）深知个人隐私的重要性。我们的核心理念是：<strong>您的数据，只属于您。</strong></p>
+                    <h2 class="text-lg text-white font-semibold mt-6">1. 我们收集什么数据？</h2>
+                    <p><strong>本软件不收集、不存储、不上传您的任何个人敏感信息至任何第三方服务器。</strong> 本软件仅作为连接您设备与官方日历服务（Google API、Microsoft Graph API）的本地桥梁。</p>
+                    <h2 class="text-lg text-white font-semibold mt-6">2. OAuth 授权与数据使用</h2>
+                    <p>当您授权本软件访问您的 Google 或 Microsoft 账户时：</p>
+                    <ul class="list-disc pl-6 space-y-2">
+                        <li>您的访问令牌（Token）仅通过系统级加密保存在您<strong>本地计算机的硬盘上</strong>。</li>
+                        <li>您的日程和任务数据仅在您的设备内存中进行加载和展示，关闭软件后即从内存释放。</li>
+                        <li>本软件遵守 <a href="https://developers.google.com/terms/api-services-user-data-policy" class="text-blue-400 hover:underline" target="_blank">Google API 服务用户数据政策</a>，仅请求实现日历读写功能所必需的最少权限。</li>
+                    </ul>
+                    <h2 class="text-lg text-white font-semibold mt-6">3. 联系我们</h2>
+                    <p>如果您对本隐私政策有任何疑问或安全担忧，请通过 GitHub Issues 联系开发者。</p>
+                </div>
+            </div>
+
+            <div class="lang-en hidden-lang">
+                <h1 class="text-3xl font-bold mb-6 border-b border-gray-700 pb-4">Privacy Policy</h1>
+                <div class="space-y-4 text-gray-300 leading-relaxed text-sm md:text-base">
+                    <p><strong>Last Updated:</strong> March 2026</p>
+                    <p>Task Flyout ("we", "our", or "the App") understands the importance of personal privacy. Our core philosophy is simple: <strong>Your data belongs to you.</strong></p>
+                    <h2 class="text-lg text-white font-semibold mt-6">1. What data do we collect?</h2>
+                    <p><strong>The App DOES NOT collect, store, or upload any of your personal or sensitive information to any third-party servers.</strong> It functions strictly as a local bridge connecting your device to official calendar services (Google API, Microsoft Graph API).</p>
+                    <h2 class="text-lg text-white font-semibold mt-6">2. OAuth Authorization and Data Usage</h2>
+                    <p>When you authorize the App to access your Google or Microsoft accounts:</p>
+                    <ul class="list-disc pl-6 space-y-2">
+                        <li>Your access tokens are encrypted and stored <strong>locally on your computer's hard drive</strong>.</li>
+                        <li>Your schedule and task data are loaded solely into your device's memory for display purposes and are released once the app is closed.</li>
+                        <li>The App complies fully with the <a href="https://developers.google.com/terms/api-services-user-data-policy" class="text-blue-400 hover:underline" target="_blank">Google API Services User Data Policy</a>, requesting only the minimum scopes necessary to provide calendar and task functionalities.</li>
+                    </ul>
+                    <h2 class="text-lg text-white font-semibold mt-6">3. Contact Us</h2>
+                    <p>If you have any questions or security concerns regarding this Privacy Policy, please contact the developer via GitHub Issues.</p>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <footer class="py-8 text-center text-gray-500 text-sm mt-auto">
+        &copy; 2026 Task Flyout. Built with ❤️ and WinUI 3.
+    </footer>
+
+    <script>
+        let currentLang = navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+        document.addEventListener('DOMContentLoaded', () => { updateUI(); });
+        function toggleLang() { currentLang = currentLang === 'zh' ? 'en' : 'zh'; updateUI(); }
+        function updateUI() {
+            const zhElements = document.querySelectorAll('.lang-zh');
+            const enElements = document.querySelectorAll('.lang-en');
+            if (currentLang === 'zh') {
+                zhElements.forEach(el => el.classList.remove('hidden-lang'));
+                enElements.forEach(el => el.classList.add('hidden-lang'));
+                document.getElementById('html-root').setAttribute('lang', 'zh-CN');
+            } else {
+                zhElements.forEach(el => el.classList.add('hidden-lang'));
+                enElements.forEach(el => el.classList.remove('hidden-lang'));
+                document.getElementById('html-root').setAttribute('lang', 'en');
+            }
+        }
+    </script>
+</body>
+</html>
