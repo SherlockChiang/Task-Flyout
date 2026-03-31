@@ -72,7 +72,6 @@ namespace Task_Flyout
         {
             InitializeComponent();
             _loader = new ResourceLoader();
-            AgendaListControl.ItemsSource = AgendaItems;
 
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             Microsoft.UI.WindowId windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
@@ -86,14 +85,26 @@ namespace Task_Flyout
             ConfigureFlyoutStyle();
             LoadCache();
             StartClock();
+            SetupPeriodicSync();
 
-            MainCalendar.SelectedDates.Add(DateTime.Today);
+            Activated += FlyoutWindow_Activated;
+
+            RootGrid.Loaded += RootGrid_Loaded;
+        }
+
+        private void RootGrid_Loaded(object sender, RoutedEventArgs e)
+        {
+            AgendaListControl.ItemsSource = AgendaItems;
+
+            if (MainCalendar.SelectedDates.Count == 0)
+            {
+                MainCalendar.SelectedDates.Add(DateTime.Today);
+            }
+
             UpdateSelectedDateHeader();
             ShowDataForDate(_selectedDay);
 
-            Activated += FlyoutWindow_Activated;
-            RootGrid.Loaded += (s, e) => _ = SyncAllDataAsync(true);
-            SetupPeriodicSync();
+            _ = SyncAllDataAsync(true);
         }
 
         private void StartClock()
@@ -199,12 +210,11 @@ namespace Task_Flyout
             ShowDataForDate(_selectedDay);
         }
 
-        // 👉 改进：常驻显示相对日期，当选择今天时隐藏后缀
         private void UpdateSelectedDateHeader()
         {
             if (_selectedDay.Date == DateTime.Today)
             {
-                TxtSelectedDateHeader.Text = _loader.GetString("CalendarPage_BtnToday/Content"); // 显示为"今天"
+                TxtSelectedDateHeader.Text = _loader.GetString("CalendarPage_BtnToday/Content") ?? "今天";
                 if (TxtRelativeDate != null) TxtRelativeDate.Visibility = Visibility.Collapsed;
             }
             else
@@ -214,7 +224,7 @@ namespace Task_Flyout
                 if (TxtRelativeDate != null)
                 {
                     int days = (_selectedDay.Date - DateTime.Today).Days;
-                    string relativeStr = days > 0 ? string.Format(_loader.GetString("TextDaysLater"), days) : string.Format(_loader.GetString("TextDaysAgo"), -days);
+                    string relativeStr = days > 0 ? string.Format(_loader.GetString("TextDaysLater") ?? "{0}天后", days) : string.Format(_loader.GetString("TextDaysAgo") ?? "{0}天前", -days);
 
                     TxtRelativeDate.Text = $"({relativeStr})";
                     TxtRelativeDate.Visibility = Visibility.Visible;
@@ -231,8 +241,8 @@ namespace Task_Flyout
             {
                 tempAgenda.Add(new AgendaItem
                 {
-                    Title = _loader.GetString("TextWelcomeTitle"),
-                    Subtitle = _loader.GetString("TextWelcomeSub"),
+                    Title = _loader.GetString("TextWelcomeTitle") ?? "未连接账户",
+                    Subtitle = _loader.GetString("TextWelcomeSub") ?? "请点击设置绑定",
                     IsEvent = false,
                     IsTask = false
                 });
@@ -245,8 +255,8 @@ namespace Task_Flyout
             {
                 tempAgenda.Add(new AgendaItem
                 {
-                    Title = _loader.GetString("TextNoAgendaTitle"),
-                    Subtitle = _loader.GetString("TextNoAgendaSub"),
+                    Title = _loader.GetString("TextNoAgendaTitle") ?? "近期没有安排",
+                    Subtitle = _loader.GetString("TextNoAgendaSub") ?? "享受空闲时光",
                     IsEvent = false,
                     IsTask = false
                 });
@@ -261,8 +271,8 @@ namespace Task_Flyout
                     var nextItems = _localCache.DayItems[nextDayKey];
                     DateTime nextDate = DateTime.Parse(nextDayKey);
                     int daysDiff = (nextDate - date).Days;
-                    string daysLaterText = daysDiff == 1 ? _loader.GetString("TextTomorrow")
-                                                         : (daysDiff == 2 ? _loader.GetString("TextDayAfterTomorrow")
+                    string daysLaterText = daysDiff == 1 ? (_loader.GetString("TextTomorrow") ?? "明天")
+                                                         : (daysDiff == 2 ? (_loader.GetString("TextDayAfterTomorrow") ?? "后天")
                                                          : nextDate.ToString("M", CultureInfo.CurrentUICulture));
                     foreach (var item in nextItems)
                     {
@@ -270,7 +280,7 @@ namespace Task_Flyout
                         {
                             Id = item.Id,
                             Title = item.Title,
-                            Subtitle = $"{_loader.GetString("TextUpcoming")} · {daysLaterText} {item.Subtitle}",
+                            Subtitle = $"{(_loader.GetString("TextUpcoming") ?? "即将到来")} · {daysLaterText} {item.Subtitle}",
                             Location = item.Location,
                             IsEvent = item.IsEvent,
                             IsTask = item.IsTask,
@@ -311,7 +321,7 @@ namespace Task_Flyout
                     });
                     AdjustWindowHeight();
                 }
-                return; 
+                return;
             }
 
             if (!silent)
@@ -319,8 +329,8 @@ namespace Task_Flyout
                 AgendaItems.Clear();
                 AgendaItems.Add(new AgendaItem
                 {
-                    Title = _loader.GetString("TextFullSyncTitle"),
-                    Subtitle = _loader.GetString("TextFullSyncSub"),
+                    Title = _loader.GetString("TextFullSyncTitle") ?? "正在同步...",
+                    Subtitle = _loader.GetString("TextFullSyncSub") ?? "拉取最新数据中",
                     IsEvent = false,
                     IsTask = false
                 });
@@ -369,7 +379,7 @@ namespace Task_Flyout
                     AgendaItems.Clear();
                     AgendaItems.Add(new AgendaItem
                     {
-                        Title = _loader.GetString("TextSyncFailed"),
+                        Title = _loader.GetString("TextSyncFailed") ?? "同步失败",
                         Subtitle = ex.Message,
                         IsEvent = false,
                         IsTask = false
@@ -408,21 +418,18 @@ namespace Task_Flyout
             if (AddPanel != null && AddPanel.Visibility == Visibility.Visible)
             {
                 ContentRow.Height = GridLength.Auto;
-
                 RootGrid.UpdateLayout();
                 RootGrid.Measure(new Windows.Foundation.Size(logicalWidth, double.PositiveInfinity));
-
                 targetLogicalHeight = RootGrid.DesiredSize.Height;
             }
             else
             {
                 ContentRow.Height = new GridLength(1, GridUnitType.Star);
-
                 int listHeight = 0;
                 foreach (var item in AgendaItems)
                 {
-                    if (item.Title == _loader.GetString("TextNoAgendaTitle")) listHeight += 50;
-                    else if (item.Subtitle != null && item.Subtitle.Contains(_loader.GetString("TextUpcoming"))) listHeight += 65;
+                    if (item.Title == (_loader.GetString("TextNoAgendaTitle") ?? "近期没有安排")) listHeight += 50;
+                    else if (item.Subtitle != null && item.Subtitle.Contains(_loader.GetString("TextUpcoming") ?? "即将到来")) listHeight += 65;
                     else listHeight += !string.IsNullOrEmpty(item.Location) ? 75 : 65;
                 }
                 targetLogicalHeight = 500 + listHeight + 45;
@@ -442,7 +449,7 @@ namespace Task_Flyout
 
             if (physicalHeight > maxPhysicalHeight)
             {
-                physicalHeight = maxPhysicalHeight; 
+                physicalHeight = maxPhysicalHeight;
                 AgendaListControl.SetValue(ScrollViewer.VerticalScrollModeProperty, ScrollMode.Enabled);
 
                 if (AddPanelScrollViewer != null)
@@ -497,7 +504,7 @@ namespace Task_Flyout
             TimePickerEnd.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
             TxtTimeSeparator.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
 
-            TimePickerStart.Header = isEvent ? _loader.GetString("TextStartTime") : _loader.GetString("TextDueTime");
+            TimePickerStart.Header = isEvent ? (_loader.GetString("TextStartTime") ?? "开始时间") : (_loader.GetString("TextDueTime") ?? "截止时间");
 
             if (isEvent)
             {
@@ -611,11 +618,11 @@ namespace Task_Flyout
 
             try
             {
-                string timeDisplay = isAllDay ? _loader.GetString("TextAllDay") : (isEvent ? $"{exactStartDateTime:HH:mm} - {exactEndDateTime:HH:mm}" : $"{exactStartDateTime:HH:mm}");
+                string timeDisplay = isAllDay ? (_loader.GetString("TextAllDay") ?? "全天") : (isEvent ? $"{exactStartDateTime:HH:mm} - {exactEndDateTime:HH:mm}" : $"{exactStartDateTime:HH:mm}");
                 AgendaItems.Add(new AgendaItem
                 {
                     Title = title,
-                    Subtitle = $"{timeDisplay} ({_loader.GetString("TextSyncing")})",
+                    Subtitle = $"{timeDisplay} ({_loader.GetString("TextSyncing") ?? "同步中..."})",
                     Location = location,
                     IsTask = !isEvent,
                     IsEvent = isEvent,
@@ -633,7 +640,7 @@ namespace Task_Flyout
 
                 AgendaItems.Insert(0, new AgendaItem
                 {
-                    Title = _loader.GetString("TextAddFailed"),
+                    Title = _loader.GetString("TextAddFailed") ?? "添加失败",
                     Subtitle = ex.Message,
                     IsEvent = false,
                     IsTask = false
