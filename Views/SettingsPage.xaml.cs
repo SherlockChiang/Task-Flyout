@@ -3,8 +3,8 @@ using Microsoft.UI.Xaml.Controls;
 using Windows.Storage;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System;
-using Microsoft.Win32;
-using Microsoft.Windows.AppLifecycle; 
+using Microsoft.Windows.AppLifecycle;
+using Windows.ApplicationModel; // 👉 新增：引入应用模型命名空间
 
 namespace Task_Flyout.Views
 {
@@ -13,9 +13,6 @@ namespace Task_Flyout.Views
         private ResourceLoader _loader;
         private bool _isInitializing = true;
 
-        private const string StartupRegistryKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-        private const string AppName = "TaskFlyout";
-
         public SettingsPage()
         {
             this.InitializeComponent();
@@ -23,7 +20,7 @@ namespace Task_Flyout.Views
             this.Loaded += SettingsPage_Loaded;
         }
 
-        private void SettingsPage_Loaded(object sender, RoutedEventArgs e)
+        private async void SettingsPage_Loaded(object sender, RoutedEventArgs e)
         {
             var theme = ApplicationData.Current.LocalSettings.Values["AppTheme"] as string;
             ThemeComboBox.SelectedIndex = theme switch { "Light" => 1, "Dark" => 2, _ => 0 };
@@ -33,12 +30,16 @@ namespace Task_Flyout.Views
 
             BackgroundToggle.IsOn = ApplicationData.Current.LocalSettings.Values["RunInBackground"] as bool? ?? true;
 
+            // 👉 修改：使用现代化 API 读取自启状态
             try
             {
-                using RegistryKey key = Registry.CurrentUser.OpenSubKey(StartupRegistryKey, false);
-                StartupToggle.IsOn = key?.GetValue(AppName) != null;
+                StartupTask startupTask = await StartupTask.GetAsync("TaskFlyoutStartupId");
+                StartupToggle.IsOn = startupTask.State == StartupTaskState.Enabled;
             }
-            catch { }
+            catch
+            {
+                // 如果在未打包(Unpackaged)模式下调试，这个 API 会报错，这里吞掉异常防止闪退
+            }
 
             _isInitializing = false;
         }
@@ -82,7 +83,7 @@ namespace Task_Flyout.Views
             {
                 Title = _loader.GetString("RestartRequired_Title"),
                 Content = _loader.GetString("RestartRequired_Content"),
-                PrimaryButtonText = _loader.GetString("RestartRequired_Primary"), 
+                PrimaryButtonText = _loader.GetString("RestartRequired_Primary"),
                 CloseButtonText = _loader.GetString("RestartRequired_Close"),
                 XamlRoot = this.XamlRoot
             };
@@ -91,25 +92,35 @@ namespace Task_Flyout.Views
 
             if (result == ContentDialogResult.Primary)
             {
-                AppInstance.Restart(""); 
+                Microsoft.Windows.AppLifecycle.AppInstance.Restart("");
             }
         }
 
-        private void StartupToggle_Toggled(object sender, RoutedEventArgs e)
+        // 👉 修改：使用现代化 API 设置开机自启
+        private async void StartupToggle_Toggled(object sender, RoutedEventArgs e)
         {
             if (_isInitializing) return;
 
             try
             {
-                using RegistryKey key = Registry.CurrentUser.OpenSubKey(StartupRegistryKey, true);
+                StartupTask startupTask = await StartupTask.GetAsync("TaskFlyoutStartupId");
+
                 if (StartupToggle.IsOn)
                 {
-                    string exePath = $"\"{Environment.ProcessPath}\"";
-                    key?.SetValue(AppName, exePath);
+                    // 向系统请求自启权限
+                    StartupTaskState state = await startupTask.RequestEnableAsync();
+
+                    // 如果用户在系统设置里禁用了该应用的自启，或者请求被拒绝，则把开关强行拨回去
+                    if (state != StartupTaskState.Enabled)
+                    {
+                        _isInitializing = true;
+                        StartupToggle.IsOn = false;
+                        _isInitializing = false;
+                    }
                 }
                 else
                 {
-                    key?.DeleteValue(AppName, false);
+                    startupTask.Disable();
                 }
             }
             catch (Exception ex)

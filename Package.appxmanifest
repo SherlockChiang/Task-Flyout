@@ -6,12 +6,13 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   xmlns:systemai="http://schemas.microsoft.com/appx/manifest/systemai/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   IgnorableNamespaces="uap rescap systemai">
 
   <Identity
     Name="Uranus92.TaskFlyout"
     Publisher="CN=Chiang"
-    Version="1.0.0.0" />
+    Version="1.0.1.0" />
 
   <mp:PhoneIdentity PhoneProductId="2397882d-bfcd-481c-b217-774742fc81ff" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
@@ -34,6 +35,11 @@
     <Application Id="App"
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
+	<Extensions>
+	    <desktop:Extension Category="windows.startupTask" Executable="Task_Flyout.exe" EntryPoint="Windows.FullTrustApplication">
+			<desktop:StartupTask TaskId="TaskFlyoutStartupId" Enabled="false" DisplayName="Task Flyout" />
+		</desktop:Extension>
+	</Extensions>
       <uap:VisualElements
         DisplayName="Task Flyout"
         Description="Task Flyout"
