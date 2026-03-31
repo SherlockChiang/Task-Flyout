@@ -28,6 +28,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
+
             <Button x:Uid="Flyout_BtnGoToToday" Grid.Row="0" Margin="16,0,16,12" Background="Transparent" BorderThickness="0"
                     HorizontalAlignment="Left" Padding="0" Click="BtnGoToToday_Click" ToolTipService.ToolTip="回到今天">
                 <StackPanel>
@@ -35,15 +36,22 @@
                     <TextBlock x:Name="TxtRealTimeDate" Text="2023年10月24日 星期二" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                 </StackPanel>
             </Button>
-            <CalendarView x:Name="MainCalendar" Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,12"
-                          Width="320" Height="354" CalendarViewDayItemChanging="MainCalendar_CalendarViewDayItemChanging" SelectedDatesChanged="MainCalendar_SelectedDatesChanged">
-                <CalendarView.CalendarViewDayItemStyle>
-                    <Style TargetType="CalendarViewDayItem">
-                        <Setter Property="CornerRadius" Value="8"/>
-                        <Setter Property="Margin" Value="1"/>
-                    </Style>
-                </CalendarView.CalendarViewDayItemStyle>
-            </CalendarView>
+
+            <Grid Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,12" Width="320" Height="354">
+                <CalendarView x:Name="MainCalendar" 
+                              HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                              CalendarViewDayItemChanging="MainCalendar_CalendarViewDayItemChanging" 
+                              SelectedDatesChanged="MainCalendar_SelectedDatesChanged">
+                    <CalendarView.CalendarViewDayItemStyle>
+                        <Style TargetType="CalendarViewDayItem">
+                            <Setter Property="Margin" Value="1"/>
+                        </Style>
+                    </CalendarView.CalendarViewDayItemStyle>
+                </CalendarView>
+
+                <Canvas x:Name="DotOverlay" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+            </Grid>
+
         </Grid>
 
         <Grid x:Name="AgendaContainer" Grid.Row="1" Margin="16,0,16,0">
@@ -60,8 +68,8 @@
             <Border Grid.Row="1" Background="{ThemeResource ControlFillColorDefaultBrush}"
                     CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                 <ListView x:Name="AgendaListControl" SelectionMode="None" Padding="0,8" 
-					  IsItemClickEnabled="True" ItemClick="AgendaListControl_ItemClick"
-					  ScrollViewer.VerticalScrollBarVisibility="Hidden" ScrollViewer.VerticalScrollMode="Disabled">
+                          IsItemClickEnabled="True" ItemClick="AgendaListControl_ItemClick"
+                          ScrollViewer.VerticalScrollBarVisibility="Hidden" ScrollViewer.VerticalScrollMode="Disabled">
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="models:AgendaItem">
                             <Grid Margin="12,6" HorizontalAlignment="Stretch">

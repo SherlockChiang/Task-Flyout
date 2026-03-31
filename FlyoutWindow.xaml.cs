@@ -55,6 +55,15 @@ namespace Task_Flyout
         private SyncManager _syncManager;
         private ResourceLoader _loader;
 
+        private DateTime _lastHideTime = DateTime.MinValue;
+
+        // 用于控制 Overlay 圆点刷新的防抖机制
+        private DispatcherTimer _dotRefreshTimer;
+        private bool _isDotRefreshPending = false;
+
+        // 👉 新增：缓存日历内部真正的滚动条
+        private ScrollViewer _activeScrollViewer;
+
         private readonly string CacheFilePath =
             System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "TaskFlyout", "local_cache_winui3.json");
@@ -70,6 +79,9 @@ namespace Task_Flyout
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool BringWindowToTop(IntPtr hWnd);
 
         public FlyoutWindow()
         {
@@ -107,6 +119,31 @@ namespace Task_Flyout
             ShowDataForDate(_selectedDay);
 
             _ = SyncAllDataAsync(true);
+        }
+
+        // 👉 核心重写：从底向上溯源，100% 抓取当前真正活动的滚动条！
+        private void HookActiveScrollViewer()
+        {
+            if (_activeScrollViewer != null) return; // 已经抓到了就不用再抓了
+
+            var dayItems = FindAllDayItems(MainCalendar);
+            if (dayItems.Count == 0) return;
+
+            // 随便拿一个正在显示的格子，顺藤摸瓜往上找它的爹
+            DependencyObject current = dayItems[0];
+            while (current != null && current != MainCalendar)
+            {
+                if (current is ScrollViewer sv)
+                {
+                    _activeScrollViewer = sv;
+
+                    // 监听滚动事件：只要滚动条一滑，立刻触发重绘，让圆点丝滑跟随！
+                    _activeScrollViewer.ViewChanging += (s, args) => RequestDotRefresh();
+                    _activeScrollViewer.ViewChanged += (s, args) => RequestDotRefresh();
+                    break;
+                }
+                current = VisualTreeHelper.GetParent(current);
+            }
         }
 
         private void StartClock()
@@ -176,26 +213,154 @@ namespace Task_Flyout
             MainCalendar.SelectedDates.Add(DateTime.Today);
         }
 
+        // ====================================================================
+        // 👉 无硬编码动态 Overlay Canvas 圆点覆盖层方案
+        // ====================================================================
+
         private void MainCalendar_CalendarViewDayItemChanging(CalendarView sender, CalendarViewDayItemChangingEventArgs args)
         {
-            var dateStr = args.Item.Date.Date.ToString("yyyy-MM-dd");
+            if (args.Phase == 0)
+            {
+                args.Item.CornerRadius = new CornerRadius(16);
+                args.Item.SetDensityColors(null); // 清除原生条带
 
-            if (EventCounts.TryGetValue(dateStr, out int count) && count > 0)
-            {
-                Color accentColor = Color.FromArgb(255, 0, 120, 215);
-                if (Application.Current.Resources.TryGetValue("SystemAccentColor", out var res) && res is Color sysColor)
-                {
-                    accentColor = sysColor;
-                }
-                args.Item.Background = new SolidColorBrush(Color.FromArgb(40, accentColor.R, accentColor.G, accentColor.B));
-                args.Item.SetDensityColors(null);
-            }
-            else
-            {
-                args.Item.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
-                args.Item.SetDensityColors(null);
+                var dateStr = args.Item.Date.Date.ToString("yyyy-MM-dd");
+                bool hasEvent = EventCounts.TryGetValue(dateStr, out int count) && count > 0;
+
+                args.Item.FontWeight = hasEvent
+                    ? Microsoft.UI.Text.FontWeights.Bold
+                    : Microsoft.UI.Text.FontWeights.Normal;
+
+                // 注册 Loaded，一旦格子布局完成，触发覆盖层刷新
+                args.Item.Loaded -= DayItem_Loaded;
+                args.Item.Loaded += DayItem_Loaded;
             }
         }
+
+        private void DayItem_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (_dotRefreshTimer == null)
+            {
+                _dotRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+                _dotRefreshTimer.Tick += (s, args) =>
+                {
+                    _dotRefreshTimer.Stop();
+                    RequestDotRefresh();
+                };
+            }
+            _dotRefreshTimer.Stop();
+            _dotRefreshTimer.Start();
+        }
+
+        // 高性能防抖：无论同一帧触发多少次滚动，只渲染一次，拒绝卡顿
+        private void RequestDotRefresh()
+        {
+            if (_isDotRefreshPending) return;
+            _isDotRefreshPending = true;
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                _isDotRefreshPending = false;
+                RefreshAllDots();
+            });
+        }
+
+        private void RefreshAllDots()
+        {
+            if (DotOverlay == null || MainCalendar == null) return;
+
+            // 尝试绑定真正的滚动条（只需成功执行一次）
+            HookActiveScrollViewer();
+
+            DotOverlay.Children.Clear();
+
+            if (EventCounts == null || EventCounts.Count == 0) return;
+
+            Color accentColor = Color.FromArgb(255, 0, 120, 215);
+            if (Application.Current.Resources.TryGetValue("SystemAccentColor", out var res) && res is Color sysColor)
+                accentColor = sysColor;
+
+            var dayItems = FindAllDayItems(MainCalendar);
+            foreach (var item in dayItems)
+            {
+                var dateStr = item.Date.Date.ToString("yyyy-MM-dd");
+                if (!EventCounts.TryGetValue(dateStr, out int count) || count <= 0)
+                    continue;
+
+                try
+                {
+                    double dotSize = 4.5;
+                    double spacing = 2.5;
+                    double bottomMargin = 6; // UI 设计内边距，并非绝对坐标的硬编码
+
+                    // 👉 彻底放弃硬编码高度，利用真正的 activeScrollViewer 动态裁剪！
+                    if (_activeScrollViewer != null)
+                    {
+                        var transformToSv = item.TransformToVisual(_activeScrollViewer);
+                        var posInSv = transformToSv.TransformPoint(new Windows.Foundation.Point(0, 0));
+
+                        // 获取圆点在滚动条里的相对 Y 坐标
+                        double dotYInSv = posInSv.Y + item.ActualHeight - bottomMargin;
+
+                        // 动态裁剪：如果圆点在滚动条上方（藏在标题下面）或下方（出界了），直接不画！完美防漏出。
+                        if (dotYInSv < 0 || dotYInSv > _activeScrollViewer.ActualHeight)
+                            continue;
+                    }
+
+                    // 如果圆点在安全区内，计算它在透明 Canvas 上的坐标并绘制
+                    var transformToCanvas = item.TransformToVisual(DotOverlay);
+                    var posInCanvas = transformToCanvas.TransformPoint(new Windows.Foundation.Point(0, 0));
+
+                    int dotsToShow = Math.Min(count, 3);
+                    double totalWidth = (dotsToShow * dotSize) + ((dotsToShow - 1) * spacing);
+
+                    double startX = posInCanvas.X + (item.ActualWidth - totalWidth) / 2;
+                    double dotYInCanvas = posInCanvas.Y + item.ActualHeight - dotSize - bottomMargin;
+
+                    for (int i = 0; i < dotsToShow; i++)
+                    {
+                        var dot = new Microsoft.UI.Xaml.Shapes.Ellipse
+                        {
+                            Width = dotSize,
+                            Height = dotSize,
+                            Fill = new SolidColorBrush(accentColor),
+                            IsHitTestVisible = false
+                        };
+
+                        Canvas.SetLeft(dot, startX + i * (dotSize + spacing));
+                        Canvas.SetTop(dot, dotYInCanvas);
+                        DotOverlay.Children.Add(dot);
+                    }
+                }
+                catch
+                {
+                    // 滚动太快时偶尔找不到 Visual 边界，忽略即可，下一帧马上补全
+                }
+            }
+        }
+
+        private List<CalendarViewDayItem> FindAllDayItems(DependencyObject parent)
+        {
+            var result = new List<CalendarViewDayItem>();
+            if (parent == null) return result;
+
+            int count = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is CalendarViewDayItem dayItem)
+                {
+                    result.Add(dayItem);
+                }
+                else
+                {
+                    result.AddRange(FindAllDayItems(child));
+                }
+            }
+            return result;
+        }
+
+        // ====================================================================
 
         private void MainCalendar_SelectedDatesChanged(CalendarView sender, CalendarViewSelectedDatesChangedEventArgs args)
         {
@@ -371,7 +536,12 @@ namespace Task_Flyout
                 EventCounts = tempEventCounts;
                 await SaveCache();
 
+                // 强制日历重新渲染所有格子
+                MainCalendar.DisplayMode = CalendarViewDisplayMode.Year;
+                MainCalendar.DisplayMode = CalendarViewDisplayMode.Month;
                 MainCalendar.UpdateLayout();
+
+                RequestDotRefresh();
                 ShowDataForDate(_selectedDay);
             }
             catch (Exception ex)
@@ -392,19 +562,24 @@ namespace Task_Flyout
 
         public void ToggleFlyout()
         {
+            if ((DateTime.Now - _lastHideTime).TotalMilliseconds < 250) return;
+
             if (_appWindow.IsVisible)
             {
                 _appWindow.Hide();
+                _lastHideTime = DateTime.Now;
             }
             else
             {
                 AdjustWindowHeight();
-                _appWindow.Show();
                 Activate();
+                _appWindow.Show();
 
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 SetForegroundWindow(hWnd);
+                BringWindowToTop(hWnd);
 
+                MainCalendar.Focus(FocusState.Programmatic);
                 UpdateClock();
 
                 if (MainCalendar.SelectedDates.Count == 0 || MainCalendar.SelectedDates[0].Date != DateTime.Today)
@@ -484,11 +659,13 @@ namespace Task_Flyout
             _appWindow.Move(new PointInt32(targetX, targetY));
         }
 
-        // 👉 这个事件现在可以完美生效了！因为上面的 ToggleFlyout 强制拿到了焦点
         private void FlyoutWindow_Activated(object sender, WindowActivatedEventArgs args)
         {
             if (args.WindowActivationState == WindowActivationState.Deactivated)
+            {
                 _appWindow.Hide();
+                _lastHideTime = DateTime.Now;
+            }
         }
 
         private async void TaskCheckBox_Click(object sender, RoutedEventArgs e)
