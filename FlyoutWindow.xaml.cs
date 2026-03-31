@@ -68,6 +68,9 @@ namespace Task_Flyout
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern uint GetDpiForWindow(IntPtr hwnd);
 
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
         public FlyoutWindow()
         {
             InitializeComponent();
@@ -88,7 +91,6 @@ namespace Task_Flyout
             SetupPeriodicSync();
 
             Activated += FlyoutWindow_Activated;
-
             RootGrid.Loaded += RootGrid_Loaded;
         }
 
@@ -391,12 +393,18 @@ namespace Task_Flyout
         public void ToggleFlyout()
         {
             if (_appWindow.IsVisible)
+            {
                 _appWindow.Hide();
+            }
             else
             {
                 AdjustWindowHeight();
                 _appWindow.Show();
                 Activate();
+
+                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                SetForegroundWindow(hWnd);
+
                 UpdateClock();
 
                 if (MainCalendar.SelectedDates.Count == 0 || MainCalendar.SelectedDates[0].Date != DateTime.Today)
@@ -476,7 +484,12 @@ namespace Task_Flyout
             _appWindow.Move(new PointInt32(targetX, targetY));
         }
 
-        private void FlyoutWindow_Activated(object sender, WindowActivatedEventArgs args) { if (args.WindowActivationState == WindowActivationState.Deactivated) _appWindow.Hide(); }
+        // 👉 这个事件现在可以完美生效了！因为上面的 ToggleFlyout 强制拿到了焦点
+        private void FlyoutWindow_Activated(object sender, WindowActivatedEventArgs args)
+        {
+            if (args.WindowActivationState == WindowActivationState.Deactivated)
+                _appWindow.Hide();
+        }
 
         private async void TaskCheckBox_Click(object sender, RoutedEventArgs e)
         {
