@@ -77,10 +77,12 @@ namespace Task_Flyout
                 {
                     var provider = app.SyncManager.Providers.FirstOrDefault(p => p.ProviderName == "Google");
                     if (provider != null) await provider.EnsureAuthorizedAsync();
-                    await app.SyncManager.GetAllDataAsync(DateTime.Today, DateTime.Today.AddDays(1));
+
                 }
+
                 Windows.Storage.ApplicationData.Current.LocalSettings.Values["IsGoogleConnected"] = true;
                 LoadAccountStates();
+
                 if (ContentFrame.Content is Views.CalendarPage page) page.ForceSync();
             }
             catch { BtnConnectGoogle.Content = _loader.GetString("TextAuthFailed") ?? "授权失败"; }
@@ -97,10 +99,12 @@ namespace Task_Flyout
                     if (provider == null) throw new Exception("未注册 MicrosoftSyncProvider");
 
                     await provider.EnsureAuthorizedAsync();
-                    await app.SyncManager.GetAllDataAsync(DateTime.Today, DateTime.Today.AddDays(1));
+
                 }
+
                 Windows.Storage.ApplicationData.Current.LocalSettings.Values["IsMSConnected"] = true;
                 LoadAccountStates();
+
                 if (ContentFrame.Content is Views.CalendarPage page) page.ForceSync();
             }
             catch (Exception ex)
