@@ -31,7 +31,7 @@ A modern tray calendar built for Windows 11. Seamlessly syncs with Google Calend
 ### 🚀 Installation
 1. Go to the [Releases page](https://github.com/SherlockChiang/Task-Flyout/releases/latest) and download the latest `.zip` package.
 2. Extract the archive to a local folder.
-3. **Right-click** the `一键安装器.bat` script and select **"Run as administrator"**.
+3. **Right-click** the `install.bat` script and select **"Run as administrator"**.
 4. The script will automatically import the trusted certificate and install the app.
 
 ### ⚠️ Google OAuth Notice
@@ -59,7 +59,7 @@ This software runs locally on your device as a "Public Client". All OAuth creden
 ### 🚀 安装指南
 1. 前往 [Releases 页面](https://github.com/SherlockChiang/Task-Flyout/releases/latest) 下载最新的 `.zip` 压缩包。
 2. 将压缩包解压到本地文件夹。
-3. **右键**点击文件夹中的 `一键安装器.bat`，选择 **“以管理员身份运行”**。
+3. **右键**点击文件夹中的 `install.bat`，选择 **“以管理员身份运行”**。
 4. 脚本会自动导入证书并安装应用，安装完成后即可在系统菜单中找到 **Task Flyout**。
 
 ### ⚠️ 登录与授权须知
