@@ -14,8 +14,18 @@ namespace Task_Flyout.Services
 
         public async Task<List<AgendaItem>> GetAllDataAsync(DateTime min, DateTime max)
         {
+            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
+            bool isGoogleConnected = settings.Values["IsGoogleConnected"] as bool? ?? false;
+            bool isMSConnected = settings.Values["IsMSConnected"] as bool? ?? false;
+
             var allItems = new List<AgendaItem>();
-            var fetchTasks = _providers.Select(async provider =>
+
+            var activeProviders = _providers.Where(p =>
+                (p.ProviderName == "Google" && isGoogleConnected) ||
+                (p.ProviderName == "Microsoft" && isMSConnected)
+            ).ToList();
+
+            var fetchTasks = activeProviders.Select(async provider =>
             {
                 try
                 {
@@ -26,7 +36,10 @@ namespace Task_Flyout.Services
             });
 
             var results = await Task.WhenAll(fetchTasks);
-            foreach (var result in results) allItems.AddRange(result);
+            foreach (var result in results)
+            {
+                if (result != null) allItems.AddRange(result);
+            }
 
             return allItems;
         }
