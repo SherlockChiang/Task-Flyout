@@ -154,9 +154,9 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TimePicker x:Uid="Flyout_TimePickerStart" x:Name="TimePickerStart" Header="开始时间" ClockIdentifier="24HourClock" HorizontalAlignment="Stretch"/>
-                            <TextBlock x:Uid="Flyout_TxtTimeSeparator" x:Name="TxtTimeSeparator" Grid.Column="1" Text="至" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="8,0,8,8" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                            <TimePicker x:Uid="Flyout_TimePickerEnd" x:Name="TimePickerEnd" Grid.Column="2" Header="结束时间" ClockIdentifier="24HourClock" HorizontalAlignment="Stretch"/>
+                            <ComboBox x:Name="CmbStartHour" Header="开始时间" HorizontalAlignment="Stretch"/>
+                            <TextBlock x:Name="TxtTimeSeparator" Grid.Column="1" Text="—" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="8,0,8,8" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <ComboBox x:Name="CmbEndHour" Grid.Column="2" Header="结束时间" HorizontalAlignment="Stretch"/>
                         </Grid>
                     </StackPanel>
 

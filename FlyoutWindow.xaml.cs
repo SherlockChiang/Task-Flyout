@@ -83,6 +83,16 @@ namespace Task_Flyout
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool BringWindowToTop(IntPtr hWnd);
 
+        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+        private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+        private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        private const int GWL_STYLE = -16;
+        private const int WS_THICKFRAME = 0x00040000;
+        private const int WS_CAPTION = 0x00C00000;
+
         public FlyoutWindow()
         {
             InitializeComponent();
@@ -174,6 +184,13 @@ namespace Task_Flyout
                 presenter.IsResizable = false; presenter.IsAlwaysOnTop = true; presenter.SetBorderAndTitleBar(false, false);
             }
             _appWindow.IsShownInSwitchers = false;
+
+            // 移除 Win32 窗口边框，消除深色模式下的白边
+            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            int style = GetWindowLong(hWnd, GWL_STYLE);
+            style &= ~WS_THICKFRAME;
+            style &= ~WS_CAPTION;
+            SetWindowLong(hWnd, GWL_STYLE, style);
         }
 
         private void LoadCache()
@@ -187,7 +204,7 @@ namespace Task_Flyout
                     EventCounts.Clear();
                     foreach (var kvp in _localCache.DayItems)
                     {
-                        int count = kvp.Value.Count(i => i.IsEvent || (i.IsTask && !i.IsCompleted));
+                        int count = kvp.Value.Count(i => IsItemVisible(i) && (i.IsEvent || (i.IsTask && !i.IsCompleted)));
                         if (count > 0) EventCounts[kvp.Key] = count;
                     }
                 }
@@ -414,9 +431,9 @@ namespace Task_Flyout
                     IsTask = false
                 });
             }
-            else if (_localCache.DayItems.ContainsKey(key) && _localCache.DayItems[key].Count > 0)
+            else if (_localCache.DayItems.ContainsKey(key) && _localCache.DayItems[key].Any(IsItemVisible))
             {
-                tempAgenda.AddRange(_localCache.DayItems[key]);
+                tempAgenda.AddRange(_localCache.DayItems[key].Where(IsItemVisible));
             }
             else
             {
@@ -431,11 +448,11 @@ namespace Task_Flyout
                 var nextDayKey = _localCache.DayItems.Keys
                     .Where(k => string.Compare(k, key) > 0)
                     .OrderBy(k => k)
-                    .FirstOrDefault(k => _localCache.DayItems[k].Count > 0);
+                    .FirstOrDefault(k => _localCache.DayItems[k].Any(IsItemVisible));
 
                 if (nextDayKey != null)
                 {
-                    var nextItems = _localCache.DayItems[nextDayKey];
+                    var nextItems = _localCache.DayItems[nextDayKey].Where(IsItemVisible).ToList();
                     DateTime nextDate = DateTime.Parse(nextDayKey);
                     int daysDiff = (nextDate - date).Days;
                     string daysLaterText = daysDiff == 1 ? (_loader.GetString("TextTomorrow") ?? "明天")
@@ -523,7 +540,7 @@ namespace Task_Flyout
 
                     tempDayItems[item.DateKey].Add(item);
 
-                    if (item.IsEvent || (item.IsTask && !item.IsCompleted))
+                    if (IsItemVisible(item) && (item.IsEvent || (item.IsTask && !item.IsCompleted)))
                     {
                         tempMarkedDates.Add(item.DateKey);
                         if (!tempEventCounts.ContainsKey(item.DateKey)) tempEventCounts[item.DateKey] = 0;
@@ -668,6 +685,31 @@ namespace Task_Flyout
             }
         }
 
+        private bool IsItemVisible(AgendaItem item)
+        {
+            if (item == null || string.IsNullOrEmpty(item.Provider)) return true;
+
+            var localSettings = Windows.Storage.ApplicationData.Current.LocalSettings;
+            bool showGE = localSettings.Values["ShowGoogleEvents"] as bool? ?? true;
+            bool showGT = localSettings.Values["ShowGoogleTasks"] as bool? ?? true;
+            bool showME = localSettings.Values["ShowMSEvents"] as bool? ?? true;
+            bool showMT = localSettings.Values["ShowMSTasks"] as bool? ?? true;
+
+            string provider = item.Provider.ToLower();
+
+            if (provider.Contains("google"))
+            {
+                if (item.IsEvent && !showGE) return false;
+                if (item.IsTask && !showGT) return false;
+            }
+            else if (provider.Contains("microsoft") || provider.Contains("todo"))
+            {
+                if (item.IsEvent && !showME) return false;
+                if (item.IsTask && !showMT) return false;
+            }
+            return true;
+        }
+
         private async void TaskCheckBox_Click(object sender, RoutedEventArgs e)
         {
             if (sender is CheckBox cb && cb.DataContext is AgendaItem item && item.IsTask)
@@ -684,25 +726,39 @@ namespace Task_Flyout
             }
         }
 
+        private void InitHourComboBoxes()
+        {
+            CmbStartHour.Items.Clear();
+            CmbEndHour.Items.Clear();
+            for (int h = 0; h < 24; h++)
+            {
+                string label = $"{h:D2}:00";
+                CmbStartHour.Items.Add(label);
+                CmbEndHour.Items.Add(label);
+            }
+            CmbStartHour.SelectedIndex = 9;  // 默认 09:00
+            CmbEndHour.SelectedIndex = 10;   // 默认 10:00
+        }
+
         private void RadioType_Changed(object sender, RoutedEventArgs e)
         {
-            if (TxtLocation == null || TimePickerEnd == null || TxtTimeSeparator == null || TimePickerStart == null) return;
+            if (TxtLocation == null || CmbEndHour == null || TxtTimeSeparator == null || CmbStartHour == null) return;
 
             bool isEvent = RadioTypeEvent.IsChecked == true;
 
             TxtLocation.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
-            TimePickerEnd.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
+            CmbEndHour.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
             TxtTimeSeparator.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
 
-            TimePickerStart.Header = isEvent ? (_loader.GetString("TextStartTime") ?? "开始时间") : (_loader.GetString("TextDueTime") ?? "截止时间");
+            CmbStartHour.Header = isEvent ? (_loader.GetString("TextStartTime") ?? "开始时间") : (_loader.GetString("TextDueTime") ?? "截止时间");
 
             if (isEvent)
             {
-                Grid.SetColumnSpan(TimePickerStart, 1);
+                Grid.SetColumnSpan(CmbStartHour, 1);
             }
             else
             {
-                Grid.SetColumnSpan(TimePickerStart, 3);
+                Grid.SetColumnSpan(CmbStartHour, 3);
             }
 
             if (AddPanel != null && AddPanel.Visibility == Visibility.Visible)
@@ -765,6 +821,7 @@ namespace Task_Flyout
             else
             {
                 SetupFlyoutProviderComboBox();
+                InitHourComboBoxes();
                 AddPanel.Visibility = Visibility.Visible;
                 if (AgendaContainer != null) AgendaContainer.Visibility = Visibility.Collapsed;
             }
@@ -794,8 +851,11 @@ namespace Task_Flyout
             string location = TxtLocation.Text;
             string providerName = (CmbAddProvider.SelectedItem as ComboBoxItem)?.Tag.ToString() ?? "Google";
 
-            TimeSpan startTime = TimePickerStart.Time;
-            TimeSpan endTime = TimePickerEnd.Time;
+            int startHour = CmbStartHour.SelectedIndex >= 0 ? CmbStartHour.SelectedIndex : 9;
+            int endHour = CmbEndHour.SelectedIndex >= 0 ? CmbEndHour.SelectedIndex : startHour + 1;
+
+            TimeSpan startTime = TimeSpan.FromHours(startHour);
+            TimeSpan endTime = TimeSpan.FromHours(endHour);
 
             if (isEvent && endTime <= startTime) endTime = startTime.Add(TimeSpan.FromHours(1));
 
@@ -808,7 +868,7 @@ namespace Task_Flyout
 
             try
             {
-                string timeDisplay = isAllDay ? (_loader.GetString("TextAllDay") ?? "全天") : (isEvent ? $"{exactStartDateTime:HH:mm} - {exactEndDateTime:HH:mm}" : $"{exactStartDateTime:HH:mm}");
+                string timeDisplay = isAllDay ? (_loader.GetString("TextAllDay") ?? "全天") : (isEvent ? $"{exactStartDateTime:HH}:00 - {exactEndDateTime:HH}:00" : $"{exactStartDateTime:HH}:00");
                 AgendaItems.Add(new AgendaItem
                 {
                     Title = title,
