@@ -148,16 +148,10 @@
                     <StackPanel Spacing="8">
                         <CheckBox x:Uid="Flyout_ChkAllDay" x:Name="ChkAllDay" Content="全天" IsChecked="False" Checked="ChkAllDay_Checked" Unchecked="ChkAllDay_Unchecked" Margin="0,0,0,-4"/>
 
-                        <Grid x:Name="TimePanel">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <ComboBox x:Name="CmbStartHour" Header="开始时间" HorizontalAlignment="Stretch"/>
-                            <TextBlock x:Name="TxtTimeSeparator" Grid.Column="1" Text="—" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="8,0,8,8" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                            <ComboBox x:Name="CmbEndHour" Grid.Column="2" Header="结束时间" HorizontalAlignment="Stretch"/>
-                        </Grid>
+                        <StackPanel x:Name="TimePanel" Spacing="8">
+                            <TimePicker x:Uid="Flyout_TimePickerStart" x:Name="TimePickerStart" Header="开始时间" ClockIdentifier="24HourClock" HorizontalAlignment="Stretch" MinuteIncrement="5"/>
+                            <TimePicker x:Uid="Flyout_TimePickerEnd" x:Name="TimePickerEnd" Header="结束时间" ClockIdentifier="24HourClock" HorizontalAlignment="Stretch" MinuteIncrement="5"/>
+                        </StackPanel>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">

@@ -57,11 +57,9 @@ namespace Task_Flyout
 
         private DateTime _lastHideTime = DateTime.MinValue;
 
-        // 用于控制 Overlay 圆点刷新的防抖机制
         private DispatcherTimer _dotRefreshTimer;
         private bool _isDotRefreshPending = false;
 
-        // 👉 新增：缓存日历内部真正的滚动条
         private ScrollViewer _activeScrollViewer;
 
         private readonly string CacheFilePath =
@@ -131,23 +129,19 @@ namespace Task_Flyout
             _ = SyncAllDataAsync(true);
         }
 
-        // 👉 核心重写：从底向上溯源，100% 抓取当前真正活动的滚动条！
         private void HookActiveScrollViewer()
         {
-            if (_activeScrollViewer != null) return; // 已经抓到了就不用再抓了
+            if (_activeScrollViewer != null) return;
 
             var dayItems = FindAllDayItems(MainCalendar);
             if (dayItems.Count == 0) return;
 
-            // 随便拿一个正在显示的格子，顺藤摸瓜往上找它的爹
             DependencyObject current = dayItems[0];
             while (current != null && current != MainCalendar)
             {
                 if (current is ScrollViewer sv)
                 {
                     _activeScrollViewer = sv;
-
-                    // 监听滚动事件：只要滚动条一滑，立刻触发重绘，让圆点丝滑跟随！
                     _activeScrollViewer.ViewChanging += (s, args) => RequestDotRefresh();
                     _activeScrollViewer.ViewChanged += (s, args) => RequestDotRefresh();
                     break;
@@ -185,7 +179,6 @@ namespace Task_Flyout
             }
             _appWindow.IsShownInSwitchers = false;
 
-            // 移除 Win32 窗口边框，消除深色模式下的白边
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             int style = GetWindowLong(hWnd, GWL_STYLE);
             style &= ~WS_THICKFRAME;
@@ -204,7 +197,8 @@ namespace Task_Flyout
                     EventCounts.Clear();
                     foreach (var kvp in _localCache.DayItems)
                     {
-                        int count = kvp.Value.Count(i => IsItemVisible(i) && (i.IsEvent || (i.IsTask && !i.IsCompleted)));
+                        // 👉 修改：不再过滤 IsCompleted，只要是可见的任务/日程都算一个圆点
+                        int count = kvp.Value.Count(i => IsItemVisible(i));
                         if (count > 0) EventCounts[kvp.Key] = count;
                     }
                 }
@@ -230,16 +224,12 @@ namespace Task_Flyout
             MainCalendar.SelectedDates.Add(DateTime.Today);
         }
 
-        // ====================================================================
-        // 👉 无硬编码动态 Overlay Canvas 圆点覆盖层方案
-        // ====================================================================
-
         private void MainCalendar_CalendarViewDayItemChanging(CalendarView sender, CalendarViewDayItemChangingEventArgs args)
         {
             if (args.Phase == 0)
             {
                 args.Item.CornerRadius = new CornerRadius(16);
-                args.Item.SetDensityColors(null); // 清除原生条带
+                args.Item.SetDensityColors(null);
 
                 var dateStr = args.Item.Date.Date.ToString("yyyy-MM-dd");
                 bool hasEvent = EventCounts.TryGetValue(dateStr, out int count) && count > 0;
@@ -248,7 +238,6 @@ namespace Task_Flyout
                     ? Microsoft.UI.Text.FontWeights.Bold
                     : Microsoft.UI.Text.FontWeights.Normal;
 
-                // 注册 Loaded，一旦格子布局完成，触发覆盖层刷新
                 args.Item.Loaded -= DayItem_Loaded;
                 args.Item.Loaded += DayItem_Loaded;
             }
@@ -269,7 +258,6 @@ namespace Task_Flyout
             _dotRefreshTimer.Start();
         }
 
-        // 高性能防抖：无论同一帧触发多少次滚动，只渲染一次，拒绝卡顿
         private void RequestDotRefresh()
         {
             if (_isDotRefreshPending) return;
@@ -286,9 +274,7 @@ namespace Task_Flyout
         {
             if (DotOverlay == null || MainCalendar == null) return;
 
-            // 尝试绑定真正的滚动条（只需成功执行一次）
             HookActiveScrollViewer();
-
             DotOverlay.Children.Clear();
 
             if (EventCounts == null || EventCounts.Count == 0) return;
@@ -308,23 +294,19 @@ namespace Task_Flyout
                 {
                     double dotSize = 4.5;
                     double spacing = 2.5;
-                    double bottomMargin = 6; // UI 设计内边距，并非绝对坐标的硬编码
+                    double bottomMargin = 6;
 
-                    // 👉 彻底放弃硬编码高度，利用真正的 activeScrollViewer 动态裁剪！
                     if (_activeScrollViewer != null)
                     {
                         var transformToSv = item.TransformToVisual(_activeScrollViewer);
                         var posInSv = transformToSv.TransformPoint(new Windows.Foundation.Point(0, 0));
 
-                        // 获取圆点在滚动条里的相对 Y 坐标
                         double dotYInSv = posInSv.Y + item.ActualHeight - bottomMargin;
 
-                        // 动态裁剪：如果圆点在滚动条上方（藏在标题下面）或下方（出界了），直接不画！完美防漏出。
                         if (dotYInSv < 0 || dotYInSv > _activeScrollViewer.ActualHeight)
                             continue;
                     }
 
-                    // 如果圆点在安全区内，计算它在透明 Canvas 上的坐标并绘制
                     var transformToCanvas = item.TransformToVisual(DotOverlay);
                     var posInCanvas = transformToCanvas.TransformPoint(new Windows.Foundation.Point(0, 0));
 
@@ -351,7 +333,6 @@ namespace Task_Flyout
                 }
                 catch
                 {
-                    // 滚动太快时偶尔找不到 Visual 边界，忽略即可，下一帧马上补全
                 }
             }
         }
@@ -376,8 +357,6 @@ namespace Task_Flyout
             }
             return result;
         }
-
-        // ====================================================================
 
         private void MainCalendar_SelectedDatesChanged(CalendarView sender, CalendarViewSelectedDatesChangedEventArgs args)
         {
@@ -540,7 +519,7 @@ namespace Task_Flyout
 
                     tempDayItems[item.DateKey].Add(item);
 
-                    if (IsItemVisible(item) && (item.IsEvent || (item.IsTask && !item.IsCompleted)))
+                    if (IsItemVisible(item))
                     {
                         tempMarkedDates.Add(item.DateKey);
                         if (!tempEventCounts.ContainsKey(item.DateKey)) tempEventCounts[item.DateKey] = 0;
@@ -553,7 +532,6 @@ namespace Task_Flyout
                 EventCounts = tempEventCounts;
                 await SaveCache();
 
-                // 强制日历重新渲染所有格子
                 MainCalendar.DisplayMode = CalendarViewDisplayMode.Year;
                 MainCalendar.DisplayMode = CalendarViewDisplayMode.Month;
                 MainCalendar.UpdateLayout();
@@ -726,40 +704,16 @@ namespace Task_Flyout
             }
         }
 
-        private void InitHourComboBoxes()
-        {
-            CmbStartHour.Items.Clear();
-            CmbEndHour.Items.Clear();
-            for (int h = 0; h < 24; h++)
-            {
-                string label = $"{h:D2}:00";
-                CmbStartHour.Items.Add(label);
-                CmbEndHour.Items.Add(label);
-            }
-            CmbStartHour.SelectedIndex = 9;  // 默认 09:00
-            CmbEndHour.SelectedIndex = 10;   // 默认 10:00
-        }
-
         private void RadioType_Changed(object sender, RoutedEventArgs e)
         {
-            if (TxtLocation == null || CmbEndHour == null || TxtTimeSeparator == null || CmbStartHour == null) return;
+            if (TxtLocation == null || TimePickerEnd == null || TimePickerStart == null) return;
 
             bool isEvent = RadioTypeEvent.IsChecked == true;
 
             TxtLocation.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
-            CmbEndHour.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
-            TxtTimeSeparator.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
+            TimePickerEnd.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
 
-            CmbStartHour.Header = isEvent ? (_loader.GetString("TextStartTime") ?? "开始时间") : (_loader.GetString("TextDueTime") ?? "截止时间");
-
-            if (isEvent)
-            {
-                Grid.SetColumnSpan(CmbStartHour, 1);
-            }
-            else
-            {
-                Grid.SetColumnSpan(CmbStartHour, 3);
-            }
+            TimePickerStart.Header = isEvent ? (_loader.GetString("TextStartTime") ?? "开始时间") : (_loader.GetString("TextDueTime") ?? "截止时间");
 
             if (AddPanel != null && AddPanel.Visibility == Visibility.Visible)
             {
@@ -821,7 +775,10 @@ namespace Task_Flyout
             else
             {
                 SetupFlyoutProviderComboBox();
-                InitHourComboBoxes();
+
+                TimePickerStart.Time = new TimeSpan(DateTime.Now.Hour, (DateTime.Now.Minute / 5) * 5, 0);
+                TimePickerEnd.Time = TimePickerStart.Time.Add(TimeSpan.FromHours(1));
+
                 AddPanel.Visibility = Visibility.Visible;
                 if (AgendaContainer != null) AgendaContainer.Visibility = Visibility.Collapsed;
             }
@@ -851,11 +808,8 @@ namespace Task_Flyout
             string location = TxtLocation.Text;
             string providerName = (CmbAddProvider.SelectedItem as ComboBoxItem)?.Tag.ToString() ?? "Google";
 
-            int startHour = CmbStartHour.SelectedIndex >= 0 ? CmbStartHour.SelectedIndex : 9;
-            int endHour = CmbEndHour.SelectedIndex >= 0 ? CmbEndHour.SelectedIndex : startHour + 1;
-
-            TimeSpan startTime = TimeSpan.FromHours(startHour);
-            TimeSpan endTime = TimeSpan.FromHours(endHour);
+            TimeSpan startTime = TimePickerStart.Time;
+            TimeSpan endTime = TimePickerEnd.Time;
 
             if (isEvent && endTime <= startTime) endTime = startTime.Add(TimeSpan.FromHours(1));
 
@@ -868,7 +822,7 @@ namespace Task_Flyout
 
             try
             {
-                string timeDisplay = isAllDay ? (_loader.GetString("TextAllDay") ?? "全天") : (isEvent ? $"{exactStartDateTime:HH}:00 - {exactEndDateTime:HH}:00" : $"{exactStartDateTime:HH}:00");
+                string timeDisplay = isAllDay ? (_loader.GetString("TextAllDay") ?? "全天") : (isEvent ? $"{exactStartDateTime:HH\\:mm} - {exactEndDateTime:HH\\:mm}" : $"{exactStartDateTime:HH\\:mm}");
                 AgendaItems.Add(new AgendaItem
                 {
                     Title = title,
