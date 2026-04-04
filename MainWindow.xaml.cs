@@ -78,7 +78,7 @@ namespace Task_Flyout
                     Title = _loader.GetString("TextRemoveAccountTitle") ?? "移除账户",
                     Content = string.Format(_loader.GetString("TextRemoveAccountContent") ?? "确定要移除 {0} 账户吗？", providerName),
                     PrimaryButtonText = _loader.GetString("TextConfirm") ?? "确定",
-                    CloseButtonText = _loader.GetString("CalendarDialog.CloseButtonText") ?? "取消",
+                    CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "取消",
                     XamlRoot = this.Content.XamlRoot,
                     DefaultButton = ContentDialogButton.Close
                 };
