@@ -30,11 +30,39 @@ namespace Task_Flyout
             MainNav.PaneClosing += (s, e) => FooterContentPanel.Visibility = Visibility.Collapsed;
             FooterContentPanel.Visibility = MainNav.IsPaneOpen ? Visibility.Visible : Visibility.Collapsed;
 
+            ContentFrame.Navigated += ContentFrame_Navigated;
+
             RefreshAccountList();
 
             var calendarItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault();
             if (calendarItem != null) MainNav.SelectedItem = calendarItem;
             ContentFrame.Navigate(typeof(Views.CalendarPage));
+        }
+
+        private void ContentFrame_Navigated(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
+        {
+            MainNav.IsBackEnabled = ContentFrame.CanGoBack;
+
+            if (ContentFrame.SourcePageType == typeof(Views.SettingsPage))
+            {
+                MainNav.SelectedItem = MainNav.SettingsItem;
+            }
+            else if (ContentFrame.SourcePageType == typeof(Views.CalendarPage))
+            {
+                MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Calendar");
+            }
+            else
+            {
+                MainNav.SelectedItem = null;
+            }
+        }
+
+        private void MainNav_BackRequested(NavigationView sender, NavigationViewBackRequestedEventArgs args)
+        {
+            if (ContentFrame.CanGoBack)
+            {
+                ContentFrame.GoBack();
+            }
         }
 
         private void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
@@ -65,7 +93,6 @@ namespace Task_Flyout
             if (App.Current is App app)
             {
                 await app.SyncManager.SyncAllCalendarsAsync();
-
                 AccountListRepeater.ItemsSource = null;
                 AccountListRepeater.ItemsSource = mgr.Accounts;
             }
@@ -74,7 +101,6 @@ namespace Task_Flyout
         private void BtnAddAccount_Click(object sender, RoutedEventArgs e)
         {
             ContentFrame.Navigate(typeof(Views.AddAccountPage));
-            MainNav.SelectedItem = null;
         }
 
         private async void BtnRemoveAccount_Click(object sender, RoutedEventArgs e)
@@ -122,10 +148,10 @@ namespace Task_Flyout
         private void BroadcastFilterChange()
         {
             if (ContentFrame.Content is CalendarPage page) page.ReloadFilters();
-            
+
             if (App.Current is App app && app.GetType().GetProperty("MyFlyoutWindow")?.GetValue(app) is FlyoutWindow flyout)
             {
-                flyout.ReloadFilters(); 
+                flyout.ReloadFilters();
             }
         }
 

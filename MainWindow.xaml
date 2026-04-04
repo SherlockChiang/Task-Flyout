@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Window
     x:Class="Task_Flyout.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -9,43 +10,51 @@
     </Window.SystemBackdrop>
 
     <Grid>
-        <NavigationView x:Name="MainNav" PaneDisplayMode="Left" IsSettingsVisible="True" ItemInvoked="MainNav_ItemInvoked">
+        <NavigationView x:Name="MainNav" PaneDisplayMode="Left" IsSettingsVisible="True" 
+                        ItemInvoked="MainNav_ItemInvoked" BackRequested="MainNav_BackRequested">
+
             <NavigationView.MenuItems>
                 <NavigationViewItem x:Uid="MainWindow_NavCalendar" Content="主日历视图" Tag="Calendar">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE787;"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-            </NavigationView.MenuItems>
 
-            <NavigationView.PaneFooter>
-                <Grid>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="400">
-                        <StackPanel x:Name="FooterContentPanel" Padding="16,0,16,16" Spacing="12">
+                <NavigationViewItemSeparator Margin="16,8,16,8"/>
 
-                            <ItemsRepeater x:Name="AccountListRepeater">
-                                <ItemsRepeater.Layout>
-                                    <StackLayout Spacing="8"/>
-                                </ItemsRepeater.Layout>
-                                <ItemsRepeater.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Spacing="0">
-                                            <Grid Margin="0,0,0,8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <FontIcon Grid.Column="0" Glyph="&#xE77B;" FontSize="16" Margin="0,0,12,0" Foreground="{ThemeResource SystemAccentColor}"/>
+                <StackPanel x:Name="FooterContentPanel" Padding="16,0,24,16" Spacing="12">
 
-                                                <TextBlock Grid.Column="1" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"
-                                                           Text="{Binding ProviderName}" TextTrimming="CharacterEllipsis"/>
+                    <ItemsRepeater x:Name="AccountListRepeater">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Spacing="4"/>
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate>
 
-                                                <Button Grid.Column="2" Padding="4" Background="Transparent" BorderThickness="0"
-                                                        Tag="{Binding ProviderName}" Click="BtnRemoveAccount_Click" ToolTipService.ToolTip="移除账户">
-                                                    <FontIcon Glyph="&#xE711;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
-                                                </Button>
-                                            </Grid>
+                                <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" 
+                                          Background="Transparent" BorderThickness="0" Padding="0" IsExpanded="True">
+
+                                    <Expander.Header>
+                                        <Grid HorizontalAlignment="Stretch" Margin="0,0,8,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Grid.Column="0" Glyph="&#xE77B;" FontSize="15" Margin="0,0,12,0" Foreground="{ThemeResource SystemAccentColor}" VerticalAlignment="Center"/>
+
+                                            <TextBlock Grid.Column="1" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"
+                                                       Text="{Binding ProviderName}" TextTrimming="CharacterEllipsis"/>
+
+                                            <Button Grid.Column="2" Padding="4" Background="Transparent" BorderThickness="0"
+                                                    Tag="{Binding ProviderName}" Click="BtnRemoveAccount_Click" ToolTipService.ToolTip="移除账户" VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE711;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                                            </Button>
+                                        </Grid>
+                                    </Expander.Header>
+
+                                    <Expander.Content>
+                                        <StackPanel Spacing="0" Margin="0,4,0,0">
 
                                             <ItemsRepeater ItemsSource="{Binding Calendars}">
                                                 <ItemsRepeater.Layout>
@@ -53,7 +62,7 @@
                                                 </ItemsRepeater.Layout>
                                                 <ItemsRepeater.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Grid Margin="28,0,0,4" ColumnSpacing="12">
+                                                        <Grid Margin="32,0,0,8" ColumnSpacing="12">
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="*" />
                                                                 <ColumnDefinition Width="Auto" />
@@ -68,7 +77,7 @@
                                                 </ItemsRepeater.ItemTemplate>
                                             </ItemsRepeater>
 
-                                            <Grid Margin="28,0,0,4" ColumnSpacing="12">
+                                            <Grid Margin="32,0,0,8" ColumnSpacing="12">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
@@ -80,24 +89,25 @@
                                                               Toggled="AccountToggle_Toggled" Tag="{Binding ProviderName}" VerticalAlignment="Center"/>
                                             </Grid>
 
-                                            <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,12,0,16"/>
+                                            <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,8,0,8"/>
                                         </StackPanel>
-                                    </DataTemplate>
-                                </ItemsRepeater.ItemTemplate>
-                            </ItemsRepeater>
+                                    </Expander.Content>
+                                </Expander>
 
-                            <Button x:Name="BtnAddAccount" HorizontalAlignment="Stretch" Click="BtnAddAccount_Click">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <FontIcon Glyph="&#xE710;" FontSize="14"/>
-                                    <TextBlock x:Uid="MainWindow_BtnAddAccount" Text="添加账户"/>
-                                </StackPanel>
-                            </Button>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
 
-                            <Button x:Uid="MainWindow_BtnForceSync" Content="强制立即同步" HorizontalAlignment="Stretch" Click="BtnForceSync_Click"/>
+                    <Button x:Name="BtnAddAccount" HorizontalAlignment="Stretch" Click="BtnAddAccount_Click" Margin="0,8,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE710;" FontSize="14"/>
+                            <TextBlock x:Uid="MainWindow_BtnAddAccount" Text="添加账户"/>
                         </StackPanel>
-                    </ScrollViewer>
-                </Grid>
-            </NavigationView.PaneFooter>
+                    </Button>
+
+                    <Button x:Uid="MainWindow_BtnForceSync" Content="强制立即同步" HorizontalAlignment="Stretch" Click="BtnForceSync_Click"/>
+                </StackPanel>
+            </NavigationView.MenuItems>
 
             <Frame x:Name="ContentFrame"/>
         </NavigationView>
