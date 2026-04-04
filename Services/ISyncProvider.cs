@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
@@ -10,6 +10,7 @@ namespace Task_Flyout.Services
         string ProviderName { get; }
         Task EnsureAuthorizedAsync();
         Task<List<AgendaItem>> FetchDataAsync(DateTime min, DateTime max);
+        Task<List<SubscribedCalendarInfo>> FetchCalendarListAsync();
         Task UpdateTaskStatusAsync(string taskId, bool isCompleted);
         Task UpdateItemAsync(string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime);
 

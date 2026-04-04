@@ -30,7 +30,7 @@ namespace Task_Flyout
             MainNav.PaneClosing += (s, e) => FooterContentPanel.Visibility = Visibility.Collapsed;
             FooterContentPanel.Visibility = MainNav.IsPaneOpen ? Visibility.Visible : Visibility.Collapsed;
 
-            LoadAccountStates();
+            RefreshAccountList();
 
             var calendarItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault();
             if (calendarItem != null) MainNav.SelectedItem = calendarItem;
@@ -39,7 +39,7 @@ namespace Task_Flyout
 
         private void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
         {
-            bool runInBackground = Windows.Storage.ApplicationData.Current.LocalSettings.Values["RunInBackground"] as bool? ?? true;
+            bool runInBackground = ApplicationData.Current.LocalSettings.Values["RunInBackground"] as bool? ?? true;
 
             if (runInBackground)
             {
@@ -48,84 +48,69 @@ namespace Task_Flyout
             }
         }
 
-        private void LoadAccountStates()
+        private Services.AccountManager GetAccountManager()
         {
-            var settings = ApplicationData.Current.LocalSettings;
-            bool isGoogleConnected = settings.Values["IsGoogleConnected"] as bool? ?? false;
-            bool isMSConnected = settings.Values["IsMSConnected"] as bool? ?? false;
-
-            // 👉 修正：移除了误粘贴的悬浮窗拦截代码，恢复主窗口正常的 UI 刷新逻辑
-            BtnConnectGoogle.Visibility = isGoogleConnected ? Visibility.Collapsed : Visibility.Visible;
-            PanelGoogleToggles.Visibility = isGoogleConnected ? Visibility.Visible : Visibility.Collapsed;
-
-            BtnConnectMS.Visibility = isMSConnected ? Visibility.Collapsed : Visibility.Visible;
-            PanelMSToggles.Visibility = isMSConnected ? Visibility.Visible : Visibility.Collapsed;
-
-            // 加载开关的历史状态
-            TglGoogleEvents.IsOn = settings.Values["ShowGoogleEvents"] as bool? ?? true;
-            TglGoogleTasks.IsOn = settings.Values["ShowGoogleTasks"] as bool? ?? true;
-            TglMSEvents.IsOn = settings.Values["ShowMSEvents"] as bool? ?? true;
-            TglMSTasks.IsOn = settings.Values["ShowMSTasks"] as bool? ?? true;
+            if (App.Current is App app) return app.SyncManager.AccountManager;
+            return null;
         }
 
-        private async void BtnConnectGoogle_Click(object sender, RoutedEventArgs e)
+        public void RefreshAccountList()
         {
-            BtnConnectGoogle.Content = _loader.GetString("TextAuthorizing") ?? "授权中...";
-            try
+            var mgr = GetAccountManager();
+            if (mgr == null) return;
+            AccountListRepeater.ItemsSource = null;
+            AccountListRepeater.ItemsSource = mgr.Accounts;
+        }
+
+        private void BtnAddAccount_Click(object sender, RoutedEventArgs e)
+        {
+            ContentFrame.Navigate(typeof(Views.AddAccountPage));
+            // Deselect nav items since AddAccountPage isn't a nav item
+            MainNav.SelectedItem = null;
+        }
+
+        private async void BtnRemoveAccount_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is string providerName)
             {
-                if (App.Current is App app)
+                var dialog = new ContentDialog
                 {
-                    var provider = app.SyncManager.Providers.FirstOrDefault(p => p.ProviderName == "Google");
-                    if (provider != null) await provider.EnsureAuthorizedAsync();
+                    Title = _loader.GetString("TextRemoveAccountTitle") ?? "移除账户",
+                    Content = string.Format(_loader.GetString("TextRemoveAccountContent") ?? "确定要移除 {0} 账户吗？", providerName),
+                    PrimaryButtonText = _loader.GetString("TextConfirm") ?? "确定",
+                    CloseButtonText = _loader.GetString("CalendarDialog.CloseButtonText") ?? "取消",
+                    XamlRoot = this.Content.XamlRoot,
+                    DefaultButton = ContentDialogButton.Close
+                };
 
-                }
-
-                Windows.Storage.ApplicationData.Current.LocalSettings.Values["IsGoogleConnected"] = true;
-                LoadAccountStates();
-
-                if (ContentFrame.Content is Views.CalendarPage page) page.ForceSync();
-            }
-            catch { BtnConnectGoogle.Content = _loader.GetString("TextAuthFailed") ?? "授权失败"; }
-        }
-
-        private async void BtnConnectMS_Click(object sender, RoutedEventArgs e)
-        {
-            BtnConnectMS.Content = _loader.GetString("TextAuthorizing") ?? "授权中...";
-            try
-            {
-                if (App.Current is App app)
+                var result = await dialog.ShowAsync();
+                if (result == ContentDialogResult.Primary)
                 {
-                    var provider = app.SyncManager.Providers.FirstOrDefault(p => p.ProviderName == "Microsoft");
-                    if (provider == null) throw new Exception("未注册 MicrosoftSyncProvider");
+                    var mgr = GetAccountManager();
+                    mgr?.RemoveAccount(providerName);
+                    RefreshAccountList();
 
-                    await provider.EnsureAuthorizedAsync();
-
+                    if (ContentFrame.Content is CalendarPage page) page.ForceSync();
                 }
-
-                Windows.Storage.ApplicationData.Current.LocalSettings.Values["IsMSConnected"] = true;
-                LoadAccountStates();
-
-                if (ContentFrame.Content is Views.CalendarPage page) page.ForceSync();
-            }
-            catch (Exception ex)
-            {
-                BtnConnectMS.Content = _loader.GetString("TextAuthFailed") ?? "授权失败";
-                System.Diagnostics.Debug.WriteLine($"============== 微软授权失败 ==============");
-                System.Diagnostics.Debug.WriteLine(ex.ToString());
             }
         }
 
-        private void Filter_Toggled(object sender, RoutedEventArgs e)
+        private void AccountToggle_Toggled(object sender, RoutedEventArgs e)
         {
-            if (TglGoogleEvents == null || TglGoogleTasks == null ||
-                TglMSEvents == null || TglMSTasks == null ||
-                ContentFrame == null)
-                return;
-            var settings = ApplicationData.Current.LocalSettings;
-            settings.Values["ShowGoogleEvents"] = TglGoogleEvents.IsOn;
-            settings.Values["ShowGoogleTasks"] = TglGoogleTasks.IsOn;
-            settings.Values["ShowMSEvents"] = TglMSEvents.IsOn;
-            settings.Values["ShowMSTasks"] = TglMSTasks.IsOn;
+            var mgr = GetAccountManager();
+            if (mgr == null) return;
+
+            mgr.Save();
+
+            if (ContentFrame.Content is CalendarPage page) page.ReloadFilters();
+        }
+
+        private void CalendarToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            var mgr = GetAccountManager();
+            if (mgr == null) return;
+
+            mgr.Save();
 
             if (ContentFrame.Content is CalendarPage page) page.ReloadFilters();
         }

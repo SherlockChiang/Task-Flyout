@@ -1,7 +1,7 @@
-﻿using Azure.Core;
+using Azure.Core;
 using Azure.Identity;
 using Microsoft.Graph;
-using Microsoft.Graph.Models; 
+using Microsoft.Graph.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -49,7 +49,7 @@ namespace Task_Flyout.Services
                 AuthorityHost = AzureAuthorityHosts.AzurePublicCloud,
                 RedirectUri = new Uri("http://localhost"),
                 TokenCachePersistenceOptions = new TokenCachePersistenceOptions { Name = "TaskFlyout_MSAL_Cache" },
-                AuthenticationRecord = authRecord 
+                AuthenticationRecord = authRecord
             };
 
             var credential = new InteractiveBrowserCredential(options);
@@ -82,6 +82,35 @@ namespace Task_Flyout.Services
             _graphClient = new GraphServiceClient(credential, _scopes);
         }
 
+        public async Task<List<SubscribedCalendarInfo>> FetchCalendarListAsync()
+        {
+            var result = new List<SubscribedCalendarInfo>();
+            if (_graphClient == null) return result;
+
+            try
+            {
+                var calendars = await _graphClient.Me.Calendars.GetAsync();
+                if (calendars?.Value != null)
+                {
+                    foreach (var cal in calendars.Value)
+                    {
+                        result.Add(new SubscribedCalendarInfo
+                        {
+                            Id = cal.Id,
+                            Name = cal.Name ?? cal.Id,
+                            IsVisible = true
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Microsoft] Failed to fetch calendar list: {ex.Message}");
+            }
+
+            return result;
+        }
+
         private async Task<string> GetDefaultTodoListIdAsync()
         {
             if (!string.IsNullOrEmpty(_defaultTodoListId)) return _defaultTodoListId;
@@ -112,6 +141,19 @@ namespace Task_Flyout.Services
             await EnsureAuthorizedAsync();
             var results = new List<AgendaItem>();
 
+            // Fetch calendars to get names for CalendarId/CalendarName
+            var calendarMap = new Dictionary<string, string>();
+            try
+            {
+                var calendars = await _graphClient.Me.Calendars.GetAsync();
+                if (calendars?.Value != null)
+                {
+                    foreach (var cal in calendars.Value)
+                        calendarMap[cal.Id] = cal.Name ?? cal.Id;
+                }
+            }
+            catch { }
+
             try
             {
                 var events = await _graphClient.Me.CalendarView.GetAsync(req =>
@@ -119,6 +161,7 @@ namespace Task_Flyout.Services
                     req.QueryParameters.StartDateTime = startDate.ToString("o");
                     req.QueryParameters.EndDateTime = endDate.ToString("o");
                     req.QueryParameters.Top = 500;
+                    req.QueryParameters.Select = new[] { "id", "subject", "start", "end", "isAllDay", "location", "bodyPreview", "calendar" };
                 });
 
                 if (events?.Value != null)
@@ -127,6 +170,24 @@ namespace Task_Flyout.Services
                     foreach (var ev in events.Value)
                     {
                         DateTime.TryParse(ev.Start?.DateTime, out var start);
+
+                        string calId = null;
+                        string calName = null;
+                        // Try to extract calendar info from the event
+                        if (ev.AdditionalData != null && ev.AdditionalData.TryGetValue("calendar@odata.associationLink", out var calLink))
+                        {
+                            calId = calLink?.ToString();
+                        }
+                        // Use the first calendar as default if we can't determine
+                        if (calId == null && calendarMap.Count > 0)
+                        {
+                            var first = calendarMap.First();
+                            calId = first.Key;
+                            calName = first.Value;
+                        }
+                        if (calId != null && calName == null)
+                            calendarMap.TryGetValue(calId, out calName);
+
                         results.Add(new AgendaItem
                         {
                             Id = ev.Id,
@@ -137,6 +198,8 @@ namespace Task_Flyout.Services
                             IsEvent = true,
                             IsTask = false,
                             Provider = ProviderName,
+                            CalendarId = calId,
+                            CalendarName = calName,
                             DateKey = start.ToString("yyyy-MM-dd")
                         });
                     }

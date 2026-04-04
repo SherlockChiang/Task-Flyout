@@ -173,11 +173,8 @@ namespace Task_Flyout.Views
         {
             if (_syncManager == null || SyncProgress == null) return;
 
-            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
-            bool isGoogle = settings.Values["IsGoogleConnected"] as bool? ?? false;
-            bool isMs = settings.Values["IsMSConnected"] as bool? ?? false;
-
-            if (!isGoogle && !isMs)
+            var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
+            if (accountMgr == null || accountMgr.Accounts.Count == 0)
             {
                 return;
             }
@@ -373,27 +370,9 @@ namespace Task_Flyout.Views
 
         private bool IsItemVisible(AgendaItem item)
         {
-            if (item == null || string.IsNullOrEmpty(item.Provider)) return true;
-
-            var localSettings = Windows.Storage.ApplicationData.Current.LocalSettings;
-            bool showGE = localSettings.Values["ShowGoogleEvents"] as bool? ?? true;
-            bool showGT = localSettings.Values["ShowGoogleTasks"] as bool? ?? true;
-            bool showME = localSettings.Values["ShowMSEvents"] as bool? ?? true;
-            bool showMT = localSettings.Values["ShowMSTasks"] as bool? ?? true;
-
-            string provider = item.Provider.ToLower();
-
-            if (provider.Contains("google"))
-            {
-                if (item.IsEvent && !showGE) return false;
-                if (item.IsTask && !showGT) return false;
-            }
-            else if (provider.Contains("microsoft") || provider.Contains("todo"))
-            {
-                if (item.IsEvent && !showME) return false;
-                if (item.IsTask && !showMT) return false;
-            }
-            return true;
+            var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
+            if (accountMgr == null) return true;
+            return accountMgr.IsItemVisible(item);
         }
 
         public void ReloadFilters()
@@ -419,14 +398,15 @@ namespace Task_Flyout.Views
         private void SetupEditProviderComboBox(string forceSelectProvider = null)
         {
             EditCmbProvider.Items.Clear();
-            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
-            bool isGoogle = settings.Values["IsGoogleConnected"] as bool? ?? false;
-            bool isMs = settings.Values["IsMSConnected"] as bool? ?? false;
+            var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
 
-            if (isGoogle || forceSelectProvider == "Google")
-                EditCmbProvider.Items.Add(new ComboBoxItem { Content = "Google", Tag = "Google" });
-            if (isMs || forceSelectProvider == "Microsoft")
-                EditCmbProvider.Items.Add(new ComboBoxItem { Content = "Microsoft", Tag = "Microsoft" });
+            if (accountMgr != null)
+            {
+                foreach (var acct in accountMgr.Accounts)
+                    EditCmbProvider.Items.Add(new ComboBoxItem { Content = acct.ProviderName, Tag = acct.ProviderName });
+            }
+            if (forceSelectProvider != null && !EditCmbProvider.Items.OfType<ComboBoxItem>().Any(i => i.Tag.ToString() == forceSelectProvider))
+                EditCmbProvider.Items.Add(new ComboBoxItem { Content = forceSelectProvider, Tag = forceSelectProvider });
 
             if (EditCmbProvider.Items.Count > 1)
             {

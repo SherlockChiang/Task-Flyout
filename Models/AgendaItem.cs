@@ -50,6 +50,8 @@ namespace Task_Flyout.Models
         }
 
         public string Provider { get; set; } = "Local";
+        public string CalendarId { get; set; }
+        public string CalendarName { get; set; }
         public string DateKey { get; set; }
 
         public Microsoft.UI.Xaml.Visibility HasLocation => string.IsNullOrWhiteSpace(Location) ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;

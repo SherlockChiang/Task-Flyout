@@ -388,4 +388,37 @@
 	<data name="SettingsPage_Startup.Header" xml:space="preserve"><value>Launch on Windows startup</value></data>
 	<data name="SettingsPage_Background.Header" xml:space="preserve"><value>Keep running in background when window is closed (Recommended)</value></data>
 	<data name="RestartRequired_Primary" xml:space="preserve"><value>Restart Now</value></data>
+  <data name="MainWindow_BtnAddAccount.Text" xml:space="preserve">
+    <value>Add Account</value>
+  </data>
+  <data name="AddAccount_Title.Text" xml:space="preserve">
+    <value>Add Account</value>
+  </data>
+  <data name="AddAccount_Subtitle.Text" xml:space="preserve">
+    <value>Choose an account type to connect</value>
+  </data>
+  <data name="AddAccount_GoogleDesc.Text" xml:space="preserve">
+    <value>Google Calendar &amp; Tasks</value>
+  </data>
+  <data name="AddAccount_MSDesc.Text" xml:space="preserve">
+    <value>Outlook Calendar &amp; To Do</value>
+  </data>
+  <data name="AddAccount_AlreadyConnected" xml:space="preserve">
+    <value>Already connected</value>
+  </data>
+  <data name="TextRemoveAccountTitle" xml:space="preserve">
+    <value>Remove Account</value>
+  </data>
+  <data name="TextRemoveAccountContent" xml:space="preserve">
+    <value>Are you sure you want to remove the {0} account?</value>
+  </data>
+  <data name="TextConfirm" xml:space="preserve">
+    <value>Confirm</value>
+  </data>
+  <data name="TextShowEvents" xml:space="preserve">
+    <value>Show Events</value>
+  </data>
+  <data name="TextShowTasks" xml:space="preserve">
+    <value>Show Tasks</value>
+  </data>
 </root>

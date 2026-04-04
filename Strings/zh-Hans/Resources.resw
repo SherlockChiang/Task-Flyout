@@ -396,4 +396,37 @@
   <data name="RestartRequired_Primary" xml:space="preserve">
     <value>立即重启</value>
   </data>
+  <data name="MainWindow_BtnAddAccount.Text" xml:space="preserve">
+    <value>添加账户</value>
+  </data>
+  <data name="AddAccount_Title.Text" xml:space="preserve">
+    <value>添加账户</value>
+  </data>
+  <data name="AddAccount_Subtitle.Text" xml:space="preserve">
+    <value>选择要连接的账户类型</value>
+  </data>
+  <data name="AddAccount_GoogleDesc.Text" xml:space="preserve">
+    <value>Google 日历与任务</value>
+  </data>
+  <data name="AddAccount_MSDesc.Text" xml:space="preserve">
+    <value>Outlook 日历与 To Do</value>
+  </data>
+  <data name="AddAccount_AlreadyConnected" xml:space="preserve">
+    <value>已连接</value>
+  </data>
+  <data name="TextRemoveAccountTitle" xml:space="preserve">
+    <value>移除账户</value>
+  </data>
+  <data name="TextRemoveAccountContent" xml:space="preserve">
+    <value>确定要移除 {0} 账户吗？</value>
+  </data>
+  <data name="TextConfirm" xml:space="preserve">
+    <value>确定</value>
+  </data>
+  <data name="TextShowEvents" xml:space="preserve">
+    <value>显示日程</value>
+  </data>
+  <data name="TextShowTasks" xml:space="preserve">
+    <value>显示任务</value>
+  </data>
 </root>

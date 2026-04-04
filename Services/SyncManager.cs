@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -10,20 +10,15 @@ namespace Task_Flyout.Services
     {
         private readonly List<ISyncProvider> _providers = new();
         public IReadOnlyList<ISyncProvider> Providers => _providers;
+        public AccountManager AccountManager { get; } = new AccountManager();
+
         public void RegisterProvider(ISyncProvider provider) => _providers.Add(provider);
 
         public async Task<List<AgendaItem>> GetAllDataAsync(DateTime min, DateTime max)
         {
-            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
-            bool isGoogleConnected = settings.Values["IsGoogleConnected"] as bool? ?? false;
-            bool isMSConnected = settings.Values["IsMSConnected"] as bool? ?? false;
-
             var allItems = new List<AgendaItem>();
 
-            var activeProviders = _providers.Where(p =>
-                (p.ProviderName == "Google" && isGoogleConnected) ||
-                (p.ProviderName == "Microsoft" && isMSConnected)
-            ).ToList();
+            var activeProviders = _providers.Where(p => AccountManager.IsConnected(p.ProviderName)).ToList();
 
             var fetchTasks = activeProviders.Select(async provider =>
             {
@@ -75,5 +70,8 @@ namespace Task_Flyout.Services
                 await provider.DeleteItemAsync(itemId, isEvent);
             }
         }
+
+        public ISyncProvider GetProvider(string providerName)
+            => _providers.FirstOrDefault(p => p.ProviderName == providerName);
     }
 }

@@ -1,4 +1,4 @@
-﻿using Google.Apis.Auth.OAuth2;
+using Google.Apis.Auth.OAuth2;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Services;
 using Google.Apis.Tasks.v1;
@@ -45,37 +45,95 @@ namespace Task_Flyout.Services
             TasksSvc = new TasksService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
         }
 
-        public async Task<List<AgendaItem>> FetchDataAsync(DateTime min, DateTime max)
+        public async Task<List<SubscribedCalendarInfo>> FetchCalendarListAsync()
         {
-            var items = new List<AgendaItem>();
-            string pageToken = null;
-            do
-            {
-                var req = CalendarSvc.Events.List("primary");
-                req.TimeMinDateTimeOffset = min; req.TimeMaxDateTimeOffset = max; req.SingleEvents = true; req.MaxResults = 2500; req.PageToken = pageToken;
-                var events = await req.ExecuteAsync().ConfigureAwait(false);
-                if (events?.Items != null)
-                {
-                    foreach (var ev in events.Items)
-                    {
-                        DateTime? date = ev.Start?.DateTime ?? (DateTime.TryParse(ev.Start?.Date, out var d) ? d : null);
-                        if (date == null) continue;
+            var result = new List<SubscribedCalendarInfo>();
+            if (CalendarSvc == null) return result;
 
-                        items.Add(new AgendaItem
+            try
+            {
+                var listRequest = CalendarSvc.CalendarList.List();
+                var calendarList = await listRequest.ExecuteAsync();
+                if (calendarList?.Items != null)
+                {
+                    foreach (var cal in calendarList.Items)
+                    {
+                        result.Add(new SubscribedCalendarInfo
                         {
-                            Title = ev.Summary,
-                            Subtitle = ev.Start?.DateTime == null ? _loader.GetString("TextAllDay") : ev.Start.DateTime.Value.ToString("HH:mm"),
-                            Location = ev.Location,
-                            Description = ev.Description,
-                            IsEvent = true,
-                            Provider = ProviderName,
-                            DateKey = date.Value.ToString("yyyy-MM-dd")
+                            Id = cal.Id,
+                            Name = cal.SummaryOverride ?? cal.Summary ?? cal.Id,
+                            IsVisible = true
                         });
                     }
                 }
-                pageToken = events?.NextPageToken;
-            } while (pageToken != null);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Google] Failed to fetch calendar list: {ex.Message}");
+            }
 
+            return result;
+        }
+
+        public async Task<List<AgendaItem>> FetchDataAsync(DateTime min, DateTime max)
+        {
+            var items = new List<AgendaItem>();
+
+            // Fetch events from all calendars
+            var calendars = await FetchCalendarListAsync();
+            if (calendars.Count == 0)
+            {
+                // Fallback to primary if calendar list fails
+                calendars.Add(new SubscribedCalendarInfo { Id = "primary", Name = "Primary" });
+            }
+
+            foreach (var cal in calendars)
+            {
+                string pageToken = null;
+                do
+                {
+                    try
+                    {
+                        var req = CalendarSvc.Events.List(cal.Id);
+                        req.TimeMinDateTimeOffset = min;
+                        req.TimeMaxDateTimeOffset = max;
+                        req.SingleEvents = true;
+                        req.MaxResults = 2500;
+                        req.PageToken = pageToken;
+                        var events = await req.ExecuteAsync().ConfigureAwait(false);
+                        if (events?.Items != null)
+                        {
+                            foreach (var ev in events.Items)
+                            {
+                                DateTime? date = ev.Start?.DateTime ?? (DateTime.TryParse(ev.Start?.Date, out var d) ? d : null);
+                                if (date == null) continue;
+
+                                items.Add(new AgendaItem
+                                {
+                                    Id = ev.Id,
+                                    Title = ev.Summary,
+                                    Subtitle = ev.Start?.DateTime == null ? _loader.GetString("TextAllDay") : ev.Start.DateTime.Value.ToString("HH:mm"),
+                                    Location = ev.Location,
+                                    Description = ev.Description,
+                                    IsEvent = true,
+                                    Provider = ProviderName,
+                                    CalendarId = cal.Id,
+                                    CalendarName = cal.Name,
+                                    DateKey = date.Value.ToString("yyyy-MM-dd")
+                                });
+                            }
+                        }
+                        pageToken = events?.NextPageToken;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[Google] Failed to fetch events from calendar {cal.Id}: {ex.Message}");
+                        pageToken = null;
+                    }
+                } while (pageToken != null);
+            }
+
+            // Fetch tasks from @default list
             string taskPageToken = null;
             do
             {
@@ -124,10 +182,7 @@ namespace Task_Flyout.Services
                 if (startTime.HasValue)
                 {
                     DateTime exactStart = targetDate.Add(startTime.Value);
-                    // 👉 如果没填结束时间，默认会议长为1小时
                     DateTime exactEnd = endTime.HasValue ? targetDate.Add(endTime.Value) : exactStart.AddHours(1);
-
-                    // 防呆：如果跨天了（比如结束时间早于开始时间），自动加一天
                     if (exactEnd < exactStart) exactEnd = exactEnd.AddDays(1);
 
                     ev.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = exactStart };
@@ -144,7 +199,7 @@ namespace Task_Flyout.Services
             {
                 var task = await TasksSvc.Tasks.Get("@default", itemId).ExecuteAsync();
                 task.Title = title;
-                task.Notes = description; // Google Task 的备注叫 Notes
+                task.Notes = description;
                 task.Due = targetDate.ToString("yyyy-MM-dd'T'00:00:00.000'Z'");
                 await TasksSvc.Tasks.Update(task, "@default", itemId).ExecuteAsync();
             }
