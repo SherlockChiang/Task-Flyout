@@ -706,6 +706,23 @@ namespace Task_Flyout
         private void ChkAllDay_Unchecked(object sender, RoutedEventArgs e) { if (TimePanel != null) TimePanel.Visibility = Visibility.Visible; }
         private async void BtnRefresh_Click(object sender, RoutedEventArgs e) => await SyncAllDataAsync(silent: false);
 
+        public void ReloadFilters()
+        {
+            EventCounts.Clear();
+            if (_localCache?.DayItems != null)
+            {
+                foreach (var kvp in _localCache.DayItems)
+                {
+                    int count = kvp.Value.Count(i => IsItemVisible(i));
+                    if (count > 0) EventCounts[kvp.Key] = count;
+                }
+            }
+
+            RequestDotRefresh();
+
+            ShowDataForDate(_selectedDay);
+        }
+
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
             _appWindow.Hide();

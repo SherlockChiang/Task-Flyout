@@ -54,18 +54,26 @@ namespace Task_Flyout
             return null;
         }
 
-        public void RefreshAccountList()
+        public async void RefreshAccountList()
         {
             var mgr = GetAccountManager();
             if (mgr == null) return;
+
             AccountListRepeater.ItemsSource = null;
             AccountListRepeater.ItemsSource = mgr.Accounts;
+
+            if (App.Current is App app)
+            {
+                await app.SyncManager.SyncAllCalendarsAsync();
+
+                AccountListRepeater.ItemsSource = null;
+                AccountListRepeater.ItemsSource = mgr.Accounts;
+            }
         }
 
         private void BtnAddAccount_Click(object sender, RoutedEventArgs e)
         {
             ContentFrame.Navigate(typeof(Views.AddAccountPage));
-            // Deselect nav items since AddAccountPage isn't a nav item
             MainNav.SelectedItem = null;
         }
 
@@ -99,20 +107,26 @@ namespace Task_Flyout
         {
             var mgr = GetAccountManager();
             if (mgr == null) return;
-
             mgr.Save();
-
-            if (ContentFrame.Content is CalendarPage page) page.ReloadFilters();
+            BroadcastFilterChange();
         }
 
         private void CalendarToggle_Toggled(object sender, RoutedEventArgs e)
         {
             var mgr = GetAccountManager();
             if (mgr == null) return;
-
             mgr.Save();
+            BroadcastFilterChange();
+        }
 
+        private void BroadcastFilterChange()
+        {
             if (ContentFrame.Content is CalendarPage page) page.ReloadFilters();
+            
+            if (App.Current is App app && app.GetType().GetProperty("MyFlyoutWindow")?.GetValue(app) is FlyoutWindow flyout)
+            {
+                flyout.ReloadFilters(); 
+            }
         }
 
         private void BtnForceSync_Click(object sender, RoutedEventArgs e)

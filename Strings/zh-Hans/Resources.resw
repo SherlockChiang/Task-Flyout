@@ -429,4 +429,7 @@
   <data name="TextShowTasks" xml:space="preserve">
     <value>显示任务</value>
   </data>
+  <data name="MainWindow_ToggleTasks.Text" xml:space="preserve">
+    <value>任务</value>
+  </data>
 </root>

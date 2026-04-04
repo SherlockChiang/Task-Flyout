@@ -14,10 +14,54 @@ namespace Task_Flyout.Services
 
         public void RegisterProvider(ISyncProvider provider) => _providers.Add(provider);
 
+        public async Task SyncAllCalendarsAsync()
+        {
+            var activeProviders = _providers.Where(p => AccountManager.IsConnected(p.ProviderName)).ToList();
+
+            foreach (var provider in activeProviders)
+            {
+                try
+                {
+                    await provider.EnsureAuthorizedAsync();
+                    var remoteCalendars = await provider.FetchCalendarListAsync();
+                    var account = AccountManager.GetAccount(provider.ProviderName);
+
+                    if (account != null && remoteCalendars != null)
+                    {
+                        bool changed = false;
+
+                        foreach (var rCal in remoteCalendars)
+                        {
+                            var existing = account.Calendars.FirstOrDefault(c => c.Id == rCal.Id);
+                            if (existing == null)
+                            {
+                                account.Calendars.Add(new SubscribedCalendarInfo { Id = rCal.Id, Name = rCal.Name, IsVisible = true });
+                                changed = true;
+                            }
+                            else if (existing.Name != rCal.Name)
+                            {
+                                existing.Name = rCal.Name;
+                                changed = true;
+                            }
+                        }
+
+                        var toRemove = account.Calendars.Where(c => !remoteCalendars.Any(r => r.Id == c.Id)).ToList();
+                        foreach (var c in toRemove)
+                        {
+                            account.Calendars.Remove(c);
+                            changed = true;
+                        }
+
+                        if (changed) AccountManager.Save();
+                    }
+                }
+                catch { } 
+            }
+        }
+
         public async Task<List<AgendaItem>> GetAllDataAsync(DateTime min, DateTime max)
         {
             var allItems = new List<AgendaItem>();
-
             var activeProviders = _providers.Where(p => AccountManager.IsConnected(p.ProviderName)).ToList();
 
             var fetchTasks = activeProviders.Select(async provider =>

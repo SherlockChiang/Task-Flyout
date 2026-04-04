@@ -125,14 +125,18 @@ namespace Task_Flyout.Services
             var account = GetAccount(item.Provider);
             if (account == null) return false;
 
-            if (item.IsEvent && !account.ShowEvents) return false;
-            if (item.IsTask && !account.ShowTasks) return false;
+            if (item.IsTask) return account.ShowTasks;
 
-            // Check calendar visibility if the item has a CalendarId
-            if (item.IsEvent && !string.IsNullOrEmpty(item.CalendarId) && account.Calendars.Count > 0)
+            if (item.IsEvent)
             {
-                var cal = account.Calendars.FirstOrDefault(c => c.Id == item.CalendarId);
-                if (cal != null && !cal.IsVisible) return false;
+                if (!string.IsNullOrEmpty(item.CalendarId) && account.Calendars.Count > 0)
+                {
+                    var cal = account.Calendars.FirstOrDefault(c => c.Id == item.CalendarId);
+                    if (cal != null)
+                    {
+                        return cal.IsVisible; 
+                    }
+                }
             }
 
             return true;

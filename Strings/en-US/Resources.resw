@@ -429,4 +429,7 @@
   <data name="TextShowTasks" xml:space="preserve">
     <value>Show Tasks</value>
   </data>
+  <data name="MainWindow_ToggleTasks.Text" xml:space="preserve">
+    <value>Tasks</value>
+  </data>
 </root>
