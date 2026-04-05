@@ -182,9 +182,20 @@ namespace Task_Flyout
 
         private void SetupPeriodicSync()
         {
-            _syncTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(15) };
+            int intervalMin = Windows.Storage.ApplicationData.Current.LocalSettings.Values["SyncIntervalMinutes"] as int? ?? 15;
+            _syncTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(intervalMin) };
             _syncTimer.Tick += async (s, e) => await SyncAllDataAsync(true);
             _syncTimer.Start();
+        }
+
+        public void UpdateSyncInterval(int minutes)
+        {
+            if (_syncTimer != null)
+            {
+                _syncTimer.Stop();
+                _syncTimer.Interval = TimeSpan.FromMinutes(minutes);
+                _syncTimer.Start();
+            }
         }
 
         private void ConfigureFlyoutStyle()
@@ -561,17 +572,34 @@ namespace Task_Flyout
                     }
                 }
 
+                // Check if data actually changed before refreshing UI
+                bool dataChanged = tempDayItems.Count != _localCache.DayItems.Count
+                    || tempEventCounts.Count != EventCounts.Count;
+                if (!dataChanged)
+                {
+                    // Quick check: compare event counts per day
+                    foreach (var kvp in tempEventCounts)
+                    {
+                        if (!EventCounts.TryGetValue(kvp.Key, out int oldCount) || oldCount != kvp.Value)
+                        { dataChanged = true; break; }
+                    }
+                }
+
                 _localCache.DayItems = tempDayItems;
                 MarkedDates = tempMarkedDates;
                 EventCounts = tempEventCounts;
                 await SaveCache();
 
-                MainCalendar.DisplayMode = CalendarViewDisplayMode.Year;
-                MainCalendar.DisplayMode = CalendarViewDisplayMode.Month;
-                MainCalendar.UpdateLayout();
-
-                RequestDotRefresh();
-                ShowDataForDate(_selectedDay);
+                // Only refresh UI if data changed to avoid flicker
+                if (dataChanged)
+                {
+                    RequestDotRefresh();
+                    ShowDataForDate(_selectedDay);
+                }
+                else
+                {
+                    RequestDotRefresh();
+                }
 
                 // Trigger notification check after sync
                 if (App.Current is App app) app.NotificationService?.CheckUpcomingEvents();
@@ -603,6 +631,12 @@ namespace Task_Flyout
             }
             else
             {
+                // Reload cache and show data before making window visible
+                LoadCache();
+                _selectedDay = DateTime.Today;
+                ShowDataForDate(_selectedDay);
+
+                // Size the window before showing to avoid jump
                 AdjustWindowHeight();
                 Activate();
                 _appWindow.Show();
@@ -616,9 +650,15 @@ namespace Task_Flyout
 
                 if (MainCalendar.SelectedDates.Count == 0 || MainCalendar.SelectedDates[0].Date != DateTime.Today)
                 {
-                    BtnGoToToday_Click(null, null);
+                    MainCalendar.SelectedDates.Clear();
+                    MainCalendar.SelectedDates.Add(DateTime.Today);
+                    MainCalendar.SetDisplayDate(DateTime.Today);
                 }
 
+                UpdateSelectedDateHeader();
+                RequestDotRefresh();
+
+                // Sync in background - don't resize or flash
                 _ = SyncAllDataAsync(true);
             }
         }

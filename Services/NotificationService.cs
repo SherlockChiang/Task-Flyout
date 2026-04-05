@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Task_Flyout.Models;
 using Microsoft.UI.Xaml;
+using Windows.Storage;
 
 namespace Task_Flyout.Services
 {
@@ -13,11 +14,12 @@ namespace Task_Flyout.Services
         private readonly SyncManager _syncManager;
         private readonly HashSet<string> _notifiedIds = new();
         private DispatcherTimer _timer;
-        private int _reminderMinutes = 15;
+        private int _reminderMinutes;
 
         public NotificationService(SyncManager syncManager)
         {
             _syncManager = syncManager;
+            _reminderMinutes = ApplicationData.Current.LocalSettings.Values["NotifyMinutes"] as int? ?? 15;
         }
 
         public void Initialize()
@@ -34,14 +36,29 @@ namespace Task_Flyout.Services
             }
         }
 
+        public bool IsEnabled => ApplicationData.Current.LocalSettings.Values["NotifyEnabled"] as bool? ?? true;
+
+        public void SetReminderMinutes(int minutes)
+        {
+            _reminderMinutes = minutes;
+        }
+
         public void StartPeriodicCheck()
         {
+            if (_timer != null)
+            {
+                _timer.Stop();
+            }
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
             _timer.Tick += (s, e) => CheckUpcomingEvents();
             _timer.Start();
 
-            // Check immediately on start
             CheckUpcomingEvents();
+        }
+
+        public void StopTimer()
+        {
+            _timer?.Stop();
         }
 
         public void Stop()
@@ -56,6 +73,8 @@ namespace Task_Flyout.Services
 
         public void CheckUpcomingEvents()
         {
+            if (!IsEnabled) return;
+
             try
             {
                 var cache = LoadCacheItems();
@@ -92,7 +111,6 @@ namespace Task_Flyout.Services
                     }
                 }
 
-                // Clean up old notification IDs (keep last 500)
                 if (_notifiedIds.Count > 500)
                 {
                     var toRemove = _notifiedIds.Take(_notifiedIds.Count - 200).ToList();
@@ -116,7 +134,6 @@ namespace Task_Flyout.Services
             if (string.IsNullOrEmpty(subtitle) || subtitle == "全天" || subtitle == "All day")
                 return null;
 
-            // Parse time from subtitle like "09:00 - 10:00" or "09:00"
             var timePart = subtitle.Split('-')[0].Trim();
             if (TimeSpan.TryParse(timePart, out var timeSpan))
                 return date.Add(timeSpan);
@@ -136,7 +153,7 @@ namespace Task_Flyout.Services
                     .AddText($"{timeText}开始 · {startTime:HH:mm}");
 
                 if (!string.IsNullOrEmpty(item.Location))
-                    builder.AddText($"📍 {item.Location}");
+                    builder.AddText($"\ud83d\udccd {item.Location}");
 
                 var notification = builder.BuildNotification();
                 AppNotificationManager.Default.Show(notification);
@@ -173,14 +190,12 @@ namespace Task_Flyout.Services
 
         private void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)
         {
-            // When user clicks the notification, show the main window
             App.MainDispatcherQueue?.TryEnqueue(() =>
             {
                 App.OpenMainWindowInternal();
             });
         }
 
-        // DTO to deserialize cache without depending on FlyoutWindow's AppCache
         private class AppCacheDto
         {
             public HashSet<string> MarkedDates { get; set; } = new();

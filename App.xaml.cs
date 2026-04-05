@@ -55,7 +55,8 @@ namespace Task_Flyout
 
             NotificationService = new NotificationService(SyncManager);
             NotificationService.Initialize();
-            NotificationService.StartPeriodicCheck();
+            if (NotificationService.IsEnabled)
+                NotificationService.StartPeriodicCheck();
 
             _trayIcon = (H.NotifyIcon.TaskbarIcon)Resources["MyTrayIcon"];
             _uiSettings = new UISettings();

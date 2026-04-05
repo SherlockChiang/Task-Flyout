@@ -444,4 +444,34 @@
   <data name="TextOneMinuteLater" xml:space="preserve">
     <value>1 分钟后开始</value>
   </data>
+  <data name="TextNoAccount" xml:space="preserve">
+    <value>尚未连接任何账户</value>
+  </data>
+  <data name="SettingsPage_ColorPalette.Text" xml:space="preserve">
+    <value>莫奈调色盘</value>
+  </data>
+  <data name="SettingsPage_ColorPaletteDesc.Text" xml:space="preserve">
+    <value>为每个日历和任务列表指定代表色，颜色将同步应用到侧栏与日历视图。</value>
+  </data>
+  <data name="SettingsPage_Notification.Text" xml:space="preserve">
+    <value>通知提醒</value>
+  </data>
+  <data name="SettingsPage_NotifyToggle.Header" xml:space="preserve">
+    <value>日程开始前弹出通知</value>
+  </data>
+  <data name="SettingsPage_NotifyTime.Header" xml:space="preserve">
+    <value>提前提醒时间</value>
+  </data>
+  <data name="SettingsPage_SyncInterval.Header" xml:space="preserve">
+    <value>自动同步间隔</value>
+  </data>
+  <data name="TextMinutes" xml:space="preserve">
+    <value>分钟</value>
+  </data>
+  <data name="TextPresetColors" xml:space="preserve">
+    <value>颜色预设</value>
+  </data>
+  <data name="TextCustomColor" xml:space="preserve">
+    <value>自定义颜色</value>
+  </data>
 </root>

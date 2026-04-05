@@ -444,4 +444,34 @@
   <data name="TextOneMinuteLater" xml:space="preserve">
     <value>Starts in 1 minute</value>
   </data>
+  <data name="TextNoAccount" xml:space="preserve">
+    <value>No accounts connected yet</value>
+  </data>
+  <data name="SettingsPage_ColorPalette.Text" xml:space="preserve">
+    <value>Monet Palette</value>
+  </data>
+  <data name="SettingsPage_ColorPaletteDesc.Text" xml:space="preserve">
+    <value>Assign a representative color to each calendar and task list. Colors are synced to the sidebar and calendar views.</value>
+  </data>
+  <data name="SettingsPage_Notification.Text" xml:space="preserve">
+    <value>Notifications</value>
+  </data>
+  <data name="SettingsPage_NotifyToggle.Header" xml:space="preserve">
+    <value>Show notification before events</value>
+  </data>
+  <data name="SettingsPage_NotifyTime.Header" xml:space="preserve">
+    <value>Reminder time</value>
+  </data>
+  <data name="SettingsPage_SyncInterval.Header" xml:space="preserve">
+    <value>Auto sync interval</value>
+  </data>
+  <data name="TextMinutes" xml:space="preserve">
+    <value>Minutes</value>
+  </data>
+  <data name="TextPresetColors" xml:space="preserve">
+    <value>Preset Colors</value>
+  </data>
+  <data name="TextCustomColor" xml:space="preserve">
+    <value>Custom Color</value>
+  </data>
 </root>

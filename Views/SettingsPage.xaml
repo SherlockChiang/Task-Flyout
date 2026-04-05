@@ -24,8 +24,26 @@
                 </ComboBox>
             </StackPanel>
 
+            <!-- Color Palette Section -->
+            <StackPanel Spacing="12">
+                <TextBlock x:Uid="SettingsPage_ColorPalette" Text="莫奈调色盘" FontWeight="SemiBold" FontSize="16"/>
+                <TextBlock x:Uid="SettingsPage_ColorPaletteDesc" Text="为每个日历和任务列表指定代表色，颜色将同步应用到侧栏与日历视图。" FontSize="13" Opacity="0.7" TextWrapping="Wrap"/>
+                <StackPanel x:Name="ColorPalettePanel" Spacing="8"/>
+            </StackPanel>
+
+            <!-- Notification Section -->
+            <StackPanel Spacing="8">
+                <TextBlock x:Uid="SettingsPage_Notification" Text="通知提醒" FontWeight="SemiBold" FontSize="16"/>
+                <ToggleSwitch x:Uid="SettingsPage_NotifyToggle" x:Name="NotifyToggle" Header="日程开始前弹出通知" IsOn="True" Toggled="NotifyToggle_Toggled"/>
+                
+                <ComboBox x:Uid="SettingsPage_NotifyTime" x:Name="NotifyTimeComboBox" Header="提前提醒时间" Width="200" SelectionChanged="NotifyTimeComboBox_SelectionChanged" />
+            </StackPanel>
+
             <StackPanel Spacing="8">
                 <TextBlock x:Uid="SettingsPage_System" Text="系统与常规" FontWeight="SemiBold" FontSize="16"/>
+                
+                <ComboBox x:Uid="SettingsPage_SyncInterval" x:Name="SyncIntervalComboBox" Header="自动同步间隔" Width="200" SelectionChanged="SyncIntervalComboBox_SelectionChanged" />
+                
                 <ToggleSwitch x:Uid="SettingsPage_Startup" x:Name="StartupToggle" Header="开机时自动启动" IsOn="False" Toggled="StartupToggle_Toggled"/>
                 <ToggleSwitch x:Uid="SettingsPage_Background" x:Name="BackgroundToggle" Header="关闭主窗口时最小化到托盘 (后台运行)" IsOn="True" Toggled="BackgroundToggle_Toggled"/>
             </StackPanel>

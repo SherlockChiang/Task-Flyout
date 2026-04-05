@@ -42,6 +42,21 @@ namespace Task_Flyout
             ContentFrame.Navigate(typeof(Views.CalendarPage));
         }
 
+        private string GetSafeString(string key, string fallbackText)
+        {
+            if (_loader == null) return fallbackText;
+            try
+            {
+                string safeKey = key.Replace(".", "/");
+                string result = _loader.GetString(safeKey);
+                return string.IsNullOrEmpty(result) ? fallbackText : result;
+            }
+            catch
+            {
+                return fallbackText;
+            }
+        }
+
         private void ContentFrame_Navigated(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
         {
             MainNav.IsBackEnabled = ContentFrame.CanGoBack;
@@ -112,10 +127,10 @@ namespace Task_Flyout
             {
                 var dialog = new ContentDialog
                 {
-                    Title = _loader.GetString("TextRemoveAccountTitle") ?? "移除账户",
-                    Content = string.Format(_loader.GetString("TextRemoveAccountContent") ?? "确定要移除 {0} 账户吗？", providerName),
-                    PrimaryButtonText = _loader.GetString("TextConfirm") ?? "确定",
-                    CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "取消",
+                    Title = GetSafeString("TextRemoveAccountTitle", "移除账户"),
+                    Content = string.Format(GetSafeString("TextRemoveAccountContent", "确定要移除 {0} 账户吗？"), providerName),
+                    PrimaryButtonText = GetSafeString("TextConfirm", "确定"),
+                    CloseButtonText = GetSafeString("CalendarDialog/CloseButtonText", "取消"),
                     XamlRoot = this.Content.XamlRoot,
                     DefaultButton = ContentDialogButton.Close
                 };
@@ -243,70 +258,95 @@ namespace Task_Flyout
         private void ShowColorPickerFlyout(FrameworkElement anchor, string currentColor, Action<string> onColorSelected)
         {
             var flyout = new Flyout();
-            var panel = new StackPanel { Spacing = 8, Padding = new Thickness(4) };
+            var panel = new StackPanel { Spacing = 12, Padding = new Thickness(8), MaxWidth = 340 };
 
-            var header = new TextBlock
+            var presetHeader = new TextBlock
             {
-                Text = _loader.GetString("TextPickColor") ?? "选择颜色",
+                Text = GetSafeString("TextPresetColors", "预设颜色"),
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                FontSize = 14,
-                Margin = new Thickness(0, 0, 0, 4)
+                FontSize = 14
             };
-            panel.Children.Add(header);
+            panel.Children.Add(presetHeader);
 
-            var grid = new GridView
+            var presetGrid = new GridView
             {
-                SelectionMode = ListViewSelectionMode.Single,
+                SelectionMode = ListViewSelectionMode.None,
                 IsItemClickEnabled = true,
-                Width = 208
+                Margin = new Thickness(-4, 0, -4, 0)
             };
-            grid.ItemsPanel = (ItemsPanelTemplate)Microsoft.UI.Xaml.Markup.XamlReader.Load(
+            presetGrid.ItemsPanel = (ItemsPanelTemplate)Microsoft.UI.Xaml.Markup.XamlReader.Load(
                 "<ItemsPanelTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'>" +
-                "<ItemsWrapGrid MaximumRowsOrColumns='4' Orientation='Horizontal'/>" +
+                "<ItemsWrapGrid MaximumRowsOrColumns='6' Orientation='Horizontal'/>" +
                 "</ItemsPanelTemplate>");
 
-            foreach (var hex in ColorHelper.MonetPalette)
+            string[] monetColors = {
+                "#D5A5A1", "#B38B8D", "#C3D1C6", "#9CB4A3", "#758A7A", "#E6D4B8",
+                "#D2B88F", "#B49665", "#BBD0D9", "#92A6B9", "#6A7B92", "#B19FB6"
+            };
+
+            var colorPicker = new ColorPicker
+            {
+                Color = ColorHelper.ParseHex(currentColor),
+                IsAlphaEnabled = false,
+                IsColorChannelTextInputVisible = true,
+                IsHexInputVisible = true,
+                Margin = new Thickness(0, -8, 0, 0)
+            };
+
+            foreach (var hex in monetColors)
             {
                 var swatch = new Border
                 {
-                    Width = 40,
-                    Height = 40,
-                    CornerRadius = new CornerRadius(8),
+                    Width = 32,
+                    Height = 32,
+                    CornerRadius = new CornerRadius(16),
                     Background = new SolidColorBrush(ColorHelper.ParseHex(hex)),
                     Margin = new Thickness(4),
-                    BorderThickness = new Thickness(hex == currentColor ? 3 : 0),
-                    BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.White)
+                    BorderThickness = new Thickness(1),
+                    BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.LightGray)
                 };
 
-                if (hex == currentColor)
-                {
-                    var check = new FontIcon
-                    {
-                        Glyph = "\uE73E",
-                        FontSize = 16,
-                        Foreground = new SolidColorBrush(
-                            ColorHelper.ShouldUseWhiteText(hex) ? Microsoft.UI.Colors.White : Microsoft.UI.Colors.Black),
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        VerticalAlignment = VerticalAlignment.Center
-                    };
-                    swatch.Child = check;
-                }
-
-                swatch.Tag = hex;
                 swatch.Tapped += (s, args) =>
                 {
-                    args.Handled = true;
-                    if (s is Border b && b.Tag is string color)
-                    {
-                        onColorSelected(color);
-                        flyout.Hide();
-                    }
+                    colorPicker.Color = ColorHelper.ParseHex(hex);
                 };
-
-                grid.Items.Add(swatch);
+                presetGrid.Items.Add(swatch);
             }
+            panel.Children.Add(presetGrid);
 
-            panel.Children.Add(grid);
+            var customHeader = new TextBlock
+            {
+                Text = GetSafeString("TextCustomColor", "自定义颜色 (RGB/HEX)"),
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 14,
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+            panel.Children.Add(customHeader);
+
+            panel.Children.Add(colorPicker);
+
+            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Margin = new Thickness(0, 8, 0, 0) };
+
+            var cancelBtn = new Button { Content = GetSafeString("CalendarDialog/CloseButtonText", "取消") };
+            cancelBtn.Click += (s, e) => flyout.Hide();
+
+            var applyBtn = new Button
+            {
+                Content = GetSafeString("TextConfirm", "确定"),
+                Style = (Style)Application.Current.Resources["AccentButtonStyle"]
+            };
+            applyBtn.Click += (s, e) =>
+            {
+                var c = colorPicker.Color;
+                string newHex = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+                onColorSelected(newHex);
+                flyout.Hide();
+            };
+
+            btnPanel.Children.Add(cancelBtn);
+            btnPanel.Children.Add(applyBtn);
+            panel.Children.Add(btnPanel);
+
             flyout.Content = panel;
             flyout.ShowAt(anchor);
         }
