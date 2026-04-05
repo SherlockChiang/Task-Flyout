@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -142,13 +143,16 @@ namespace Task_Flyout
             UpdateSelectedDateHeader();
             ShowDataForDate(_selectedDay);
 
+            MainCalendar.RegisterPropertyChangedCallback(CalendarView.DisplayModeProperty, (s, args) => RequestDotRefresh());
+
             _ = SyncAllDataAsync(true);
         }
 
+        private void OnScrollViewerViewChanging(object sender, ScrollViewerViewChangingEventArgs e) => RequestDotRefresh();
+        private void OnScrollViewerViewChanged(object sender, ScrollViewerViewChangedEventArgs e) => RequestDotRefresh();
+
         private void HookActiveScrollViewer()
         {
-            if (_activeScrollViewer != null) return;
-
             var dayItems = FindAllDayItems(MainCalendar);
             if (dayItems.Count == 0) return;
 
@@ -157,9 +161,19 @@ namespace Task_Flyout
             {
                 if (current is ScrollViewer sv)
                 {
-                    _activeScrollViewer = sv;
-                    _activeScrollViewer.ViewChanging += (s, args) => RequestDotRefresh();
-                    _activeScrollViewer.ViewChanged += (s, args) => RequestDotRefresh();
+                    if (_activeScrollViewer != sv)
+                    {
+                        if (_activeScrollViewer != null)
+                        {
+                            _activeScrollViewer.ViewChanging -= OnScrollViewerViewChanging;
+                            _activeScrollViewer.ViewChanged -= OnScrollViewerViewChanged;
+                        }
+
+                        _activeScrollViewer = sv;
+
+                        _activeScrollViewer.ViewChanging += OnScrollViewerViewChanging;
+                        _activeScrollViewer.ViewChanged += OnScrollViewerViewChanged;
+                    }
                     break;
                 }
                 current = VisualTreeHelper.GetParent(current);
@@ -224,7 +238,6 @@ namespace Task_Flyout
                     EventCounts.Clear();
                     foreach (var kvp in _localCache.DayItems)
                     {
-                        // 👉 修改：不再过滤 IsCompleted，只要是可见的任务/日程都算一个圆点
                         int count = kvp.Value.Count(i => IsItemVisible(i));
                         if (count > 0) EventCounts[kvp.Key] = count;
                     }
@@ -237,7 +250,7 @@ namespace Task_Flyout
         {
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(CacheFilePath));
+                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(CacheFilePath));
                 _localCache.MarkedDates = MarkedDates;
                 await File.WriteAllTextAsync(CacheFilePath, JsonSerializer.Serialize(_localCache));
             }
@@ -246,9 +259,16 @@ namespace Task_Flyout
 
         private void BtnGoToToday_Click(object sender, RoutedEventArgs e)
         {
+            if (MainCalendar.DisplayMode != CalendarViewDisplayMode.Month)
+            {
+                MainCalendar.DisplayMode = CalendarViewDisplayMode.Month;
+            }
+
             MainCalendar.SetDisplayDate(DateTime.Today);
             MainCalendar.SelectedDates.Clear();
             MainCalendar.SelectedDates.Add(DateTime.Today);
+
+            RequestDotRefresh();
         }
 
         private void MainCalendar_CalendarViewDayItemChanging(CalendarView sender, CalendarViewDayItemChangingEventArgs args)
@@ -301,6 +321,12 @@ namespace Task_Flyout
         {
             if (DotOverlay == null || MainCalendar == null) return;
 
+            if (MainCalendar.DisplayMode != CalendarViewDisplayMode.Month)
+            {
+                DotOverlay.Children.Clear();
+                return;
+            }
+
             HookActiveScrollViewer();
             DotOverlay.Children.Clear();
 
@@ -335,7 +361,6 @@ namespace Task_Flyout
                     var transformToCanvas = item.TransformToVisual(DotOverlay);
                     var posInCanvas = transformToCanvas.TransformPoint(new Windows.Foundation.Point(0, 0));
 
-                    // Collect unique colors for this day's visible items
                     var dotColors = new List<Color>();
                     if (_localCache.DayItems.TryGetValue(dateStr, out var agendaItems))
                     {
@@ -572,12 +597,10 @@ namespace Task_Flyout
                     }
                 }
 
-                // Check if data actually changed before refreshing UI
                 bool dataChanged = tempDayItems.Count != _localCache.DayItems.Count
                     || tempEventCounts.Count != EventCounts.Count;
                 if (!dataChanged)
                 {
-                    // Quick check: compare event counts per day
                     foreach (var kvp in tempEventCounts)
                     {
                         if (!EventCounts.TryGetValue(kvp.Key, out int oldCount) || oldCount != kvp.Value)
@@ -590,7 +613,6 @@ namespace Task_Flyout
                 EventCounts = tempEventCounts;
                 await SaveCache();
 
-                // Only refresh UI if data changed to avoid flicker
                 if (dataChanged)
                 {
                     RequestDotRefresh();
@@ -601,7 +623,6 @@ namespace Task_Flyout
                     RequestDotRefresh();
                 }
 
-                // Trigger notification check after sync
                 if (App.Current is App app) app.NotificationService?.CheckUpcomingEvents();
             }
             catch (Exception ex)
@@ -631,12 +652,10 @@ namespace Task_Flyout
             }
             else
             {
-                // Reload cache and show data before making window visible
                 LoadCache();
                 _selectedDay = DateTime.Today;
                 ShowDataForDate(_selectedDay);
 
-                // Size the window before showing to avoid jump
                 AdjustWindowHeight();
                 Activate();
                 _appWindow.Show();
@@ -658,7 +677,6 @@ namespace Task_Flyout
                 UpdateSelectedDateHeader();
                 RequestDotRefresh();
 
-                // Sync in background - don't resize or flash
                 _ = SyncAllDataAsync(true);
             }
         }
