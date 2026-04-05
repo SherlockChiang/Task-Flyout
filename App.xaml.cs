@@ -4,7 +4,6 @@ using System.Linq;
 using System;
 using Task_Flyout.Services;
 using Windows.UI.ViewManagement;
-using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace Task_Flyout
 {
@@ -25,6 +24,7 @@ namespace Task_Flyout
         public static MainWindow? MyMainWindow { get; private set; }
         public static Microsoft.UI.Dispatching.DispatcherQueue MainDispatcherQueue { get; private set; }
         public SyncManager SyncManager { get; } = new SyncManager();
+        public NotificationService NotificationService { get; private set; }
 
         public App()
         {
@@ -52,6 +52,10 @@ namespace Task_Flyout
         {
             MainDispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
             MyFlyoutWindow = new FlyoutWindow();
+
+            NotificationService = new NotificationService(SyncManager);
+            NotificationService.Initialize();
+            NotificationService.StartPeriodicCheck();
 
             _trayIcon = (H.NotifyIcon.TaskbarIcon)Resources["MyTrayIcon"];
             _uiSettings = new UISettings();
@@ -114,6 +118,7 @@ namespace Task_Flyout
 
         private void ExitAppInternal()
         {
+            NotificationService?.Stop();
             _trayIcon?.Dispose();
             MyFlyoutWindow?.Close();
             MyMainWindow?.Close();

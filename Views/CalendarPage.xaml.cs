@@ -22,13 +22,9 @@ namespace Task_Flyout.Views
     {
         public object Convert(object value, Type targetType, object parameter, string language)
         {
-            string provider = (value as string)?.ToLower() ?? "";
-
-            if (provider.Contains("google"))
-                return new SolidColorBrush(Color.FromArgb(255, 89, 118, 186));
-
-            if (provider.Contains("microsoft") || provider.Contains("todo"))
-                return new SolidColorBrush(Color.FromArgb(255, 230, 175, 115));
+            string colorHex = value as string;
+            if (!string.IsNullOrEmpty(colorHex) && colorHex.StartsWith("#"))
+                return new SolidColorBrush(Services.ColorHelper.ParseHex(colorHex));
 
             return new SolidColorBrush(Color.FromArgb(255, 150, 150, 150));
         }
@@ -39,14 +35,13 @@ namespace Task_Flyout.Views
     {
         public object Convert(object value, Type targetType, object parameter, string language)
         {
-            string provider = (value as string)?.ToLower() ?? "";
-
-            if (provider.Contains("google"))
-                return new SolidColorBrush(Microsoft.UI.Colors.White);
-
-            if (provider.Contains("microsoft") || provider.Contains("todo"))
-                return new SolidColorBrush(Microsoft.UI.Colors.Black);
-
+            string colorHex = value as string;
+            if (!string.IsNullOrEmpty(colorHex) && colorHex.StartsWith("#"))
+            {
+                return Services.ColorHelper.ShouldUseWhiteText(colorHex)
+                    ? new SolidColorBrush(Microsoft.UI.Colors.White)
+                    : new SolidColorBrush(Microsoft.UI.Colors.Black);
+            }
             return new SolidColorBrush(Microsoft.UI.Colors.White);
         }
         public object ConvertBack(object v, Type t, object p, string l) => throw new NotImplementedException();
@@ -152,7 +147,10 @@ namespace Task_Flyout.Views
                 if (_localCache.DayItems.ContainsKey(key))
                 {
                     foreach (var item in _localCache.DayItems[key].Where(IsItemVisible))
+                    {
+                        PopulateItemColor(item);
                         cell.Items.Add(item);
+                    }
                 }
                 DayCells.Add(cell);
             }
@@ -225,7 +223,11 @@ namespace Task_Flyout.Views
                 {
                     cell.Items.Clear();
                     var dayItems = allItems.Where(it => it.DateKey == cell.Date.ToString("yyyy-MM-dd") && IsItemVisible(it));
-                    foreach (var item in dayItems) cell.Items.Add(item);
+                    foreach (var item in dayItems)
+                    {
+                        PopulateItemColor(item);
+                        cell.Items.Add(item);
+                    }
                 }
 
                 if (CalendarGrid.SelectedItem is DayCellViewModel selectedCell)
@@ -326,8 +328,10 @@ namespace Task_Flyout.Views
                         IsTask = item.IsTask,
                         IsCompleted = item.IsCompleted,
                         Provider = item.Provider,
+                        CalendarId = item.CalendarId,
                         DateKey = item.DateKey
                     };
+                    PopulateItemColor(displayItem);
                     SelectedDayItems.Add(displayItem);
                     hasItems = true;
                 }
@@ -373,6 +377,12 @@ namespace Task_Flyout.Views
             var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
             if (accountMgr == null) return true;
             return accountMgr.IsItemVisible(item);
+        }
+
+        private void PopulateItemColor(AgendaItem item)
+        {
+            var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
+            accountMgr?.PopulateItemColor(item);
         }
 
         public void ReloadFilters()

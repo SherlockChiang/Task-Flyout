@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace Task_Flyout.Models
@@ -53,6 +54,10 @@ namespace Task_Flyout.Models
         public string CalendarId { get; set; }
         public string CalendarName { get; set; }
         public string DateKey { get; set; }
+        public string ColorHex { get; set; }
+
+        public DateTime? StartDateTime { get; set; }
+        public DateTime? EndDateTime { get; set; }
 
         public Microsoft.UI.Xaml.Visibility HasLocation => string.IsNullOrWhiteSpace(Location) ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
 

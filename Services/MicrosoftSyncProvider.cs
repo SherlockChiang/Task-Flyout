@@ -188,6 +188,7 @@ namespace Task_Flyout.Services
                         if (calId != null && calName == null)
                             calendarMap.TryGetValue(calId, out calName);
 
+                        DateTime.TryParse(ev.End?.DateTime, out var end);
                         results.Add(new AgendaItem
                         {
                             Id = ev.Id,
@@ -200,7 +201,9 @@ namespace Task_Flyout.Services
                             Provider = ProviderName,
                             CalendarId = calId,
                             CalendarName = calName,
-                            DateKey = start.ToString("yyyy-MM-dd")
+                            DateKey = start.ToString("yyyy-MM-dd"),
+                            StartDateTime = start,
+                            EndDateTime = end
                         });
                     }
                 }

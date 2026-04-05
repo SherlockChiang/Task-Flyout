@@ -108,6 +108,7 @@ namespace Task_Flyout.Services
                                 DateTime? date = ev.Start?.DateTime ?? (DateTime.TryParse(ev.Start?.Date, out var d) ? d : null);
                                 if (date == null) continue;
 
+                                var endDate2 = ev.End?.DateTime ?? (DateTime.TryParse(ev.End?.Date, out var ed) ? ed : (DateTime?)null);
                                 items.Add(new AgendaItem
                                 {
                                     Id = ev.Id,
@@ -119,7 +120,9 @@ namespace Task_Flyout.Services
                                     Provider = ProviderName,
                                     CalendarId = cal.Id,
                                     CalendarName = cal.Name,
-                                    DateKey = date.Value.ToString("yyyy-MM-dd")
+                                    DateKey = date.Value.ToString("yyyy-MM-dd"),
+                                    StartDateTime = ev.Start?.DateTime,
+                                    EndDateTime = endDate2
                                 });
                             }
                         }

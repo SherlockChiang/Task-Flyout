@@ -134,12 +134,58 @@ namespace Task_Flyout.Services
                     var cal = account.Calendars.FirstOrDefault(c => c.Id == item.CalendarId);
                     if (cal != null)
                     {
-                        return cal.IsVisible; 
+                        return cal.IsVisible;
                     }
                 }
             }
 
             return true;
+        }
+
+        public string GetColorForItem(AgendaItem item)
+        {
+            if (item == null || string.IsNullOrEmpty(item.Provider)) return null;
+
+            var account = GetAccount(item.Provider);
+            if (account == null) return null;
+
+            if (item.IsTask && !string.IsNullOrEmpty(account.TaskColorHex))
+                return account.TaskColorHex;
+
+            if (item.IsEvent && !string.IsNullOrEmpty(item.CalendarId) && account.Calendars.Count > 0)
+            {
+                var cal = account.Calendars.FirstOrDefault(c => c.Id == item.CalendarId);
+                if (cal?.ColorHex != null) return cal.ColorHex;
+            }
+
+            return null;
+        }
+
+        public void EnsureDefaultColors()
+        {
+            int colorIndex = 0;
+            foreach (var account in Accounts)
+            {
+                foreach (var cal in account.Calendars)
+                {
+                    if (string.IsNullOrEmpty(cal.ColorHex))
+                    {
+                        cal.ColorHex = ColorHelper.GetDefaultColorForIndex(colorIndex);
+                    }
+                    colorIndex++;
+                }
+                if (string.IsNullOrEmpty(account.TaskColorHex))
+                {
+                    account.TaskColorHex = ColorHelper.GetDefaultColorForIndex(colorIndex);
+                    colorIndex++;
+                }
+            }
+        }
+
+        public void PopulateItemColor(AgendaItem item)
+        {
+            var color = GetColorForItem(item);
+            if (color != null) item.ColorHex = color;
         }
     }
 }

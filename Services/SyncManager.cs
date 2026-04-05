@@ -52,11 +52,17 @@ namespace Task_Flyout.Services
                             changed = true;
                         }
 
-                        if (changed) AccountManager.Save();
+                        if (changed)
+                        {
+                            AccountManager.EnsureDefaultColors();
+                            AccountManager.Save();
+                        }
                     }
                 }
-                catch { } 
+                catch { }
             }
+
+            AccountManager.EnsureDefaultColors();
         }
 
         public async Task<List<AgendaItem>> GetAllDataAsync(DateTime min, DateTime max)

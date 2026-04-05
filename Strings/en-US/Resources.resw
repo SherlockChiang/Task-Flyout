@@ -432,4 +432,16 @@
   <data name="MainWindow_ToggleTasks.Text" xml:space="preserve">
     <value>Tasks</value>
   </data>
+  <data name="TextPickColor" xml:space="preserve">
+    <value>Pick a color</value>
+  </data>
+  <data name="TextNotificationReminder" xml:space="preserve">
+    <value>Event Reminder</value>
+  </data>
+  <data name="TextMinutesLater" xml:space="preserve">
+    <value>Starts in {0} minutes</value>
+  </data>
+  <data name="TextOneMinuteLater" xml:space="preserve">
+    <value>Starts in 1 minute</value>
+  </data>
 </root>

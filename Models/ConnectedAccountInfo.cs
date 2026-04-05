@@ -16,6 +16,13 @@ namespace Task_Flyout.Models
             set { if (_isVisible != value) { _isVisible = value; OnPropertyChanged(); } }
         }
 
+        private string _colorHex;
+        public string ColorHex
+        {
+            get => _colorHex;
+            set { if (_colorHex != value) { _colorHex = value; OnPropertyChanged(); } }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -37,6 +44,13 @@ namespace Task_Flyout.Models
         {
             get => _showTasks;
             set { if (_showTasks != value) { _showTasks = value; OnPropertyChanged(); } }
+        }
+
+        private string _taskColorHex;
+        public string TaskColorHex
+        {
+            get => _taskColorHex;
+            set { if (_taskColorHex != value) { _taskColorHex = value; OnPropertyChanged(); } }
         }
 
         public ObservableCollection<SubscribedCalendarInfo> Calendars { get; set; } = new();

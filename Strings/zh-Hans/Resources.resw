@@ -432,4 +432,16 @@
   <data name="MainWindow_ToggleTasks.Text" xml:space="preserve">
     <value>任务</value>
   </data>
+  <data name="TextPickColor" xml:space="preserve">
+    <value>选择颜色</value>
+  </data>
+  <data name="TextNotificationReminder" xml:space="preserve">
+    <value>日程提醒</value>
+  </data>
+  <data name="TextMinutesLater" xml:space="preserve">
+    <value>{0} 分钟后开始</value>
+  </data>
+  <data name="TextOneMinuteLater" xml:space="preserve">
+    <value>1 分钟后开始</value>
+  </data>
 </root>

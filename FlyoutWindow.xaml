@@ -14,6 +14,7 @@
         <Grid.Resources>
             <local:BoolToBrushConverter x:Key="BoolToBrushConverter"/>
             <local:BoolToStrikethroughConverter x:Key="BoolToStrikethroughConverter"/>
+            <local:ColorHexToBrushConverter x:Key="ColorHexToBrushConverter"/>
         </Grid.Resources>
 
         <Grid.RowDefinitions>
@@ -80,7 +81,8 @@
                                 </Grid.ColumnDefinitions>
 
                                 <Grid Grid.Column="0" Width="24" Margin="0,0,12,0">
-                                    <Border Width="4" HorizontalAlignment="Left" Background="{ThemeResource SystemAccentColor}"
+                                    <Border Width="4" HorizontalAlignment="Left"
+                                            Background="{Binding ColorHex, Converter={StaticResource ColorHexToBrushConverter}}"
                                             CornerRadius="2" Visibility="{x:Bind IsEvent, Mode=OneWay}"/>
                                     <CheckBox IsChecked="{x:Bind IsCompleted, Mode=TwoWay}" MinWidth="0" Padding="0"
                                               VerticalAlignment="Center" HorizontalAlignment="Left"

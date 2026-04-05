@@ -26,6 +26,22 @@ namespace Task_Flyout
         public Dictionary<string, List<AgendaItem>> DayItems { get; set; } = new();
     }
 
+    public partial class ColorHexToBrushConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            var hex = value as string ?? string.Empty;
+            if (hex.StartsWith('#'))
+                return new SolidColorBrush(Services.ColorHelper.ParseHex(hex));
+
+            if (Application.Current.Resources.TryGetValue("SystemAccentColor", out var res) && res is Color sysColor)
+                return new SolidColorBrush(sysColor);
+
+            return new SolidColorBrush(Color.FromArgb(255, 0, 120, 215));
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, string language) => throw new NotImplementedException();
+    }
+
     public class BoolToBrushConverter : IValueConverter
     {
         private static readonly SolidColorBrush _transparentBrush = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
@@ -279,9 +295,7 @@ namespace Task_Flyout
 
             if (EventCounts == null || EventCounts.Count == 0) return;
 
-            Color accentColor = Color.FromArgb(255, 0, 120, 215);
-            if (Application.Current.Resources.TryGetValue("SystemAccentColor", out var res) && res is Color sysColor)
-                accentColor = sysColor;
+            var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
 
             var dayItems = FindAllDayItems(MainCalendar);
             foreach (var item in dayItems)
@@ -310,7 +324,24 @@ namespace Task_Flyout
                     var transformToCanvas = item.TransformToVisual(DotOverlay);
                     var posInCanvas = transformToCanvas.TransformPoint(new Windows.Foundation.Point(0, 0));
 
-                    int dotsToShow = Math.Min(count, 3);
+                    // Collect unique colors for this day's visible items
+                    var dotColors = new List<Color>();
+                    if (_localCache.DayItems.TryGetValue(dateStr, out var agendaItems))
+                    {
+                        foreach (var ai in agendaItems.Where(IsItemVisible))
+                        {
+                            accountMgr?.PopulateItemColor(ai);
+                            var c = !string.IsNullOrEmpty(ai.ColorHex)
+                                ? Services.ColorHelper.ParseHex(ai.ColorHex)
+                                : Color.FromArgb(255, 0, 120, 215);
+                            if (!dotColors.Any(dc => dc.R == c.R && dc.G == c.G && dc.B == c.B))
+                                dotColors.Add(c);
+                        }
+                    }
+                    if (dotColors.Count == 0)
+                        dotColors.Add(Color.FromArgb(255, 0, 120, 215));
+
+                    int dotsToShow = Math.Min(dotColors.Count, 3);
                     double totalWidth = (dotsToShow * dotSize) + ((dotsToShow - 1) * spacing);
 
                     double startX = posInCanvas.X + (item.ActualWidth - totalWidth) / 2;
@@ -322,7 +353,7 @@ namespace Task_Flyout
                         {
                             Width = dotSize,
                             Height = dotSize,
-                            Fill = new SolidColorBrush(accentColor),
+                            Fill = new SolidColorBrush(dotColors[i]),
                             IsHitTestVisible = false
                         };
 
@@ -412,7 +443,9 @@ namespace Task_Flyout
             }
             else if (_localCache.DayItems.ContainsKey(key) && _localCache.DayItems[key].Any(IsItemVisible))
             {
-                tempAgenda.AddRange(_localCache.DayItems[key].Where(IsItemVisible));
+                var visibleItems = _localCache.DayItems[key].Where(IsItemVisible).ToList();
+                foreach (var item in visibleItems) PopulateItemColor(item);
+                tempAgenda.AddRange(visibleItems);
             }
             else
             {
@@ -439,6 +472,7 @@ namespace Task_Flyout
                                                          : nextDate.ToString("M", CultureInfo.CurrentUICulture));
                     foreach (var item in nextItems)
                     {
+                        PopulateItemColor(item);
                         tempAgenda.Add(new AgendaItem
                         {
                             Id = item.Id,
@@ -449,6 +483,8 @@ namespace Task_Flyout
                             IsTask = item.IsTask,
                             IsCompleted = item.IsCompleted,
                             Provider = item.Provider,
+                            CalendarId = item.CalendarId,
+                            ColorHex = item.ColorHex,
                             DateKey = item.DateKey
                         });
                     }
@@ -536,6 +572,9 @@ namespace Task_Flyout
 
                 RequestDotRefresh();
                 ShowDataForDate(_selectedDay);
+
+                // Trigger notification check after sync
+                if (App.Current is App app) app.NotificationService?.CheckUpcomingEvents();
             }
             catch (Exception ex)
             {
@@ -666,6 +705,12 @@ namespace Task_Flyout
             var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
             if (accountMgr == null) return true;
             return accountMgr.IsItemVisible(item);
+        }
+
+        private void PopulateItemColor(AgendaItem item)
+        {
+            var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
+            accountMgr?.PopulateItemColor(item);
         }
 
         private async void TaskCheckBox_Click(object sender, RoutedEventArgs e)

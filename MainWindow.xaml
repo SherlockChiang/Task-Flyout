@@ -10,7 +10,7 @@
     </Window.SystemBackdrop>
 
     <Grid>
-        <NavigationView x:Name="MainNav" PaneDisplayMode="Left" IsSettingsVisible="True" 
+        <NavigationView x:Name="MainNav" PaneDisplayMode="Left" IsSettingsVisible="True"
                         ItemInvoked="MainNav_ItemInvoked" BackRequested="MainNav_BackRequested">
 
             <NavigationView.MenuItems>
@@ -31,7 +31,7 @@
                         <ItemsRepeater.ItemTemplate>
                             <DataTemplate>
 
-                                <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" 
+                                <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                                           Background="Transparent" BorderThickness="0" Padding="0" IsExpanded="True">
 
                                     <Expander.Header>
@@ -62,30 +62,40 @@
                                                 </ItemsRepeater.Layout>
                                                 <ItemsRepeater.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Grid Margin="32,0,0,8" ColumnSpacing="12">
+                                                        <Grid Margin="32,0,0,8" ColumnSpacing="8">
                                                             <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="*" />
-                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
                                                             </Grid.ColumnDefinitions>
-                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" 
+                                                            <Border Grid.Column="0" Width="16" Height="16" CornerRadius="8"
+                                                                    VerticalAlignment="Center" Tapped="CalendarColorDot_Tapped" Tag="{Binding}"
+                                                                    Loaded="CalendarColorDot_Loaded"
+                                                                    ToolTipService.ToolTip="点击更换颜色"/>
+                                                            <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
                                                                        TextTrimming="CharacterEllipsis" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                                            <ToggleSwitch Grid.Column="1" IsOn="{Binding IsVisible, Mode=TwoWay}" 
-                                                                          OffContent="" OnContent="" MinWidth="0" Margin="0" 
+                                                            <ToggleSwitch Grid.Column="2" IsOn="{Binding IsVisible, Mode=TwoWay}"
+                                                                          OffContent="" OnContent="" MinWidth="0" Margin="0"
                                                                           Toggled="CalendarToggle_Toggled" VerticalAlignment="Center"/>
                                                         </Grid>
                                                     </DataTemplate>
                                                 </ItemsRepeater.ItemTemplate>
                                             </ItemsRepeater>
 
-                                            <Grid Margin="32,0,0,8" ColumnSpacing="12">
+                                            <Grid Margin="32,0,0,8" ColumnSpacing="8">
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock x:Uid="MainWindow_ToggleTasks" Grid.Column="0" Text="待办任务" VerticalAlignment="Center" 
+                                                <Border Grid.Column="0" Width="16" Height="16" CornerRadius="8"
+                                                        VerticalAlignment="Center" Tapped="TaskColorDot_Tapped" Tag="{Binding}"
+                                                        Loaded="TaskColorDot_Loaded"
+                                                        ToolTipService.ToolTip="点击更换颜色"/>
+                                                <TextBlock x:Uid="MainWindow_ToggleTasks" Grid.Column="1" Text="待办任务" VerticalAlignment="Center"
                                                            TextTrimming="CharacterEllipsis" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                                <ToggleSwitch Grid.Column="1" IsOn="{Binding ShowTasks, Mode=TwoWay}" 
-                                                              OffContent="" OnContent="" MinWidth="0" Margin="0" 
+                                                <ToggleSwitch Grid.Column="2" IsOn="{Binding ShowTasks, Mode=TwoWay}"
+                                                              OffContent="" OnContent="" MinWidth="0" Margin="0"
                                                               Toggled="AccountToggle_Toggled" Tag="{Binding ProviderName}" VerticalAlignment="Center"/>
                                             </Grid>
 

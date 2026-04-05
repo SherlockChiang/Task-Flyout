@@ -1,10 +1,13 @@
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 using System;
 using System.Linq;
 using Task_Flyout.Models;
+using Task_Flyout.Services;
 using Task_Flyout.Views;
 using Windows.Storage;
 using Microsoft.Windows.ApplicationModel.Resources;
@@ -183,6 +186,129 @@ namespace Task_Flyout
             {
                 if (ContentFrame.Content is Views.CalendarPage calendarPage) calendarPage.OpenEditDialogFromExternal(itemToEdit);
             });
+        }
+
+        private void CalendarColorDot_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is Border border && border.Tag is SubscribedCalendarInfo calInfo)
+            {
+                var hex = calInfo.ColorHex;
+                border.Background = !string.IsNullOrEmpty(hex)
+                    ? new SolidColorBrush(ColorHelper.ParseHex(hex))
+                    : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 150, 150, 150));
+            }
+        }
+
+        private void TaskColorDot_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is Border border && border.Tag is ConnectedAccountInfo accountInfo)
+            {
+                var hex = accountInfo.TaskColorHex;
+                border.Background = !string.IsNullOrEmpty(hex)
+                    ? new SolidColorBrush(ColorHelper.ParseHex(hex))
+                    : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 150, 150, 150));
+            }
+        }
+
+        private void CalendarColorDot_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            if (sender is Border border && border.Tag is SubscribedCalendarInfo calInfo)
+            {
+                ShowColorPickerFlyout(border, calInfo.ColorHex, selectedColor =>
+                {
+                    calInfo.ColorHex = selectedColor;
+                    border.Background = new SolidColorBrush(ColorHelper.ParseHex(selectedColor));
+                    var mgr = GetAccountManager();
+                    mgr?.Save();
+                    BroadcastFilterChange();
+                });
+            }
+        }
+
+        private void TaskColorDot_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            if (sender is Border border && border.Tag is ConnectedAccountInfo accountInfo)
+            {
+                ShowColorPickerFlyout(border, accountInfo.TaskColorHex, selectedColor =>
+                {
+                    accountInfo.TaskColorHex = selectedColor;
+                    border.Background = new SolidColorBrush(ColorHelper.ParseHex(selectedColor));
+                    var mgr = GetAccountManager();
+                    mgr?.Save();
+                    BroadcastFilterChange();
+                });
+            }
+        }
+
+        private void ShowColorPickerFlyout(FrameworkElement anchor, string currentColor, Action<string> onColorSelected)
+        {
+            var flyout = new Flyout();
+            var panel = new StackPanel { Spacing = 8, Padding = new Thickness(4) };
+
+            var header = new TextBlock
+            {
+                Text = _loader.GetString("TextPickColor") ?? "选择颜色",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 14,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            panel.Children.Add(header);
+
+            var grid = new GridView
+            {
+                SelectionMode = ListViewSelectionMode.Single,
+                IsItemClickEnabled = true,
+                Width = 208
+            };
+            grid.ItemsPanel = (ItemsPanelTemplate)Microsoft.UI.Xaml.Markup.XamlReader.Load(
+                "<ItemsPanelTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'>" +
+                "<ItemsWrapGrid MaximumRowsOrColumns='4' Orientation='Horizontal'/>" +
+                "</ItemsPanelTemplate>");
+
+            foreach (var hex in ColorHelper.MonetPalette)
+            {
+                var swatch = new Border
+                {
+                    Width = 40,
+                    Height = 40,
+                    CornerRadius = new CornerRadius(8),
+                    Background = new SolidColorBrush(ColorHelper.ParseHex(hex)),
+                    Margin = new Thickness(4),
+                    BorderThickness = new Thickness(hex == currentColor ? 3 : 0),
+                    BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.White)
+                };
+
+                if (hex == currentColor)
+                {
+                    var check = new FontIcon
+                    {
+                        Glyph = "\uE73E",
+                        FontSize = 16,
+                        Foreground = new SolidColorBrush(
+                            ColorHelper.ShouldUseWhiteText(hex) ? Microsoft.UI.Colors.White : Microsoft.UI.Colors.Black),
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    swatch.Child = check;
+                }
+
+                swatch.Tag = hex;
+                swatch.Tapped += (s, args) =>
+                {
+                    args.Handled = true;
+                    if (s is Border b && b.Tag is string color)
+                    {
+                        onColorSelected(color);
+                        flyout.Hide();
+                    }
+                };
+
+                grid.Items.Add(swatch);
+            }
+
+            panel.Children.Add(grid);
+            flyout.Content = panel;
+            flyout.ShowAt(anchor);
         }
     }
 }
