@@ -1,13 +1,10 @@
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Shapes;
 using System;
 using System.Linq;
 using Task_Flyout.Models;
-using Task_Flyout.Services;
 using Task_Flyout.Views;
 using Windows.Storage;
 using Microsoft.Windows.ApplicationModel.Resources;
@@ -209,7 +206,7 @@ namespace Task_Flyout
             {
                 var hex = calInfo.ColorHex;
                 border.Background = !string.IsNullOrEmpty(hex)
-                    ? new SolidColorBrush(ColorHelper.ParseHex(hex))
+                    ? new SolidColorBrush(Services.ColorHelper.ParseHex(hex))
                     : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 150, 150, 150));
             }
         }
@@ -220,135 +217,9 @@ namespace Task_Flyout
             {
                 var hex = accountInfo.TaskColorHex;
                 border.Background = !string.IsNullOrEmpty(hex)
-                    ? new SolidColorBrush(ColorHelper.ParseHex(hex))
+                    ? new SolidColorBrush(Services.ColorHelper.ParseHex(hex))
                     : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 150, 150, 150));
             }
-        }
-
-        private void CalendarColorDot_Tapped(object sender, TappedRoutedEventArgs e)
-        {
-            if (sender is Border border && border.Tag is SubscribedCalendarInfo calInfo)
-            {
-                ShowColorPickerFlyout(border, calInfo.ColorHex, selectedColor =>
-                {
-                    calInfo.ColorHex = selectedColor;
-                    border.Background = new SolidColorBrush(ColorHelper.ParseHex(selectedColor));
-                    var mgr = GetAccountManager();
-                    mgr?.Save();
-                    BroadcastFilterChange();
-                });
-            }
-        }
-
-        private void TaskColorDot_Tapped(object sender, TappedRoutedEventArgs e)
-        {
-            if (sender is Border border && border.Tag is ConnectedAccountInfo accountInfo)
-            {
-                ShowColorPickerFlyout(border, accountInfo.TaskColorHex, selectedColor =>
-                {
-                    accountInfo.TaskColorHex = selectedColor;
-                    border.Background = new SolidColorBrush(ColorHelper.ParseHex(selectedColor));
-                    var mgr = GetAccountManager();
-                    mgr?.Save();
-                    BroadcastFilterChange();
-                });
-            }
-        }
-
-        private void ShowColorPickerFlyout(FrameworkElement anchor, string currentColor, Action<string> onColorSelected)
-        {
-            var flyout = new Flyout();
-            var panel = new StackPanel { Spacing = 12, Padding = new Thickness(8), MaxWidth = 340 };
-
-            var presetHeader = new TextBlock
-            {
-                Text = GetSafeString("TextPresetColors", "预设颜色"),
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                FontSize = 14
-            };
-            panel.Children.Add(presetHeader);
-
-            var presetGrid = new GridView
-            {
-                SelectionMode = ListViewSelectionMode.None,
-                IsItemClickEnabled = true,
-                Margin = new Thickness(-4, 0, -4, 0)
-            };
-            presetGrid.ItemsPanel = (ItemsPanelTemplate)Microsoft.UI.Xaml.Markup.XamlReader.Load(
-                "<ItemsPanelTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'>" +
-                "<ItemsWrapGrid MaximumRowsOrColumns='6' Orientation='Horizontal'/>" +
-                "</ItemsPanelTemplate>");
-
-            string[] monetColors = {
-                "#D5A5A1", "#B38B8D", "#C3D1C6", "#9CB4A3", "#758A7A", "#E6D4B8",
-                "#D2B88F", "#B49665", "#BBD0D9", "#92A6B9", "#6A7B92", "#B19FB6"
-            };
-
-            var colorPicker = new ColorPicker
-            {
-                Color = ColorHelper.ParseHex(currentColor),
-                IsAlphaEnabled = false,
-                IsColorChannelTextInputVisible = true,
-                IsHexInputVisible = true,
-                Margin = new Thickness(0, -8, 0, 0)
-            };
-
-            foreach (var hex in monetColors)
-            {
-                var swatch = new Border
-                {
-                    Width = 32,
-                    Height = 32,
-                    CornerRadius = new CornerRadius(16),
-                    Background = new SolidColorBrush(ColorHelper.ParseHex(hex)),
-                    Margin = new Thickness(4),
-                    BorderThickness = new Thickness(1),
-                    BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.LightGray)
-                };
-
-                swatch.Tapped += (s, args) =>
-                {
-                    colorPicker.Color = ColorHelper.ParseHex(hex);
-                };
-                presetGrid.Items.Add(swatch);
-            }
-            panel.Children.Add(presetGrid);
-
-            var customHeader = new TextBlock
-            {
-                Text = GetSafeString("TextCustomColor", "自定义颜色 (RGB/HEX)"),
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                FontSize = 14,
-                Margin = new Thickness(0, 8, 0, 0)
-            };
-            panel.Children.Add(customHeader);
-
-            panel.Children.Add(colorPicker);
-
-            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Margin = new Thickness(0, 8, 0, 0) };
-
-            var cancelBtn = new Button { Content = GetSafeString("CalendarDialog/CloseButtonText", "取消") };
-            cancelBtn.Click += (s, e) => flyout.Hide();
-
-            var applyBtn = new Button
-            {
-                Content = GetSafeString("TextConfirm", "确定"),
-                Style = (Style)Application.Current.Resources["AccentButtonStyle"]
-            };
-            applyBtn.Click += (s, e) =>
-            {
-                var c = colorPicker.Color;
-                string newHex = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
-                onColorSelected(newHex);
-                flyout.Hide();
-            };
-
-            btnPanel.Children.Add(cancelBtn);
-            btnPanel.Children.Add(applyBtn);
-            panel.Children.Add(btnPanel);
-
-            flyout.Content = panel;
-            flyout.ShowAt(anchor);
         }
     }
 }

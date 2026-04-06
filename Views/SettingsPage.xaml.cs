@@ -106,14 +106,30 @@ namespace Task_Flyout.Views
 
             foreach (var account in mgr.Accounts)
             {
+                var headerPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 8,
+                    Margin = new Thickness(0, 8, 0, 4)
+                };
+                var accentColor = (Windows.UI.Color)Application.Current.Resources["SystemAccentColor"];
+                var accountIcon = new FontIcon
+                {
+                    Glyph = "\uE77B",
+                    FontSize = 15,
+                    Foreground = new SolidColorBrush(accentColor),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                headerPanel.Children.Add(accountIcon);
                 var accountHeader = new TextBlock
                 {
                     Text = account.ProviderName,
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                     FontSize = 14,
-                    Margin = new Thickness(0, 8, 0, 4)
+                    VerticalAlignment = VerticalAlignment.Center
                 };
-                ColorPalettePanel.Children.Add(accountHeader);
+                headerPanel.Children.Add(accountHeader);
+                ColorPalettePanel.Children.Add(headerPanel);
 
                 foreach (var cal in account.Calendars)
                 {
