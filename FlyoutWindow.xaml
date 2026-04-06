@@ -30,13 +30,32 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Button x:Uid="Flyout_BtnGoToToday" Grid.Row="0" Margin="16,0,16,12" Background="Transparent" BorderThickness="0"
-                    HorizontalAlignment="Left" Padding="0" Click="BtnGoToToday_Click" ToolTipService.ToolTip="回到今天">
-                <StackPanel>
-                    <TextBlock x:Name="TxtRealTimeClock" Text="10:30" FontSize="32" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
-                    <TextBlock x:Name="TxtRealTimeDate" Text="2023年10月24日 星期二" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+            <Grid Grid.Row="0" Margin="16,0,16,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Button x:Uid="Flyout_BtnGoToToday" Grid.Column="0" Background="Transparent" BorderThickness="0"
+                        HorizontalAlignment="Left" Padding="0" Click="BtnGoToToday_Click" ToolTipService.ToolTip="回到今天">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtRealTimeClock" Text="10:30" FontSize="32" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                        <TextBlock x:Name="TxtRealTimeDate" Text="2023年10月24日 星期二" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </StackPanel>
+                </Button>
+
+                <StackPanel x:Name="WeatherPanel" Grid.Column="1" Orientation="Horizontal" Spacing="6"
+                            VerticalAlignment="Center" Visibility="Collapsed">
+                    <FontIcon x:Name="WeatherIcon" Glyph="&#xE9BD;" FontSize="22"
+                              Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtWeatherTemp" Text="--" FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                        <TextBlock x:Name="TxtWeatherDesc" Text="" FontSize="11"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxWidth="60" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
                 </StackPanel>
-            </Button>
+            </Grid>
 
             <Grid Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,12" Width="320" Height="354">
                 <CalendarView x:Name="MainCalendar" 

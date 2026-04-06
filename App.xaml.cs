@@ -25,6 +25,7 @@ namespace Task_Flyout
         public static Microsoft.UI.Dispatching.DispatcherQueue MainDispatcherQueue { get; private set; }
         public SyncManager SyncManager { get; } = new SyncManager();
         public NotificationService NotificationService { get; private set; }
+        public WeatherService WeatherService { get; } = new WeatherService();
 
         public App()
         {

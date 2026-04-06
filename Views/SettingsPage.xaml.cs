@@ -77,6 +77,13 @@ namespace Task_Flyout.Views
             }
             catch { }
 
+            var weatherService = (App.Current as App)?.WeatherService;
+            if (weatherService != null)
+            {
+                WeatherToggle.IsOn = weatherService.IsEnabled;
+                WeatherCityTextBox.Text = weatherService.City;
+            }
+
             BuildColorPaletteUI();
 
             _isInitializing = false;
@@ -433,6 +440,28 @@ namespace Task_Flyout.Views
         {
             if (_isInitializing) return;
             ApplicationData.Current.LocalSettings.Values["RunInBackground"] = BackgroundToggle.IsOn;
+        }
+
+        private void WeatherToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            var weatherService = (App.Current as App)?.WeatherService;
+            if (weatherService != null)
+            {
+                weatherService.IsEnabled = WeatherToggle.IsOn;
+                _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: true);
+            }
+        }
+
+        private void WeatherCityTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            var weatherService = (App.Current as App)?.WeatherService;
+            if (weatherService != null)
+            {
+                weatherService.City = WeatherCityTextBox.Text.Trim();
+                _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: true);
+            }
         }
     }
 }

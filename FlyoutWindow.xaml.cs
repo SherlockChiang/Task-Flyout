@@ -146,6 +146,7 @@ namespace Task_Flyout
             MainCalendar.RegisterPropertyChangedCallback(CalendarView.DisplayModeProperty, (s, args) => RequestDotRefresh());
 
             _ = SyncAllDataAsync(true);
+            _ = RefreshWeatherAsync();
         }
 
         private void OnScrollViewerViewChanging(object sender, ScrollViewerViewChangingEventArgs e) => RequestDotRefresh();
@@ -678,6 +679,7 @@ namespace Task_Flyout
                 RequestDotRefresh();
 
                 _ = SyncAllDataAsync(true);
+                _ = RefreshWeatherAsync();
             }
         }
 
@@ -824,6 +826,33 @@ namespace Task_Flyout
             RequestDotRefresh();
 
             ShowDataForDate(_selectedDay);
+        }
+
+        public async Task RefreshWeatherAsync(bool forceRefresh = false)
+        {
+            var weatherService = (App.Current as App)?.WeatherService;
+            if (weatherService == null || !weatherService.IsEnabled)
+            {
+                DispatcherQueue.TryEnqueue(() => WeatherPanel.Visibility = Visibility.Collapsed);
+                return;
+            }
+
+            var info = await weatherService.GetWeatherAsync(forceRefresh);
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (info != null)
+                {
+                    WeatherIcon.Glyph = info.Icon;
+                    TxtWeatherTemp.Text = info.Temperature;
+                    TxtWeatherDesc.Text = info.Description;
+                    WeatherPanel.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    WeatherPanel.Visibility = Visibility.Collapsed;
+                }
+            });
         }
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)

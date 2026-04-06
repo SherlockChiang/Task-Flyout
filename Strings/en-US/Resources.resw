@@ -474,4 +474,16 @@
   <data name="TextCustomColor" xml:space="preserve">
     <value>Custom Color</value>
   </data>
+  <data name="SettingsPage_Weather.Text" xml:space="preserve">
+    <value>Weather</value>
+  </data>
+  <data name="SettingsPage_WeatherToggle.Header" xml:space="preserve">
+    <value>Show weather in flyout</value>
+  </data>
+  <data name="SettingsPage_WeatherCity.Header" xml:space="preserve">
+    <value>City name</value>
+  </data>
+  <data name="SettingsPage_WeatherCity.PlaceholderText" xml:space="preserve">
+    <value>e.g. Beijing</value>
+  </data>
 </root>

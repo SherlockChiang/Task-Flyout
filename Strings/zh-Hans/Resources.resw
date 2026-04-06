@@ -474,4 +474,16 @@
   <data name="TextCustomColor" xml:space="preserve">
     <value>自定义颜色</value>
   </data>
+  <data name="SettingsPage_Weather.Text" xml:space="preserve">
+    <value>今日天气</value>
+  </data>
+  <data name="SettingsPage_WeatherToggle.Header" xml:space="preserve">
+    <value>在浮窗显示天气</value>
+  </data>
+  <data name="SettingsPage_WeatherCity.Header" xml:space="preserve">
+    <value>城市名称</value>
+  </data>
+  <data name="SettingsPage_WeatherCity.PlaceholderText" xml:space="preserve">
+    <value>例如：Beijing</value>
+  </data>
 </root>
