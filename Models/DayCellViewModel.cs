@@ -11,7 +11,6 @@ namespace Task_Flyout.Models
         public bool IsCurrentMonth { get; set; }
         public bool IsToday => Date.Date == DateTime.Today;
 
-        // 存放这一天的所有日程和任务
         public ObservableCollection<AgendaItem> Items { get; set; } = new();
     }
 }
