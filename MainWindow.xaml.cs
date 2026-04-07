@@ -213,6 +213,14 @@ namespace Task_Flyout
             });
         }
 
+        public void RefreshCalendarColors()
+        {
+            if (ContentFrame.Content is Views.CalendarPage page)
+            {
+                page.ReloadFilters();
+            }
+        }
+
         private void CalendarColorDot_Loaded(object sender, RoutedEventArgs e)
         {
             if (sender is Border border && border.Tag is SubscribedCalendarInfo calInfo)
