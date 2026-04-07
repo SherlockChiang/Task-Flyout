@@ -486,4 +486,55 @@
   <data name="SettingsPage_WeatherCity.PlaceholderText" xml:space="preserve">
     <value>例如：Beijing</value>
   </data>
+  <data name="SettingsPage_Clock.Text" xml:space="preserve">
+    <value>时钟显示</value>
+  </data>
+  <data name="SettingsPage_ShowSeconds.Header" xml:space="preserve">
+    <value>在浮窗时钟中显示秒</value>
+  </data>
+  <data name="Flyout_BtnPin.ToolTipService.ToolTip" xml:space="preserve">
+    <value>置顶窗口</value>
+  </data>
+  <data name="Flyout_BtnWeather.ToolTipService.ToolTip" xml:space="preserve">
+    <value>查看天气详情</value>
+  </data>
+  <data name="WeatherPage_Title.Text" xml:space="preserve">
+    <value>天气设置与概览</value>
+  </data>
+  <data name="WeatherPage_Toggle.Header" xml:space="preserve">
+    <value>在系统浮窗中显示今日天气</value>
+  </data>
+  <data name="WeatherPage_CityHeader.Text" xml:space="preserve">
+    <value>搜索城市 (支持中英拼音)</value>
+  </data>
+  <data name="WeatherPage_24Hour.Text" xml:space="preserve">
+    <value>24 小时预报</value>
+  </data>
+  <data name="MainWindow_NavWeather.Content" xml:space="preserve">
+    <value>天气</value>
+  </data>
+  <data name="WeatherPage_CitySearchBox.PlaceholderText" xml:space="preserve">
+    <value>输入城市名后等待几秒...</value>
+  </data>
+  <data name="WeatherPage_BtnRefresh.Content" xml:space="preserve">
+    <value>刷新</value>
+  </data>
+  <data name="WeatherPage_IconFontHeader.Header" xml:space="preserve">
+    <value>图标风格</value>
+  </data>
+  <data name="WeatherPage_FontEmoji.Content" xml:space="preserve">
+    <value>Windows 11 风格</value>
+  </data>
+  <data name="WeatherPage_FontSymbol.Content" xml:space="preserve">
+    <value>经典</value>
+  </data>
+  <data name="WeatherPage_FontCustom.Content" xml:space="preserve">
+    <value>自定义字体</value>
+  </data>
+  <data name="WeatherPage_CustomFontBox.Header" xml:space="preserve">
+    <value>自定义字体名称</value>
+  </data>
+  <data name="WeatherPage_CustomFontBox.PlaceholderText" xml:space="preserve">
+    <value>Noto Color Emoji</value>
+  </data>
 </root>

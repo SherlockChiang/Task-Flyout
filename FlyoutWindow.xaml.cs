@@ -73,6 +73,7 @@ namespace Task_Flyout
         private ResourceLoader _loader;
 
         private DateTime _lastHideTime = DateTime.MinValue;
+        private bool _isPinned = false;
 
         private DispatcherTimer _dotRefreshTimer;
         private bool _isDotRefreshPending = false;
@@ -183,16 +184,26 @@ namespace Task_Flyout
 
         private void StartClock()
         {
+            _showSeconds = Windows.Storage.ApplicationData.Current.LocalSettings.Values["ShowSeconds"] as bool? ?? false;
             UpdateClock();
             _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _clockTimer.Tick += (s, e) => UpdateClock();
             _clockTimer.Start();
         }
 
+        private bool _showSeconds;
+
         private void UpdateClock()
         {
-            TxtRealTimeClock.Text = DateTime.Now.ToString("HH:mm");
+            string format = _showSeconds ? "HH:mm:ss" : "HH:mm";
+            TxtRealTimeClock.Text = DateTime.Now.ToString(format);
             TxtRealTimeDate.Text = DateTime.Now.ToString("D", CultureInfo.CurrentUICulture);
+        }
+
+        public void UpdateClockFormat()
+        {
+            _showSeconds = Windows.Storage.ApplicationData.Current.LocalSettings.Values["ShowSeconds"] as bool? ?? false;
+            UpdateClock();
         }
 
         private void SetupPeriodicSync()
@@ -753,7 +764,7 @@ namespace Task_Flyout
 
         private void FlyoutWindow_Activated(object sender, WindowActivatedEventArgs args)
         {
-            if (args.WindowActivationState == WindowActivationState.Deactivated)
+            if (args.WindowActivationState == WindowActivationState.Deactivated && !_isPinned)
             {
                 _appWindow.Hide();
                 _lastHideTime = DateTime.Now;
@@ -843,7 +854,9 @@ namespace Task_Flyout
             {
                 if (info != null)
                 {
-                    WeatherIcon.Glyph = info.Icon;
+                    WeatherIcon.Text = info.Icon;
+                    WeatherIcon.FontFamily = new Microsoft.UI.Xaml.Media.FontFamily(info.IconFont);
+
                     TxtWeatherTemp.Text = info.Temperature;
                     TxtWeatherDesc.Text = info.Description;
                     WeatherPanel.Visibility = Visibility.Visible;
@@ -859,6 +872,19 @@ namespace Task_Flyout
         {
             _appWindow.Hide();
             App.OpenMainWindowInternal(win => win.NavigateToSettings());
+        }
+
+        private void BtnWeather_Click(object sender, RoutedEventArgs e)
+        {
+            _appWindow.Hide();
+            App.OpenMainWindowInternal(win => win.NavigateToWeather());
+        }
+
+        private void BtnPin_Click(object sender, RoutedEventArgs e)
+        {
+            _isPinned = !_isPinned;
+            // E718 = Pin (pinned), E77A = Unpin (unpinned)
+            PinIcon.Glyph = _isPinned ? "\uE718" : "\uE77A";
         }
 
         private void AgendaListControl_ItemClick(object sender, ItemClickEventArgs e)

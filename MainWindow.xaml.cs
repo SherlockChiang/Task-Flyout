@@ -66,6 +66,10 @@ namespace Task_Flyout
             {
                 MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Calendar");
             }
+            else if (ContentFrame.SourcePageType == typeof(Views.WeatherPage))
+            {
+                MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Weather");
+            }
             else
             {
                 MainNav.SelectedItem = null;
@@ -180,12 +184,21 @@ namespace Task_Flyout
             if (args.IsSettingsInvoked) ContentFrame.Navigate(typeof(SettingsPage));
             else if (args.InvokedItemContainer is NavigationViewItem item && item.Tag?.ToString() == "Calendar")
                 ContentFrame.Navigate(typeof(CalendarPage));
+            else if (args.InvokedItemContainer is NavigationViewItem itemW && itemW.Tag?.ToString() == "Weather")
+                ContentFrame.Navigate(typeof(WeatherPage));
         }
 
         public void NavigateToSettings()
         {
             MainNav.SelectedItem = MainNav.SettingsItem;
             ContentFrame.Navigate(typeof(Views.SettingsPage));
+        }
+
+        public void NavigateToWeather()
+        {
+            var weatherItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Weather");
+            if (weatherItem != null) MainNav.SelectedItem = weatherItem;
+            ContentFrame.Navigate(typeof(Views.WeatherPage));
         }
 
         public void NavigateToCalendarAndEdit(AgendaItem itemToEdit)

@@ -20,6 +20,12 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
+                <NavigationViewItem x:Uid="MainWindow_NavWeather" Content="天气" Tag="Weather">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xECAA;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+
                 <NavigationViewItemSeparator Margin="16,8,16,8"/>
 
                 <StackPanel x:Name="FooterContentPanel" Padding="16,0,24,16" Spacing="12">

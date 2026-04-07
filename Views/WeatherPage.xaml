@@ -1,0 +1,85 @@
+<Page
+    x:Class="Task_Flyout.Views.WeatherPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Task_Flyout.Services"
+    Background="Transparent">
+
+    <ScrollViewer Padding="40">
+        <StackPanel Spacing="28" MaxWidth="800" HorizontalAlignment="Left">
+            <TextBlock x:Uid="WeatherPage_Title" Style="{StaticResource TitleTextBlockStyle}"/>
+
+            <StackPanel Spacing="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="24" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+
+                <ToggleSwitch x:Uid="WeatherPage_Toggle" x:Name="WeatherToggle" Toggled="WeatherToggle_Toggled"/>
+
+                <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4"/>
+
+                <StackPanel Spacing="8">
+                    <TextBlock x:Uid="WeatherPage_CityHeader" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    <Grid ColumnSpacing="12" HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="300"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <AutoSuggestBox Grid.Column="0" x:Uid="WeatherPage_CitySearchBox" x:Name="CitySearchBox" 
+                                        TextChanged="CitySearchBox_TextChanged" QuerySubmitted="CitySearchBox_QuerySubmitted"
+                                        SuggestionChosen="CitySearchBox_SuggestionChosen" VerticalAlignment="Center"/>
+
+                        <Button x:Uid="WeatherPage_BtnRefresh" Grid.Column="1" Click="BtnRefresh_Click" VerticalAlignment="Center">
+                            <Button.ContentTransitions>
+                                <TransitionCollection>
+                                    <ContentThemeTransition/>
+                                </TransitionCollection>
+                            </Button.ContentTransitions>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+
+                <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4"/>
+
+                <StackPanel Spacing="8">
+                    <ComboBox x:Uid="WeatherPage_IconFontHeader" x:Name="IconFontComboBox" Width="300" HorizontalAlignment="Left" SelectionChanged="IconFontComboBox_SelectionChanged">
+                        <ComboBoxItem x:Uid="WeatherPage_FontEmoji" Tag="Segoe UI Emoji"/>
+                        <ComboBoxItem x:Uid="WeatherPage_FontSymbol" Tag="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+                        <ComboBoxItem x:Uid="WeatherPage_FontCustom" Tag="__custom__"/>
+                    </ComboBox>
+
+                    <AutoSuggestBox x:Uid="WeatherPage_CustomFontBox" x:Name="CustomFontBox" 
+                                    Width="300" HorizontalAlignment="Left" Visibility="Collapsed"
+                                    TextChanged="CustomFontBox_TextChanged"
+                                    QuerySubmitted="CustomFontBox_QuerySubmitted"
+                                    SuggestionChosen="CustomFontBox_SuggestionChosen"/>
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel x:Name="ForecastPanel" Spacing="12" Visibility="Collapsed">
+                <TextBlock x:Uid="WeatherPage_24Hour" FontWeight="SemiBold" FontSize="16"/>
+                <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="16">
+                    <ScrollViewer HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Auto" VerticalScrollMode="Disabled">
+                        <ItemsRepeater x:Name="HourlyRepeater">
+                            <ItemsRepeater.Layout>
+                                <StackLayout Orientation="Horizontal" Spacing="24"/>
+                            </ItemsRepeater.Layout>
+                            <ItemsRepeater.ItemTemplate>
+                                <DataTemplate x:DataType="models:HourlyWeather">
+                                    <StackPanel Width="60" Spacing="12" HorizontalAlignment="Center" Margin="0,8">
+                                        <TextBlock Text="{x:Bind Time}" HorizontalAlignment="Center" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                                        <TextBlock Text="{x:Bind Icon}" FontSize="28" HorizontalAlignment="Center" 
+                                                   FontFamily="{x:Bind IconFont}" />
+
+                                        <TextBlock Text="{x:Bind Temperature}" HorizontalAlignment="Center" FontWeight="Bold" FontSize="15"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsRepeater.ItemTemplate>
+                        </ItemsRepeater>
+                    </ScrollViewer>
+                </Border>
+            </StackPanel>
+
+            <ProgressRing x:Name="LoadingRing" IsActive="False" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

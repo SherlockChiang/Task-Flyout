@@ -21,6 +21,7 @@
         <None Remove="FlyoutWindow.xaml" />
         <None Remove="Views\CalendarPage.xaml" />
         <None Remove="Views\SettingsPage.xaml" />
+        <None Remove="Views\WeatherPage.xaml" />
         </ItemGroup>
 
     <ItemGroup>
@@ -63,6 +64,12 @@
       <Content Update="Assets\TrayIcon_Light.ico">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+    </ItemGroup>
+    
+    <ItemGroup>
+      <Page Update="Views\WeatherPage.xaml">
+        <Generator>MSBuild:Compile</Generator>
+      </Page>
     </ItemGroup>
     
     <ItemGroup>

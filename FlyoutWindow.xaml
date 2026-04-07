@@ -44,17 +44,21 @@
                     </StackPanel>
                 </Button>
 
-                <StackPanel x:Name="WeatherPanel" Grid.Column="1" Orientation="Horizontal" Spacing="6"
-                            VerticalAlignment="Center" Visibility="Collapsed">
-                    <FontIcon x:Name="WeatherIcon" Glyph="&#xE9BD;" FontSize="22"
-                              Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock x:Name="TxtWeatherTemp" Text="--" FontSize="16" FontWeight="SemiBold"
-                                   Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
-                        <TextBlock x:Name="TxtWeatherDesc" Text="" FontSize="11"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxWidth="60" TextTrimming="CharacterEllipsis"/>
+                <Button x:Uid="Flyout_BtnWeather" x:Name="WeatherPanel" Grid.Column="1" Background="Transparent" BorderThickness="0"
+                        Padding="4" VerticalAlignment="Center" Visibility="Collapsed"
+                        Click="BtnWeather_Click" ToolTipService.ToolTip="查看天气详情">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock x:Name="WeatherIcon" Text="☀️" FontSize="22"
+                                   FontFamily="Segoe UI Emoji" VerticalAlignment="Center" Margin="0,0,4,0"/>
+
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock x:Name="TxtWeatherTemp" Text="--" FontSize="16" FontWeight="SemiBold"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                            <TextBlock x:Name="TxtWeatherDesc" Text="" FontSize="11"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxWidth="60" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
                     </StackPanel>
-                </StackPanel>
+                </Button>
             </Grid>
 
             <Grid Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,12" Width="320" Height="354">
@@ -133,6 +137,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
@@ -142,7 +147,10 @@
             <Button x:Uid="Flyout_BtnRefresh" Grid.Column="1" Click="BtnRefresh_Click" ToolTipService.ToolTip="强制同步云端" Background="Transparent" BorderThickness="0" Margin="4,0,0,0" Foreground="{ThemeResource TextFillColorPrimaryBrush}">
                 <SymbolIcon Symbol="Refresh"/>
             </Button>
-            <Button Grid.Column="3" Style="{StaticResource AccentButtonStyle}" Padding="12,4" Click="BtnToggleAddPanel_Click">
+            <Button x:Uid="Flyout_BtnPin" x:Name="BtnPin" Grid.Column="2" Click="BtnPin_Click" ToolTipService.ToolTip="置顶窗口" Background="Transparent" BorderThickness="0" Margin="4,0,0,0" Foreground="{ThemeResource TextFillColorPrimaryBrush}">
+                <FontIcon x:Name="PinIcon" Glyph="&#xE77A;" FontSize="16"/>
+            </Button>
+            <Button Grid.Column="4" Style="{StaticResource AccentButtonStyle}" Padding="12,4" Click="BtnToggleAddPanel_Click">
                 <StackPanel Orientation="Horizontal">
                     <SymbolIcon Symbol="Add" Margin="0,0,8,0"/>
                     <TextBlock x:Uid="Flyout_TextAdd" Text="添加"/>

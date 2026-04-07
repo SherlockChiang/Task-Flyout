@@ -52,6 +52,7 @@ namespace Task_Flyout.Views
 
             BackgroundToggle.IsOn = settings.Values["RunInBackground"] as bool? ?? true;
             NotifyToggle.IsOn = settings.Values["NotifyEnabled"] as bool? ?? true;
+            ShowSecondsToggle.IsOn = settings.Values["ShowSeconds"] as bool? ?? false;
 
             // 👉 这里已经支持多语言了！只需在英文 resw 中添加键名 TextMinutes，值为 Minutes 即可。
             string minuteStr = GetSafeString("TextMinutes", "分钟");
@@ -76,13 +77,6 @@ namespace Task_Flyout.Views
                 StartupToggle.IsOn = startupTask.State == StartupTaskState.Enabled;
             }
             catch { }
-
-            var weatherService = (App.Current as App)?.WeatherService;
-            if (weatherService != null)
-            {
-                WeatherToggle.IsOn = weatherService.IsEnabled;
-                WeatherCityTextBox.Text = weatherService.City;
-            }
 
             BuildColorPaletteUI();
 
@@ -442,26 +436,12 @@ namespace Task_Flyout.Views
             ApplicationData.Current.LocalSettings.Values["RunInBackground"] = BackgroundToggle.IsOn;
         }
 
-        private void WeatherToggle_Toggled(object sender, RoutedEventArgs e)
+        private void ShowSecondsToggle_Toggled(object sender, RoutedEventArgs e)
         {
             if (_isInitializing) return;
-            var weatherService = (App.Current as App)?.WeatherService;
-            if (weatherService != null)
-            {
-                weatherService.IsEnabled = WeatherToggle.IsOn;
-                _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: true);
-            }
+            ApplicationData.Current.LocalSettings.Values["ShowSeconds"] = ShowSecondsToggle.IsOn;
+            App.MyFlyoutWindow?.UpdateClockFormat();
         }
 
-        private void WeatherCityTextBox_LostFocus(object sender, RoutedEventArgs e)
-        {
-            if (_isInitializing) return;
-            var weatherService = (App.Current as App)?.WeatherService;
-            if (weatherService != null)
-            {
-                weatherService.City = WeatherCityTextBox.Text.Trim();
-                _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: true);
-            }
-        }
     }
 }

@@ -31,25 +31,12 @@
                 <StackPanel x:Name="ColorPalettePanel" Spacing="8"/>
             </StackPanel>
 
-            <!-- Weather Section -->
+            <!-- Clock Display Section -->
             <StackPanel Spacing="8">
-                <TextBlock x:Uid="SettingsPage_Weather" Text="今日天气" FontWeight="SemiBold" FontSize="16"/>
-                
-                <Grid ColumnSpacing="32">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    
-                    <ToggleSwitch Grid.Column="0" x:Uid="SettingsPage_WeatherToggle" x:Name="WeatherToggle" 
-                                  Header="在浮窗显示天气" IsOn="False" Toggled="WeatherToggle_Toggled" VerticalAlignment="Bottom"/>
-                                  
-                    <TextBox Grid.Column="1" x:Uid="SettingsPage_WeatherCity" x:Name="WeatherCityTextBox" 
-                             Header="城市名称" PlaceholderText="拼音或英文，如: Beijing" Width="200" 
-                             LostFocus="WeatherCityTextBox_LostFocus" VerticalAlignment="Bottom"/>
-                </Grid>
+                <TextBlock x:Uid="SettingsPage_Clock" Text="时钟显示" FontWeight="SemiBold" FontSize="16"/>
+                <ToggleSwitch x:Uid="SettingsPage_ShowSeconds" x:Name="ShowSecondsToggle" Header="在浮窗时钟中显示秒" IsOn="False" Toggled="ShowSecondsToggle_Toggled"/>
             </StackPanel>
-            
+
             <!-- Notification Section -->
             <StackPanel Spacing="8">
                 <TextBlock x:Uid="SettingsPage_Notification" Text="通知提醒" FontWeight="SemiBold" FontSize="16"/>

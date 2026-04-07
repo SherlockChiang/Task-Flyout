@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -6,12 +7,22 @@ using Windows.Storage;
 
 namespace Task_Flyout.Services
 {
+    public class HourlyWeather
+    {
+        public string Time { get; set; }
+        public string Temperature { get; set; }
+        public string Icon { get; set; }
+        public string IconFont { get; set; }
+    }
+
     public class WeatherInfo
     {
         public string Temperature { get; set; }
         public string Description { get; set; }
         public string Icon { get; set; }
+        public string IconFont { get; set; }
         public string City { get; set; }
+        public List<HourlyWeather> HourlyForecast { get; set; } = new();
     }
 
     public class WeatherService
@@ -33,6 +44,41 @@ namespace Task_Flyout.Services
             set => ApplicationData.Current.LocalSettings.Values["WeatherCity"] = value;
         }
 
+        public string IconFontFamily
+        {
+            get => ApplicationData.Current.LocalSettings.Values["WeatherIconFont"] as string ?? "Segoe UI Emoji";
+            set => ApplicationData.Current.LocalSettings.Values["WeatherIconFont"] = value;
+        }
+        public async Task<List<string>> SearchCityAsync(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query)) return new List<string>();
+            try
+            {
+                string url = $"https://geocoding-api.open-meteo.com/v1/search?name={Uri.EscapeDataString(query)}&count=5&language=zh";
+                _httpClient.DefaultRequestHeaders.UserAgent.Clear();
+                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("TaskFlyout/1.0");
+
+                var response = await _httpClient.GetStringAsync(url);
+                using var doc = JsonDocument.Parse(response);
+                if (doc.RootElement.TryGetProperty("results", out var results))
+                {
+                    var list = new List<string>();
+                    foreach (var item in results.EnumerateArray())
+                    {
+                        string name = item.GetProperty("name").GetString();
+                        string admin1 = item.TryGetProperty("admin1", out var a1) ? a1.GetString() : "";
+                        string country = item.TryGetProperty("country", out var c) ? c.GetString() : "";
+                        
+                        string fullName = $"{name}, {admin1}, {country}".Replace(", ,", ",").TrimEnd(',', ' ');
+                        list.Add(fullName);
+                    }
+                    return list;
+                }
+            }
+            catch { }
+            return new List<string>();
+        }
+
         public async Task<WeatherInfo> GetWeatherAsync(bool forceRefresh = false)
         {
             if (!IsEnabled || string.IsNullOrWhiteSpace(City))
@@ -43,11 +89,18 @@ namespace Task_Flyout.Services
 
             try
             {
-                // 👉 核心修复 1：强制加上 &lang=zh 确保有中文描述
-                string url = $"https://wttr.in/{Uri.EscapeDataString(City)}?format=j1&lang=zh";
-                
+                // 👉 1. 动态获取当前设置的语言
+                string appLang = ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
+                if (string.IsNullOrEmpty(appLang))
+                    appLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+
+                string wttrLang = appLang.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "en" : "zh";
+
+                string searchCity = City.Split(',')[0].Trim();
+                // 👉 2. 将语言参数动态拼接入 URL
+                string url = $"https://wttr.in/{Uri.EscapeDataString(searchCity)}?format=j1&lang={wttrLang}";
+
                 _httpClient.DefaultRequestHeaders.UserAgent.Clear();
-                // 👉 核心修复 2：伪装成命令行工具，防止 wttr.in 拒绝响应 JSON
                 _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("curl/7.68.0");
 
                 var response = await _httpClient.GetStringAsync(url);
@@ -58,19 +111,46 @@ namespace Task_Flyout.Services
                 string tempC = current.GetProperty("temp_C").GetString();
                 string weatherCode = current.GetProperty("weatherCode").GetString();
 
+                // 👉 3. 根据语言动态提取对应的天气描述字段
                 string desc = "";
-                if (current.TryGetProperty("lang_zh", out var langZh) && langZh.GetArrayLength() > 0)
+                if (wttrLang == "zh" && current.TryGetProperty("lang_zh", out var langZh) && langZh.GetArrayLength() > 0)
                     desc = langZh[0].GetProperty("value").GetString();
                 else if (current.TryGetProperty("weatherDesc", out var wDesc) && wDesc.GetArrayLength() > 0)
                     desc = wDesc[0].GetProperty("value").GetString();
 
-                _cachedWeather = new WeatherInfo
+                var weatherInfo = new WeatherInfo
                 {
                     Temperature = $"{tempC}°C",
                     Description = desc,
-                    Icon = WeatherCodeToIcon(weatherCode),
+                    Icon = WeatherCodeToIcon(weatherCode, IconFontFamily),
+                    IconFont = IconFontFamily,
                     City = City
                 };
+
+                if (root.TryGetProperty("weather", out var weatherArray) && weatherArray.GetArrayLength() > 0)
+                {
+                    var today = weatherArray[0];
+                    if (today.TryGetProperty("hourly", out var hourlyArray))
+                    {
+                        foreach (var hour in hourlyArray.EnumerateArray())
+                        {
+                            string timeRaw = hour.GetProperty("time").GetString();
+                            string timeFormatted = timeRaw == "0" ? "00:00" : timeRaw.PadLeft(4, '0').Insert(2, ":");
+                            string hourTemp = hour.GetProperty("tempC").GetString() + "°C";
+                            string hourCode = hour.GetProperty("weatherCode").GetString();
+
+                            weatherInfo.HourlyForecast.Add(new HourlyWeather
+                            {
+                                Time = timeFormatted,
+                                Temperature = hourTemp,
+                                Icon = WeatherCodeToIcon(hourCode, IconFontFamily),
+                                IconFont = IconFontFamily
+                            });
+                        }
+                    }
+                }
+
+                _cachedWeather = weatherInfo;
                 _lastFetchTime = DateTime.Now;
 
                 return _cachedWeather;
@@ -78,25 +158,48 @@ namespace Task_Flyout.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"获取天气失败: {ex.Message}");
-                return _cachedWeather; // 报错则返回旧缓存
+                return _cachedWeather;
             }
         }
 
-        private static string WeatherCodeToIcon(string code)
+        private static string WeatherCodeToIcon(string code, string fontFamily)
         {
-            return code switch
+            bool isSymbol = fontFamily != null && fontFamily.Contains("Segoe UI Symbol");
+
+            if (isSymbol)
             {
-                "113" => "\uE9BD",  // Sunny - E9BD
-                "116" => "\uE9BE",  // Partly cloudy
-                "119" or "122" => "\uE9BF",  // Cloudy/Overcast
-                "143" or "248" or "260" => "\uE9CB",  // Fog/Mist
-                "176" or "263" or "266" or "293" or "296" => "\uE9C1",  // Light rain
-                "299" or "302" or "305" or "308" or "356" or "359" => "\uE9C2",  // Rain/Heavy rain
-                "179" or "227" or "323" or "326" or "329" or "332" or "335" or "338" or "368" or "371" => "\uE9C8",  // Snow
-                "200" or "386" or "389" or "392" or "395" => "\uE9C6",  // Thunderstorm
-                "182" or "185" or "281" or "284" or "311" or "314" or "317" or "350" or "362" or "365" or "374" or "377" => "\uE9C4",  // Sleet/Freezing
-                _ => "\uE9BD"
-            };
+                // Basic Unicode weather symbols — render reliably in Segoe UI Symbol
+                return code switch
+                {
+                    "113" => "\u2600",  // ☀ 晴天
+                    "116" => "\u26C5",  // ⛅ 多云
+                    "119" or "122" => "\u2601",  // ☁ 阴天
+                    "143" or "248" or "260" => "\u2601",  // ☁ 雾
+                    "176" or "263" or "266" or "293" or "296" => "\u2602",  // ☂ 阵雨
+                    "299" or "302" or "305" or "308" or "356" or "359" => "\u2614",  // ☔ 大雨
+                    "179" or "227" or "323" or "326" or "329" or "332" or "335" or "338" or "368" or "371" => "\u2744",  // ❄ 雪
+                    "200" or "386" or "389" or "392" or "395" => "\u26A1",  // ⚡ 雷阵雨
+                    "182" or "185" or "281" or "284" or "311" or "314" or "317" or "350" or "362" or "365" or "374" or "377" => "\u2744",  // ❄ 雨夹雪
+                    _ => "\u2600"
+                };
+            }
+            else
+            {
+                // Color emoji — works with Segoe UI Emoji / Noto Color Emoji / custom font
+                return code switch
+                {
+                    "113" => "☀️",
+                    "116" => "⛅",
+                    "119" or "122" => "☁️",
+                    "143" or "248" or "260" => "🌫️",
+                    "176" or "263" or "266" or "293" or "296" => "🌦️",
+                    "299" or "302" or "305" or "308" or "356" or "359" => "🌧️",
+                    "179" or "227" or "323" or "326" or "329" or "332" or "335" or "338" or "368" or "371" => "❄️",
+                    "200" or "386" or "389" or "392" or "395" => "⛈️",
+                    "182" or "185" or "281" or "284" or "311" or "314" or "317" or "350" or "362" or "365" or "374" or "377" => "🌨️",
+                    _ => "🌤️"
+                };
+            }
         }
     }
 }

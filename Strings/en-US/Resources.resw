@@ -486,4 +486,55 @@
   <data name="SettingsPage_WeatherCity.PlaceholderText" xml:space="preserve">
     <value>e.g. Beijing</value>
   </data>
+  <data name="SettingsPage_Clock.Text" xml:space="preserve">
+    <value>Clock Display</value>
+  </data>
+  <data name="SettingsPage_ShowSeconds.Header" xml:space="preserve">
+    <value>Show seconds in flyout clock</value>
+  </data>
+  <data name="Flyout_BtnPin.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Pin window</value>
+  </data>
+  <data name="Flyout_BtnWeather.ToolTipService.ToolTip" xml:space="preserve">
+    <value>View weather details</value>
+  </data>
+  <data name="WeatherPage_Title.Text" xml:space="preserve">
+    <value>Weather Settings &amp; Overview</value>
+  </data>
+  <data name="WeatherPage_Toggle.Header" xml:space="preserve">
+    <value>Show today's weather in flyout</value>
+  </data>
+  <data name="WeatherPage_CityHeader.Text" xml:space="preserve">
+    <value>Search city</value>
+  </data>
+  <data name="WeatherPage_24Hour.Text" xml:space="preserve">
+    <value>24-Hour Forecast</value>
+  </data>
+  <data name="MainWindow_NavWeather.Content" xml:space="preserve">
+    <value>Weather</value>
+  </data>
+  <data name="WeatherPage_CitySearchBox.PlaceholderText" xml:space="preserve">
+    <value>Searching...</value>
+  </data>
+  <data name="WeatherPage_BtnRefresh.Content" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="WeatherPage_IconFontHeader.Header" xml:space="preserve">
+    <value>Icon Style</value>
+  </data>
+  <data name="WeatherPage_FontEmoji.Content" xml:space="preserve">
+    <value>Windows 11 Style</value>
+  </data>
+  <data name="WeatherPage_FontSymbol.Content" xml:space="preserve">
+    <value>Classical</value>
+  </data>
+  <data name="WeatherPage_FontCustom.Content" xml:space="preserve">
+    <value>Customize</value>
+  </data>
+  <data name="WeatherPage_CustomFontBox.Header" xml:space="preserve">
+    <value>Customize font name</value>
+  </data>
+  <data name="WeatherPage_CustomFontBox.PlaceholderText" xml:space="preserve">
+    <value>Noto Color Emoji</value>
+  </data>
 </root>
