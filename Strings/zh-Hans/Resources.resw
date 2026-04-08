@@ -537,4 +537,19 @@
   <data name="WeatherPage_CustomFontBox.PlaceholderText" xml:space="preserve">
     <value>Noto Color Emoji</value>
   </data>
+  <data name="WeatherPage_SourceHeader.Header" xml:space="preserve">
+    <value>天气数据源</value>
+  </data>
+  <data name="WeatherPage_SourceHintOM" xml:space="preserve">
+    <value>Open-Meteo: 免费、无需 API Key、支持空气质量与花粉数据、真正逐时预报</value>
+  </data>
+  <data name="WeatherPage_SourceHintWttr" xml:space="preserve">
+    <value>wttr.in: 免费、无需 API Key、仅提供基础天气数据、每 3 小时插值预报</value>
+  </data>
+  <data name="WeatherPage_FlyoutFields" xml:space="preserve">
+    <value>浮窗显示字段</value>
+  </data>
+  <data name="WeatherPage_FlyoutFieldsDesc" xml:space="preserve">
+    <value>勾选希望在系统浮窗中显示的天气信息</value>
+  </data>
 </root>

@@ -537,4 +537,19 @@
   <data name="WeatherPage_CustomFontBox.PlaceholderText" xml:space="preserve">
     <value>Noto Color Emoji</value>
   </data>
+  <data name="WeatherPage_SourceHeader.Header" xml:space="preserve">
+    <value>Weather Source</value>
+  </data>
+  <data name="WeatherPage_SourceHintOM" xml:space="preserve">
+    <value>Open-Meteo: Free, no API key, supports air quality &amp; pollen data, true hourly forecast</value>
+  </data>
+  <data name="WeatherPage_SourceHintWttr" xml:space="preserve">
+    <value>wttr.in: Free, no API key, basic weather data only, 3-hourly interpolated forecast</value>
+  </data>
+  <data name="WeatherPage_FlyoutFields" xml:space="preserve">
+    <value>Flyout Display Fields</value>
+  </data>
+  <data name="WeatherPage_FlyoutFieldsDesc" xml:space="preserve">
+    <value>Select weather details to show in the system flyout</value>
+  </data>
 </root>

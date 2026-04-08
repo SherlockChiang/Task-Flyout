@@ -1,9 +1,12 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
+using Microsoft.Windows.ApplicationModel.Resources;
 
 namespace Task_Flyout.Views
 {
@@ -11,6 +14,7 @@ namespace Task_Flyout.Views
     {
         private bool _isInitializing = true;
         private WeatherService _weatherService;
+        private ResourceLoader _loader;
 
         private readonly string[] _commonFonts = new[]
         {
@@ -22,7 +26,20 @@ namespace Task_Flyout.Views
         public WeatherPage()
         {
             this.InitializeComponent();
+            _loader = new ResourceLoader();
             this.Loaded += WeatherPage_Loaded;
+        }
+
+        private string GetSafeString(string key, string fallbackText)
+        {
+            if (_loader == null) return fallbackText;
+            try
+            {
+                string safeKey = key.Replace(".", "/");
+                string result = _loader.GetString(safeKey);
+                return string.IsNullOrEmpty(result) ? fallbackText : result;
+            }
+            catch { return fallbackText; }
         }
 
         private async void WeatherPage_Loaded(object sender, RoutedEventArgs e)
@@ -33,6 +50,14 @@ namespace Task_Flyout.Views
             WeatherToggle.IsOn = _weatherService.IsEnabled;
             CitySearchBox.Text = _weatherService.City;
 
+            // Source ComboBox
+            string src = _weatherService.WeatherSource;
+            var srcItem = SourceComboBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => i.Tag?.ToString() == src);
+            if (srcItem != null) SourceComboBox.SelectedItem = srcItem;
+            else SourceComboBox.SelectedIndex = 0;
+            UpdateSourceHint();
+
+            // Icon Font ComboBox
             string fontStr = _weatherService.IconFontFamily;
             var item = IconFontComboBox.Items.OfType<ComboBoxItem>()
                 .FirstOrDefault(i => i.Tag.ToString() == fontStr);
@@ -50,6 +75,12 @@ namespace Task_Flyout.Views
                 CustomFontBox.Visibility = Visibility.Visible;
             }
 
+            // Flyout Fields header
+            FlyoutFieldsHeader.Text = GetSafeString("WeatherPage_FlyoutFields", "\u6D6E\u7A97\u663E\u793A\u5B57\u6BB5");
+            FlyoutFieldsDesc.Text = GetSafeString("WeatherPage_FlyoutFieldsDesc", "\u52FE\u9009\u5E0C\u671B\u5728\u7CFB\u7EDF\u6D6E\u7A97\u4E2D\u663E\u793A\u7684\u5929\u6C14\u4FE1\u606F");
+
+            BuildFieldToggles();
+
             _isInitializing = false;
 
             if (_weatherService.IsEnabled && !string.IsNullOrEmpty(_weatherService.City))
@@ -57,6 +88,103 @@ namespace Task_Flyout.Views
                 await LoadWeatherDataAsync();
             }
         }
+
+        #region Field Toggles
+
+        private void BuildFieldToggles()
+        {
+            var enabled = _weatherService.GetEnabledFields();
+            string lang = GetCurrentLang();
+            var items = new List<StackPanel>();
+
+            foreach (var field in WeatherService.AllFlyoutFields)
+            {
+                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                var icon = new FontIcon
+                {
+                    Glyph = field.Glyph,
+                    FontSize = 14,
+                    FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+                };
+                var toggle = new ToggleSwitch
+                {
+                    IsOn = enabled.Contains(field.Key),
+                    OnContent = "",
+                    OffContent = "",
+                    MinWidth = 0,
+                    Tag = field.Key
+                };
+                toggle.Toggled += FieldToggle_Toggled;
+
+                var label = new TextBlock
+                {
+                    Text = lang == "en" ? field.EnLabel : field.ZhLabel,
+                    FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                panel.Children.Add(icon);
+                panel.Children.Add(label);
+                panel.Children.Add(toggle);
+                items.Add(panel);
+            }
+
+            FieldToggleRepeater.ItemsSource = items;
+        }
+
+        private void FieldToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing || _weatherService == null) return;
+            if (sender is ToggleSwitch ts && ts.Tag is string key)
+            {
+                var fields = _weatherService.GetEnabledFields();
+                if (ts.IsOn) fields.Add(key);
+                else fields.Remove(key);
+                _weatherService.SetEnabledFields(fields);
+
+                _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: false);
+            }
+        }
+
+        private static string GetCurrentLang()
+        {
+            string appLang = Windows.Storage.ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
+            if (string.IsNullOrEmpty(appLang))
+                appLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+            return appLang.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "en" : "zh";
+        }
+
+        #endregion
+
+        #region Source Selection
+
+        private async void SourceComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isInitializing || _weatherService == null) return;
+            if (SourceComboBox.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+            {
+                _weatherService.WeatherSource = tag;
+                UpdateSourceHint();
+                await LoadWeatherDataAsync(forceRefresh: true);
+            }
+        }
+
+        private void UpdateSourceHint()
+        {
+            string src = _weatherService?.WeatherSource ?? "OpenMeteo";
+            if (src == "OpenMeteo")
+                SourceHintText.Text = GetSafeString("WeatherPage_SourceHintOM",
+                    "Open-Meteo: \u514D\u8D39\u3001\u65E0\u9700 API Key\u3001\u652F\u6301\u7A7A\u6C14\u8D28\u91CF\u4E0E\u82B1\u7C89\u6570\u636E\u3001\u771F\u6B63\u903C\u65F6\u9884\u62A5");
+            else
+                SourceHintText.Text = GetSafeString("WeatherPage_SourceHintWttr",
+                    "wttr.in: \u514D\u8D39\u3001\u65E0\u9700 API Key\u3001\u4EC5\u63D0\u4F9B\u57FA\u7840\u5929\u6C14\u6570\u636E\u3001\u6BCF 3 \u5C0F\u65F6\u63D2\u503C\u9884\u62A5");
+        }
+
+        #endregion
+
+        #region Icon Font
 
         private async void IconFontComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -112,6 +240,10 @@ namespace Task_Flyout.Views
             }
         }
 
+        #endregion
+
+        #region Toggle & City
+
         private async void WeatherToggle_Toggled(object sender, RoutedEventArgs e)
         {
             if (_isInitializing || _weatherService == null) return;
@@ -147,22 +279,19 @@ namespace Task_Flyout.Views
             if (args.SelectedItem is string selectedCity)
             {
                 sender.Text = selectedCity;
-                _weatherService.City = selectedCity;
-                await LoadWeatherDataAsync();
+                _weatherService.SelectCity(selectedCity);
+                await LoadWeatherDataAsync(forceRefresh: true);
             }
         }
 
         private async void CitySearchBox_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
         {
-            if (args.ChosenSuggestion != null)
+            string city = args.ChosenSuggestion?.ToString() ?? args.QueryText;
+            if (!string.IsNullOrWhiteSpace(city))
             {
-                _weatherService.City = args.ChosenSuggestion.ToString();
+                _weatherService.SelectCity(city);
+                await LoadWeatherDataAsync(forceRefresh: true);
             }
-            else
-            {
-                _weatherService.City = args.QueryText;
-            }
-            await LoadWeatherDataAsync();
         }
 
         private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
@@ -170,18 +299,21 @@ namespace Task_Flyout.Views
             await LoadWeatherDataAsync(forceRefresh: true);
         }
 
+        #endregion
+
+        #region Hourly Selection
+
         private void HourlyListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (HourlyListView.SelectedItem is HourlyWeather hw)
             {
                 DetailIcon.Text = hw.Icon;
-                DetailIcon.FontFamily = new Microsoft.UI.Xaml.Media.FontFamily(hw.IconFont);
+                DetailIcon.FontFamily = new FontFamily(hw.IconFont);
                 DetailTemp.Text = hw.Temperature;
                 DetailTime.Text = hw.Time;
                 DetailDesc.Text = hw.Description ?? "";
-                DetailFeelsLike.Text = hw.FeelsLike ?? "";
-                DetailHumidity.Text = hw.Humidity ?? "";
-                DetailWind.Text = hw.WindSpeed ?? "";
+
+                BuildDetailFields(hw);
                 HourDetailPanel.Visibility = Visibility.Visible;
             }
             else
@@ -189,6 +321,68 @@ namespace Task_Flyout.Views
                 HourDetailPanel.Visibility = Visibility.Collapsed;
             }
         }
+
+        private void BuildDetailFields(HourlyWeather hw)
+        {
+            string lang = GetCurrentLang();
+            var items = new List<StackPanel>();
+
+            void AddField(string glyph, string label, string value)
+            {
+                if (string.IsNullOrEmpty(value)) return;
+                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Padding = new Thickness(4, 6, 4, 6) };
+                panel.Children.Add(new FontIcon
+                {
+                    Glyph = glyph,
+                    FontSize = 14,
+                    FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+                    Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                panel.Children.Add(new StackPanel
+                {
+                    Children =
+                    {
+                        new TextBlock { Text = label, FontSize = 11, Foreground = (Brush)Application.Current.Resources["TextFillColorTertiaryBrush"] },
+                        new TextBlock { Text = value, FontSize = 13, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold }
+                    }
+                });
+                items.Add(panel);
+            }
+
+            AddField("\uE9CA", lang == "en" ? "Feels like" : "\u4F53\u611F", hw.FeelsLike);
+            AddField("\uE945", lang == "en" ? "Humidity" : "\u6E7F\u5EA6", hw.Humidity);
+            AddField("\uEBE7", lang == "en" ? "Wind" : "\u98CE\u901F", $"{hw.WindSpeed} {hw.WindDirection}");
+            AddField("\uE790", lang == "en" ? "Precip. prob." : "\u964D\u6C34\u6982\u7387", hw.PrecipProbability);
+            AddField("\uE790", lang == "en" ? "Precipitation" : "\u964D\u6C34\u91CF", hw.Precipitation);
+            AddField("\uE706", lang == "en" ? "UV Index" : "UV \u6307\u6570", hw.UVIndex);
+            AddField("\uE7B3", lang == "en" ? "Visibility" : "\u80FD\u89C1\u5EA6", hw.Visibility);
+            AddField("\uEC49", lang == "en" ? "Pressure" : "\u6C14\u538B", hw.Pressure);
+            AddField("\uE9CA", lang == "en" ? "AQI" : "\u7A7A\u6C14\u8D28\u91CF", FormatAqi(hw.AirQuality, lang));
+            AddField("\uE9CA", "PM2.5", hw.PM25);
+            AddField("\uE9CA", "PM10", hw.PM10);
+            AddField("\uE710", lang == "en" ? "Grass pollen" : "\u8349\u7C7B\u82B1\u7C89", hw.PollenGrass);
+            AddField("\uE710", lang == "en" ? "Birch pollen" : "\u6866\u6811\u82B1\u7C89", hw.PollenBirch);
+            AddField("\uE710", lang == "en" ? "Ragweed pollen" : "\u8C5A\u8349\u82B1\u7C89", hw.PollenRagweed);
+
+            DetailFieldsRepeater.ItemsSource = items;
+        }
+
+        private static string FormatAqi(string aqi, string lang)
+        {
+            if (string.IsNullOrEmpty(aqi)) return null;
+            if (!double.TryParse(aqi, out var val)) return aqi;
+            string level;
+            if (lang == "en")
+                level = val <= 50 ? "Good" : val <= 100 ? "Moderate" : val <= 150 ? "Unhealthy (Sensitive)" : val <= 200 ? "Unhealthy" : "Hazardous";
+            else
+                level = val <= 50 ? "\u4F18" : val <= 100 ? "\u826F" : val <= 150 ? "\u8F7B\u5EA6\u6C61\u67D3" : val <= 200 ? "\u4E2D\u5EA6\u6C61\u67D3" : "\u91CD\u5EA6\u6C61\u67D3";
+            return $"{aqi} ({level})";
+        }
+
+        #endregion
+
+        #region Load Data
 
         private async Task LoadWeatherDataAsync(bool forceRefresh = false)
         {
@@ -205,10 +399,27 @@ namespace Task_Flyout.Views
                 HourlyListView.ItemsSource = info.HourlyForecast;
                 ForecastPanel.Visibility = Visibility.Visible;
                 HourDetailPanel.Visibility = Visibility.Collapsed;
-                HourlyListView.SelectedIndex = 0;
+
+                // Select current hour
+                int nowHour = DateTime.Now.Hour;
+                int idx = 0;
+                for (int i = 0; i < info.HourlyForecast.Count; i++)
+                {
+                    if (info.HourlyForecast[i].Hour == nowHour) { idx = i; break; }
+                }
+                HourlyListView.SelectedIndex = idx;
+
+                // Scroll to selected
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (idx < info.HourlyForecast.Count)
+                        HourlyListView.ScrollIntoView(info.HourlyForecast[idx], ScrollIntoViewAlignment.Leading);
+                });
             }
 
             LoadingRing.IsActive = false;
         }
+
+        #endregion
     }
 }

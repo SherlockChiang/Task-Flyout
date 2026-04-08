@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -9,14 +10,27 @@ namespace Task_Flyout.Services
 {
     public class HourlyWeather
     {
+        public int Hour { get; set; }
         public string Time { get; set; }
         public string Temperature { get; set; }
         public string Icon { get; set; }
         public string IconFont { get; set; }
         public string Description { get; set; }
+        public string FeelsLike { get; set; }
         public string Humidity { get; set; }
         public string WindSpeed { get; set; }
-        public string FeelsLike { get; set; }
+        public string WindDirection { get; set; }
+        public string Precipitation { get; set; }
+        public string PrecipProbability { get; set; }
+        public string UVIndex { get; set; }
+        public string Visibility { get; set; }
+        public string Pressure { get; set; }
+        public string AirQuality { get; set; }
+        public string PM25 { get; set; }
+        public string PM10 { get; set; }
+        public string PollenGrass { get; set; }
+        public string PollenBirch { get; set; }
+        public string PollenRagweed { get; set; }
     }
 
     public class WeatherInfo
@@ -26,6 +40,17 @@ namespace Task_Flyout.Services
         public string Icon { get; set; }
         public string IconFont { get; set; }
         public string City { get; set; }
+        public string Sunrise { get; set; }
+        public string Sunset { get; set; }
+        public string MoonPhase { get; set; }
+        public string FeelsLike { get; set; }
+        public string Humidity { get; set; }
+        public string WindSpeed { get; set; }
+        public string UVIndex { get; set; }
+        public string Visibility { get; set; }
+        public string Pressure { get; set; }
+        public string AirQuality { get; set; }
+        public string Pollen { get; set; }
         public List<HourlyWeather> HourlyForecast { get; set; } = new();
     }
 
@@ -35,6 +60,9 @@ namespace Task_Flyout.Services
         private WeatherInfo _cachedWeather;
         private DateTime _lastFetchTime = DateTime.MinValue;
         private readonly TimeSpan _cacheExpiry = TimeSpan.FromMinutes(30);
+        private Dictionary<string, (double Lat, double Lon)> _lastSearchCoords = new();
+
+        #region Settings Properties
 
         public bool IsEnabled
         {
@@ -48,11 +76,59 @@ namespace Task_Flyout.Services
             set => ApplicationData.Current.LocalSettings.Values["WeatherCity"] = value;
         }
 
+        public double CityLat
+        {
+            get => ApplicationData.Current.LocalSettings.Values["WeatherCityLat"] as double? ?? 0;
+            set => ApplicationData.Current.LocalSettings.Values["WeatherCityLat"] = value;
+        }
+
+        public double CityLon
+        {
+            get => ApplicationData.Current.LocalSettings.Values["WeatherCityLon"] as double? ?? 0;
+            set => ApplicationData.Current.LocalSettings.Values["WeatherCityLon"] = value;
+        }
+
         public string IconFontFamily
         {
             get => ApplicationData.Current.LocalSettings.Values["WeatherIconFont"] as string ?? "Segoe UI Emoji";
             set => ApplicationData.Current.LocalSettings.Values["WeatherIconFont"] = value;
         }
+
+        public string WeatherSource
+        {
+            get => ApplicationData.Current.LocalSettings.Values["WeatherSource"] as string ?? "OpenMeteo";
+            set => ApplicationData.Current.LocalSettings.Values["WeatherSource"] = value;
+        }
+
+        public string EnabledFlyoutFields
+        {
+            get => ApplicationData.Current.LocalSettings.Values["WeatherFlyoutFields"] as string ?? "temperature,description";
+            set => ApplicationData.Current.LocalSettings.Values["WeatherFlyoutFields"] = value;
+        }
+
+        #endregion
+
+        public HashSet<string> GetEnabledFields()
+        {
+            return new HashSet<string>(
+                (EnabledFlyoutFields ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        }
+
+        public void SetEnabledFields(HashSet<string> fields)
+        {
+            EnabledFlyoutFields = string.Join(",", fields);
+        }
+
+        public void SelectCity(string cityName)
+        {
+            City = cityName;
+            if (_lastSearchCoords.TryGetValue(cityName, out var coords))
+            {
+                CityLat = coords.Lat;
+                CityLon = coords.Lon;
+            }
+        }
+
         public async Task<List<string>> SearchCityAsync(string query)
         {
             if (string.IsNullOrWhiteSpace(query)) return new List<string>();
@@ -67,13 +143,17 @@ namespace Task_Flyout.Services
                 if (doc.RootElement.TryGetProperty("results", out var results))
                 {
                     var list = new List<string>();
+                    _lastSearchCoords.Clear();
                     foreach (var item in results.EnumerateArray())
                     {
                         string name = item.GetProperty("name").GetString();
                         string admin1 = item.TryGetProperty("admin1", out var a1) ? a1.GetString() : "";
                         string country = item.TryGetProperty("country", out var c) ? c.GetString() : "";
-                        
+                        double lat = item.GetProperty("latitude").GetDouble();
+                        double lon = item.GetProperty("longitude").GetDouble();
+
                         string fullName = $"{name}, {admin1}, {country}".Replace(", ,", ",").TrimEnd(',', ' ');
+                        _lastSearchCoords[fullName] = (lat, lon);
                         list.Add(fullName);
                     }
                     return list;
@@ -93,131 +173,526 @@ namespace Task_Flyout.Services
 
             try
             {
-                // 👉 1. 动态获取当前设置的语言
-                string appLang = ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
-                if (string.IsNullOrEmpty(appLang))
-                    appLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+                WeatherInfo info;
+                if (WeatherSource == "OpenMeteo" && CityLat != 0 && CityLon != 0)
+                    info = await GetWeatherFromOpenMeteoAsync();
+                else
+                    info = await GetWeatherFromWttrInAsync();
 
-                string wttrLang = appLang.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "en" : "zh";
-
-                string searchCity = City.Split(',')[0].Trim();
-                // 👉 2. 将语言参数动态拼接入 URL
-                string url = $"https://wttr.in/{Uri.EscapeDataString(searchCity)}?format=j1&lang={wttrLang}";
-
-                _httpClient.DefaultRequestHeaders.UserAgent.Clear();
-                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("curl/7.68.0");
-
-                var response = await _httpClient.GetStringAsync(url);
-                using var doc = JsonDocument.Parse(response);
-                var root = doc.RootElement;
-
-                var current = root.GetProperty("current_condition")[0];
-                string tempC = current.GetProperty("temp_C").GetString();
-                string weatherCode = current.GetProperty("weatherCode").GetString();
-
-                // 👉 3. 根据语言动态提取对应的天气描述字段
-                string desc = "";
-                if (wttrLang == "zh" && current.TryGetProperty("lang_zh", out var langZh) && langZh.GetArrayLength() > 0)
-                    desc = langZh[0].GetProperty("value").GetString();
-                else if (current.TryGetProperty("weatherDesc", out var wDesc) && wDesc.GetArrayLength() > 0)
-                    desc = wDesc[0].GetProperty("value").GetString();
-
-                var weatherInfo = new WeatherInfo
+                if (info != null)
                 {
-                    Temperature = $"{tempC}°C",
-                    Description = desc,
-                    Icon = WeatherCodeToIcon(weatherCode, IconFontFamily),
-                    IconFont = IconFontFamily,
-                    City = City
-                };
-
-                if (root.TryGetProperty("weather", out var weatherArray) && weatherArray.GetArrayLength() > 0)
-                {
-                    var today = weatherArray[0];
-                    if (today.TryGetProperty("hourly", out var hourlyArray))
-                    {
-                        foreach (var hour in hourlyArray.EnumerateArray())
-                        {
-                            string timeRaw = hour.GetProperty("time").GetString();
-                            string timeFormatted = timeRaw == "0" ? "00:00" : timeRaw.PadLeft(4, '0').Insert(2, ":");
-                            string hourTemp = hour.GetProperty("tempC").GetString() + "°C";
-                            string hourCode = hour.GetProperty("weatherCode").GetString();
-
-                            string hourDesc = "";
-                            if (wttrLang == "zh" && hour.TryGetProperty("lang_zh", out var hLangZh) && hLangZh.GetArrayLength() > 0)
-                                hourDesc = hLangZh[0].GetProperty("value").GetString();
-                            else if (hour.TryGetProperty("weatherDesc", out var hDesc) && hDesc.GetArrayLength() > 0)
-                                hourDesc = hDesc[0].GetProperty("value").GetString();
-
-                            string humidity = hour.TryGetProperty("humidity", out var hum) ? hum.GetString() + "%" : "";
-                            string windSpeed = hour.TryGetProperty("windspeedKmph", out var ws) ? ws.GetString() + " km/h" : "";
-                            string feelsLike = hour.TryGetProperty("FeelsLikeC", out var fl) ? fl.GetString() + "°C" : "";
-
-                            weatherInfo.HourlyForecast.Add(new HourlyWeather
-                            {
-                                Time = timeFormatted,
-                                Temperature = hourTemp,
-                                Icon = WeatherCodeToIcon(hourCode, IconFontFamily),
-                                IconFont = IconFontFamily,
-                                Description = hourDesc,
-                                Humidity = humidity,
-                                WindSpeed = windSpeed,
-                                FeelsLike = feelsLike
-                            });
-                        }
-                    }
+                    _cachedWeather = info;
+                    _lastFetchTime = DateTime.Now;
                 }
-
-                _cachedWeather = weatherInfo;
-                _lastFetchTime = DateTime.Now;
-
                 return _cachedWeather;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"获取天气失败: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Weather fetch failed: {ex.Message}");
                 return _cachedWeather;
             }
         }
 
-        private static string WeatherCodeToIcon(string code, string fontFamily)
+        #region Open-Meteo Provider
+
+        private async Task<WeatherInfo> GetWeatherFromOpenMeteoAsync()
+        {
+            string forecastUrl = $"https://api.open-meteo.com/v1/forecast?" +
+                $"latitude={CityLat}&longitude={CityLon}" +
+                $"&hourly=temperature_2m,relative_humidity_2m,apparent_temperature," +
+                $"precipitation_probability,precipitation,weather_code," +
+                $"surface_pressure,visibility,wind_speed_10m,wind_direction_10m,uv_index" +
+                $"&daily=sunrise,sunset" +
+                $"&timezone=auto&forecast_days=2";
+
+            string aqUrl = $"https://air-quality-api.open-meteo.com/v1/air-quality?" +
+                $"latitude={CityLat}&longitude={CityLon}" +
+                $"&hourly=us_aqi,pm2_5,pm10,grass_pollen,birch_pollen,ragweed_pollen" +
+                $"&forecast_days=2";
+
+            _httpClient.DefaultRequestHeaders.UserAgent.Clear();
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("TaskFlyout/1.0");
+
+            var forecastTask = _httpClient.GetStringAsync(forecastUrl);
+            Task<string> aqTask;
+            try { aqTask = _httpClient.GetStringAsync(aqUrl); }
+            catch { aqTask = Task.FromResult<string>(null); }
+
+            string forecastJson = await forecastTask;
+            string aqJson = null;
+            try { aqJson = await aqTask; } catch { }
+
+            using var forecastDoc = JsonDocument.Parse(forecastJson);
+            var root = forecastDoc.RootElement;
+            var hourly = root.GetProperty("hourly");
+            var daily = root.GetProperty("daily");
+
+            var times = hourly.GetProperty("time");
+            var temps = hourly.GetProperty("temperature_2m");
+            var humidity = hourly.GetProperty("relative_humidity_2m");
+            var feelsLike = hourly.GetProperty("apparent_temperature");
+            var precipProb = hourly.GetProperty("precipitation_probability");
+            var precip = hourly.GetProperty("precipitation");
+            var weatherCodes = hourly.GetProperty("weather_code");
+            var pressure = hourly.GetProperty("surface_pressure");
+            var visibility = hourly.GetProperty("visibility");
+            var windSpeed = hourly.GetProperty("wind_speed_10m");
+            var windDir = hourly.GetProperty("wind_direction_10m");
+            var uvIndex = hourly.GetProperty("uv_index");
+
+            // Parse air quality data
+            JsonElement aqTimes = default, aqAqi = default, aqPm25 = default, aqPm10 = default;
+            JsonElement aqGrassPollen = default, aqBirchPollen = default, aqRagweedPollen = default;
+            bool hasAq = false;
+
+            if (aqJson != null)
+            {
+                try
+                {
+                    using var aqDoc = JsonDocument.Parse(aqJson);
+                    var aqRoot = aqDoc.RootElement;
+                    if (aqRoot.TryGetProperty("hourly", out var aqHourly))
+                    {
+                        // Clone to separate document since aqDoc will be disposed
+                        var aqClone = JsonDocument.Parse(aqHourly.GetRawText());
+                        var aqH = aqClone.RootElement;
+                        aqTimes = aqH.GetProperty("time");
+                        aqAqi = aqH.GetProperty("us_aqi");
+                        aqPm25 = aqH.GetProperty("pm2_5");
+                        aqPm10 = aqH.GetProperty("pm10");
+                        aqGrassPollen = aqH.GetProperty("grass_pollen");
+                        aqBirchPollen = aqH.GetProperty("birch_pollen");
+                        aqRagweedPollen = aqH.GetProperty("ragweed_pollen");
+                        hasAq = true;
+                    }
+                }
+                catch { }
+            }
+
+            string sunrise = daily.GetProperty("sunrise")[0].GetString();
+            string sunset = daily.GetProperty("sunset")[0].GetString();
+            string sunriseTime = sunrise.Contains("T") ? sunrise.Split('T')[1] : sunrise;
+            string sunsetTime = sunset.Contains("T") ? sunset.Split('T')[1] : sunset;
+
+            string lang = GetCurrentLanguage();
+            var info = new WeatherInfo
+            {
+                City = City,
+                IconFont = IconFontFamily,
+                Sunrise = sunriseTime,
+                Sunset = sunsetTime,
+                MoonPhase = GetMoonPhaseEmoji(DateTime.Today),
+                HourlyForecast = new()
+            };
+
+            int totalHours = times.GetArrayLength();
+            int nowHour = DateTime.Now.Hour;
+
+            // Build hourly data: 24 hours from current hour
+            for (int i = 0; i < Math.Min(totalHours, 48); i++)
+            {
+                string timeStr = times[i].GetString();
+                if (!DateTime.TryParse(timeStr, out var dt)) continue;
+
+                // Only include hours from now through next 23 hours
+                var diffHours = (dt - DateTime.Now).TotalHours;
+                if (diffHours < -1 || diffHours > 24) continue;
+
+                int code = weatherCodes[i].GetInt32();
+                double tempVal = temps[i].GetDouble();
+                double flVal = feelsLike[i].GetDouble();
+                int humVal = humidity[i].GetInt32();
+                double wsVal = windSpeed[i].GetDouble();
+                int wdVal = windDir[i].GetInt32();
+                double ppVal = precipProb[i].GetDouble();
+                double pVal = precip[i].GetDouble();
+                double uvVal = uvIndex[i].GetDouble();
+                double visVal = visibility[i].GetDouble();
+                double pressVal = pressure[i].GetDouble();
+
+                string aqiStr = "", pm25Str = "", pm10Str = "";
+                string grassStr = "", birchStr = "", ragweedStr = "";
+
+                if (hasAq && i < aqAqi.GetArrayLength())
+                {
+                    try
+                    {
+                        aqiStr = aqAqi[i].ValueKind != JsonValueKind.Null ? aqAqi[i].GetDouble().ToString("F0") : "";
+                        pm25Str = aqPm25[i].ValueKind != JsonValueKind.Null ? aqPm25[i].GetDouble().ToString("F1") : "";
+                        pm10Str = aqPm10[i].ValueKind != JsonValueKind.Null ? aqPm10[i].GetDouble().ToString("F1") : "";
+                        grassStr = aqGrassPollen[i].ValueKind != JsonValueKind.Null ? aqGrassPollen[i].GetDouble().ToString("F0") : "";
+                        birchStr = aqBirchPollen[i].ValueKind != JsonValueKind.Null ? aqBirchPollen[i].GetDouble().ToString("F0") : "";
+                        ragweedStr = aqRagweedPollen[i].ValueKind != JsonValueKind.Null ? aqRagweedPollen[i].GetDouble().ToString("F0") : "";
+                    }
+                    catch { }
+                }
+
+                var hw = new HourlyWeather
+                {
+                    Hour = dt.Hour,
+                    Time = dt.ToString("HH:mm"),
+                    Temperature = $"{tempVal:F0}°C",
+                    Icon = OpenMeteoCodeToIcon(code, IconFontFamily),
+                    IconFont = IconFontFamily,
+                    Description = OpenMeteoCodeToDescription(code, lang),
+                    FeelsLike = $"{flVal:F0}°C",
+                    Humidity = $"{humVal}%",
+                    WindSpeed = $"{wsVal:F0} km/h",
+                    WindDirection = WindDegreeToDirection(wdVal, lang),
+                    PrecipProbability = $"{ppVal:F0}%",
+                    Precipitation = $"{pVal:F1} mm",
+                    UVIndex = $"{uvVal:F1}",
+                    Visibility = visVal >= 1000 ? $"{visVal / 1000:F1} km" : $"{visVal:F0} m",
+                    Pressure = $"{pressVal:F0} hPa",
+                    AirQuality = aqiStr,
+                    PM25 = pm25Str,
+                    PM10 = pm10Str,
+                    PollenGrass = grassStr,
+                    PollenBirch = birchStr,
+                    PollenRagweed = ragweedStr
+                };
+                info.HourlyForecast.Add(hw);
+            }
+
+            // Set current conditions from nearest hour
+            var currentHw = info.HourlyForecast.FirstOrDefault();
+            if (currentHw != null)
+            {
+                info.Temperature = currentHw.Temperature;
+                info.Description = currentHw.Description;
+                info.Icon = currentHw.Icon;
+                info.FeelsLike = currentHw.FeelsLike;
+                info.Humidity = currentHw.Humidity;
+                info.WindSpeed = currentHw.WindSpeed;
+                info.UVIndex = currentHw.UVIndex;
+                info.Visibility = currentHw.Visibility;
+                info.Pressure = currentHw.Pressure;
+                info.AirQuality = currentHw.AirQuality;
+
+                var maxPollen = new[] {
+                    double.TryParse(currentHw.PollenGrass, out var g) ? g : 0,
+                    double.TryParse(currentHw.PollenBirch, out var b) ? b : 0,
+                    double.TryParse(currentHw.PollenRagweed, out var r) ? r : 0
+                }.Max();
+                info.Pollen = maxPollen > 0 ? maxPollen.ToString("F0") : "";
+            }
+
+            return info;
+        }
+
+        private static string GetCurrentLanguage()
+        {
+            string appLang = ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
+            if (string.IsNullOrEmpty(appLang))
+                appLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+            return appLang.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "en" : "zh";
+        }
+
+        private static string OpenMeteoCodeToIcon(int code, string fontFamily)
         {
             bool isSymbol = fontFamily != null && fontFamily.Contains("Segoe UI Symbol");
 
             if (isSymbol)
             {
-                // Basic Unicode weather symbols — render reliably in Segoe UI Symbol
                 return code switch
                 {
-                    "113" => "\u2600",  // ☀ 晴天
-                    "116" => "\u26C5",  // ⛅ 多云
-                    "119" or "122" => "\u2601",  // ☁ 阴天
-                    "143" or "248" or "260" => "\u2601",  // ☁ 雾
-                    "176" or "263" or "266" or "293" or "296" => "\u2602",  // ☂ 阵雨
-                    "299" or "302" or "305" or "308" or "356" or "359" => "\u2614",  // ☔ 大雨
-                    "179" or "227" or "323" or "326" or "329" or "332" or "335" or "338" or "368" or "371" => "\u2744",  // ❄ 雪
-                    "200" or "386" or "389" or "392" or "395" => "\u26A1",  // ⚡ 雷阵雨
-                    "182" or "185" or "281" or "284" or "311" or "314" or "317" or "350" or "362" or "365" or "374" or "377" => "\u2744",  // ❄ 雨夹雪
+                    0 => "\u2600",
+                    1 or 2 => "\u26C5",
+                    3 => "\u2601",
+                    45 or 48 => "\u2601",
+                    51 or 53 or 55 or 56 or 57 => "\u2602",
+                    61 or 63 or 65 or 66 or 67 or 80 or 81 or 82 => "\u2614",
+                    71 or 73 or 75 or 77 or 85 or 86 => "\u2744",
+                    95 or 96 or 99 => "\u26A1",
                     _ => "\u2600"
                 };
             }
-            else
+            return code switch
             {
-                // Color emoji — works with Segoe UI Emoji / Noto Color Emoji / custom font
+                0 => "\u2600\uFE0F",
+                1 => "\U0001F324\uFE0F",
+                2 => "\u26C5",
+                3 => "\u2601\uFE0F",
+                45 or 48 => "\U0001F32B\uFE0F",
+                51 or 53 or 55 => "\U0001F326\uFE0F",
+                56 or 57 => "\U0001F327\uFE0F",
+                61 or 63 or 80 or 81 => "\U0001F327\uFE0F",
+                65 or 82 => "\U0001F327\uFE0F",
+                66 or 67 => "\U0001F327\uFE0F",
+                71 or 73 or 75 or 77 => "\u2744\uFE0F",
+                85 or 86 => "\U0001F328\uFE0F",
+                95 => "\u26C8\uFE0F",
+                96 or 99 => "\u26C8\uFE0F",
+                _ => "\U0001F324\uFE0F"
+            };
+        }
+
+        private static string OpenMeteoCodeToDescription(int code, string lang)
+        {
+            if (lang == "zh")
+            {
                 return code switch
                 {
-                    "113" => "☀️",
-                    "116" => "⛅",
-                    "119" or "122" => "☁️",
-                    "143" or "248" or "260" => "🌫️",
-                    "176" or "263" or "266" or "293" or "296" => "🌦️",
-                    "299" or "302" or "305" or "308" or "356" or "359" => "🌧️",
-                    "179" or "227" or "323" or "326" or "329" or "332" or "335" or "338" or "368" or "371" => "❄️",
-                    "200" or "386" or "389" or "392" or "395" => "⛈️",
-                    "182" or "185" or "281" or "284" or "311" or "314" or "317" or "350" or "362" or "365" or "374" or "377" => "🌨️",
-                    _ => "🌤️"
+                    0 => "\u6674",
+                    1 => "\u5927\u90E8\u6674\u6717",
+                    2 => "\u591A\u4E91",
+                    3 => "\u9634",
+                    45 => "\u96FE",
+                    48 => "\u51BB\u96FE",
+                    51 => "\u5C0F\u6BDB\u6BDB\u96E8",
+                    53 => "\u6BDB\u6BDB\u96E8",
+                    55 => "\u5927\u6BDB\u6BDB\u96E8",
+                    56 or 57 => "\u51BB\u6BDB\u6BDB\u96E8",
+                    61 => "\u5C0F\u96E8",
+                    63 => "\u4E2D\u96E8",
+                    65 => "\u5927\u96E8",
+                    66 or 67 => "\u51BB\u96E8",
+                    71 => "\u5C0F\u96EA",
+                    73 => "\u4E2D\u96EA",
+                    75 => "\u5927\u96EA",
+                    77 => "\u96EA\u7C92",
+                    80 => "\u5C0F\u9635\u96E8",
+                    81 => "\u4E2D\u9635\u96E8",
+                    82 => "\u5927\u9635\u96E8",
+                    85 => "\u5C0F\u9635\u96EA",
+                    86 => "\u5927\u9635\u96EA",
+                    95 => "\u96F7\u9635\u96E8",
+                    96 or 99 => "\u96F7\u9635\u96E8\u4F34\u51B0\u96F9",
+                    _ => "\u672A\u77E5"
                 };
             }
+            return code switch
+            {
+                0 => "Clear sky",
+                1 => "Mainly clear",
+                2 => "Partly cloudy",
+                3 => "Overcast",
+                45 => "Fog",
+                48 => "Rime fog",
+                51 => "Light drizzle",
+                53 => "Moderate drizzle",
+                55 => "Dense drizzle",
+                56 or 57 => "Freezing drizzle",
+                61 => "Slight rain",
+                63 => "Moderate rain",
+                65 => "Heavy rain",
+                66 or 67 => "Freezing rain",
+                71 => "Slight snow",
+                73 => "Moderate snow",
+                75 => "Heavy snow",
+                77 => "Snow grains",
+                80 => "Slight rain showers",
+                81 => "Moderate rain showers",
+                82 => "Violent rain showers",
+                85 => "Slight snow showers",
+                86 => "Heavy snow showers",
+                95 => "Thunderstorm",
+                96 or 99 => "Thunderstorm with hail",
+                _ => "Unknown"
+            };
         }
+
+        private static string WindDegreeToDirection(int deg, string lang)
+        {
+            string[] dirsZh = { "\u5317", "\u4E1C\u5317", "\u4E1C", "\u4E1C\u5357", "\u5357", "\u897F\u5357", "\u897F", "\u897F\u5317" };
+            string[] dirsEn = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+            int idx = (int)Math.Round(deg / 45.0) % 8;
+            return lang == "zh" ? dirsZh[idx] : dirsEn[idx];
+        }
+
+        private static string GetMoonPhaseEmoji(DateTime date)
+        {
+            double year = date.Year;
+            double month = date.Month;
+            double day = date.Day;
+            if (month <= 2) { year--; month += 12; }
+            double jd = Math.Floor(365.25 * (year + 4716)) + Math.Floor(30.6001 * (month + 1)) + day - 1524.5;
+            double phase = ((jd - 2451549.5) / 29.53 % 1 + 1) % 1 * 29.53;
+
+            if (phase < 1.84) return "\U0001F311";
+            if (phase < 5.53) return "\U0001F312";
+            if (phase < 9.22) return "\U0001F313";
+            if (phase < 12.91) return "\U0001F314";
+            if (phase < 16.61) return "\U0001F315";
+            if (phase < 20.30) return "\U0001F316";
+            if (phase < 23.99) return "\U0001F317";
+            if (phase < 27.68) return "\U0001F318";
+            return "\U0001F311";
+        }
+
+        #endregion
+
+        #region wttr.in Provider (Legacy)
+
+        private async Task<WeatherInfo> GetWeatherFromWttrInAsync()
+        {
+            string lang = GetCurrentLanguage();
+            string wttrLang = lang == "en" ? "en" : "zh";
+            string searchCity = City.Split(',')[0].Trim();
+            string url = $"https://wttr.in/{Uri.EscapeDataString(searchCity)}?format=j1&lang={wttrLang}";
+
+            _httpClient.DefaultRequestHeaders.UserAgent.Clear();
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("curl/7.68.0");
+
+            var response = await _httpClient.GetStringAsync(url);
+            using var doc = JsonDocument.Parse(response);
+            var root = doc.RootElement;
+
+            var current = root.GetProperty("current_condition")[0];
+            string tempC = current.GetProperty("temp_C").GetString();
+            string weatherCode = current.GetProperty("weatherCode").GetString();
+            string humidityVal = current.TryGetProperty("humidity", out var h) ? h.GetString() : "";
+            string windVal = current.TryGetProperty("windspeedKmph", out var w) ? w.GetString() : "";
+            string flVal = current.TryGetProperty("FeelsLikeC", out var fl) ? fl.GetString() : "";
+            string visVal = current.TryGetProperty("visibility", out var vis) ? vis.GetString() : "";
+            string pressVal = current.TryGetProperty("pressure", out var pr) ? pr.GetString() : "";
+            string uvVal = current.TryGetProperty("uvIndex", out var uv) ? uv.GetString() : "";
+
+            string desc = "";
+            if (wttrLang == "zh" && current.TryGetProperty("lang_zh", out var langZh) && langZh.GetArrayLength() > 0)
+                desc = langZh[0].GetProperty("value").GetString();
+            else if (current.TryGetProperty("weatherDesc", out var wDesc) && wDesc.GetArrayLength() > 0)
+                desc = wDesc[0].GetProperty("value").GetString();
+
+            var info = new WeatherInfo
+            {
+                Temperature = $"{tempC}\u00B0C",
+                Description = desc,
+                Icon = WttrCodeToIcon(weatherCode, IconFontFamily),
+                IconFont = IconFontFamily,
+                City = City,
+                FeelsLike = string.IsNullOrEmpty(flVal) ? "" : $"{flVal}\u00B0C",
+                Humidity = string.IsNullOrEmpty(humidityVal) ? "" : $"{humidityVal}%",
+                WindSpeed = string.IsNullOrEmpty(windVal) ? "" : $"{windVal} km/h",
+                UVIndex = uvVal,
+                Visibility = string.IsNullOrEmpty(visVal) ? "" : $"{visVal} km",
+                Pressure = string.IsNullOrEmpty(pressVal) ? "" : $"{pressVal} hPa"
+            };
+
+            // wttr.in provides 3-hourly data; interpolate to hourly
+            if (root.TryGetProperty("weather", out var weatherArray) && weatherArray.GetArrayLength() > 0)
+            {
+                var allHourlyRaw = new List<(int hour, string tempC, string code, string hDesc,
+                    string hum, string ws, string flC, string pp, string uvi, string visKm, string press)>();
+
+                for (int d = 0; d < Math.Min(weatherArray.GetArrayLength(), 2); d++)
+                {
+                    var day = weatherArray[d];
+                    if (!day.TryGetProperty("hourly", out var hourlyArray)) continue;
+                    foreach (var hour in hourlyArray.EnumerateArray())
+                    {
+                        string timeRaw = hour.GetProperty("time").GetString();
+                        int hourVal = int.Parse(timeRaw) / 100;
+
+                        string hd = "";
+                        if (wttrLang == "zh" && hour.TryGetProperty("lang_zh", out var hLang) && hLang.GetArrayLength() > 0)
+                            hd = hLang[0].GetProperty("value").GetString();
+                        else if (hour.TryGetProperty("weatherDesc", out var hdesc) && hdesc.GetArrayLength() > 0)
+                            hd = hdesc[0].GetProperty("value").GetString();
+
+                        allHourlyRaw.Add((
+                            hourVal + d * 24,
+                            hour.GetProperty("tempC").GetString(),
+                            hour.GetProperty("weatherCode").GetString(),
+                            hd,
+                            hour.TryGetProperty("humidity", out var hh) ? hh.GetString() : "",
+                            hour.TryGetProperty("windspeedKmph", out var ww) ? ww.GetString() : "",
+                            hour.TryGetProperty("FeelsLikeC", out var ff) ? ff.GetString() : "",
+                            hour.TryGetProperty("chanceofrain", out var cr) ? cr.GetString() : "",
+                            hour.TryGetProperty("uvIndex", out var ui) ? ui.GetString() : "",
+                            hour.TryGetProperty("visibility", out var vv) ? vv.GetString() : "",
+                            hour.TryGetProperty("pressure", out var pp) ? pp.GetString() : ""
+                        ));
+                    }
+                }
+
+                // Interpolate 3-hourly to hourly for 24 hours from now
+                int nowHour = DateTime.Now.Hour;
+                for (int offset = 0; offset < 24; offset++)
+                {
+                    int targetHour = nowHour + offset;
+                    // Find surrounding 3-hourly points
+                    var before = allHourlyRaw.LastOrDefault(x => x.hour <= targetHour);
+                    var after = allHourlyRaw.FirstOrDefault(x => x.hour > targetHour);
+
+                    var source = before.code != null ? before : (after.code != null ? after : before);
+                    if (source.code == null) continue;
+
+                    int displayHour = targetHour % 24;
+                    info.HourlyForecast.Add(new HourlyWeather
+                    {
+                        Hour = displayHour,
+                        Time = $"{displayHour:D2}:00",
+                        Temperature = $"{source.tempC}\u00B0C",
+                        Icon = WttrCodeToIcon(source.code, IconFontFamily),
+                        IconFont = IconFontFamily,
+                        Description = source.hDesc,
+                        FeelsLike = string.IsNullOrEmpty(source.flC) ? "" : $"{source.flC}\u00B0C",
+                        Humidity = string.IsNullOrEmpty(source.hum) ? "" : $"{source.hum}%",
+                        WindSpeed = string.IsNullOrEmpty(source.ws) ? "" : $"{source.ws} km/h",
+                        PrecipProbability = string.IsNullOrEmpty(source.pp) ? "" : $"{source.pp}%",
+                        UVIndex = source.uvi ?? "",
+                        Visibility = string.IsNullOrEmpty(source.visKm) ? "" : $"{source.visKm} km",
+                        Pressure = string.IsNullOrEmpty(source.press) ? "" : $"{source.press} hPa"
+                    });
+                }
+            }
+
+            return info;
+        }
+
+        private static string WttrCodeToIcon(string code, string fontFamily)
+        {
+            bool isSymbol = fontFamily != null && fontFamily.Contains("Segoe UI Symbol");
+
+            if (isSymbol)
+            {
+                return code switch
+                {
+                    "113" => "\u2600",
+                    "116" => "\u26C5",
+                    "119" or "122" => "\u2601",
+                    "143" or "248" or "260" => "\u2601",
+                    "176" or "263" or "266" or "293" or "296" => "\u2602",
+                    "299" or "302" or "305" or "308" or "356" or "359" => "\u2614",
+                    "179" or "227" or "323" or "326" or "329" or "332" or "335" or "338" or "368" or "371" => "\u2744",
+                    "200" or "386" or "389" or "392" or "395" => "\u26A1",
+                    "182" or "185" or "281" or "284" or "311" or "314" or "317" or "350" or "362" or "365" or "374" or "377" => "\u2744",
+                    _ => "\u2600"
+                };
+            }
+            return code switch
+            {
+                "113" => "\u2600\uFE0F",
+                "116" => "\u26C5",
+                "119" or "122" => "\u2601\uFE0F",
+                "143" or "248" or "260" => "\U0001F32B\uFE0F",
+                "176" or "263" or "266" or "293" or "296" => "\U0001F326\uFE0F",
+                "299" or "302" or "305" or "308" or "356" or "359" => "\U0001F327\uFE0F",
+                "179" or "227" or "323" or "326" or "329" or "332" or "335" or "338" or "368" or "371" => "\u2744\uFE0F",
+                "200" or "386" or "389" or "392" or "395" => "\u26C8\uFE0F",
+                "182" or "185" or "281" or "284" or "311" or "314" or "317" or "350" or "362" or "365" or "374" or "377" => "\U0001F328\uFE0F",
+                _ => "\U0001F324\uFE0F"
+            };
+        }
+
+        #endregion
+
+        public static readonly (string Key, string ZhLabel, string EnLabel, string Glyph)[] AllFlyoutFields = new[]
+        {
+            ("temperature",    "\u6E29\u5EA6",         "Temperature",    "\uE9CA"),
+            ("feelslike",      "\u4F53\u611F\u6E29\u5EA6",     "Feels like",     "\uE9CA"),
+            ("description",    "\u5929\u6C14\u63CF\u8FF0",     "Description",    "\uE286"),
+            ("humidity",       "\u6E7F\u5EA6",         "Humidity",       "\uE945"),
+            ("wind",           "\u98CE\u901F",         "Wind",           "\uEBE7"),
+            ("precipitation",  "\u964D\u6C34\u6982\u7387",     "Precipitation",  "\uE790"),
+            ("uv",             "UV \u6307\u6570",      "UV Index",       "\uE706"),
+            ("visibility",     "\u80FD\u89C1\u5EA6",       "Visibility",     "\uE7B3"),
+            ("pressure",       "\u6C14\u538B",         "Pressure",       "\uEC49"),
+            ("airquality",     "\u7A7A\u6C14\u8D28\u91CF",     "Air Quality",    "\uE9CA"),
+            ("pollen",         "\u82B1\u7C89\u8FC7\u654F",     "Pollen",         "\uE710"),
+            ("sun",            "\u65E5\u51FA\u65E5\u843D",     "Sunrise/Sunset", "\uE706"),
+            ("moon",           "\u6708\u76F8",         "Moon Phase",     "\uE708"),
+        };
     }
 }

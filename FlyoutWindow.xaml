@@ -28,6 +28,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0" Margin="16,0,16,12">
@@ -61,7 +62,13 @@
                 </Button>
             </Grid>
 
-            <Grid Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,12" Width="320" Height="354">
+            <!-- Weather detail strip (configurable fields) -->
+            <StackPanel x:Name="WeatherDetailStrip" Grid.Row="1" Orientation="Horizontal" Spacing="12"
+                        Margin="16,0,16,8" Visibility="Collapsed"
+                        HorizontalAlignment="Left">
+            </StackPanel>
+
+            <Grid Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,12" Width="320" Height="354">
                 <CalendarView x:Name="MainCalendar" 
                               HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                               CalendarViewDayItemChanging="MainCalendar_CalendarViewDayItemChanging" 

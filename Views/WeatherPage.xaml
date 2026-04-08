@@ -9,6 +9,7 @@
         <StackPanel Spacing="28" MaxWidth="800" HorizontalAlignment="Left">
             <TextBlock x:Uid="WeatherPage_Title" Style="{StaticResource TitleTextBlockStyle}"/>
 
+            <!-- Basic Settings Card -->
             <StackPanel Spacing="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="24" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
 
                 <ToggleSwitch x:Uid="WeatherPage_Toggle" x:Name="WeatherToggle" Toggled="WeatherToggle_Toggled"/>
@@ -23,22 +24,28 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <AutoSuggestBox Grid.Column="0" x:Uid="WeatherPage_CitySearchBox" x:Name="CitySearchBox" 
+                        <AutoSuggestBox Grid.Column="0" x:Uid="WeatherPage_CitySearchBox" x:Name="CitySearchBox"
                                         TextChanged="CitySearchBox_TextChanged" QuerySubmitted="CitySearchBox_QuerySubmitted"
                                         SuggestionChosen="CitySearchBox_SuggestionChosen" VerticalAlignment="Center"/>
 
-                        <Button x:Uid="WeatherPage_BtnRefresh" Grid.Column="1" Click="BtnRefresh_Click" VerticalAlignment="Center">
-                            <Button.ContentTransitions>
-                                <TransitionCollection>
-                                    <ContentThemeTransition/>
-                                </TransitionCollection>
-                            </Button.ContentTransitions>
-                        </Button>
+                        <Button x:Uid="WeatherPage_BtnRefresh" Grid.Column="1" Click="BtnRefresh_Click" VerticalAlignment="Center"/>
                     </Grid>
                 </StackPanel>
 
                 <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4"/>
 
+                <!-- Weather Source -->
+                <StackPanel Spacing="8">
+                    <ComboBox x:Name="SourceComboBox" x:Uid="WeatherPage_SourceHeader" Width="300" HorizontalAlignment="Left" SelectionChanged="SourceComboBox_SelectionChanged">
+                        <ComboBoxItem Content="Open-Meteo" Tag="OpenMeteo"/>
+                        <ComboBoxItem Content="wttr.in" Tag="WttrIn"/>
+                    </ComboBox>
+                    <TextBlock x:Name="SourceHintText" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" MaxWidth="400"/>
+                </StackPanel>
+
+                <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4"/>
+
+                <!-- Icon Font -->
                 <StackPanel Spacing="8">
                     <ComboBox x:Uid="WeatherPage_IconFontHeader" x:Name="IconFontComboBox" Width="300" HorizontalAlignment="Left" SelectionChanged="IconFontComboBox_SelectionChanged">
                         <ComboBoxItem x:Uid="WeatherPage_FontEmoji" Tag="Segoe UI Emoji"/>
@@ -46,7 +53,7 @@
                         <ComboBoxItem x:Uid="WeatherPage_FontCustom" Tag="__custom__"/>
                     </ComboBox>
 
-                    <AutoSuggestBox x:Uid="WeatherPage_CustomFontBox" x:Name="CustomFontBox" 
+                    <AutoSuggestBox x:Uid="WeatherPage_CustomFontBox" x:Name="CustomFontBox"
                                     Width="300" HorizontalAlignment="Left" Visibility="Collapsed"
                                     TextChanged="CustomFontBox_TextChanged"
                                     QuerySubmitted="CustomFontBox_QuerySubmitted"
@@ -54,20 +61,32 @@
                 </StackPanel>
             </StackPanel>
 
+            <!-- Flyout Display Fields Card -->
+            <StackPanel Spacing="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="24" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                <TextBlock x:Name="FlyoutFieldsHeader" FontWeight="SemiBold" FontSize="16"/>
+                <TextBlock x:Name="FlyoutFieldsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                <ItemsRepeater x:Name="FieldToggleRepeater">
+                    <ItemsRepeater.Layout>
+                        <UniformGridLayout MinItemWidth="180" MinColumnSpacing="12" MinRowSpacing="4"/>
+                    </ItemsRepeater.Layout>
+                </ItemsRepeater>
+            </StackPanel>
+
+            <!-- 24-Hour Forecast -->
             <StackPanel x:Name="ForecastPanel" Spacing="12" Visibility="Collapsed">
                 <TextBlock x:Uid="WeatherPage_24Hour" FontWeight="SemiBold" FontSize="16"/>
-                <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="16">
+                <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="12">
                     <ListView x:Name="HourlyListView" SelectionMode="Single" SelectionChanged="HourlyListView_SelectionChanged"
                               ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
                               ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
                         <ListView.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="4"/>
+                                <StackPanel Orientation="Horizontal" Spacing="2"/>
                             </ItemsPanelTemplate>
                         </ListView.ItemsPanel>
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem">
-                                <Setter Property="Padding" Value="4"/>
+                                <Setter Property="Padding" Value="2"/>
                                 <Setter Property="MinWidth" Value="0"/>
                                 <Setter Property="MinHeight" Value="0"/>
                                 <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -75,53 +94,40 @@
                         </ListView.ItemContainerStyle>
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:HourlyWeather">
-                                <StackPanel Width="60" Spacing="10" HorizontalAlignment="Center" Margin="4,8">
-                                    <TextBlock Text="{x:Bind Time}" HorizontalAlignment="Center" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                    <TextBlock Text="{x:Bind Icon}" FontSize="28" HorizontalAlignment="Center" FontFamily="{x:Bind IconFont}"/>
-                                    <TextBlock Text="{x:Bind Temperature}" HorizontalAlignment="Center" FontWeight="Bold" FontSize="15"/>
+                                <StackPanel Width="56" Spacing="8" HorizontalAlignment="Center" Margin="2,6">
+                                    <TextBlock Text="{x:Bind Time}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <TextBlock Text="{x:Bind Icon}" FontSize="24" HorizontalAlignment="Center" FontFamily="{x:Bind IconFont}"/>
+                                    <TextBlock Text="{x:Bind Temperature}" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="13"/>
                                 </StackPanel>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
                 </Border>
 
+                <!-- Detail Panel for selected hour -->
                 <Border x:Name="HourDetailPanel" Visibility="Collapsed"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8"
-                        BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="20">
-                    <Grid ColumnSpacing="16" RowSpacing="8">
+                        BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="24">
+                    <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Column="0" Grid.RowSpan="3" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4" Margin="0,0,8,0">
-                            <TextBlock x:Name="DetailIcon" FontSize="40" HorizontalAlignment="Center"/>
-                            <TextBlock x:Name="DetailTemp" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center"/>
+                        <!-- Left: Icon + Temp + Time -->
+                        <StackPanel Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Center" Spacing="4" Margin="0,0,24,0" MinWidth="80">
+                            <TextBlock x:Name="DetailIcon" FontSize="44" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="DetailTemp" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center"/>
                             <TextBlock x:Name="DetailTime" FontSize="13" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <TextBlock x:Name="DetailDesc" FontSize="13" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="DetailDesc" Grid.Column="1" Grid.Row="0" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
-
-                        <StackPanel Grid.Column="1" Grid.Row="1" Orientation="Horizontal" Spacing="16">
-                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                <FontIcon Glyph="&#xE9CA;" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"/>
-                                <TextBlock x:Name="DetailFeelsLike" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                <FontIcon Glyph="&#xE945;" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"/>
-                                <TextBlock x:Name="DetailHumidity" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                            </StackPanel>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="1" Grid.Row="2" Orientation="Horizontal" Spacing="4">
-                            <FontIcon Glyph="&#xEBE7;" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"/>
-                            <TextBlock x:Name="DetailWind" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                        </StackPanel>
+                        <!-- Right: Detail grid -->
+                        <ItemsRepeater x:Name="DetailFieldsRepeater" Grid.Column="1">
+                            <ItemsRepeater.Layout>
+                                <UniformGridLayout MinItemWidth="140" MinColumnSpacing="8" MinRowSpacing="6"/>
+                            </ItemsRepeater.Layout>
+                        </ItemsRepeater>
                     </Grid>
                 </Border>
             </StackPanel>

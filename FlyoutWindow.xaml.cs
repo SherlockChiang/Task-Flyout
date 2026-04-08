@@ -842,7 +842,11 @@ namespace Task_Flyout
             var weatherService = (App.Current as App)?.WeatherService;
             if (weatherService == null || !weatherService.IsEnabled)
             {
-                DispatcherQueue.TryEnqueue(() => WeatherPanel.Visibility = Visibility.Collapsed);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    WeatherPanel.Visibility = Visibility.Collapsed;
+                    WeatherDetailStrip.Visibility = Visibility.Collapsed;
+                });
                 return;
             }
 
@@ -858,12 +862,92 @@ namespace Task_Flyout
                     TxtWeatherTemp.Text = info.Temperature;
                     TxtWeatherDesc.Text = info.Description;
                     WeatherPanel.Visibility = Visibility.Visible;
+
+                    BuildWeatherDetailStrip(info, weatherService);
                 }
                 else
                 {
                     WeatherPanel.Visibility = Visibility.Collapsed;
+                    WeatherDetailStrip.Visibility = Visibility.Collapsed;
                 }
             });
+        }
+
+        private void BuildWeatherDetailStrip(WeatherInfo info, WeatherService weatherService)
+        {
+            WeatherDetailStrip.Children.Clear();
+            var fields = weatherService.GetEnabledFields();
+
+            // Remove temperature and description since they're already shown in the weather button
+            fields.Remove("temperature");
+            fields.Remove("description");
+
+            if (fields.Count == 0)
+            {
+                WeatherDetailStrip.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            string lang = GetWeatherLang();
+
+            void AddChip(string glyph, string text)
+            {
+                if (string.IsNullOrEmpty(text)) return;
+                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+                panel.Children.Add(new FontIcon
+                {
+                    Glyph = glyph,
+                    FontSize = 11,
+                    FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+                    Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                panel.Children.Add(new TextBlock
+                {
+                    Text = text,
+                    FontSize = 11,
+                    Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                WeatherDetailStrip.Children.Add(panel);
+            }
+
+            if (fields.Contains("feelslike") && !string.IsNullOrEmpty(info.FeelsLike))
+                AddChip("\uE9CA", info.FeelsLike);
+            if (fields.Contains("humidity") && !string.IsNullOrEmpty(info.Humidity))
+                AddChip("\uE945", info.Humidity);
+            if (fields.Contains("wind") && !string.IsNullOrEmpty(info.WindSpeed))
+                AddChip("\uEBE7", info.WindSpeed);
+            if (fields.Contains("uv") && !string.IsNullOrEmpty(info.UVIndex))
+                AddChip("\uE706", $"UV {info.UVIndex}");
+            if (fields.Contains("visibility") && !string.IsNullOrEmpty(info.Visibility))
+                AddChip("\uE7B3", info.Visibility);
+            if (fields.Contains("pressure") && !string.IsNullOrEmpty(info.Pressure))
+                AddChip("\uEC49", info.Pressure);
+            if (fields.Contains("airquality") && !string.IsNullOrEmpty(info.AirQuality))
+                AddChip("\uE9CA", $"AQI {info.AirQuality}");
+            if (fields.Contains("pollen") && !string.IsNullOrEmpty(info.Pollen))
+                AddChip("\uE710", lang == "en" ? $"Pollen {info.Pollen}" : $"\u82B1\u7C89 {info.Pollen}");
+            if (fields.Contains("sun") && !string.IsNullOrEmpty(info.Sunrise))
+                AddChip("\uE706", $"{info.Sunrise} / {info.Sunset}");
+            if (fields.Contains("moon") && !string.IsNullOrEmpty(info.MoonPhase))
+                AddChip("\uE708", info.MoonPhase);
+            if (fields.Contains("precipitation"))
+            {
+                var hw = info.HourlyForecast?.FirstOrDefault();
+                if (hw != null && !string.IsNullOrEmpty(hw.PrecipProbability))
+                    AddChip("\uE790", hw.PrecipProbability);
+            }
+
+            WeatherDetailStrip.Visibility = WeatherDetailStrip.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private static string GetWeatherLang()
+        {
+            string appLang = Windows.Storage.ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
+            if (string.IsNullOrEmpty(appLang))
+                appLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+            return appLang.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "en" : "zh";
         }
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
