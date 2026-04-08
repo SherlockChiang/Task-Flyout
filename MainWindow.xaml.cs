@@ -117,6 +117,14 @@ namespace Task_Flyout
             }
         }
 
+        public void RefreshAccountListUI()
+        {
+            var mgr = GetAccountManager();
+            if (mgr == null) return;
+            AccountListRepeater.ItemsSource = null;
+            AccountListRepeater.ItemsSource = mgr.Accounts;
+        }
+
         private void BtnAddAccount_Click(object sender, RoutedEventArgs e)
         {
             ContentFrame.Navigate(typeof(Views.AddAccountPage));

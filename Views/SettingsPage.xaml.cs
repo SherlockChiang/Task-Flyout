@@ -307,7 +307,7 @@ namespace Task_Flyout.Views
 
             if (App.MyMainWindow != null)
             {
-                App.MyMainWindow.RefreshAccountList();
+                App.MyMainWindow.RefreshAccountListUI();
                 App.MyMainWindow.RefreshCalendarColors();
             }
 

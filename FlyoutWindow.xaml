@@ -91,7 +91,7 @@
 
             <Border Grid.Row="1" Background="{ThemeResource ControlFillColorDefaultBrush}"
                     CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                <ListView x:Name="AgendaListControl" SelectionMode="None" Padding="0,8" 
+                <ListView x:Name="AgendaListControl" ItemsSource="{x:Bind AgendaItems, Mode=OneWay}" SelectionMode="None" Padding="0,8" 
                           IsItemClickEnabled="True" ItemClick="AgendaListControl_ItemClick"
                           ScrollViewer.VerticalScrollBarVisibility="Hidden" ScrollViewer.VerticalScrollMode="Disabled">
                     <ListView.ItemTemplate>

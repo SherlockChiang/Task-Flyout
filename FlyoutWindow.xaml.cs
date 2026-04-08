@@ -134,8 +134,6 @@ namespace Task_Flyout
 
         private void RootGrid_Loaded(object sender, RoutedEventArgs e)
         {
-            AgendaListControl.ItemsSource = AgendaItems;
-
             if (MainCalendar.SelectedDates.Count == 0)
             {
                 MainCalendar.SelectedDates.Add(DateTime.Today);

@@ -57,25 +57,72 @@
             <StackPanel x:Name="ForecastPanel" Spacing="12" Visibility="Collapsed">
                 <TextBlock x:Uid="WeatherPage_24Hour" FontWeight="SemiBold" FontSize="16"/>
                 <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="16">
-                    <ScrollViewer HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Auto" VerticalScrollMode="Disabled">
-                        <ItemsRepeater x:Name="HourlyRepeater">
-                            <ItemsRepeater.Layout>
-                                <StackLayout Orientation="Horizontal" Spacing="24"/>
-                            </ItemsRepeater.Layout>
-                            <ItemsRepeater.ItemTemplate>
-                                <DataTemplate x:DataType="models:HourlyWeather">
-                                    <StackPanel Width="60" Spacing="12" HorizontalAlignment="Center" Margin="0,8">
-                                        <TextBlock Text="{x:Bind Time}" HorizontalAlignment="Center" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    <ListView x:Name="HourlyListView" SelectionMode="Single" SelectionChanged="HourlyListView_SelectionChanged"
+                              ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                              ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                        <ListView.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="4"/>
+                            </ItemsPanelTemplate>
+                        </ListView.ItemsPanel>
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="Padding" Value="4"/>
+                                <Setter Property="MinWidth" Value="0"/>
+                                <Setter Property="MinHeight" Value="0"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:HourlyWeather">
+                                <StackPanel Width="60" Spacing="10" HorizontalAlignment="Center" Margin="4,8">
+                                    <TextBlock Text="{x:Bind Time}" HorizontalAlignment="Center" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <TextBlock Text="{x:Bind Icon}" FontSize="28" HorizontalAlignment="Center" FontFamily="{x:Bind IconFont}"/>
+                                    <TextBlock Text="{x:Bind Temperature}" HorizontalAlignment="Center" FontWeight="Bold" FontSize="15"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Border>
 
-                                        <TextBlock Text="{x:Bind Icon}" FontSize="28" HorizontalAlignment="Center" 
-                                                   FontFamily="{x:Bind IconFont}" />
+                <Border x:Name="HourDetailPanel" Visibility="Collapsed"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8"
+                        BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="20">
+                    <Grid ColumnSpacing="16" RowSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                                        <TextBlock Text="{x:Bind Temperature}" HorizontalAlignment="Center" FontWeight="Bold" FontSize="15"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsRepeater.ItemTemplate>
-                        </ItemsRepeater>
-                    </ScrollViewer>
+                        <StackPanel Grid.Column="0" Grid.RowSpan="3" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4" Margin="0,0,8,0">
+                            <TextBlock x:Name="DetailIcon" FontSize="40" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="DetailTemp" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="DetailTime" FontSize="13" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="DetailDesc" Grid.Column="1" Grid.Row="0" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+
+                        <StackPanel Grid.Column="1" Grid.Row="1" Orientation="Horizontal" Spacing="16">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <FontIcon Glyph="&#xE9CA;" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+                                <TextBlock x:Name="DetailFeelsLike" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <FontIcon Glyph="&#xE945;" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+                                <TextBlock x:Name="DetailHumidity" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Grid.Row="2" Orientation="Horizontal" Spacing="4">
+                            <FontIcon Glyph="&#xEBE7;" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+                            <TextBlock x:Name="DetailWind" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+                    </Grid>
                 </Border>
             </StackPanel>
 

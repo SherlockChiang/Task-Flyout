@@ -170,6 +170,26 @@ namespace Task_Flyout.Views
             await LoadWeatherDataAsync(forceRefresh: true);
         }
 
+        private void HourlyListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (HourlyListView.SelectedItem is HourlyWeather hw)
+            {
+                DetailIcon.Text = hw.Icon;
+                DetailIcon.FontFamily = new Microsoft.UI.Xaml.Media.FontFamily(hw.IconFont);
+                DetailTemp.Text = hw.Temperature;
+                DetailTime.Text = hw.Time;
+                DetailDesc.Text = hw.Description ?? "";
+                DetailFeelsLike.Text = hw.FeelsLike ?? "";
+                DetailHumidity.Text = hw.Humidity ?? "";
+                DetailWind.Text = hw.WindSpeed ?? "";
+                HourDetailPanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                HourDetailPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+
         private async Task LoadWeatherDataAsync(bool forceRefresh = false)
         {
             if (_weatherService == null || string.IsNullOrWhiteSpace(_weatherService.City)) return;
@@ -182,8 +202,10 @@ namespace Task_Flyout.Views
 
             if (info != null && info.HourlyForecast.Count > 0)
             {
-                HourlyRepeater.ItemsSource = info.HourlyForecast;
+                HourlyListView.ItemsSource = info.HourlyForecast;
                 ForecastPanel.Visibility = Visibility.Visible;
+                HourDetailPanel.Visibility = Visibility.Collapsed;
+                HourlyListView.SelectedIndex = 0;
             }
 
             LoadingRing.IsActive = false;

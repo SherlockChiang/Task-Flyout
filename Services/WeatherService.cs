@@ -13,6 +13,10 @@ namespace Task_Flyout.Services
         public string Temperature { get; set; }
         public string Icon { get; set; }
         public string IconFont { get; set; }
+        public string Description { get; set; }
+        public string Humidity { get; set; }
+        public string WindSpeed { get; set; }
+        public string FeelsLike { get; set; }
     }
 
     public class WeatherInfo
@@ -139,12 +143,26 @@ namespace Task_Flyout.Services
                             string hourTemp = hour.GetProperty("tempC").GetString() + "°C";
                             string hourCode = hour.GetProperty("weatherCode").GetString();
 
+                            string hourDesc = "";
+                            if (wttrLang == "zh" && hour.TryGetProperty("lang_zh", out var hLangZh) && hLangZh.GetArrayLength() > 0)
+                                hourDesc = hLangZh[0].GetProperty("value").GetString();
+                            else if (hour.TryGetProperty("weatherDesc", out var hDesc) && hDesc.GetArrayLength() > 0)
+                                hourDesc = hDesc[0].GetProperty("value").GetString();
+
+                            string humidity = hour.TryGetProperty("humidity", out var hum) ? hum.GetString() + "%" : "";
+                            string windSpeed = hour.TryGetProperty("windspeedKmph", out var ws) ? ws.GetString() + " km/h" : "";
+                            string feelsLike = hour.TryGetProperty("FeelsLikeC", out var fl) ? fl.GetString() + "°C" : "";
+
                             weatherInfo.HourlyForecast.Add(new HourlyWeather
                             {
                                 Time = timeFormatted,
                                 Temperature = hourTemp,
                                 Icon = WeatherCodeToIcon(hourCode, IconFontFamily),
-                                IconFont = IconFontFamily
+                                IconFont = IconFontFamily,
+                                Description = hourDesc,
+                                Humidity = humidity,
+                                WindSpeed = windSpeed,
+                                FeelsLike = feelsLike
                             });
                         }
                     }

@@ -39,6 +39,16 @@
 
                                 <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                                           Background="Transparent" BorderThickness="0" Padding="0" IsExpanded="True">
+                                    <Expander.Resources>
+                                        <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="Transparent"/>
+                                        <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="Transparent"/>
+                                        <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="Transparent"/>
+                                        <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="Transparent"/>
+                                        <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="Transparent"/>
+                                        <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="Transparent"/>
+                                        <SolidColorBrush x:Key="ExpanderContentBackground" Color="Transparent"/>
+                                        <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="Transparent"/>
+                                    </Expander.Resources>
 
                                     <Expander.Header>
                                         <Grid HorizontalAlignment="Stretch" Margin="0,0,8,0">
