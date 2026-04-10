@@ -22,6 +22,7 @@ namespace Task_Flyout
         private UISettings _uiSettings;
         public static FlyoutWindow? MyFlyoutWindow { get; private set; }
         public static MainWindow? MyMainWindow { get; private set; }
+        public static WeatherBarWindow? MyWeatherBar { get; private set; }
         public static Microsoft.UI.Dispatching.DispatcherQueue MainDispatcherQueue { get; private set; }
         public SyncManager SyncManager { get; } = new SyncManager();
         public NotificationService NotificationService { get; private set; }
@@ -67,6 +68,9 @@ namespace Task_Flyout
 
             _trayIcon.LeftClickCommand = new RelayCommand(() => MyFlyoutWindow.ToggleFlyout());
 
+            // Initialize weather bar if enabled
+            InitWeatherBar();
+
             _trayIcon.DoubleClickCommand = new RelayCommand(() => OpenMainWindowInternal());
 
             if (_trayIcon.ContextFlyout is MenuFlyout menu)
@@ -101,6 +105,47 @@ namespace Task_Flyout
             _trayIcon.IconSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri($"ms-appx:///Assets/{iconName}"));
         }
 
+        private void InitWeatherBar()
+        {
+            bool weatherBarEnabled = Windows.Storage.ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false;
+            if (weatherBarEnabled && WeatherService.IsEnabled)
+            {
+                MyWeatherBar = new WeatherBarWindow();
+                MyWeatherBar.ShowBar();
+            }
+        }
+
+        public static void ToggleWeatherBar(bool enabled)
+        {
+            MainDispatcherQueue.TryEnqueue(async () =>
+            {
+                Windows.Storage.ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] = enabled;
+
+                if (enabled && (App.Current as App)?.WeatherService?.IsEnabled == true)
+                {
+                    if (MyWeatherBar == null)
+                    {
+                        MyWeatherBar = new WeatherBarWindow();
+                    }
+                    MyWeatherBar.ShowBar();
+                    await MyWeatherBar.RefreshWeatherAsync();
+                }
+                else
+                {
+                    MyWeatherBar?.HideBar();
+                }
+            });
+        }
+
+        public static void RefreshWeatherBar()
+        {
+            MainDispatcherQueue.TryEnqueue(async () =>
+            {
+                if (MyWeatherBar != null)
+                    await MyWeatherBar.RefreshWeatherAsync();
+            });
+        }
+
         public static void OpenMainWindowInternal(Action<MainWindow> onOpened = null)
         {
             MainDispatcherQueue.TryEnqueue(() =>
@@ -122,6 +167,7 @@ namespace Task_Flyout
         {
             NotificationService?.Stop();
             _trayIcon?.Dispose();
+            MyWeatherBar?.Close();
             MyFlyoutWindow?.Close();
             MyMainWindow?.Close();
             Exit();

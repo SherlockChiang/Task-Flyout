@@ -709,6 +709,22 @@ namespace Task_Flyout
             else
             {
                 ContentRow.Height = new GridLength(1, GridUnitType.Star);
+
+                // Measure the header area (Row 0) dynamically to account for weather strip visibility
+                double headerHeight = 16; // top padding
+                headerHeight += 50;       // clock area
+                headerHeight += 12;       // clock bottom margin
+                headerHeight += 354;      // calendar fixed height
+                headerHeight += 12;       // calendar bottom margin
+
+                // Account for weather detail strip when visible
+                if (WeatherDetailStrip != null && WeatherDetailStrip.Visibility == Visibility.Visible)
+                {
+                    WeatherDetailStrip.Measure(new Windows.Foundation.Size(logicalWidth, double.PositiveInfinity));
+                    headerHeight += WeatherDetailStrip.DesiredSize.Height + 8; // strip height + margin
+                }
+
+                // Measure agenda list height
                 int listHeight = 0;
                 foreach (var item in AgendaItems)
                 {
@@ -716,7 +732,11 @@ namespace Task_Flyout
                     else if (item.Subtitle != null && item.Subtitle.Contains(_loader.GetString("TextUpcoming") ?? "即将到来")) listHeight += 65;
                     else listHeight += !string.IsNullOrEmpty(item.Location) ? 75 : 65;
                 }
-                targetLogicalHeight = 500 + listHeight + 45;
+
+                // Bottom bar height (~56) + agenda header (~30) + agenda border padding (16) + margins
+                double bottomAndAgendaChrome = 56 + 30 + 16 + 16;
+
+                targetLogicalHeight = headerHeight + listHeight + bottomAndAgendaChrome;
             }
 
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
@@ -864,11 +884,13 @@ namespace Task_Flyout
                     WeatherPanel.Visibility = Visibility.Visible;
 
                     BuildWeatherDetailStrip(info, weatherService);
+                    AdjustWindowHeight();
                 }
                 else
                 {
                     WeatherPanel.Visibility = Visibility.Collapsed;
                     WeatherDetailStrip.Visibility = Visibility.Collapsed;
+                    AdjustWindowHeight();
                 }
             });
         }

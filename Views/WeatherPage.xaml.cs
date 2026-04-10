@@ -50,6 +50,14 @@ namespace Task_Flyout.Views
             WeatherToggle.IsOn = _weatherService.IsEnabled;
             CitySearchBox.Text = _weatherService.City;
 
+            // Weather bar toggle
+            bool weatherBarEnabled = Windows.Storage.ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false;
+            WeatherBarToggle.IsOn = weatherBarEnabled;
+            string lang = GetCurrentLang();
+            WeatherBarDesc.Text = lang == "en"
+                ? "Show a floating weather pill on the taskbar (replaces Win11 widget weather)"
+                : "\u5728\u4EFB\u52A1\u680F\u4E0A\u663E\u793A\u6D6E\u52A8\u5929\u6C14\u6761\uFF08\u66FF\u4EE3 Win11 \u5C0F\u7EC4\u4EF6\u5929\u6C14\uFF09";
+
             // Source ComboBox
             string src = _weatherService.WeatherSource;
             var srcItem = SourceComboBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => i.Tag?.ToString() == src);
@@ -255,6 +263,18 @@ namespace Task_Flyout.Views
                 ForecastPanel.Visibility = Visibility.Collapsed;
 
             _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: true);
+
+            // Auto-disable weather bar when weather is turned off
+            if (!WeatherToggle.IsOn && WeatherBarToggle.IsOn)
+            {
+                WeatherBarToggle.IsOn = false;
+            }
+        }
+
+        private void WeatherBarToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            App.ToggleWeatherBar(WeatherBarToggle.IsOn);
         }
 
         private async void CitySearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
@@ -393,6 +413,7 @@ namespace Task_Flyout.Views
 
             var info = await _weatherService.GetWeatherAsync(forceRefresh);
             _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh);
+            App.RefreshWeatherBar();
 
             if (info != null && info.HourlyForecast.Count > 0)
             {

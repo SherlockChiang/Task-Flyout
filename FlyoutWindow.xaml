@@ -85,7 +85,7 @@
 
         </Grid>
 
-        <Grid x:Name="AgendaContainer" Grid.Row="1" Margin="16,0,16,0">
+        <Grid x:Name="AgendaContainer" Grid.Row="1" Margin="16,0,16,0" MinHeight="80">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -98,9 +98,9 @@
 
             <Border Grid.Row="1" Background="{ThemeResource ControlFillColorDefaultBrush}"
                     CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                <ListView x:Name="AgendaListControl" ItemsSource="{x:Bind AgendaItems, Mode=OneWay}" SelectionMode="None" Padding="0,8" 
+                <ListView x:Name="AgendaListControl" ItemsSource="{x:Bind AgendaItems, Mode=OneWay}" SelectionMode="None" Padding="0,8"
                           IsItemClickEnabled="True" ItemClick="AgendaListControl_ItemClick"
-                          ScrollViewer.VerticalScrollBarVisibility="Hidden" ScrollViewer.VerticalScrollMode="Disabled">
+                          ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollMode="Disabled">
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="models:AgendaItem">
                             <Grid Margin="12,6" HorizontalAlignment="Stretch">
