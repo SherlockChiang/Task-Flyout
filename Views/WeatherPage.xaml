@@ -9,7 +9,90 @@
         <StackPanel Spacing="28" MaxWidth="800" HorizontalAlignment="Left">
             <TextBlock x:Uid="WeatherPage_Title" Style="{StaticResource TitleTextBlockStyle}"/>
 
-            <!-- Basic Settings Card -->
+            <!-- Current Weather Summary Card (top) -->
+            <Border x:Name="CurrentWeatherCard" Visibility="Collapsed"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8"
+                    BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="24">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4" Margin="0,0,28,0" MinWidth="90">
+                        <TextBlock x:Name="CurrentIcon" FontSize="48" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="CurrentTemp" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+                        <TextBlock x:Name="CurrentDesc" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="CurrentCity" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <StackPanel x:Name="CurrentDetailsPanel" Orientation="Horizontal" Spacing="16" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 24-Hour Forecast -->
+            <StackPanel x:Name="ForecastPanel" Spacing="12" Visibility="Collapsed">
+                <TextBlock x:Uid="WeatherPage_24Hour" FontWeight="SemiBold" FontSize="16"/>
+                <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="12">
+                    <ListView x:Name="HourlyListView" SelectionMode="Single" SelectionChanged="HourlyListView_SelectionChanged"
+                              ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                              ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                        <ListView.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="2"/>
+                            </ItemsPanelTemplate>
+                        </ListView.ItemsPanel>
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="Padding" Value="2"/>
+                                <Setter Property="MinWidth" Value="0"/>
+                                <Setter Property="MinHeight" Value="0"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:HourlyWeather">
+                                <StackPanel Width="56" Spacing="8" HorizontalAlignment="Center" Margin="2,6">
+                                    <TextBlock Text="{x:Bind Time}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <TextBlock Text="{x:Bind Icon}" FontSize="24" HorizontalAlignment="Center" FontFamily="{x:Bind IconFont}"/>
+                                    <TextBlock Text="{x:Bind Temperature}" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="13"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Border>
+
+                <!-- Detail Panel for selected hour -->
+                <Border x:Name="HourDetailPanel" Visibility="Collapsed"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8"
+                        BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="24">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Center" Spacing="4" Margin="0,0,24,0" MinWidth="80">
+                            <TextBlock x:Name="DetailIcon" FontSize="44" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="DetailTemp" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="DetailTime" FontSize="13" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <TextBlock x:Name="DetailDesc" FontSize="13" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <ItemsRepeater x:Name="DetailFieldsRepeater" Grid.Column="1">
+                            <ItemsRepeater.Layout>
+                                <UniformGridLayout MinItemWidth="140" MinColumnSpacing="8" MinRowSpacing="6"/>
+                            </ItemsRepeater.Layout>
+                        </ItemsRepeater>
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <ProgressRing x:Name="LoadingRing" IsActive="False" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+
+            <!-- Settings Card (moved to bottom) -->
             <StackPanel Spacing="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="24" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
 
                 <ToggleSwitch x:Uid="WeatherPage_Toggle" x:Name="WeatherToggle" Toggled="WeatherToggle_Toggled"/>
@@ -78,68 +161,6 @@
                     </ItemsRepeater.Layout>
                 </ItemsRepeater>
             </StackPanel>
-
-            <!-- 24-Hour Forecast -->
-            <StackPanel x:Name="ForecastPanel" Spacing="12" Visibility="Collapsed">
-                <TextBlock x:Uid="WeatherPage_24Hour" FontWeight="SemiBold" FontSize="16"/>
-                <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="12">
-                    <ListView x:Name="HourlyListView" SelectionMode="Single" SelectionChanged="HourlyListView_SelectionChanged"
-                              ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                              ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                        <ListView.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="2"/>
-                            </ItemsPanelTemplate>
-                        </ListView.ItemsPanel>
-                        <ListView.ItemContainerStyle>
-                            <Style TargetType="ListViewItem">
-                                <Setter Property="Padding" Value="2"/>
-                                <Setter Property="MinWidth" Value="0"/>
-                                <Setter Property="MinHeight" Value="0"/>
-                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                            </Style>
-                        </ListView.ItemContainerStyle>
-                        <ListView.ItemTemplate>
-                            <DataTemplate x:DataType="models:HourlyWeather">
-                                <StackPanel Width="56" Spacing="8" HorizontalAlignment="Center" Margin="2,6">
-                                    <TextBlock Text="{x:Bind Time}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                    <TextBlock Text="{x:Bind Icon}" FontSize="24" HorizontalAlignment="Center" FontFamily="{x:Bind IconFont}"/>
-                                    <TextBlock Text="{x:Bind Temperature}" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="13"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
-                </Border>
-
-                <!-- Detail Panel for selected hour -->
-                <Border x:Name="HourDetailPanel" Visibility="Collapsed"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8"
-                        BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="24">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Left: Icon + Temp + Time -->
-                        <StackPanel Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Center" Spacing="4" Margin="0,0,24,0" MinWidth="80">
-                            <TextBlock x:Name="DetailIcon" FontSize="44" HorizontalAlignment="Center"/>
-                            <TextBlock x:Name="DetailTemp" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center"/>
-                            <TextBlock x:Name="DetailTime" FontSize="13" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                            <TextBlock x:Name="DetailDesc" FontSize="13" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap"/>
-                        </StackPanel>
-
-                        <!-- Right: Detail grid -->
-                        <ItemsRepeater x:Name="DetailFieldsRepeater" Grid.Column="1">
-                            <ItemsRepeater.Layout>
-                                <UniformGridLayout MinItemWidth="140" MinColumnSpacing="8" MinRowSpacing="6"/>
-                            </ItemsRepeater.Layout>
-                        </ItemsRepeater>
-                    </Grid>
-                </Border>
-            </StackPanel>
-
-            <ProgressRing x:Name="LoadingRing" IsActive="False" HorizontalAlignment="Left" Margin="0,12,0,0"/>
         </StackPanel>
     </ScrollViewer>
 </Page>

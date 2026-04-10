@@ -97,6 +97,59 @@ namespace Task_Flyout.Views
             }
         }
 
+        #region Current Weather Card
+
+        private void UpdateCurrentWeatherCard(WeatherInfo info)
+        {
+            if (info == null)
+            {
+                CurrentWeatherCard.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            CurrentIcon.Text = info.Icon;
+            CurrentIcon.FontFamily = new FontFamily(info.IconFont);
+            CurrentTemp.Text = info.Temperature;
+            CurrentDesc.Text = info.Description ?? "";
+            CurrentCity.Text = info.City ?? _weatherService?.City ?? "";
+
+            // Build detail chips
+            CurrentDetailsPanel.Children.Clear();
+            string lang = GetCurrentLang();
+
+            void AddChip(string glyph, string text)
+            {
+                if (string.IsNullOrEmpty(text)) return;
+                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+                panel.Children.Add(new FontIcon
+                {
+                    Glyph = glyph,
+                    FontSize = 12,
+                    FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+                    Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                panel.Children.Add(new TextBlock
+                {
+                    Text = text,
+                    FontSize = 12,
+                    Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                CurrentDetailsPanel.Children.Add(panel);
+            }
+
+            AddChip("\uE9CA", info.FeelsLike);
+            AddChip("\uE945", info.Humidity);
+            AddChip("\uEBE7", info.WindSpeed);
+            if (!string.IsNullOrEmpty(info.UVIndex))
+                AddChip("\uE706", $"UV {info.UVIndex}");
+
+            CurrentWeatherCard.Visibility = Visibility.Visible;
+        }
+
+        #endregion
+
         #region Field Toggles
 
         private void BuildFieldToggles()
@@ -153,6 +206,7 @@ namespace Task_Flyout.Views
                 _weatherService.SetEnabledFields(fields);
 
                 _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: false);
+                App.RefreshWeatherBar();
             }
         }
 
@@ -260,9 +314,13 @@ namespace Task_Flyout.Views
             if (WeatherToggle.IsOn && !string.IsNullOrEmpty(_weatherService.City))
                 await LoadWeatherDataAsync();
             else
+            {
                 ForecastPanel.Visibility = Visibility.Collapsed;
+                CurrentWeatherCard.Visibility = Visibility.Collapsed;
+            }
 
             _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: true);
+            App.RefreshWeatherBar();
 
             // Auto-disable weather bar when weather is turned off
             if (!WeatherToggle.IsOn && WeatherBarToggle.IsOn)
@@ -414,6 +472,9 @@ namespace Task_Flyout.Views
             var info = await _weatherService.GetWeatherAsync(forceRefresh);
             _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh);
             App.RefreshWeatherBar();
+
+            // Update current weather card
+            UpdateCurrentWeatherCard(info);
 
             if (info != null && info.HourlyForecast.Count > 0)
             {

@@ -1,6 +1,7 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using System;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Windows.Graphics;
@@ -11,18 +12,32 @@ namespace Task_Flyout
     {
         private AppWindow _appWindow;
         private DispatcherTimer _refreshTimer;
+        private bool _initialActivationDone;
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        #region P/Invoke
+
+        [DllImport("user32.dll")]
         private static extern uint GetDpiForWindow(IntPtr hwnd);
 
-        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+        [DllImport("user32.dll", SetLastError = true)]
         private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
 
-        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+        [DllImport("user32.dll", SetLastError = true)]
         private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        private delegate IntPtr SUBCLASSPROC(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, IntPtr uIdSubclass, IntPtr dwRefData);
+
+        [DllImport("comctl32.dll")]
+        private static extern bool SetWindowSubclass(IntPtr hWnd, SUBCLASSPROC pfnSubclass, IntPtr uIdSubclass, IntPtr dwRefData);
+
+        [DllImport("comctl32.dll")]
+        private static extern IntPtr DefSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
 
         private const int GWL_STYLE = -16;
         private const int GWL_EXSTYLE = -20;
@@ -34,6 +49,15 @@ namespace Task_Flyout
         private const uint SWP_NOMOVE = 0x0002;
         private const uint SWP_NOSIZE = 0x0001;
         private const uint SWP_NOACTIVATE = 0x0010;
+        private const uint SWP_SHOWWINDOW = 0x0040;
+        private const int SW_SHOWNOACTIVATE = 4;
+        private const uint WM_MOUSEACTIVATE = 0x0021;
+        private const int MA_NOACTIVATE = 3;
+
+        // prevent GC collection of the delegate
+        private SUBCLASSPROC _subclassProc;
+
+        #endregion
 
         public WeatherBarWindow()
         {
@@ -43,7 +67,8 @@ namespace Task_Flyout
             var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
             _appWindow = AppWindow.GetFromWindowId(windowId);
 
-            ConfigureBarStyle();
+            ConfigureBarStyle(hWnd);
+            InstallSubclass(hWnd);
             PositionOnTaskbar();
 
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
@@ -53,9 +78,25 @@ namespace Task_Flyout
             RootGrid.Loaded += async (s, e) => await RefreshWeatherAsync();
         }
 
-        private void ConfigureBarStyle()
+        private void InstallSubclass(IntPtr hWnd)
         {
-            // Frameless, non-resizable, always on top
+            // Subclass the Win32 window to intercept WM_MOUSEACTIVATE
+            // and return MA_NOACTIVATE so clicking the bar never activates it.
+            _subclassProc = SubclassProc;
+            SetWindowSubclass(hWnd, _subclassProc, IntPtr.Zero, IntPtr.Zero);
+        }
+
+        private IntPtr SubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, IntPtr uIdSubclass, IntPtr dwRefData)
+        {
+            if (uMsg == WM_MOUSEACTIVATE)
+            {
+                return (IntPtr)MA_NOACTIVATE;
+            }
+            return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+        }
+
+        private void ConfigureBarStyle(IntPtr hWnd)
+        {
             if (_appWindow.Presenter is OverlappedPresenter presenter)
             {
                 presenter.IsResizable = false;
@@ -67,22 +108,17 @@ namespace Task_Flyout
 
             _appWindow.IsShownInSwitchers = false;
 
-            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-
             // Remove window chrome
             int style = GetWindowLong(hWnd, GWL_STYLE);
             style &= ~WS_THICKFRAME;
             style &= ~WS_CAPTION;
             SetWindowLong(hWnd, GWL_STYLE, style);
 
-            // Tool window (no taskbar entry) + no-activate (don't steal focus)
+            // Tool window (no taskbar entry) + no-activate
             int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
             exStyle |= WS_EX_TOOLWINDOW;
             exStyle |= WS_EX_NOACTIVATE;
             SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
-
-            // Ensure topmost
-            SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         }
 
         public void PositionOnTaskbar()
@@ -95,20 +131,25 @@ namespace Task_Flyout
             var workArea = display.WorkArea;
             var outerBounds = display.OuterBounds;
 
-            // Taskbar height = screen height minus work area height
-            int taskbarHeight = outerBounds.Height - workArea.Height;
-            if (taskbarHeight < 20) taskbarHeight = (int)(48 * scaleFactor); // fallback
+            // Taskbar height in physical pixels
+            int taskbarPhysicalHeight = outerBounds.Height - workArea.Height;
+            if (taskbarPhysicalHeight < 20)
+                taskbarPhysicalHeight = (int)(48 * scaleFactor);
 
-            // Pill size in physical pixels
-            int pillWidth = (int)(160 * scaleFactor);
-            int pillHeight = (int)(34 * scaleFactor);
+            // Pill fills the taskbar height with small vertical insets
+            int verticalInset = (int)(4 * scaleFactor);
+            int pillHeight = taskbarPhysicalHeight - verticalInset * 2;
+            if (pillHeight < (int)(28 * scaleFactor))
+                pillHeight = (int)(28 * scaleFactor);
+
+            int pillWidth = (int)(180 * scaleFactor);
 
             _appWindow.Resize(new SizeInt32(pillWidth, pillHeight));
 
-            // Position: left side of taskbar area, vertically centered in taskbar
-            int margin = (int)(8 * scaleFactor);
-            int x = workArea.X + margin;
-            int y = workArea.Y + workArea.Height + (taskbarHeight - pillHeight) / 2;
+            // Position: left side of taskbar, vertically centered
+            int horizontalMargin = (int)(8 * scaleFactor);
+            int x = workArea.X + horizontalMargin;
+            int y = workArea.Y + workArea.Height + (taskbarPhysicalHeight - pillHeight) / 2;
 
             _appWindow.Move(new PointInt32(x, y));
         }
@@ -149,18 +190,26 @@ namespace Task_Flyout
 
         private void WeatherButton_Click(object sender, RoutedEventArgs e)
         {
-            // Click opens the main flyout window
-            App.MyFlyoutWindow?.ToggleFlyout();
+            App.OpenMainWindowInternal(win => win.NavigateToWeather());
         }
 
         public void ShowBar()
         {
-            Activate();
-            _appWindow.Show();
+            PositionOnTaskbar();
 
-            // Re-apply topmost after show
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+
+            if (!_initialActivationDone)
+            {
+                // WinUI 3 requires Activate() once to render XAML content
+                Activate();
+                _initialActivationDone = true;
+            }
+
+            // Show without stealing focus
+            ShowWindow(hWnd, SW_SHOWNOACTIVATE);
+            SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
         }
 
         public void HideBar()
