@@ -12,6 +12,7 @@ namespace Task_Flyout
     {
         private AppWindow _appWindow;
         private DispatcherTimer _refreshTimer;
+        private DispatcherTimer _zOrderTimer;
         private bool _initialActivationDone;
 
         #region P/Invoke
@@ -30,6 +31,9 @@ namespace Task_Flyout
 
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
 
         private delegate IntPtr SUBCLASSPROC(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, IntPtr uIdSubclass, IntPtr dwRefData);
 
@@ -53,6 +57,23 @@ namespace Task_Flyout
         private const int SW_SHOWNOACTIVATE = 4;
         private const uint WM_MOUSEACTIVATE = 0x0021;
         private const int MA_NOACTIVATE = 3;
+        private const uint WM_WINDOWPOSCHANGING = 0x0046;
+        private const uint SWP_NOZORDER = 0x0004;
+        private const uint WM_DISPLAYCHANGE = 0x007E;
+        private const uint WM_SETTINGCHANGE = 0x001A;
+        private const uint WM_DPICHANGED = 0x02E0;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WINDOWPOS
+        {
+            public IntPtr hwnd;
+            public IntPtr hwndInsertAfter;
+            public int x;
+            public int y;
+            public int cx;
+            public int cy;
+            public uint flags;
+        }
 
         // prevent GC collection of the delegate
         private SUBCLASSPROC _subclassProc;
@@ -71,17 +92,33 @@ namespace Task_Flyout
             InstallSubclass(hWnd);
             PositionOnTaskbar();
 
+            // Prevent WinUI 3 from hiding the window when it loses activation
+            Activated += WeatherBarWindow_Activated;
+
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
             _refreshTimer.Tick += async (s, e) => await RefreshWeatherAsync();
             _refreshTimer.Start();
 
+            // Periodically re-assert topmost Z-order to combat other topmost windows
+            _zOrderTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            _zOrderTimer.Tick += ZOrderTimer_Tick;
+            _zOrderTimer.Start();
+
             RootGrid.Loaded += async (s, e) => await RefreshWeatherAsync();
+        }
+
+        private void ZOrderTimer_Tick(object sender, object e)
+        {
+            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            if (IsWindowVisible(hWnd))
+            {
+                SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            }
         }
 
         private void InstallSubclass(IntPtr hWnd)
         {
-            // Subclass the Win32 window to intercept WM_MOUSEACTIVATE
-            // and return MA_NOACTIVATE so clicking the bar never activates it.
             _subclassProc = SubclassProc;
             SetWindowSubclass(hWnd, _subclassProc, IntPtr.Zero, IntPtr.Zero);
         }
@@ -92,7 +129,47 @@ namespace Task_Flyout
             {
                 return (IntPtr)MA_NOACTIVATE;
             }
+
+            if (uMsg == WM_WINDOWPOSCHANGING)
+            {
+                // Force the window to stay topmost whenever Windows tries to change its Z-order
+                var pos = Marshal.PtrToStructure<WINDOWPOS>(lParam);
+                if (pos.hwndInsertAfter != HWND_TOPMOST)
+                {
+                    pos.hwndInsertAfter = HWND_TOPMOST;
+                    pos.flags &= ~SWP_NOZORDER;
+                    Marshal.StructureToPtr(pos, lParam, false);
+                }
+            }
+
+            // Re-position when display settings change (resolution, DPI, taskbar moved)
+            if (uMsg == WM_DISPLAYCHANGE || uMsg == WM_DPICHANGED)
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    PositionOnTaskbar();
+                    ReassertTopmost();
+                });
+            }
+
+            // WM_SETTINGCHANGE fires when taskbar auto-hide, size, or position changes
+            if (uMsg == WM_SETTINGCHANGE)
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    PositionOnTaskbar();
+                    ReassertTopmost();
+                });
+            }
+
             return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+        }
+
+        private void ReassertTopmost()
+        {
+            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         }
 
         private void ConfigureBarStyle(IntPtr hWnd)
@@ -186,6 +263,15 @@ namespace Task_Flyout
                     TxtDesc.Text = "";
                 }
             });
+        }
+
+        private void WeatherBarWindow_Activated(object sender, WindowActivatedEventArgs args)
+        {
+            if (args.WindowActivationState == WindowActivationState.Deactivated)
+            {
+                // Re-assert topmost without SWP_SHOWWINDOW to avoid activation loop
+                ReassertTopmost();
+            }
         }
 
         private void WeatherButton_Click(object sender, RoutedEventArgs e)
