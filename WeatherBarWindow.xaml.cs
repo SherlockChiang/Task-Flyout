@@ -1,7 +1,9 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.Win32;
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Windows.Graphics;
@@ -34,6 +36,29 @@ namespace Task_Flyout
 
         [DllImport("user32.dll")]
         private static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr FindWindowEx(IntPtr hWndParent, IntPtr hWndChildAfter, string lpszClass, string lpszWindow);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        private delegate bool EnumChildProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool EnumChildWindows(IntPtr hWndParent, EnumChildProc lpEnumFunc, IntPtr lParam);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left, Top, Right, Bottom;
+        }
 
         private delegate IntPtr SUBCLASSPROC(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, IntPtr uIdSubclass, IntPtr dwRefData);
 
@@ -223,12 +248,70 @@ namespace Task_Flyout
 
             _appWindow.Resize(new SizeInt32(pillWidth, pillHeight));
 
-            // Position: left side of taskbar, vertically centered
+            // Position: left side of taskbar, avoiding Win11 Widgets area
             int horizontalMargin = (int)(8 * scaleFactor);
-            int x = workArea.X + horizontalMargin;
+            int widgetsOffset = GetWin11WidgetsOffset(workArea.X, scaleFactor);
+            int x = workArea.X + horizontalMargin + widgetsOffset;
             int y = workArea.Y + workArea.Height + (taskbarPhysicalHeight - pillHeight) / 2;
 
             _appWindow.Move(new PointInt32(x, y));
+        }
+
+        /// <summary>
+        /// Detects the Windows 11 Widgets area on the taskbar and returns the
+        /// horizontal offset (in physical pixels) needed to avoid overlapping it.
+        /// </summary>
+        private static int GetWin11WidgetsOffset(int taskbarLeft, double scaleFactor)
+        {
+            try
+            {
+                // Check if Win11 Widgets feature is enabled via registry
+                using var key = Registry.CurrentUser.OpenSubKey(
+                    @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced");
+                var val = key?.GetValue("TaskbarDa");
+                if (val is int enabled && enabled != 1)
+                    return 0; // Widgets disabled
+
+                // Try to measure the actual Widgets area on the taskbar.
+                // The Win11 taskbar (Shell_TrayWnd) hosts a XAML island via
+                // "Windows.UI.Composition.DesktopWindowContentBridge" child windows.
+                // The leftmost bridge that starts at the taskbar's left edge
+                // is the Widgets area (shows weather/stocks on hover or inline).
+                IntPtr taskbar = FindWindow("Shell_TrayWnd", null!);
+                if (taskbar != IntPtr.Zero)
+                {
+                    int widgetsRight = 0;
+                    IntPtr child = IntPtr.Zero;
+                    while (true)
+                    {
+                        child = FindWindowEx(taskbar, child,
+                            "Windows.UI.Composition.DesktopWindowContentBridge", null!);
+                        if (child == IntPtr.Zero)
+                            break;
+
+                        if (GetWindowRect(child, out RECT rc) && IsWindowVisible(child))
+                        {
+                            // The Widgets area is the bridge anchored to the left edge
+                            // of the taskbar (within a small tolerance).
+                            int childWidth = rc.Right - rc.Left;
+                            if (rc.Left <= taskbarLeft + 10 && childWidth > 0 && childWidth < 500)
+                            {
+                                widgetsRight = Math.Max(widgetsRight, rc.Right - taskbarLeft);
+                            }
+                        }
+                    }
+
+                    if (widgetsRight > 0)
+                        return widgetsRight;
+                }
+
+                // Fallback: Widgets enabled but can't measure — use conservative default
+                return (int)(50 * scaleFactor);
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
         public async Task RefreshWeatherAsync()
