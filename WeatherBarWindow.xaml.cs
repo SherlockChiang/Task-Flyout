@@ -502,21 +502,80 @@ namespace Task_Flyout
             }
 
             var info = await weatherService.GetWeatherAsync(false);
+            var alert = (info != null && weatherService.BarAlertsEnabled)
+                ? weatherService.DetectUpcomingAlert(info)
+                : null;
 
             DispatcherQueue.TryEnqueue(() =>
             {
-                if (info != null)
-                {
-                    WeatherIcon.Text = info.Icon;
-                    WeatherIcon.FontFamily = new FontFamily(info.IconFont);
-                    TxtTemp.Text = info.Temperature;
-                    TxtDesc.Text = info.Description;
-                }
-                else
+                if (info == null)
                 {
                     WeatherIcon.Text = "--";
                     TxtTemp.Text = "--";
                     TxtDesc.Text = "";
+                    return;
+                }
+
+                var enabledFields = weatherService.GetEnabledBarFields();
+
+                // Icon: alert icon overrides normal weather icon
+                if (enabledFields.Contains("icon"))
+                {
+                    WeatherIcon.Visibility = Visibility.Visible;
+                    WeatherIcon.Text = alert != null ? alert.Icon : info.Icon;
+                    WeatherIcon.FontFamily = new FontFamily(info.IconFont);
+                }
+                else
+                {
+                    WeatherIcon.Visibility = Visibility.Collapsed;
+                }
+
+                // Temperature
+                if (enabledFields.Contains("temperature"))
+                {
+                    TxtTemp.Visibility = Visibility.Visible;
+                    TxtTemp.Text = info.Temperature;
+                }
+                else
+                {
+                    TxtTemp.Visibility = Visibility.Collapsed;
+                }
+
+                // Description / alert / feelslike / humidity / wind — all into TxtDesc
+                // Priority: alert > description > first enabled secondary field
+                string desc = "";
+                if (alert != null)
+                {
+                    desc = alert.Message;
+                }
+                else if (enabledFields.Contains("description"))
+                {
+                    desc = info.Description ?? "";
+                }
+                else if (enabledFields.Contains("feelslike"))
+                {
+                    desc = info.FeelsLike ?? "";
+                }
+                else if (enabledFields.Contains("humidity"))
+                {
+                    desc = info.Humidity ?? "";
+                }
+                else if (enabledFields.Contains("wind"))
+                {
+                    desc = info.WindSpeed ?? "";
+                }
+
+                if (!string.IsNullOrEmpty(desc))
+                {
+                    TxtDesc.Visibility = Visibility.Visible;
+                    TxtDesc.Text = desc;
+                    TxtDesc.Foreground = new SolidColorBrush(alert != null
+                        ? Color.FromArgb(255, 255, 170, 80)
+                        : Color.FromArgb(255, 180, 180, 180));
+                }
+                else
+                {
+                    TxtDesc.Visibility = Visibility.Collapsed;
                 }
             });
         }

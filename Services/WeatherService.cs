@@ -11,6 +11,7 @@ namespace Task_Flyout.Services
     public class HourlyWeather
     {
         public int Hour { get; set; }
+        public DateTime RawTime { get; set; }
         public string Time { get; set; }
         public string Temperature { get; set; }
         public string Icon { get; set; }
@@ -31,6 +32,35 @@ namespace Task_Flyout.Services
         public string PollenGrass { get; set; }
         public string PollenBirch { get; set; }
         public string PollenRagweed { get; set; }
+
+        // Raw numeric values used for alert detection
+        public int WeatherCode { get; set; }
+        public double TempValue { get; set; }
+        public double WindSpeedValue { get; set; }
+        public double PrecipProbValue { get; set; }
+        public double PrecipValue { get; set; }
+    }
+
+    public enum WeatherAlertType
+    {
+        HeavyRain,
+        Rain,
+        FreezingRain,
+        HeavySnow,
+        Snow,
+        Thunderstorm,
+        Fog,
+        HighWind,
+        ExtremeHeat,
+        ExtremeCold
+    }
+
+    public class WeatherAlert
+    {
+        public WeatherAlertType Type { get; set; }
+        public int HoursAhead { get; set; }
+        public string Icon { get; set; } = "";
+        public string Message { get; set; } = "";
     }
 
     public class WeatherInfo
@@ -106,7 +136,204 @@ namespace Task_Flyout.Services
             set => ApplicationData.Current.LocalSettings.Values["WeatherFlyoutFields"] = value;
         }
 
+        public string EnabledBarFields
+        {
+            get => ApplicationData.Current.LocalSettings.Values["WeatherBarFields"] as string ?? "icon,temperature,description";
+            set => ApplicationData.Current.LocalSettings.Values["WeatherBarFields"] = value;
+        }
+
+        public bool BarAlertsEnabled
+        {
+            get => ApplicationData.Current.LocalSettings.Values["WeatherBarAlertsEnabled"] as bool? ?? true;
+            set => ApplicationData.Current.LocalSettings.Values["WeatherBarAlertsEnabled"] = value;
+        }
+
+        public int BarAlertHours
+        {
+            get => ApplicationData.Current.LocalSettings.Values["WeatherBarAlertHours"] as int? ?? 3;
+            set => ApplicationData.Current.LocalSettings.Values["WeatherBarAlertHours"] = value;
+        }
+
+        public string EnabledAlertTypes
+        {
+            get => ApplicationData.Current.LocalSettings.Values["WeatherAlertTypes"] as string
+                   ?? "HeavyRain,Rain,FreezingRain,HeavySnow,Snow,Thunderstorm,Fog,HighWind,ExtremeHeat,ExtremeCold";
+            set => ApplicationData.Current.LocalSettings.Values["WeatherAlertTypes"] = value;
+        }
+
         #endregion
+
+        public HashSet<string> GetEnabledBarFields()
+        {
+            return new HashSet<string>(
+                (EnabledBarFields ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        }
+
+        public void SetEnabledBarFields(HashSet<string> fields)
+        {
+            EnabledBarFields = string.Join(",", fields);
+        }
+
+        public HashSet<WeatherAlertType> GetEnabledAlertTypes()
+        {
+            var set = new HashSet<WeatherAlertType>();
+            foreach (var s in (EnabledAlertTypes ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (Enum.TryParse<WeatherAlertType>(s, out var t)) set.Add(t);
+            }
+            return set;
+        }
+
+        public void SetEnabledAlertTypes(HashSet<WeatherAlertType> types)
+        {
+            EnabledAlertTypes = string.Join(",", types);
+        }
+
+        /// <summary>
+        /// Scan upcoming hours for extreme weather, return the most urgent alert (or null).
+        /// </summary>
+        public WeatherAlert DetectUpcomingAlert(WeatherInfo info)
+        {
+            if (info == null || info.HourlyForecast == null || info.HourlyForecast.Count == 0)
+                return null;
+
+            int lookAhead = Math.Max(1, BarAlertHours);
+            var enabled = GetEnabledAlertTypes();
+            if (enabled.Count == 0) return null;
+
+            string lang = GetCurrentLanguage();
+            var now = DateTime.Now;
+            var upcoming = info.HourlyForecast
+                .Where(h => (h.RawTime - now).TotalHours >= 0 && (h.RawTime - now).TotalHours <= lookAhead)
+                .OrderBy(h => h.RawTime)
+                .ToList();
+
+            if (upcoming.Count == 0) return null;
+
+            // Priority order: most severe first
+            var priority = new[]
+            {
+                WeatherAlertType.Thunderstorm,
+                WeatherAlertType.FreezingRain,
+                WeatherAlertType.HeavyRain,
+                WeatherAlertType.HeavySnow,
+                WeatherAlertType.Snow,
+                WeatherAlertType.Rain,
+                WeatherAlertType.HighWind,
+                WeatherAlertType.ExtremeHeat,
+                WeatherAlertType.ExtremeCold,
+                WeatherAlertType.Fog,
+            };
+
+            foreach (var type in priority)
+            {
+                if (!enabled.Contains(type)) continue;
+                var hit = upcoming.FirstOrDefault(h => MatchAlert(h, type));
+                if (hit != null)
+                {
+                    int hoursAhead = Math.Max(0, (int)Math.Round((hit.RawTime - now).TotalHours));
+                    return new WeatherAlert
+                    {
+                        Type = type,
+                        HoursAhead = hoursAhead,
+                        Icon = GetAlertIcon(type),
+                        Message = BuildAlertMessage(type, hoursAhead, lang)
+                    };
+                }
+            }
+            return null;
+        }
+
+        private static bool MatchAlert(HourlyWeather h, WeatherAlertType type)
+        {
+            int code = h.WeatherCode;
+            switch (type)
+            {
+                case WeatherAlertType.Thunderstorm:
+                    return code == 95 || code == 96 || code == 99;
+                case WeatherAlertType.FreezingRain:
+                    return code == 56 || code == 57 || code == 66 || code == 67;
+                case WeatherAlertType.HeavyRain:
+                    return (code == 65 || code == 82) && h.PrecipProbValue >= 50;
+                case WeatherAlertType.Rain:
+                    return (code == 61 || code == 63 || code == 80 || code == 81) && h.PrecipProbValue >= 50;
+                case WeatherAlertType.HeavySnow:
+                    return code == 75 || code == 86;
+                case WeatherAlertType.Snow:
+                    return code == 71 || code == 73 || code == 77 || code == 85;
+                case WeatherAlertType.Fog:
+                    return code == 45 || code == 48;
+                case WeatherAlertType.HighWind:
+                    return h.WindSpeedValue >= 40; // km/h
+                case WeatherAlertType.ExtremeHeat:
+                    return h.TempValue >= 35;
+                case WeatherAlertType.ExtremeCold:
+                    return h.TempValue <= -10;
+            }
+            return false;
+        }
+
+        private static string GetAlertIcon(WeatherAlertType type) => type switch
+        {
+            WeatherAlertType.Thunderstorm => "\u26C8\uFE0F",
+            WeatherAlertType.FreezingRain => "\U0001F327\uFE0F",
+            WeatherAlertType.HeavyRain => "\U0001F327\uFE0F",
+            WeatherAlertType.Rain => "\U0001F326\uFE0F",
+            WeatherAlertType.HeavySnow => "\u2744\uFE0F",
+            WeatherAlertType.Snow => "\U0001F328\uFE0F",
+            WeatherAlertType.Fog => "\U0001F32B\uFE0F",
+            WeatherAlertType.HighWind => "\U0001F4A8",
+            WeatherAlertType.ExtremeHeat => "\U0001F525",
+            WeatherAlertType.ExtremeCold => "\U0001F976",
+            _ => "\u26A0\uFE0F"
+        };
+
+        private static string BuildAlertMessage(WeatherAlertType type, int hoursAhead, string lang)
+        {
+            bool zh = lang == "zh";
+            string when = hoursAhead <= 0
+                ? (zh ? "\u5373\u5c06" : "now")
+                : (zh ? $"{hoursAhead}h\u540e" : $"in {hoursAhead}h");
+            string label = type switch
+            {
+                WeatherAlertType.Thunderstorm => zh ? "\u96f7\u9635\u96e8" : "Thunderstorm",
+                WeatherAlertType.FreezingRain => zh ? "\u51bb\u96e8" : "Freezing rain",
+                WeatherAlertType.HeavyRain => zh ? "\u5927\u96e8" : "Heavy rain",
+                WeatherAlertType.Rain => zh ? "\u964d\u96e8" : "Rain",
+                WeatherAlertType.HeavySnow => zh ? "\u5927\u96ea" : "Heavy snow",
+                WeatherAlertType.Snow => zh ? "\u964d\u96ea" : "Snow",
+                WeatherAlertType.Fog => zh ? "\u8d77\u96fe" : "Fog",
+                WeatherAlertType.HighWind => zh ? "\u5927\u98ce" : "Strong wind",
+                WeatherAlertType.ExtremeHeat => zh ? "\u9ad8\u6e29" : "Extreme heat",
+                WeatherAlertType.ExtremeCold => zh ? "\u4e25\u5bd2" : "Extreme cold",
+                _ => ""
+            };
+            return zh ? $"{when}{label}" : $"{label} {when}";
+        }
+
+        public static readonly (string Key, string ZhLabel, string EnLabel)[] AllBarFields = new[]
+        {
+            ("icon",         "\u56fe\u6807",     "Icon"),
+            ("temperature",  "\u6e29\u5ea6",     "Temperature"),
+            ("description",  "\u63cf\u8ff0",     "Description"),
+            ("feelslike",    "\u4f53\u611f",     "Feels like"),
+            ("humidity",     "\u6e7f\u5ea6",     "Humidity"),
+            ("wind",         "\u98ce\u901f",     "Wind"),
+        };
+
+        public static readonly (WeatherAlertType Type, string ZhLabel, string EnLabel)[] AllAlertTypes = new[]
+        {
+            (WeatherAlertType.Thunderstorm, "\u96f7\u9635\u96e8",   "Thunderstorm"),
+            (WeatherAlertType.FreezingRain, "\u51bb\u96e8",         "Freezing rain"),
+            (WeatherAlertType.HeavyRain,    "\u5927\u96e8",         "Heavy rain"),
+            (WeatherAlertType.Rain,         "\u964d\u96e8",         "Rain"),
+            (WeatherAlertType.HeavySnow,    "\u5927\u96ea",         "Heavy snow"),
+            (WeatherAlertType.Snow,         "\u964d\u96ea",         "Snow"),
+            (WeatherAlertType.Fog,          "\u8d77\u96fe",         "Fog"),
+            (WeatherAlertType.HighWind,     "\u5927\u98ce",         "Strong wind"),
+            (WeatherAlertType.ExtremeHeat,  "\u9ad8\u6e29",         "Extreme heat"),
+            (WeatherAlertType.ExtremeCold,  "\u4e25\u5bd2",         "Extreme cold"),
+        };
 
         public HashSet<string> GetEnabledFields()
         {
@@ -330,6 +557,12 @@ namespace Task_Flyout.Services
                 var hw = new HourlyWeather
                 {
                     Hour = dt.Hour,
+                    RawTime = dt,
+                    WeatherCode = code,
+                    TempValue = tempVal,
+                    WindSpeedValue = wsVal,
+                    PrecipProbValue = ppVal,
+                    PrecipValue = pVal,
                     Time = dt.ToString("HH:mm"),
                     Temperature = $"{tempVal:F0}°C",
                     Icon = OpenMeteoCodeToIcon(code, IconFontFamily),
@@ -619,9 +852,18 @@ namespace Task_Flyout.Services
                     if (source.code == null) continue;
 
                     int displayHour = targetHour % 24;
+                    int.TryParse(source.code, out int rawCode);
+                    double.TryParse(source.tempC, out double rawTemp);
+                    double.TryParse(source.ws, out double rawWs);
+                    double.TryParse(source.pp, out double rawPp);
                     info.HourlyForecast.Add(new HourlyWeather
                     {
                         Hour = displayHour,
+                        RawTime = DateTime.Today.AddHours(targetHour),
+                        WeatherCode = rawCode,
+                        TempValue = rawTemp,
+                        WindSpeedValue = rawWs,
+                        PrecipProbValue = rawPp,
                         Time = $"{displayHour:D2}:00",
                         Temperature = $"{source.tempC}\u00B0C",
                         Icon = WttrCodeToIcon(source.code, IconFontFamily),

@@ -161,6 +161,33 @@
                     </ItemsRepeater.Layout>
                 </ItemsRepeater>
             </StackPanel>
+
+            <!-- Taskbar Weather Bar Fields Card -->
+            <StackPanel Spacing="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="24" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                <TextBlock x:Name="BarFieldsHeader" FontWeight="SemiBold" FontSize="16"/>
+                <TextBlock x:Name="BarFieldsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                <ItemsRepeater x:Name="BarFieldToggleRepeater">
+                    <ItemsRepeater.Layout>
+                        <UniformGridLayout MinItemWidth="180" MinColumnSpacing="12" MinRowSpacing="4"/>
+                    </ItemsRepeater.Layout>
+                </ItemsRepeater>
+            </StackPanel>
+
+            <!-- Taskbar Weather Bar Alerts Card -->
+            <StackPanel Spacing="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="24" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                <TextBlock x:Name="AlertsHeader" FontWeight="SemiBold" FontSize="16"/>
+                <TextBlock x:Name="AlertsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                <ToggleSwitch x:Name="AlertsToggle" Toggled="AlertsToggle_Toggled"/>
+                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <TextBlock x:Name="AlertHoursLabel" VerticalAlignment="Center" FontSize="13"/>
+                    <NumberBox x:Name="AlertHoursBox" Minimum="1" Maximum="24" SpinButtonPlacementMode="Inline" Width="120" ValueChanged="AlertHoursBox_ValueChanged"/>
+                </StackPanel>
+                <ItemsRepeater x:Name="AlertTypeRepeater">
+                    <ItemsRepeater.Layout>
+                        <UniformGridLayout MinItemWidth="180" MinColumnSpacing="12" MinRowSpacing="4"/>
+                    </ItemsRepeater.Layout>
+                </ItemsRepeater>
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </Page>

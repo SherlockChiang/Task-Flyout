@@ -89,6 +89,24 @@ namespace Task_Flyout.Views
 
             BuildFieldToggles();
 
+            // Weather bar fields
+            BarFieldsHeader.Text = lang == "en" ? "Taskbar Bar Content" : "\u4efb\u52a1\u680f\u5929\u6c14\u6761\u5185\u5bb9";
+            BarFieldsDesc.Text = lang == "en"
+                ? "Pick which fields appear in the taskbar weather bar"
+                : "\u9009\u62e9\u4efb\u52a1\u680f\u5929\u6c14\u6761\u4e0a\u663e\u793a\u7684\u5b57\u6bb5";
+            BuildBarFieldToggles();
+
+            // Alerts
+            AlertsHeader.Text = lang == "en" ? "Extreme Weather Alerts" : "\u6781\u7aef\u5929\u6c14\u9884\u8b66";
+            AlertsDesc.Text = lang == "en"
+                ? "Show alerts on the weather bar when extreme conditions are forecast"
+                : "\u68c0\u6d4b\u5230\u6781\u7aef\u5929\u6c14\u65f6\u5728\u5929\u6c14\u6761\u4e0a\u663e\u793a\u9884\u8b66";
+            AlertsToggle.Header = lang == "en" ? "Enable alerts" : "\u542f\u7528\u9884\u8b66";
+            AlertsToggle.IsOn = _weatherService.BarAlertsEnabled;
+            AlertHoursLabel.Text = lang == "en" ? "Look ahead (hours):" : "\u9884\u8b66\u63d0\u524d\u91cf\uff08\u5c0f\u65f6\uff09\uff1a";
+            AlertHoursBox.Value = _weatherService.BarAlertHours;
+            BuildAlertTypeToggles();
+
             _isInitializing = false;
 
             if (_weatherService.IsEnabled && !string.IsNullOrEmpty(_weatherService.City))
@@ -206,6 +224,117 @@ namespace Task_Flyout.Views
                 _weatherService.SetEnabledFields(fields);
 
                 _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: false);
+                App.RefreshWeatherBar();
+            }
+        }
+
+        private void BuildBarFieldToggles()
+        {
+            var enabled = _weatherService.GetEnabledBarFields();
+            string lang = GetCurrentLang();
+            var items = new List<StackPanel>();
+
+            foreach (var field in WeatherService.AllBarFields)
+            {
+                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                var toggle = new ToggleSwitch
+                {
+                    IsOn = enabled.Contains(field.Key),
+                    OnContent = "",
+                    OffContent = "",
+                    MinWidth = 0,
+                    Tag = field.Key
+                };
+                toggle.Toggled += BarFieldToggle_Toggled;
+
+                var label = new TextBlock
+                {
+                    Text = lang == "en" ? field.EnLabel : field.ZhLabel,
+                    FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                panel.Children.Add(label);
+                panel.Children.Add(toggle);
+                items.Add(panel);
+            }
+
+            BarFieldToggleRepeater.ItemsSource = items;
+        }
+
+        private void BarFieldToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing || _weatherService == null) return;
+            if (sender is ToggleSwitch ts && ts.Tag is string key)
+            {
+                var fields = _weatherService.GetEnabledBarFields();
+                if (ts.IsOn) fields.Add(key);
+                else fields.Remove(key);
+                _weatherService.SetEnabledBarFields(fields);
+                App.RefreshWeatherBar();
+            }
+        }
+
+        private void BuildAlertTypeToggles()
+        {
+            var enabled = _weatherService.GetEnabledAlertTypes();
+            string lang = GetCurrentLang();
+            var items = new List<StackPanel>();
+
+            foreach (var entry in WeatherService.AllAlertTypes)
+            {
+                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                var toggle = new ToggleSwitch
+                {
+                    IsOn = enabled.Contains(entry.Type),
+                    OnContent = "",
+                    OffContent = "",
+                    MinWidth = 0,
+                    Tag = entry.Type
+                };
+                toggle.Toggled += AlertTypeToggle_Toggled;
+
+                var label = new TextBlock
+                {
+                    Text = lang == "en" ? entry.EnLabel : entry.ZhLabel,
+                    FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                panel.Children.Add(label);
+                panel.Children.Add(toggle);
+                items.Add(panel);
+            }
+
+            AlertTypeRepeater.ItemsSource = items;
+        }
+
+        private void AlertTypeToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing || _weatherService == null) return;
+            if (sender is ToggleSwitch ts && ts.Tag is WeatherAlertType type)
+            {
+                var types = _weatherService.GetEnabledAlertTypes();
+                if (ts.IsOn) types.Add(type);
+                else types.Remove(type);
+                _weatherService.SetEnabledAlertTypes(types);
+                App.RefreshWeatherBar();
+            }
+        }
+
+        private void AlertsToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing || _weatherService == null) return;
+            _weatherService.BarAlertsEnabled = AlertsToggle.IsOn;
+            App.RefreshWeatherBar();
+        }
+
+        private void AlertHoursBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+        {
+            if (_isInitializing || _weatherService == null) return;
+            if (!double.IsNaN(args.NewValue))
+            {
+                _weatherService.BarAlertHours = (int)args.NewValue;
                 App.RefreshWeatherBar();
             }
         }
