@@ -24,6 +24,7 @@ namespace Task_Flyout
         private bool _initialActivationDone;
         private IntPtr _taskbarHwnd = IntPtr.Zero;
         private bool _isParented;
+        private bool _userHidden;
 
         #region P/Invoke
 
@@ -169,6 +170,8 @@ namespace Task_Flyout
 
         private void ReparentTimer_Tick(object sender, object e)
         {
+            if (_userHidden) return;
+
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             IntPtr currentTaskbar = FindWindow("Shell_TrayWnd", null);
 
@@ -525,6 +528,7 @@ namespace Task_Flyout
 
         public void ShowBar()
         {
+            _userHidden = false;
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
 
             if (!_initialActivationDone)
@@ -542,6 +546,7 @@ namespace Task_Flyout
 
         public void HideBar()
         {
+            _userHidden = true;
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             ShowWindow(hWnd, 0);
         }
