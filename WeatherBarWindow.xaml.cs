@@ -3,16 +3,16 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
-using Windows.Graphics;
 using Windows.UI;
+
 
 namespace Task_Flyout
 {
@@ -72,16 +72,16 @@ namespace Task_Flyout
         private static extern bool EnumWindows(EnumWindowProc lpEnumFunc, IntPtr lParam);
 
         [DllImport("user32.dll")]
-        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+        private static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowProc lpEnumFunc, IntPtr lParam);
 
         [DllImport("user32.dll")]
-        private static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
+        private static extern int GetWindowRgnBox(IntPtr hWnd, out RECT lprc);
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT { public int Left, Top, Right, Bottom; }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct POINT { public int X, Y; }
 
         private delegate IntPtr SUBCLASSPROC(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, IntPtr uIdSubclass, IntPtr dwRefData);
 
@@ -98,10 +98,8 @@ namespace Task_Flyout
         private const int WS_THICKFRAME = 0x00040000;
         private const int WS_CAPTION = 0x00C00000;
         private const int WS_CLIPSIBLINGS = 0x04000000;
-        private const int WS_VISIBLE = 0x10000000;
         private const int WS_EX_TOOLWINDOW = 0x00000080;
         private const int WS_EX_NOACTIVATE = 0x08000000;
-        private const int WS_EX_LAYERED = 0x00080000;
         private const uint SWP_NOMOVE = 0x0002;
         private const uint SWP_NOSIZE = 0x0001;
         private const uint SWP_NOACTIVATE = 0x0010;
@@ -118,6 +116,34 @@ namespace Task_Flyout
 
         #endregion
 
+        // 已知第三方 widget 进程名（小写，不含 .exe）
+        private static readonly HashSet<string> KnownWidgetProcesses = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "fluentflyout",
+            "fluentflyoutwpf",
+            "translucenttb",
+            "taskbarx",
+            "roundedtb",
+        };
+
+        // Shell_TrayWnd 内部系统子窗口类名（不是 widget，需要跳过）
+        private static readonly HashSet<string> SystemTaskbarClasses = new(StringComparer.Ordinal)
+        {
+            "TrayNotifyWnd",
+            "ReBarWindow32",
+            "MSTaskSwWClass",
+            "MSTaskListWClass",
+            "Start",
+            "TrayButton",
+            "TrayDummySearchControl",
+            "TrayShowDesktopButtonWClass",
+            "TrayInputIndicatorWClass",
+            "TrayClockWClass",
+            "SysPager",
+            "ToolbarWindow32",
+            "WorkerW",
+        };
+
         public WeatherBarWindow()
         {
             InitializeComponent();
@@ -128,14 +154,12 @@ namespace Task_Flyout
 
             ConfigureBarStyle(hWnd);
             InstallSubclass(hWnd);
-
             ApplyWindowsTheme();
 
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
             _refreshTimer.Tick += async (s, e) => await RefreshWeatherAsync();
             _refreshTimer.Start();
 
-            // 定期检查父窗口状态 + 重新定位（应对任务栏重启、widget 启停）
             _reparentTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             _reparentTimer.Tick += ReparentTimer_Tick;
             _reparentTimer.Start();
@@ -148,7 +172,6 @@ namespace Task_Flyout
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             IntPtr currentTaskbar = FindWindow("Shell_TrayWnd", null);
 
-            // 任务栏句柄变了（explorer 重启），需要重新挂载
             if (currentTaskbar != _taskbarHwnd || GetParent(hWnd) != currentTaskbar)
             {
                 _taskbarHwnd = currentTaskbar;
@@ -169,7 +192,6 @@ namespace Task_Flyout
                 _taskbarHwnd = FindWindow("Shell_TrayWnd", null);
             if (_taskbarHwnd == IntPtr.Zero) return;
 
-            // 改为子窗口样式
             int style = GetWindowLong(hWnd, GWL_STYLE);
             style &= ~WS_POPUP;
             style |= WS_CHILD | WS_CLIPSIBLINGS;
@@ -203,7 +225,7 @@ namespace Task_Flyout
             if (_appWindow.Presenter is OverlappedPresenter presenter)
             {
                 presenter.IsResizable = false;
-                presenter.IsAlwaysOnTop = false; // 作为子窗口不需要 topmost
+                presenter.IsAlwaysOnTop = false;
                 presenter.SetBorderAndTitleBar(false, false);
                 presenter.IsMinimizable = false;
                 presenter.IsMaximizable = false;
@@ -226,40 +248,48 @@ namespace Task_Flyout
         {
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
 
-            if (_taskbarHwnd == IntPtr.Zero || !_isParented)
-                return;
-
-            if (!GetWindowRect(_taskbarHwnd, out RECT tbRect))
-                return;
-            if (!GetClientRect(_taskbarHwnd, out RECT tbClient))
-                return;
+            if (_taskbarHwnd == IntPtr.Zero || !_isParented) return;
+            if (!GetWindowRect(_taskbarHwnd, out RECT tbRect)) return;
+            if (!GetClientRect(_taskbarHwnd, out RECT tbClient)) return;
 
             double scaleFactor = GetDpiForWindow(_taskbarHwnd) / 96.0;
-
             int taskbarHeight = tbClient.Bottom - tbClient.Top;
 
-            // 胶囊尺寸
             int verticalInset = (int)(4 * scaleFactor);
             int pillHeight = taskbarHeight - verticalInset * 2;
             if (pillHeight < (int)(28 * scaleFactor))
                 pillHeight = (int)(28 * scaleFactor);
             int pillWidth = (int)(180 * scaleFactor);
 
-            // 计算避让偏移（Win11 Widgets + 第三方 widget）
             int widgetsOffset = GetTaskbarWidgetsOffset(hWnd, tbRect);
 
-            // 子窗口坐标 = 相对 Shell_TrayWnd 客户区
-            int horizontalMargin = (int)(8 * scaleFactor);
-            int x = horizontalMargin + widgetsOffset;
+            int gap = (int)(6 * scaleFactor);
+            int x = widgetsOffset + (widgetsOffset > 0 ? gap : 0);
             int y = (taskbarHeight - pillHeight) / 2;
 
             SetWindowPos(hWnd, IntPtr.Zero, x, y, pillWidth, pillHeight,
                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
         }
 
+        [DllImport("gdi32.dll")]
+        private static extern int GetRgnBox(IntPtr hrgn, out RECT lprc);
+
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr CreateRectRgn(int x1, int y1, int x2, int y2);
+
+        [DllImport("gdi32.dll")]
+        private static extern bool DeleteObject(IntPtr hObject);
+
+        [DllImport("user32.dll")]
+        private static extern int GetWindowRgn(IntPtr hWnd, IntPtr hRgn);
+
+        // 把这两个常量也加到 P/Invoke 区域
+        private const int SIMPLEREGION = 2;
+        private const int COMPLEXREGION = 3;
+
         /// <summary>
-        /// 检测任务栏左侧已存在的 widget（Win11 Widgets、FluentFlyout 等），
-        /// 返回需要避让的横向偏移（相对 Shell_TrayWnd 客户区，物理像素）。
+        /// 检测任务栏上的 widget。FluentFlyout TaskbarWidget 是横跨屏幕的透明顶层窗口，
+        /// 实际可见区域通过 window region 裁剪 —— 必须用 GetWindowRgn 才能拿到真实矩形。
         /// </summary>
         private int GetTaskbarWidgetsOffset(IntPtr ownHwnd, RECT taskbarScreenRect)
         {
@@ -273,93 +303,158 @@ namespace Task_Flyout
 
                 GetWindowThreadProcessId(ownHwnd, out uint ownPid);
 
-                int maxRightScreen = 0;
+                int maxRightScreen = taskbarLeft;
 
-                // 1. Win11 Widgets（作为 Shell_TrayWnd 的子窗口）
-                bool widgetsEnabled = false;
-                try
+                // 枚举 Shell_TrayWnd 的直接子窗口（FluentFlyout TaskbarWindow 通过 SetParent 挂载在这里，
+                // Win11 原生 Widgets 也是 DesktopWindowContentBridge 子窗口）
+                if (_taskbarHwnd != IntPtr.Zero)
                 {
-                    using var key = Registry.CurrentUser.OpenSubKey(
-                        @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced");
-                    var val = key?.GetValue("TaskbarDa");
-                    widgetsEnabled = val is int v && v == 1;
-                }
-                catch { }
-
-                if (widgetsEnabled && _taskbarHwnd != IntPtr.Zero)
-                {
-                    IntPtr bridge = IntPtr.Zero;
+                    IntPtr child = IntPtr.Zero;
                     while (true)
                     {
-                        bridge = FindWindowEx(_taskbarHwnd, bridge,
-                            "Windows.UI.Composition.DesktopWindowContentBridge", null);
-                        if (bridge == IntPtr.Zero) break;
-                        if (bridge == ownHwnd) continue;
+                        child = FindWindowEx(_taskbarHwnd, child, null, null);
+                        if (child == IntPtr.Zero) break;
+                        if (child == ownHwnd) continue;
+                        if (!IsWindowVisible(child)) continue;
 
-                        if (GetWindowRect(bridge, out RECT rc) && IsWindowVisible(bridge))
+                        GetWindowThreadProcessId(child, out uint pid);
+                        if (pid == ownPid) continue;
+
+                        var clsBuf = new StringBuilder(256);
+                        GetClassName(child, clsBuf, clsBuf.Capacity);
+                        string cls = clsBuf.ToString();
+
+                        if (SystemTaskbarClasses.Contains(cls)) continue;
+
+                        bool isBridge = cls == "Windows.UI.Composition.DesktopWindowContentBridge";
+                        bool isFluentFlyout = cls.StartsWith("HwndWrapper[FluentFlyout", StringComparison.Ordinal);
+
+                        if (!isBridge && !isFluentFlyout) continue;
+
+                        if (!GetWindowRect(child, out RECT rc)) continue;
+
+                        // FluentFlyout TaskbarWindow 覆盖整个任务栏宽度，必须用 window region
+                        // 拿到真实的 widget 可见区域
+                        RECT visibleRc = rc;
+                        if (TryGetWindowVisibleRect(child, rc, out RECT rgnRc))
                         {
-                            int w = rc.Right - rc.Left;
-                            if (rc.Left <= taskbarLeft + 10 && w > 0 && w < 500)
-                                maxRightScreen = Math.Max(maxRightScreen, rc.Right);
+                            visibleRc = rgnRc;
                         }
+
+                        int vw = visibleRc.Right - visibleRc.Left;
+                        if (vw <= 0 || vw > 600) continue;
+                        if (visibleRc.Right > taskbarMidX) continue;
+
+                        Debug.WriteLine($"[WeatherBar] Widget detected: cls={cls} " +
+                                        $"fullRc={rc.Left},{rc.Top},{rc.Right},{rc.Bottom} " +
+                                        $"visibleRc={visibleRc.Left},{visibleRc.Top},{visibleRc.Right},{visibleRc.Bottom}");
+
+                        int right = visibleRc.Right;
+                        if (right > maxRightScreen) maxRightScreen = right;
                     }
                 }
-
-                // 2. 第三方 widget（独立顶层窗口，如 FluentFlyout）
-                EnumWindows((hWnd, lParam) =>
-                {
-                    if (hWnd == ownHwnd || hWnd == _taskbarHwnd) return true;
-                    if (!IsWindowVisible(hWnd)) return true;
-
-                    GetWindowThreadProcessId(hWnd, out uint pid);
-                    if (pid == ownPid) return true;
-
-                    if (!GetWindowRect(hWnd, out RECT rc)) return true;
-
-                    int w = rc.Right - rc.Left;
-                    int h = rc.Bottom - rc.Top;
-                    if (w <= 0 || h <= 0) return true;
-
-                    // 窗口必须在任务栏附近：任务栏内部 或 紧贴任务栏上方 200px 内
-                    bool inTaskbarBand = rc.Bottom > taskbarTop - 200 && rc.Top < taskbarBottom + 10;
-                    if (!inTaskbarBand) return true;
-
-                    // 只关心左半边
-                    if (rc.Left >= taskbarMidX) return true;
-
-                    // 必须是 widget 尺寸
-                    if (w > 500 || h > taskbarHeight * 3) return true;
-
-                    // 进一步过滤：已知 widget 的进程名
-                    bool isKnownWidget = false;
-                    try
-                    {
-                        var proc = Process.GetProcessById((int)pid);
-                        var name = proc.ProcessName.ToLowerInvariant();
-                        if (name.Contains("fluentflyout") ||
-                            name.Contains("translucenttb") ||
-                            name.Contains("taskbarx") ||
-                            name.Contains("widget"))
-                        {
-                            isKnownWidget = true;
-                        }
-                    }
-                    catch { }
-
-                    // 或者：尺寸非常像 widget（宽 < 400，高接近任务栏）
-                    bool looksLikeWidget = w < 400 && h < taskbarHeight * 2;
-
-                    if (isKnownWidget || looksLikeWidget)
-                        maxRightScreen = Math.Max(maxRightScreen, rc.Right);
-
-                    return true;
-                }, IntPtr.Zero);
 
                 return maxRightScreen > taskbarLeft ? maxRightScreen - taskbarLeft : 0;
             }
             catch
             {
                 return 0;
+            }
+        }
+
+        /// <summary>
+        /// 获取窗口 region 的边界矩形（屏幕坐标）。
+        /// region 坐标是相对窗口左上角的，需要加上 GetWindowRect 的 offset。
+        /// </summary>
+        private static bool TryGetWindowVisibleRect(IntPtr hWnd, RECT windowRect, out RECT visibleRect)
+        {
+            visibleRect = windowRect;
+            IntPtr hrgn = CreateRectRgn(0, 0, 0, 0);
+            try
+            {
+                int result = GetWindowRgn(hWnd, hrgn);
+                if (result == 0) return false; // 没有 region，窗口是矩形（即 windowRect）
+
+                if (GetRgnBox(hrgn, out RECT rgnBox) == 0) return false;
+
+                // region 坐标是客户区/窗口相对坐标，转换为屏幕坐标
+                visibleRect = new RECT
+                {
+                    Left = windowRect.Left + rgnBox.Left,
+                    Top = windowRect.Top + rgnBox.Top,
+                    Right = windowRect.Left + rgnBox.Right,
+                    Bottom = windowRect.Top + rgnBox.Bottom
+                };
+                return true;
+            }
+            finally
+            {
+                DeleteObject(hrgn);
+            }
+        }
+
+        private void TryAccumulateWidgetRight(
+            IntPtr hWnd, IntPtr ownHwnd, uint ownPid,
+            int taskbarLeft, int taskbarTop, int taskbarBottom, int taskbarMidX, int taskbarHeight,
+            ref int maxRightScreen)
+        {
+            if (hWnd == ownHwnd) return;
+            if (!IsWindowVisible(hWnd)) return;
+
+            GetWindowThreadProcessId(hWnd, out uint pid);
+            if (pid == ownPid) return;
+
+            var clsBuf = new StringBuilder(256);
+            GetClassName(hWnd, clsBuf, clsBuf.Capacity);
+            string cls = clsBuf.ToString();
+
+            // 跳过 Shell 自身的系统子窗口
+            if (SystemTaskbarClasses.Contains(cls)) return;
+
+            if (!GetWindowRect(hWnd, out RECT rc)) return;
+            int w = rc.Right - rc.Left;
+            int h = rc.Bottom - rc.Top;
+            if (w <= 0 || h <= 0) return;
+
+            // 尺寸护栏：widget 通常 < 600px 宽，高度不超过任务栏 2 倍（动画/阴影时会超出）
+            if (w > 600) return;
+            if (h > taskbarHeight * 2 + 20) return;
+
+            // 必须与任务栏垂直相交
+            if (rc.Bottom <= taskbarTop || rc.Top >= taskbarBottom) return;
+
+            // 必须与任务栏左半边有横向重叠（不要求整体落在左半边 —— FluentFlyout 居中时会横跨中线）
+            if (rc.Left >= taskbarMidX) return;
+
+            // 判断是否是 widget：
+            //   1) 类名是 WinUI bridge (Win11 Widgets)
+            //   2) 类名是 WPF HwndWrapper（FluentFlyout 等）
+            //   3) 进程名在已知列表
+            bool isBridge = cls == "Windows.UI.Composition.DesktopWindowContentBridge";
+            bool isWpf = cls.StartsWith("HwndWrapper[", StringComparison.Ordinal);
+            bool isKnownProc = TryGetProcessName(pid, out string procName) &&
+                               KnownWidgetProcesses.Contains(procName);
+
+            if (!(isBridge || isWpf || isKnownProc)) return;
+
+            // 避让终点不能超过任务栏中线，避免被横跨中线的 widget 推到屏幕中央
+            int effectiveRight = Math.Min(rc.Right, taskbarMidX);
+            if (effectiveRight > maxRightScreen)
+                maxRightScreen = effectiveRight;
+        }
+
+        private static bool TryGetProcessName(uint pid, out string name)
+        {
+            name = string.Empty;
+            try
+            {
+                using var p = Process.GetProcessById((int)pid);
+                name = p.ProcessName;
+                return !string.IsNullOrEmpty(name);
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -372,22 +467,16 @@ namespace Task_Flyout
                 var val = key?.GetValue("SystemUsesLightTheme");
                 bool lightTheme = val is int v && v == 1;
 
-                if (lightTheme)
-                {
-                    TopBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0));
-                }
-                else
-                {
-                    TopBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255));
-                }
+                TopBorder.BorderBrush = lightTheme
+                    ? new SolidColorBrush(Color.FromArgb(40, 0, 0, 0))
+                    : new SolidColorBrush(Color.FromArgb(60, 255, 255, 255));
             }
             catch { }
         }
 
         private void MainBorder_PointerEntered(object sender, PointerRoutedEventArgs e)
         {
-            var targetColor = Color.FromArgb(30, 255, 255, 255);
-            MainBorder.Background = new SolidColorBrush(targetColor);
+            MainBorder.Background = new SolidColorBrush(Color.FromArgb(30, 255, 255, 255));
         }
 
         private void MainBorder_PointerExited(object sender, PointerRoutedEventArgs e)
@@ -444,7 +533,6 @@ namespace Task_Flyout
                 _initialActivationDone = true;
             }
 
-            // 首次显示时挂载到任务栏
             if (!_isParented)
                 AttachToTaskbar();
 
@@ -455,7 +543,7 @@ namespace Task_Flyout
         public void HideBar()
         {
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            ShowWindow(hWnd, 0); // SW_HIDE
+            ShowWindow(hWnd, 0);
         }
     }
 }
