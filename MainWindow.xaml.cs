@@ -227,6 +227,32 @@ namespace Task_Flyout
             {
                 page.ReloadFilters();
             }
+
+            UpdateSidebarColorDots(AccountListRepeater);
+        }
+
+        private void UpdateSidebarColorDots(DependencyObject root)
+        {
+            if (root == null) return;
+            int count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < count; i++)
+            {
+                var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(root, i);
+                if (child is Border border && border.Tag != null)
+                {
+                    string hex = null;
+                    if (border.Tag is SubscribedCalendarInfo calInfo) hex = calInfo.ColorHex;
+                    else if (border.Tag is ConnectedAccountInfo accInfo) hex = accInfo.TaskColorHex;
+
+                    if (hex != null)
+                    {
+                        border.Background = !string.IsNullOrEmpty(hex)
+                            ? new SolidColorBrush(Services.ColorHelper.ParseHex(hex))
+                            : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 150, 150, 150));
+                    }
+                }
+                UpdateSidebarColorDots(child);
+            }
         }
 
         private void CalendarColorDot_Loaded(object sender, RoutedEventArgs e)
