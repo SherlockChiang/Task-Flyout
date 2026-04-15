@@ -166,8 +166,16 @@ namespace Task_Flyout
             _reparentTimer.Tick += ReparentTimer_Tick;
             _reparentTimer.Start();
 
-            RootGrid.Loaded += async (s, e) => await RefreshWeatherAsync();
+            RootGrid.Loaded += async (s, e) =>
+            {
+                _contentPanel = RootGrid.FindName("ContentPanel") as FrameworkElement;
+                if (_contentPanel != null)
+                    _contentPanel.SizeChanged += (s2, e2) => RecomputeBarWidth();
+                await RefreshWeatherAsync();
+            };
         }
+
+        private FrameworkElement? _contentPanel;
 
         private void ReparentTimer_Tick(object sender, object e)
         {
@@ -571,15 +579,25 @@ namespace Task_Flyout
         {
             try
             {
-                ContentPanel.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
-                double contentLogical = ContentPanel.DesiredSize.Width;
+                var panel = _contentPanel;
+                if (panel == null) return;
 
-                // ScaleTransform on MainGrid shrinks visuals to 0.9; account for it + button padding
-                const double horizontalPadding = 24; // button Padding="8,0" ×2 + slack
-                double logical = contentLogical * 0.9 + horizontalPadding;
+                // Prefer ActualWidth (post-layout) over Measure+DesiredSize so we reflect the
+                // real laid-out size including all item spacing.
+                double contentLogical = panel.ActualWidth;
+                if (contentLogical <= 0)
+                {
+                    panel.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+                    contentLogical = panel.DesiredSize.Width;
+                }
+                if (contentLogical <= 0) return;
+
+                // MainGrid has ScaleTransform 0.9 (render transform — visual only).
+                // Rendered content occupies `contentLogical * 0.9` DIPs. Add slack for the
+                // button chrome/padding and the pill's rounded inset so nothing gets clipped.
+                double logical = contentLogical * 0.9 + 48;
 
                 if (logical < 80) logical = 80;
-                if (logical > 480) logical = 480;
 
                 if (Math.Abs(logical - _preferredLogicalWidth) > 1)
                 {
