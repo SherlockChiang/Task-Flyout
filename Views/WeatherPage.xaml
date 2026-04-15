@@ -135,34 +135,22 @@
 
                 <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4"/>
 
-                <!-- Icon Font -->
+                <!-- Weather Icon (emoji / custom font / imported icon pack) -->
                 <StackPanel Spacing="8">
-                    <ComboBox x:Uid="WeatherPage_IconFontHeader" x:Name="IconFontComboBox" Width="300" HorizontalAlignment="Left" SelectionChanged="IconFontComboBox_SelectionChanged">
-                        <ComboBoxItem x:Uid="WeatherPage_FontEmoji" Tag="Segoe UI Emoji"/>
-                        <ComboBoxItem x:Uid="WeatherPage_FontSymbol" Tag="Segoe Fluent Icons, Segoe MDL2 Assets"/>
-                        <ComboBoxItem x:Uid="WeatherPage_FontCustom" Tag="__custom__"/>
-                    </ComboBox>
+                    <ComboBox x:Uid="WeatherPage_IconFontHeader" x:Name="IconFontComboBox" Width="300" HorizontalAlignment="Left" SelectionChanged="IconFontComboBox_SelectionChanged"/>
 
                     <AutoSuggestBox x:Uid="WeatherPage_CustomFontBox" x:Name="CustomFontBox"
                                     Width="300" HorizontalAlignment="Left" Visibility="Collapsed"
                                     TextChanged="CustomFontBox_TextChanged"
                                     QuerySubmitted="CustomFontBox_QuerySubmitted"
                                     SuggestionChosen="CustomFontBox_SuggestionChosen"/>
-                </StackPanel>
 
-                <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4"/>
-
-                <!-- Icon Pack -->
-                <StackPanel Spacing="8">
-                    <TextBlock x:Uid="WeatherPage_IconPackHeader" FontWeight="SemiBold"/>
-                    <TextBlock x:Uid="WeatherPage_IconPackDesc" FontSize="12"
-                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                    <ComboBox x:Name="IconPackComboBox" Width="300" HorizontalAlignment="Left"
-                              SelectionChanged="IconPackComboBox_SelectionChanged"/>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button x:Uid="WeatherPage_BtnImportIconPack" x:Name="BtnImportIconPack" Click="BtnImportIconPack_Click"/>
                         <Button x:Uid="WeatherPage_BtnDeleteIconPack" x:Name="BtnDeleteIconPack" Click="BtnDeleteIconPack_Click"/>
                     </StackPanel>
+                    <TextBlock x:Uid="WeatherPage_IconPackDesc" FontSize="12"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                     <TextBlock x:Name="IconPackStatusText" FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                 </StackPanel>

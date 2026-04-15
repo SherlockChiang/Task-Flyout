@@ -2,6 +2,7 @@
 bin/
 obj/
 AppPackages/
+pixel-icon-provider/
 credentials.json
 Secrets.cs
 *.user

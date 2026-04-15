@@ -65,25 +65,7 @@ namespace Task_Flyout.Views
             else SourceComboBox.SelectedIndex = 0;
             UpdateSourceHint();
 
-            // Icon Font ComboBox
-            string fontStr = _weatherService.IconFontFamily;
-            var item = IconFontComboBox.Items.OfType<ComboBoxItem>()
-                .FirstOrDefault(i => i.Tag.ToString() == fontStr);
-
-            if (item != null)
-            {
-                IconFontComboBox.SelectedItem = item;
-            }
-            else
-            {
-                var customItem = IconFontComboBox.Items.OfType<ComboBoxItem>()
-                    .FirstOrDefault(i => i.Tag.ToString() == "__custom__");
-                if (customItem != null) IconFontComboBox.SelectedItem = customItem;
-                CustomFontBox.Text = fontStr;
-                CustomFontBox.Visibility = Visibility.Visible;
-            }
-
-            RefreshIconPackComboBox();
+            RefreshIconSourceComboBox();
 
             // Flyout Fields header
             FlyoutFieldsHeader.Text = GetSafeString("WeatherPage_FlyoutFields", "\u6D6E\u7A97\u663E\u793A\u5B57\u6BB5");
@@ -382,24 +364,36 @@ namespace Task_Flyout.Views
         private async void IconFontComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_isInitializing || _weatherService == null) return;
-            if (IconFontComboBox.SelectedItem is ComboBoxItem item && item.Tag != null)
+            if (IconFontComboBox.SelectedItem is not ComboBoxItem item || item.Tag is not string tag) return;
+
+            if (tag.StartsWith("pack:", StringComparison.Ordinal))
             {
-                string tag = item.Tag.ToString();
-                if (tag == "__custom__")
+                // Imported third-party icon pack
+                CustomFontBox.Visibility = Visibility.Collapsed;
+                IconPackService.Instance.ActivePackId = tag.Substring("pack:".Length);
+                BtnDeleteIconPack.IsEnabled = true;
+                await LoadWeatherDataAsync(forceRefresh: true);
+                return;
+            }
+
+            // Font-based source — ensure pack path is disabled
+            IconPackService.Instance.ActivePackId = IconPackService.BuiltInEmojiId;
+            BtnDeleteIconPack.IsEnabled = false;
+
+            if (tag == "__custom__")
+            {
+                CustomFontBox.Visibility = Visibility.Visible;
+                if (!string.IsNullOrWhiteSpace(CustomFontBox.Text))
                 {
-                    CustomFontBox.Visibility = Visibility.Visible;
-                    if (!string.IsNullOrWhiteSpace(CustomFontBox.Text))
-                    {
-                        _weatherService.IconFontFamily = CustomFontBox.Text.Trim();
-                        await LoadWeatherDataAsync(forceRefresh: true);
-                    }
-                }
-                else
-                {
-                    CustomFontBox.Visibility = Visibility.Collapsed;
-                    _weatherService.IconFontFamily = tag;
+                    _weatherService.IconFontFamily = CustomFontBox.Text.Trim();
                     await LoadWeatherDataAsync(forceRefresh: true);
                 }
+            }
+            else
+            {
+                CustomFontBox.Visibility = Visibility.Collapsed;
+                _weatherService.IconFontFamily = tag;
+                await LoadWeatherDataAsync(forceRefresh: true);
             }
         }
 
@@ -435,40 +429,75 @@ namespace Task_Flyout.Views
 
         #endregion
 
-        #region Icon Pack
+        #region Icon Source (unified: emoji / custom font / imported pack)
 
-        private void RefreshIconPackComboBox()
+        private void RefreshIconSourceComboBox()
         {
-            if (IconPackComboBox == null) return;
+            if (IconFontComboBox == null) return;
             string lang = GetCurrentLang();
-            string builtInLabel = lang == "en" ? "Windows 11 Emoji (default)" : "Windows 11 Emoji\uFF08\u9ED8\u8BA4\uFF09";
 
-            IconPackComboBox.SelectionChanged -= IconPackComboBox_SelectionChanged;
-            IconPackComboBox.Items.Clear();
-            IconPackComboBox.Items.Add(new ComboBoxItem { Content = builtInLabel, Tag = IconPackService.BuiltInEmojiId });
-            foreach (var pack in IconPackService.Instance.ListInstalledPacks())
+            IconFontComboBox.SelectionChanged -= IconFontComboBox_SelectionChanged;
+            IconFontComboBox.Items.Clear();
+
+            // Built-in font presets. Labels mirror the old resw strings so zh/en stay consistent.
+            IconFontComboBox.Items.Add(new ComboBoxItem
             {
-                IconPackComboBox.Items.Add(new ComboBoxItem { Content = $"{pack.DisplayName} ({pack.IconCount})", Tag = pack.Id });
+                Content = lang == "en" ? "Windows 11 Style (emoji)" : "Windows 11 \u98CE\u683C\uFF08emoji\uFF09",
+                Tag = "Segoe UI Emoji"
+            });
+            IconFontComboBox.Items.Add(new ComboBoxItem
+            {
+                Content = lang == "en" ? "Classical (Segoe Fluent Icons)" : "\u7ECF\u5178\u98CE\u683C\uFF08Segoe Fluent Icons\uFF09",
+                Tag = "Segoe Fluent Icons, Segoe MDL2 Assets"
+            });
+            IconFontComboBox.Items.Add(new ComboBoxItem
+            {
+                Content = lang == "en" ? "Custom font..." : "\u81EA\u5B9A\u4E49\u5B57\u4F53\u2026",
+                Tag = "__custom__"
+            });
+
+            // Imported icon packs
+            var packs = IconPackService.Instance.ListInstalledPacks();
+            foreach (var pack in packs)
+            {
+                IconFontComboBox.Items.Add(new ComboBoxItem
+                {
+                    Content = $"{pack.DisplayName} ({pack.IconCount})",
+                    Tag = "pack:" + pack.Id
+                });
             }
 
-            string active = IconPackService.Instance.ActivePackId;
-            var selected = IconPackComboBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (i.Tag as string) == active);
-            IconPackComboBox.SelectedItem = selected ?? IconPackComboBox.Items[0];
-            IconPackComboBox.SelectionChanged += IconPackComboBox_SelectionChanged;
+            // Resolve current selection: pack wins over font preset when active.
+            ComboBoxItem? target = null;
+            if (!IconPackService.Instance.IsBuiltInActive)
+            {
+                string packTag = "pack:" + IconPackService.Instance.ActivePackId;
+                target = IconFontComboBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (i.Tag as string) == packTag);
+            }
+            if (target == null)
+            {
+                string fontStr = _weatherService?.IconFontFamily ?? "Segoe UI Emoji";
+                target = IconFontComboBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (i.Tag as string) == fontStr);
+                if (target == null)
+                {
+                    target = IconFontComboBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (i.Tag as string) == "__custom__");
+                    CustomFontBox.Text = fontStr;
+                    CustomFontBox.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    CustomFontBox.Visibility = Visibility.Collapsed;
+                }
+            }
+            else
+            {
+                CustomFontBox.Visibility = Visibility.Collapsed;
+            }
+            IconFontComboBox.SelectedItem = target ?? IconFontComboBox.Items.FirstOrDefault();
 
+            IconFontComboBox.SelectionChanged += IconFontComboBox_SelectionChanged;
             BtnDeleteIconPack.IsEnabled = !IconPackService.Instance.IsBuiltInActive;
             if (IconPackStatusText != null) IconPackStatusText.Text = "";
-        }
-
-        private async void IconPackComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_isInitializing) return;
-            if (IconPackComboBox.SelectedItem is ComboBoxItem item && item.Tag is string id)
-            {
-                IconPackService.Instance.ActivePackId = id;
-                BtnDeleteIconPack.IsEnabled = id != IconPackService.BuiltInEmojiId;
-                if (_weatherService != null) await LoadWeatherDataAsync(forceRefresh: true);
-            }
         }
 
         private async void BtnImportIconPack_Click(object sender, RoutedEventArgs e)
@@ -502,7 +531,7 @@ namespace Task_Flyout.Views
                 }
 
                 IconPackService.Instance.ActivePackId = id;
-                RefreshIconPackComboBox();
+                RefreshIconSourceComboBox();
                 IconPackStatusText.Text = lang == "en" ? $"Imported: {id}" : $"\u5BFC\u5165\u5B8C\u6210\uFF1A{id}";
                 if (_weatherService != null) await LoadWeatherDataAsync(forceRefresh: true);
             }
@@ -517,7 +546,7 @@ namespace Task_Flyout.Views
             var active = IconPackService.Instance.ActivePackId;
             if (active == IconPackService.BuiltInEmojiId) return;
             IconPackService.Instance.DeletePack(active);
-            RefreshIconPackComboBox();
+            RefreshIconSourceComboBox();
             if (_weatherService != null) await LoadWeatherDataAsync(forceRefresh: true);
         }
 
