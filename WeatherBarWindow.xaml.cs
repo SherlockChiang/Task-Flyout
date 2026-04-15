@@ -528,13 +528,29 @@ namespace Task_Flyout
 
                 var enabledFields = weatherService.GetEnabledBarFields();
 
-                // Icon (alert icon overrides normal icon)
+                // Icon (alert icon overrides normal icon; icon pack PNG overrides emoji)
                 bool showIcon = enabledFields.Contains("icon");
-                WeatherIcon.Visibility = showIcon ? Visibility.Visible : Visibility.Collapsed;
-                if (showIcon)
+                bool useBitmap = showIcon && alert == null && !string.IsNullOrEmpty(info.IconBitmapUri);
+                WeatherIcon.Visibility = (showIcon && !useBitmap) ? Visibility.Visible : Visibility.Collapsed;
+                WeatherIconImage.Visibility = useBitmap ? Visibility.Visible : Visibility.Collapsed;
+                if (showIcon && !useBitmap)
                 {
                     WeatherIcon.Text = alert != null ? alert.Icon : info.Icon;
                     WeatherIcon.FontFamily = new FontFamily(info.IconFont);
+                }
+                else if (useBitmap)
+                {
+                    try
+                    {
+                        WeatherIconImage.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(info.IconBitmapUri));
+                    }
+                    catch
+                    {
+                        WeatherIconImage.Visibility = Visibility.Collapsed;
+                        WeatherIcon.Visibility = Visibility.Visible;
+                        WeatherIcon.Text = info.Icon;
+                        WeatherIcon.FontFamily = new FontFamily(info.IconFont);
+                    }
                 }
 
                 // Temperature

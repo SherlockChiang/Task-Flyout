@@ -537,6 +537,18 @@
   <data name="WeatherPage_CustomFontBox.PlaceholderText" xml:space="preserve">
     <value>Noto Color Emoji</value>
   </data>
+  <data name="WeatherPage_IconPackHeader.Text" xml:space="preserve">
+    <value>Icon Pack</value>
+  </data>
+  <data name="WeatherPage_IconPackDesc.Text" xml:space="preserve">
+    <value>Import a Breezy-style icon provider (.zip from a GitHub source archive). The zip must contain drawable_filter.xml and a drawable/ folder of PNGs. Default is Windows 11 emoji.</value>
+  </data>
+  <data name="WeatherPage_BtnImportIconPack.Content" xml:space="preserve">
+    <value>Import .zip...</value>
+  </data>
+  <data name="WeatherPage_BtnDeleteIconPack.Content" xml:space="preserve">
+    <value>Delete current pack</value>
+  </data>
   <data name="WeatherPage_SourceHeader.Header" xml:space="preserve">
     <value>Weather Source</value>
   </data>

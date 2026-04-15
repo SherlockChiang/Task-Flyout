@@ -30,8 +30,12 @@
                             VerticalAlignment="Stretch"
                             Click="WeatherButton_Click">
                         <StackPanel x:Name="ContentPanel" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <TextBlock x:Name="WeatherIcon" Text="--" FontSize="20"
-                                       FontFamily="Segoe UI Emoji" VerticalAlignment="Center"/>
+                            <Grid VerticalAlignment="Center">
+                                <TextBlock x:Name="WeatherIcon" Text="--" FontSize="20"
+                                           FontFamily="Segoe UI Emoji" VerticalAlignment="Center"/>
+                                <Image x:Name="WeatherIconImage" Width="24" Height="24"
+                                       Visibility="Collapsed" Stretch="Uniform"/>
+                            </Grid>
                             <TextBlock x:Name="TxtTemp" Text="--" FontSize="15" FontWeight="SemiBold"
                                        Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                        VerticalAlignment="Center"/>

@@ -537,6 +537,18 @@
   <data name="WeatherPage_CustomFontBox.PlaceholderText" xml:space="preserve">
     <value>Noto Color Emoji</value>
   </data>
+  <data name="WeatherPage_IconPackHeader.Text" xml:space="preserve">
+    <value>图标包</value>
+  </data>
+  <data name="WeatherPage_IconPackDesc.Text" xml:space="preserve">
+    <value>导入 Breezy 风格图标包（GitHub 源码 zip）。压缩包需包含 drawable_filter.xml 以及 drawable/ 文件夹中的 PNG。默认使用 Windows 11 emoji。</value>
+  </data>
+  <data name="WeatherPage_BtnImportIconPack.Content" xml:space="preserve">
+    <value>导入 .zip…</value>
+  </data>
+  <data name="WeatherPage_BtnDeleteIconPack.Content" xml:space="preserve">
+    <value>删除当前图标包</value>
+  </data>
   <data name="WeatherPage_SourceHeader.Header" xml:space="preserve">
     <value>天气数据源</value>
   </data>

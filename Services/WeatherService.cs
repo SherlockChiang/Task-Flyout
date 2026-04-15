@@ -69,6 +69,9 @@ namespace Task_Flyout.Services
         public string Description { get; set; }
         public string Icon { get; set; }
         public string IconFont { get; set; }
+        public string IconBitmapUri { get; set; } // non-null when an imported icon pack provides a PNG
+        public int RawWeatherCode { get; set; }
+        public bool IsDayTime { get; set; }
         public string City { get; set; }
         public string Sunrise { get; set; }
         public string Sunset { get; set; }
@@ -591,9 +594,13 @@ namespace Task_Flyout.Services
             var currentHw = info.HourlyForecast.FirstOrDefault();
             if (currentHw != null)
             {
+                bool omIsDay = IsDaylight(DateTime.Now, info.Sunrise, info.Sunset);
                 info.Temperature = currentHw.Temperature;
                 info.Description = currentHw.Description;
                 info.Icon = currentHw.Icon;
+                info.RawWeatherCode = currentHw.WeatherCode;
+                info.IsDayTime = omIsDay;
+                info.IconBitmapUri = IconPackService.Instance.TryResolveBitmapUri(currentHw.WeatherCode, omIsDay, isOpenMeteo: true);
                 info.FeelsLike = currentHw.FeelsLike;
                 info.Humidity = currentHw.Humidity;
                 info.WindSpeed = currentHw.WindSpeed;
@@ -787,12 +794,17 @@ namespace Task_Flyout.Services
             else if (current.TryGetProperty("weatherDesc", out var wDesc) && wDesc.GetArrayLength() > 0)
                 desc = wDesc[0].GetProperty("value").GetString();
 
+            int.TryParse(weatherCode, out int wttrRawCode);
+            bool wttrIsDay = DateTime.Now.Hour >= 6 && DateTime.Now.Hour < 18;
             var info = new WeatherInfo
             {
                 Temperature = $"{tempC}\u00B0C",
                 Description = desc,
                 Icon = WttrCodeToIcon(weatherCode, IconFontFamily),
                 IconFont = IconFontFamily,
+                IconBitmapUri = IconPackService.Instance.TryResolveBitmapUri(wttrRawCode, wttrIsDay, isOpenMeteo: false),
+                RawWeatherCode = wttrRawCode,
+                IsDayTime = wttrIsDay,
                 City = City,
                 FeelsLike = string.IsNullOrEmpty(flVal) ? "" : $"{flVal}\u00B0C",
                 Humidity = string.IsNullOrEmpty(humidityVal) ? "" : $"{humidityVal}%",
@@ -881,6 +893,17 @@ namespace Task_Flyout.Services
             }
 
             return info;
+        }
+
+        private static bool IsDaylight(DateTime now, string sunrise, string sunset)
+        {
+            if (!string.IsNullOrEmpty(sunrise) && !string.IsNullOrEmpty(sunset)
+                && TimeSpan.TryParse(sunrise, out var sr) && TimeSpan.TryParse(sunset, out var ss))
+            {
+                var t = now.TimeOfDay;
+                return t >= sr && t < ss;
+            }
+            return now.Hour >= 6 && now.Hour < 18;
         }
 
         private static string WttrCodeToIcon(string code, string fontFamily)

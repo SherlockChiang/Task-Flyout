@@ -878,6 +878,25 @@ namespace Task_Flyout
                 {
                     WeatherIcon.Text = info.Icon;
                     WeatherIcon.FontFamily = new Microsoft.UI.Xaml.Media.FontFamily(info.IconFont);
+                    if (!string.IsNullOrEmpty(info.IconBitmapUri))
+                    {
+                        try
+                        {
+                            WeatherIconImage.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(info.IconBitmapUri));
+                            WeatherIconImage.Visibility = Visibility.Visible;
+                            WeatherIcon.Visibility = Visibility.Collapsed;
+                        }
+                        catch
+                        {
+                            WeatherIconImage.Visibility = Visibility.Collapsed;
+                            WeatherIcon.Visibility = Visibility.Visible;
+                        }
+                    }
+                    else
+                    {
+                        WeatherIconImage.Visibility = Visibility.Collapsed;
+                        WeatherIcon.Visibility = Visibility.Visible;
+                    }
 
                     TxtWeatherTemp.Text = info.Temperature;
                     TxtWeatherDesc.Text = info.Description;

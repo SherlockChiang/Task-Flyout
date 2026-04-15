@@ -83,6 +83,8 @@ namespace Task_Flyout.Views
                 CustomFontBox.Visibility = Visibility.Visible;
             }
 
+            RefreshIconPackComboBox();
+
             // Flyout Fields header
             FlyoutFieldsHeader.Text = GetSafeString("WeatherPage_FlyoutFields", "\u6D6E\u7A97\u663E\u793A\u5B57\u6BB5");
             FlyoutFieldsDesc.Text = GetSafeString("WeatherPage_FlyoutFieldsDesc", "\u52FE\u9009\u5E0C\u671B\u5728\u7CFB\u7EDF\u6D6E\u7A97\u4E2D\u663E\u793A\u7684\u5929\u6C14\u4FE1\u606F");
@@ -429,6 +431,94 @@ namespace Task_Flyout.Views
                 _weatherService.IconFontFamily = fontName;
                 await LoadWeatherDataAsync(forceRefresh: true);
             }
+        }
+
+        #endregion
+
+        #region Icon Pack
+
+        private void RefreshIconPackComboBox()
+        {
+            if (IconPackComboBox == null) return;
+            string lang = GetCurrentLang();
+            string builtInLabel = lang == "en" ? "Windows 11 Emoji (default)" : "Windows 11 Emoji\uFF08\u9ED8\u8BA4\uFF09";
+
+            IconPackComboBox.SelectionChanged -= IconPackComboBox_SelectionChanged;
+            IconPackComboBox.Items.Clear();
+            IconPackComboBox.Items.Add(new ComboBoxItem { Content = builtInLabel, Tag = IconPackService.BuiltInEmojiId });
+            foreach (var pack in IconPackService.Instance.ListInstalledPacks())
+            {
+                IconPackComboBox.Items.Add(new ComboBoxItem { Content = $"{pack.DisplayName} ({pack.IconCount})", Tag = pack.Id });
+            }
+
+            string active = IconPackService.Instance.ActivePackId;
+            var selected = IconPackComboBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (i.Tag as string) == active);
+            IconPackComboBox.SelectedItem = selected ?? IconPackComboBox.Items[0];
+            IconPackComboBox.SelectionChanged += IconPackComboBox_SelectionChanged;
+
+            BtnDeleteIconPack.IsEnabled = !IconPackService.Instance.IsBuiltInActive;
+            if (IconPackStatusText != null) IconPackStatusText.Text = "";
+        }
+
+        private async void IconPackComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isInitializing) return;
+            if (IconPackComboBox.SelectedItem is ComboBoxItem item && item.Tag is string id)
+            {
+                IconPackService.Instance.ActivePackId = id;
+                BtnDeleteIconPack.IsEnabled = id != IconPackService.BuiltInEmojiId;
+                if (_weatherService != null) await LoadWeatherDataAsync(forceRefresh: true);
+            }
+        }
+
+        private async void BtnImportIconPack_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var picker = new Windows.Storage.Pickers.FileOpenPicker();
+                picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads;
+                picker.FileTypeFilter.Add(".zip");
+
+                var window = App.MyMainWindow;
+                if (window != null)
+                {
+                    var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+                    WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+                }
+
+                var file = await picker.PickSingleFileAsync();
+                if (file == null) return;
+
+                string lang = GetCurrentLang();
+                IconPackStatusText.Text = lang == "en" ? "Importing..." : "\u6B63\u5728\u5BFC\u5165\u2026";
+
+                var id = await IconPackService.Instance.ImportFromZipAsync(file, System.IO.Path.GetFileNameWithoutExtension(file.Name));
+                if (id == null)
+                {
+                    IconPackStatusText.Text = lang == "en"
+                        ? "Failed: drawable_filter.xml not found in zip"
+                        : "\u5931\u8D25\uFF1AZIP \u4E2D\u672A\u627E\u5230 drawable_filter.xml";
+                    return;
+                }
+
+                IconPackService.Instance.ActivePackId = id;
+                RefreshIconPackComboBox();
+                IconPackStatusText.Text = lang == "en" ? $"Imported: {id}" : $"\u5BFC\u5165\u5B8C\u6210\uFF1A{id}";
+                if (_weatherService != null) await LoadWeatherDataAsync(forceRefresh: true);
+            }
+            catch (Exception ex)
+            {
+                IconPackStatusText.Text = "Error: " + ex.Message;
+            }
+        }
+
+        private async void BtnDeleteIconPack_Click(object sender, RoutedEventArgs e)
+        {
+            var active = IconPackService.Instance.ActivePackId;
+            if (active == IconPackService.BuiltInEmojiId) return;
+            IconPackService.Instance.DeletePack(active);
+            RefreshIconPackComboBox();
+            if (_weatherService != null) await LoadWeatherDataAsync(forceRefresh: true);
         }
 
         #endregion
