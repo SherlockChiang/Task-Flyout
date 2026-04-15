@@ -39,6 +39,17 @@ namespace Task_Flyout.Services
         public double WindSpeedValue { get; set; }
         public double PrecipProbValue { get; set; }
         public double PrecipValue { get; set; }
+
+        // Icon pack stacked layers (index 0 = base drawable, 1..3 = overlay layers for rain intensity).
+        // Empty array means the active pack is the built-in emoji or no drawable matched.
+        public string[] IconLayerUris { get; set; } = Array.Empty<string>();
+
+        // x:Bind helpers — let the hourly DataTemplate pick up layer paths without a converter.
+        public string IconLayer0Uri => IconLayerUris.Length > 0 ? IconLayerUris[0] : "";
+        public string IconLayer1Uri => IconLayerUris.Length > 1 ? IconLayerUris[1] : "";
+        public string IconLayer2Uri => IconLayerUris.Length > 2 ? IconLayerUris[2] : "";
+        public string IconLayer3Uri => IconLayerUris.Length > 3 ? IconLayerUris[3] : "";
+        public bool HasIconBitmap => IconLayerUris.Length > 0;
     }
 
     public enum WeatherAlertType
@@ -69,7 +80,8 @@ namespace Task_Flyout.Services
         public string Description { get; set; }
         public string Icon { get; set; }
         public string IconFont { get; set; }
-        public string IconBitmapUri { get; set; } // non-null when an imported icon pack provides a PNG
+        public string IconBitmapUri { get; set; } // layer 0 convenience (same as IconLayerUris[0])
+        public string[] IconLayerUris { get; set; } = Array.Empty<string>();
         public int RawWeatherCode { get; set; }
         public bool IsDayTime { get; set; }
         public string City { get; set; }
@@ -557,6 +569,7 @@ namespace Task_Flyout.Services
                     catch { }
                 }
 
+                bool omHourIsDay = IsDaylight(dt, sunriseTime, sunsetTime);
                 var hw = new HourlyWeather
                 {
                     Hour = dt.Hour,
@@ -570,6 +583,7 @@ namespace Task_Flyout.Services
                     Temperature = $"{tempVal:F0}°C",
                     Icon = OpenMeteoCodeToIcon(code, IconFontFamily),
                     IconFont = IconFontFamily,
+                    IconLayerUris = IconPackService.Instance.TryResolveBitmapLayers(code, omHourIsDay, isOpenMeteo: true),
                     Description = OpenMeteoCodeToDescription(code, lang),
                     FeelsLike = $"{flVal:F0}°C",
                     Humidity = $"{humVal}%",
@@ -600,7 +614,8 @@ namespace Task_Flyout.Services
                 info.Icon = currentHw.Icon;
                 info.RawWeatherCode = currentHw.WeatherCode;
                 info.IsDayTime = omIsDay;
-                info.IconBitmapUri = IconPackService.Instance.TryResolveBitmapUri(currentHw.WeatherCode, omIsDay, isOpenMeteo: true);
+                info.IconLayerUris = currentHw.IconLayerUris;
+                info.IconBitmapUri = currentHw.IconLayerUris.Length > 0 ? currentHw.IconLayerUris[0] : null;
                 info.FeelsLike = currentHw.FeelsLike;
                 info.Humidity = currentHw.Humidity;
                 info.WindSpeed = currentHw.WindSpeed;
@@ -796,13 +811,15 @@ namespace Task_Flyout.Services
 
             int.TryParse(weatherCode, out int wttrRawCode);
             bool wttrIsDay = DateTime.Now.Hour >= 6 && DateTime.Now.Hour < 18;
+            var wttrLayers = IconPackService.Instance.TryResolveBitmapLayers(wttrRawCode, wttrIsDay, isOpenMeteo: false);
             var info = new WeatherInfo
             {
                 Temperature = $"{tempC}\u00B0C",
                 Description = desc,
                 Icon = WttrCodeToIcon(weatherCode, IconFontFamily),
                 IconFont = IconFontFamily,
-                IconBitmapUri = IconPackService.Instance.TryResolveBitmapUri(wttrRawCode, wttrIsDay, isOpenMeteo: false),
+                IconLayerUris = wttrLayers,
+                IconBitmapUri = wttrLayers.Length > 0 ? wttrLayers[0] : null,
                 RawWeatherCode = wttrRawCode,
                 IsDayTime = wttrIsDay,
                 City = City,
@@ -868,6 +885,7 @@ namespace Task_Flyout.Services
                     double.TryParse(source.tempC, out double rawTemp);
                     double.TryParse(source.ws, out double rawWs);
                     double.TryParse(source.pp, out double rawPp);
+                    bool hIsDay = displayHour >= 6 && displayHour < 18;
                     info.HourlyForecast.Add(new HourlyWeather
                     {
                         Hour = displayHour,
@@ -880,6 +898,7 @@ namespace Task_Flyout.Services
                         Temperature = $"{source.tempC}\u00B0C",
                         Icon = WttrCodeToIcon(source.code, IconFontFamily),
                         IconFont = IconFontFamily,
+                        IconLayerUris = IconPackService.Instance.TryResolveBitmapLayers(rawCode, hIsDay, isOpenMeteo: false),
                         Description = source.hDesc,
                         FeelsLike = string.IsNullOrEmpty(source.flC) ? "" : $"{source.flC}\u00B0C",
                         Humidity = string.IsNullOrEmpty(source.hum) ? "" : $"{source.hum}%",

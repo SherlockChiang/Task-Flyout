@@ -49,11 +49,13 @@
                         Padding="4" VerticalAlignment="Center" Visibility="Collapsed"
                         Click="BtnWeather_Click" ToolTipService.ToolTip="查看天气详情">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                        <Grid VerticalAlignment="Center" Margin="0,0,4,0">
+                        <Grid Width="28" Height="28" VerticalAlignment="Center" Margin="0,0,4,0">
                             <TextBlock x:Name="WeatherIcon" Text="☀️" FontSize="22"
-                                       FontFamily="Segoe UI Emoji" VerticalAlignment="Center"/>
-                            <Image x:Name="WeatherIconImage" Width="28" Height="28"
-                                   Visibility="Collapsed" Stretch="Uniform"/>
+                                       FontFamily="Segoe UI Emoji" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            <Image x:Name="WeatherIconImage" Visibility="Collapsed" Stretch="Uniform"/>
+                            <Image x:Name="WeatherIconImage1" Visibility="Collapsed" Stretch="Uniform"/>
+                            <Image x:Name="WeatherIconImage2" Visibility="Collapsed" Stretch="Uniform"/>
+                            <Image x:Name="WeatherIconImage3" Visibility="Collapsed" Stretch="Uniform"/>
                         </Grid>
 
                         <StackPanel VerticalAlignment="Center">

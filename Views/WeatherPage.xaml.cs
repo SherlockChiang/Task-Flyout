@@ -111,6 +111,8 @@ namespace Task_Flyout.Views
 
             CurrentIcon.Text = info.Icon;
             CurrentIcon.FontFamily = new FontFamily(info.IconFont);
+            ApplyIconLayers(info.IconLayerUris, CurrentIcon,
+                CurrentIconImage0, CurrentIconImage1, CurrentIconImage2, CurrentIconImage3);
             CurrentTemp.Text = info.Temperature;
             CurrentDesc.Text = info.Description ?? "";
             CurrentCity.Text = info.City ?? _weatherService?.City ?? "";
@@ -429,6 +431,31 @@ namespace Task_Flyout.Views
 
         #endregion
 
+        private static void ApplyIconLayers(string[] layers, TextBlock emojiBlock, params Image[] images)
+        {
+            bool useBitmap = layers != null && layers.Length > 0;
+            emojiBlock.Visibility = useBitmap ? Visibility.Collapsed : Visibility.Visible;
+            for (int i = 0; i < images.Length; i++)
+            {
+                if (useBitmap && i < layers!.Length && !string.IsNullOrEmpty(layers[i]))
+                {
+                    try
+                    {
+                        images[i].Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(layers[i]));
+                        images[i].Visibility = Visibility.Visible;
+                    }
+                    catch
+                    {
+                        images[i].Visibility = Visibility.Collapsed;
+                    }
+                }
+                else
+                {
+                    images[i].Visibility = Visibility.Collapsed;
+                }
+            }
+        }
+
         #region Icon Source (unified: emoji / custom font / imported pack)
 
         private void RefreshIconSourceComboBox()
@@ -635,6 +662,8 @@ namespace Task_Flyout.Views
             {
                 DetailIcon.Text = hw.Icon;
                 DetailIcon.FontFamily = new FontFamily(hw.IconFont);
+                ApplyIconLayers(hw.IconLayerUris, DetailIcon,
+                    DetailIconImage0, DetailIconImage1, DetailIconImage2, DetailIconImage3);
                 DetailTemp.Text = hw.Temperature;
                 DetailTime.Text = hw.Time;
                 DetailDesc.Text = hw.Description ?? "";

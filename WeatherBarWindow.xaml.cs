@@ -528,29 +528,40 @@ namespace Task_Flyout
 
                 var enabledFields = weatherService.GetEnabledBarFields();
 
-                // Icon (alert icon overrides normal icon; icon pack PNG overrides emoji)
+                // Icon (alert icon overrides normal icon; icon pack layers override emoji)
                 bool showIcon = enabledFields.Contains("icon");
-                bool useBitmap = showIcon && alert == null && !string.IsNullOrEmpty(info.IconBitmapUri);
-                WeatherIcon.Visibility = (showIcon && !useBitmap) ? Visibility.Visible : Visibility.Collapsed;
-                WeatherIconImage.Visibility = useBitmap ? Visibility.Visible : Visibility.Collapsed;
-                if (showIcon && !useBitmap)
+                bool useBitmap = showIcon && alert == null && info.IconLayerUris != null && info.IconLayerUris.Length > 0;
+                var layerImages = new[] { WeatherIconImage, WeatherIconImage1, WeatherIconImage2, WeatherIconImage3 };
+
+                if (!showIcon)
                 {
-                    WeatherIcon.Text = alert != null ? alert.Icon : info.Icon;
-                    WeatherIcon.FontFamily = new FontFamily(info.IconFont);
+                    WeatherIcon.Visibility = Visibility.Collapsed;
+                    foreach (var img in layerImages) img.Visibility = Visibility.Collapsed;
                 }
                 else if (useBitmap)
                 {
-                    try
+                    WeatherIcon.Visibility = Visibility.Collapsed;
+                    var layers = info.IconLayerUris;
+                    for (int i = 0; i < layerImages.Length; i++)
                     {
-                        WeatherIconImage.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(info.IconBitmapUri));
+                        if (i < layers.Length && !string.IsNullOrEmpty(layers[i]))
+                        {
+                            try
+                            {
+                                layerImages[i].Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(layers[i]));
+                                layerImages[i].Visibility = Visibility.Visible;
+                            }
+                            catch { layerImages[i].Visibility = Visibility.Collapsed; }
+                        }
+                        else layerImages[i].Visibility = Visibility.Collapsed;
                     }
-                    catch
-                    {
-                        WeatherIconImage.Visibility = Visibility.Collapsed;
-                        WeatherIcon.Visibility = Visibility.Visible;
-                        WeatherIcon.Text = info.Icon;
-                        WeatherIcon.FontFamily = new FontFamily(info.IconFont);
-                    }
+                }
+                else
+                {
+                    WeatherIcon.Visibility = Visibility.Visible;
+                    foreach (var img in layerImages) img.Visibility = Visibility.Collapsed;
+                    WeatherIcon.Text = alert != null ? alert.Icon : info.Icon;
+                    WeatherIcon.FontFamily = new FontFamily(info.IconFont);
                 }
 
                 // Temperature

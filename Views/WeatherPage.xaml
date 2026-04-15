@@ -2,6 +2,7 @@
     x:Class="Task_Flyout.Views.WeatherPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Task_Flyout.Views"
     xmlns:models="using:Task_Flyout.Services"
     Background="Transparent">
 
@@ -20,7 +21,13 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4" Margin="0,0,28,0" MinWidth="90">
-                        <TextBlock x:Name="CurrentIcon" FontSize="48" HorizontalAlignment="Center"/>
+                        <Grid Width="72" Height="72" HorizontalAlignment="Center">
+                            <TextBlock x:Name="CurrentIcon" FontSize="48" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Image x:Name="CurrentIconImage0" Visibility="Collapsed" Stretch="Uniform"/>
+                            <Image x:Name="CurrentIconImage1" Visibility="Collapsed" Stretch="Uniform"/>
+                            <Image x:Name="CurrentIconImage2" Visibility="Collapsed" Stretch="Uniform"/>
+                            <Image x:Name="CurrentIconImage3" Visibility="Collapsed" Stretch="Uniform"/>
+                        </Grid>
                         <TextBlock x:Name="CurrentTemp" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
                     </StackPanel>
 
@@ -56,7 +63,23 @@
                             <DataTemplate x:DataType="models:HourlyWeather">
                                 <StackPanel Width="56" Spacing="8" HorizontalAlignment="Center" Margin="2,6">
                                     <TextBlock Text="{x:Bind Time}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                    <TextBlock Text="{x:Bind Icon}" FontSize="24" HorizontalAlignment="Center" FontFamily="{x:Bind IconFont}"/>
+                                    <Grid Width="32" Height="32" HorizontalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Icon}" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   FontFamily="{x:Bind IconFont}"
+                                                   Visibility="{x:Bind local:WeatherXamlHelpers.UriToCollapsed(IconLayer0Uri)}"/>
+                                        <Image Stretch="Uniform"
+                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer0Uri)}"
+                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer0Uri)}"/>
+                                        <Image Stretch="Uniform"
+                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer1Uri)}"
+                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer1Uri)}"/>
+                                        <Image Stretch="Uniform"
+                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer2Uri)}"
+                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer2Uri)}"/>
+                                        <Image Stretch="Uniform"
+                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer3Uri)}"
+                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer3Uri)}"/>
+                                    </Grid>
                                     <TextBlock Text="{x:Bind Temperature}" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="13"/>
                                 </StackPanel>
                             </DataTemplate>
@@ -75,7 +98,13 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Center" Spacing="4" Margin="0,0,24,0" MinWidth="80">
-                            <TextBlock x:Name="DetailIcon" FontSize="44" HorizontalAlignment="Center"/>
+                            <Grid Width="64" Height="64" HorizontalAlignment="Center">
+                                <TextBlock x:Name="DetailIcon" FontSize="44" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <Image x:Name="DetailIconImage0" Visibility="Collapsed" Stretch="Uniform"/>
+                                <Image x:Name="DetailIconImage1" Visibility="Collapsed" Stretch="Uniform"/>
+                                <Image x:Name="DetailIconImage2" Visibility="Collapsed" Stretch="Uniform"/>
+                                <Image x:Name="DetailIconImage3" Visibility="Collapsed" Stretch="Uniform"/>
+                            </Grid>
                             <TextBlock x:Name="DetailTemp" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center"/>
                             <TextBlock x:Name="DetailTime" FontSize="13" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                             <TextBlock x:Name="DetailDesc" FontSize="13" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap"/>

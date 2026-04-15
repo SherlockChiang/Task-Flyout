@@ -272,6 +272,64 @@ namespace Task_Flyout.Services
         }
 
         /// <summary>
+        /// Resolves a weather code to up to four stacked PNG layers from the active icon pack:
+        /// the main drawable plus 0..3 rain overlay drawables depending on rain intensity.
+        /// Returns an empty array if the built-in pack is active or no main drawable matches.
+        /// Array index 0 is the base, 1..3 are overlays to be drawn on top in order.
+        /// </summary>
+        public string[] TryResolveBitmapLayers(int weatherCode, bool isDay, bool isOpenMeteo)
+        {
+            var main = TryResolveBitmapUri(weatherCode, isDay, isOpenMeteo);
+            if (main == null) return Array.Empty<string>();
+
+            int intensity = GetRainIntensity(weatherCode, isOpenMeteo);
+            if (intensity <= 0 || _activeFilter == null || _activeDrawableDir == null)
+                return new[] { main };
+
+            var layers = new List<string> { main };
+            string dayNight = isDay ? "day" : "night";
+            for (int i = 1; i <= intensity; i++)
+            {
+                var key = $"weather_rain_{dayNight}_{i}";
+                if (!_activeFilter.TryGetValue(key, out var resName)) continue;
+                var path = Path.Combine(_activeDrawableDir, resName + ".png");
+                if (!File.Exists(path)) continue;
+                var uri = new Uri(path).AbsoluteUri;
+                if (!layers.Contains(uri)) // filter often reuses the main drawable for _1
+                    layers.Add(uri);
+            }
+            return layers.ToArray();
+        }
+
+        /// <summary>
+        /// Classifies rain intensity: 0 = not rain / drizzle, 1 = light, 2 = moderate, 3 = heavy.
+        /// Used to decide how many overlay layers to stack on the base rain drawable.
+        /// </summary>
+        public static int GetRainIntensity(int code, bool isOpenMeteo)
+        {
+            if (isOpenMeteo)
+            {
+                return code switch
+                {
+                    51 or 53 or 55 => 1,                 // drizzle light/moderate/dense
+                    56 or 57 => 1,                        // freezing drizzle
+                    61 or 80 => 1,                        // slight rain / slight shower
+                    63 or 81 or 66 => 2,                  // moderate rain / shower / freezing
+                    65 or 82 or 67 => 3,                  // heavy rain / violent shower
+                    _ => 0
+                };
+            }
+            // wttr.in codes
+            return code switch
+            {
+                176 or 263 or 266 or 293 => 1,            // patchy / light rain
+                296 or 299 or 353 or 356 => 2,            // light-to-moderate rain / shower
+                302 or 305 or 308 or 359 or 314 => 3,     // heavy rain / heavy shower
+                _ => 0
+            };
+        }
+
+        /// <summary>
         /// Map a wttr.in or Open-Meteo weather code to a Breezy-style semantic key
         /// (e.g. "weather_rain_day"). Returns null for unknown codes.
         /// </summary>
