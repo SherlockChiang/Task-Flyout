@@ -463,6 +463,10 @@ namespace Task_Flyout.Views
             if (IconFontComboBox == null) return;
             string lang = GetCurrentLang();
 
+            // Migrate the old "Fluent Icons" classical preset which never rendered (no matching glyphs).
+            if (_weatherService != null && _weatherService.IconFontFamily == "Segoe Fluent Icons, Segoe MDL2 Assets")
+                _weatherService.IconFontFamily = "Segoe UI Symbol";
+
             IconFontComboBox.SelectionChanged -= IconFontComboBox_SelectionChanged;
             IconFontComboBox.Items.Clear();
 
@@ -474,8 +478,8 @@ namespace Task_Flyout.Views
             });
             IconFontComboBox.Items.Add(new ComboBoxItem
             {
-                Content = lang == "en" ? "Classical (Segoe Fluent Icons)" : "\u7ECF\u5178\u98CE\u683C\uFF08Segoe Fluent Icons\uFF09",
-                Tag = "Segoe Fluent Icons, Segoe MDL2 Assets"
+                Content = lang == "en" ? "Classical (Segoe UI Symbol)" : "\u7ECF\u5178\u98CE\u683C\uFF08Segoe UI Symbol\uFF09",
+                Tag = "Segoe UI Symbol"
             });
             IconFontComboBox.Items.Add(new ComboBoxItem
             {

@@ -283,22 +283,29 @@ namespace Task_Flyout.Services
             if (main == null) return Array.Empty<string>();
 
             int intensity = GetRainIntensity(weatherCode, isOpenMeteo);
-            if (intensity <= 0 || _activeFilter == null || _activeDrawableDir == null)
+            if (intensity <= 0 || intensity >= 3 || _activeFilter == null || _activeDrawableDir == null)
                 return new[] { main };
 
-            var layers = new List<string> { main };
+            // For light/moderate rain, swap the baked main drawable (cloud + 3 droplets) for
+            // `_1` (cloud only) and overlay `_3` (1 droplet) or `_2` (2 droplets).
+            // Breezy's _1/_2/_3 are animation frames, not additive overlays on the base.
             string dayNight = isDay ? "day" : "night";
-            for (int i = 1; i <= intensity; i++)
+            string? TryLayer(int idx)
             {
-                var key = $"weather_rain_{dayNight}_{i}";
-                if (!_activeFilter.TryGetValue(key, out var resName)) continue;
-                var path = Path.Combine(_activeDrawableDir, resName + ".png");
-                if (!File.Exists(path)) continue;
-                var uri = new Uri(path).AbsoluteUri;
-                if (!layers.Contains(uri)) // filter often reuses the main drawable for _1
-                    layers.Add(uri);
+                var key = $"weather_rain_{dayNight}_{idx}";
+                if (!_activeFilter!.TryGetValue(key, out var resName))
+                {
+                    var alt = key.Replace("_" + dayNight, dayNight == "day" ? "_night" : "_day");
+                    if (!_activeFilter.TryGetValue(alt, out resName)) return null;
+                }
+                var path = Path.Combine(_activeDrawableDir!, resName + ".png");
+                return File.Exists(path) ? new Uri(path).AbsoluteUri : null;
             }
-            return layers.ToArray();
+
+            var cloudOnly = TryLayer(1);
+            var droplet = TryLayer(intensity == 1 ? 3 : 2);
+            if (cloudOnly == null || droplet == null) return new[] { main };
+            return new[] { cloudOnly, droplet };
         }
 
         /// <summary>
@@ -322,9 +329,9 @@ namespace Task_Flyout.Services
             // wttr.in codes
             return code switch
             {
-                176 or 263 or 266 or 293 => 1,            // patchy / light rain
-                296 or 299 or 353 or 356 => 2,            // light-to-moderate rain / shower
-                302 or 305 or 308 or 359 or 314 => 3,     // heavy rain / heavy shower
+                176 or 263 or 266 or 293 or 296 or 353 => 1,  // patchy / light rain / light shower
+                299 or 302 or 356 => 2,                        // moderate rain / moderate shower
+                305 or 308 or 359 or 314 => 3,                 // heavy rain / torrential shower
                 _ => 0
             };
         }
