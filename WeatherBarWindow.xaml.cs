@@ -25,6 +25,7 @@ namespace Task_Flyout
         private IntPtr _taskbarHwnd = IntPtr.Zero;
         private bool _isParented;
         private bool _userHidden;
+        private double _preferredLogicalWidth = 180;
 
         #region P/Invoke
 
@@ -262,7 +263,8 @@ namespace Task_Flyout
             int pillHeight = taskbarHeight - verticalInset * 2;
             if (pillHeight < (int)(28 * scaleFactor))
                 pillHeight = (int)(28 * scaleFactor);
-            int pillWidth = (int)(180 * scaleFactor);
+            int pillWidth = (int)(_preferredLogicalWidth * scaleFactor);
+            if (pillWidth < (int)(80 * scaleFactor)) pillWidth = (int)(80 * scaleFactor);
 
             int widgetsOffset = GetTaskbarWidgetsOffset(hWnd, tbRect);
 
@@ -518,66 +520,74 @@ namespace Task_Flyout
 
                 var enabledFields = weatherService.GetEnabledBarFields();
 
-                // Icon: alert icon overrides normal weather icon
-                if (enabledFields.Contains("icon"))
+                // Icon (alert icon overrides normal icon)
+                bool showIcon = enabledFields.Contains("icon");
+                WeatherIcon.Visibility = showIcon ? Visibility.Visible : Visibility.Collapsed;
+                if (showIcon)
                 {
-                    WeatherIcon.Visibility = Visibility.Visible;
                     WeatherIcon.Text = alert != null ? alert.Icon : info.Icon;
                     WeatherIcon.FontFamily = new FontFamily(info.IconFont);
                 }
-                else
-                {
-                    WeatherIcon.Visibility = Visibility.Collapsed;
-                }
 
                 // Temperature
-                if (enabledFields.Contains("temperature"))
-                {
-                    TxtTemp.Visibility = Visibility.Visible;
-                    TxtTemp.Text = info.Temperature;
-                }
-                else
-                {
-                    TxtTemp.Visibility = Visibility.Collapsed;
-                }
+                bool showTemp = enabledFields.Contains("temperature");
+                TxtTemp.Visibility = showTemp ? Visibility.Visible : Visibility.Collapsed;
+                if (showTemp) TxtTemp.Text = info.Temperature ?? "";
 
-                // Description / alert / feelslike / humidity / wind — all into TxtDesc
-                // Priority: alert > description > first enabled secondary field
-                string desc = "";
-                if (alert != null)
+                // Description (alert message replaces description text when active)
+                bool showDesc = enabledFields.Contains("description") || alert != null;
+                TxtDesc.Visibility = showDesc ? Visibility.Visible : Visibility.Collapsed;
+                if (showDesc)
                 {
-                    desc = alert.Message;
-                }
-                else if (enabledFields.Contains("description"))
-                {
-                    desc = info.Description ?? "";
-                }
-                else if (enabledFields.Contains("feelslike"))
-                {
-                    desc = info.FeelsLike ?? "";
-                }
-                else if (enabledFields.Contains("humidity"))
-                {
-                    desc = info.Humidity ?? "";
-                }
-                else if (enabledFields.Contains("wind"))
-                {
-                    desc = info.WindSpeed ?? "";
-                }
-
-                if (!string.IsNullOrEmpty(desc))
-                {
-                    TxtDesc.Visibility = Visibility.Visible;
-                    TxtDesc.Text = desc;
+                    TxtDesc.Text = alert != null ? alert.Message : (info.Description ?? "");
                     TxtDesc.Foreground = new SolidColorBrush(alert != null
                         ? Color.FromArgb(255, 255, 170, 80)
                         : Color.FromArgb(255, 180, 180, 180));
                 }
-                else
-                {
-                    TxtDesc.Visibility = Visibility.Collapsed;
-                }
+
+                // Feels like
+                bool showFeels = enabledFields.Contains("feelslike") && !string.IsNullOrEmpty(info.FeelsLike);
+                TxtFeels.Visibility = showFeels ? Visibility.Visible : Visibility.Collapsed;
+                if (showFeels) TxtFeels.Text = info.FeelsLike;
+
+                // Humidity
+                bool showHum = enabledFields.Contains("humidity") && !string.IsNullOrEmpty(info.Humidity);
+                TxtHumidity.Visibility = showHum ? Visibility.Visible : Visibility.Collapsed;
+                if (showHum) TxtHumidity.Text = info.Humidity;
+
+                // Wind
+                bool showWind = enabledFields.Contains("wind") && !string.IsNullOrEmpty(info.WindSpeed);
+                TxtWind.Visibility = showWind ? Visibility.Visible : Visibility.Collapsed;
+                if (showWind) TxtWind.Text = info.WindSpeed;
+
+                RecomputeBarWidth();
             });
+        }
+
+        /// <summary>
+        /// Measure the content panel and resize the bar accordingly.
+        /// </summary>
+        private void RecomputeBarWidth()
+        {
+            try
+            {
+                ContentPanel.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+                double contentLogical = ContentPanel.DesiredSize.Width;
+
+                // ScaleTransform on MainGrid shrinks visuals to 0.9; account for it + button padding
+                const double horizontalPadding = 24; // button Padding="8,0" ×2 + slack
+                double logical = contentLogical * 0.9 + horizontalPadding;
+
+                if (logical < 80) logical = 80;
+                if (logical > 480) logical = 480;
+
+                if (Math.Abs(logical - _preferredLogicalWidth) > 1)
+                {
+                    _preferredLogicalWidth = logical;
+                    PositionOnTaskbar();
+                }
+            }
+            catch { }
         }
 
         private void WeatherButton_Click(object sender, RoutedEventArgs e)

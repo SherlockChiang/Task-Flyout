@@ -29,7 +29,7 @@
                             HorizontalAlignment="Stretch"
                             VerticalAlignment="Stretch"
                             Click="WeatherButton_Click">
-                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <StackPanel x:Name="ContentPanel" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                             <TextBlock x:Name="WeatherIcon" Text="--" FontSize="20"
                                        FontFamily="Segoe UI Emoji" VerticalAlignment="Center"/>
                             <TextBlock x:Name="TxtTemp" Text="--" FontSize="15" FontWeight="SemiBold"
@@ -37,8 +37,16 @@
                                        VerticalAlignment="Center"/>
                             <TextBlock x:Name="TxtDesc" Text="" FontSize="12"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       VerticalAlignment="Center" MaxWidth="72"
-                                       TextTrimming="CharacterEllipsis"/>
+                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtFeels" Text="" FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center" Visibility="Collapsed"/>
+                            <TextBlock x:Name="TxtHumidity" Text="" FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center" Visibility="Collapsed"/>
+                            <TextBlock x:Name="TxtWind" Text="" FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center" Visibility="Collapsed"/>
                         </StackPanel>
                     </Button>
                 </Grid>
