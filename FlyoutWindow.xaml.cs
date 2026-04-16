@@ -69,6 +69,7 @@ namespace Task_Flyout
         private AppCache _localCache = new();
         private DispatcherTimer _syncTimer;
         private DispatcherTimer _clockTimer;
+        private DispatcherTimer _focusTimer;
         private SyncManager _syncManager;
         private ResourceLoader _loader;
 
@@ -99,6 +100,9 @@ namespace Task_Flyout
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool BringWindowToTop(IntPtr hWnd);
 
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
         [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
         private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
 
@@ -127,6 +131,7 @@ namespace Task_Flyout
             LoadCache();
             StartClock();
             SetupPeriodicSync();
+            SetupFocusTimer();
 
             Activated += FlyoutWindow_Activated;
             RootGrid.Loaded += RootGrid_Loaded;
@@ -657,6 +662,7 @@ namespace Task_Flyout
 
             if (_appWindow.IsVisible)
             {
+                _focusTimer.Stop();
                 _appWindow.Hide();
                 _lastHideTime = DateTime.Now;
             }
@@ -686,6 +692,8 @@ namespace Task_Flyout
 
                 UpdateSelectedDateHeader();
                 RequestDotRefresh();
+
+                _focusTimer.Start();
 
                 _ = SyncAllDataAsync(true);
                 _ = RefreshWeatherAsync();
@@ -780,10 +788,28 @@ namespace Task_Flyout
             _appWindow.Move(new PointInt32(targetX, targetY));
         }
 
+        private void SetupFocusTimer()
+        {
+            _focusTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+            _focusTimer.Tick += (s, e) =>
+            {
+                if (_isPinned || !_appWindow.IsVisible) return;
+                IntPtr fg = GetForegroundWindow();
+                IntPtr myHwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                if (fg != myHwnd && fg != IntPtr.Zero)
+                {
+                    _focusTimer.Stop();
+                    _appWindow.Hide();
+                    _lastHideTime = DateTime.Now;
+                }
+            };
+        }
+
         private void FlyoutWindow_Activated(object sender, WindowActivatedEventArgs args)
         {
             if (args.WindowActivationState == WindowActivationState.Deactivated && !_isPinned)
             {
+                _focusTimer.Stop();
                 _appWindow.Hide();
                 _lastHideTime = DateTime.Now;
             }
