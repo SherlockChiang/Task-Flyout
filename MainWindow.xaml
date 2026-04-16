@@ -16,13 +16,13 @@
             <NavigationView.MenuItems>
                 <NavigationViewItem x:Uid="MainWindow_NavCalendar" Content="主日历视图" Tag="Calendar">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE787;"/>
+                        <FontIcon Glyph="&#xE263;" FontFamily="ms-appx:///Assets/FluentSystemIcons-Filled.ttf#FluentSystemIcons-Filled"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
-                <NavigationViewItem x:Uid="MainWindow_NavWeather" Content="天气" Tag="Weather">
+                <NavigationViewItem x:Uid="MainWindow_NavWeather" x:Name="WeatherNavItem" Content="天气" Tag="Weather">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xECAA;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+                        <FontIcon x:Name="WeatherNavIcon" Glyph="&#xF8BA;" FontFamily="ms-appx:///Assets/FluentSystemIcons-Filled.ttf#FluentSystemIcons-Filled"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 

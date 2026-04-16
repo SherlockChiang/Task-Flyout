@@ -33,6 +33,7 @@ namespace Task_Flyout
             ContentFrame.Navigated += ContentFrame_Navigated;
 
             RefreshAccountList();
+            RefreshWeatherNavIconAsync();
 
             var calendarItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault();
             if (calendarItem != null) MainNav.SelectedItem = calendarItem;
@@ -311,6 +312,59 @@ namespace Task_Flyout
                     });
                 }
             }
+        }
+
+        private const string FluentIconsFont = "ms-appx:///Assets/FluentSystemIcons-Filled.ttf#FluentSystemIcons-Filled";
+
+        public async void RefreshWeatherNavIconAsync()
+        {
+            var weatherService = (App.Current as App)?.WeatherService;
+            if (weatherService == null || !weatherService.IsEnabled) return;
+
+            var info = await weatherService.GetWeatherAsync();
+            if (info == null) return;
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                WeatherNavIcon.Glyph = WeatherCodeToFluentGlyph(info.RawWeatherCode);
+                WeatherNavIcon.FontFamily = new FontFamily(FluentIconsFont);
+            });
+        }
+
+        private static string WeatherCodeToFluentGlyph(int code)
+        {
+            // FluentSystemIcons-Filled codepoints for weather conditions
+            // Supports both Open-Meteo WMO codes (0-99) and wttr.in codes (113-395)
+            return code switch
+            {
+                // Sunny / Clear
+                0 or 113 => "\uF8BA",                          // weather_sunny
+                // Partly cloudy
+                1 or 2 or 116 => "\uF899",                     // weather_partly_cloudy_day
+                // Cloudy / Overcast
+                3 or 119 or 122 => "\uF887",                    // weather_cloudy
+                // Fog / Mist
+                45 or 48 or 143 or 248 or 260 => "\uF88D",     // weather_fog
+                // Drizzle / Light rain
+                51 or 53 or 55 or 56 or 57
+                    or 176 or 263 or 266 or 293 or 296 => "\uF8A2", // weather_rain_showers_day
+                // Rain
+                61 or 63 or 65 or 66 or 67 or 80 or 81 or 82
+                    or 299 or 302 or 305 or 308
+                    or 356 or 359 => "\uF89F",                  // weather_rain
+                // Snow
+                71 or 73 or 75 or 77 or 85 or 86
+                    or 179 or 227 or 323 or 326 or 329 or 332
+                    or 335 or 338 or 368 or 371 => "\uF8AB",   // weather_snow
+                // Thunderstorm
+                95 or 96 or 99
+                    or 200 or 386 or 389 or 392 or 395 => "\uF8B7", // weather_squalls (thunder)
+                // Sleet / Ice
+                182 or 185 or 281 or 284 or 311 or 314
+                    or 317 or 350 or 362 or 365
+                    or 374 or 377 => "\uF8A8",                  // weather_rain_snow
+                _ => "\uF8BA"                                    // default: sunny
+            };
         }
     }
 }

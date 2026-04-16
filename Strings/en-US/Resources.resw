@@ -259,7 +259,7 @@
     <value>Fetching all your events and tasks</value>
   </data>
   <data name="MainWindow_NavCalendar.Content" xml:space="preserve">
-    <value>Main Calendar</value>
+    <value>Calendar</value>
   </data>
   <data name="MainWindow_GoogleAccount.Text" xml:space="preserve">
     <value>Google Account</value>
