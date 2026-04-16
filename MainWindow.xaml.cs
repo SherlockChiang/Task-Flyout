@@ -228,7 +228,11 @@ namespace Task_Flyout
                 page.ReloadFilters();
             }
 
-            UpdateSidebarColorDots(AccountListRepeater);
+            // Delay visual tree walk until after ItemsRepeater has finished layout
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                UpdateSidebarColorDots(AccountListRepeater);
+            });
         }
 
         private void UpdateSidebarColorDots(DependencyObject root)
@@ -255,25 +259,57 @@ namespace Task_Flyout
             }
         }
 
+        private void ApplyColorToBorder(Border border, string hex)
+        {
+            border.Background = !string.IsNullOrEmpty(hex)
+                ? new SolidColorBrush(Services.ColorHelper.ParseHex(hex))
+                : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 150, 150, 150));
+        }
+
         private void CalendarColorDot_Loaded(object sender, RoutedEventArgs e)
         {
-            if (sender is Border border && border.Tag is SubscribedCalendarInfo calInfo)
+            if (sender is Border border)
             {
-                var hex = calInfo.ColorHex;
-                border.Background = !string.IsNullOrEmpty(hex)
-                    ? new SolidColorBrush(Services.ColorHelper.ParseHex(hex))
-                    : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 150, 150, 150));
+                if (border.Tag is SubscribedCalendarInfo calInfo)
+                {
+                    ApplyColorToBorder(border, calInfo.ColorHex);
+                }
+                else
+                {
+                    // Tag binding not yet evaluated, wait for it
+                    long token = 0;
+                    token = border.RegisterPropertyChangedCallback(FrameworkElement.TagProperty, (s, dp) =>
+                    {
+                        if (s is Border b && b.Tag is SubscribedCalendarInfo ci)
+                        {
+                            ApplyColorToBorder(b, ci.ColorHex);
+                            b.UnregisterPropertyChangedCallback(FrameworkElement.TagProperty, token);
+                        }
+                    });
+                }
             }
         }
 
         private void TaskColorDot_Loaded(object sender, RoutedEventArgs e)
         {
-            if (sender is Border border && border.Tag is ConnectedAccountInfo accountInfo)
+            if (sender is Border border)
             {
-                var hex = accountInfo.TaskColorHex;
-                border.Background = !string.IsNullOrEmpty(hex)
-                    ? new SolidColorBrush(Services.ColorHelper.ParseHex(hex))
-                    : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 150, 150, 150));
+                if (border.Tag is ConnectedAccountInfo accountInfo)
+                {
+                    ApplyColorToBorder(border, accountInfo.TaskColorHex);
+                }
+                else
+                {
+                    long token = 0;
+                    token = border.RegisterPropertyChangedCallback(FrameworkElement.TagProperty, (s, dp) =>
+                    {
+                        if (s is Border b && b.Tag is ConnectedAccountInfo accInfo)
+                        {
+                            ApplyColorToBorder(b, accInfo.TaskColorHex);
+                            b.UnregisterPropertyChangedCallback(FrameworkElement.TagProperty, token);
+                        }
+                    });
+                }
             }
         }
     }
