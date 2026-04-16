@@ -26,6 +26,7 @@ namespace Task_Flyout
         private bool _isParented;
         private bool _userHidden;
         private double _preferredLogicalWidth = 180;
+        private IntPtr _fluentFlyoutHwnd = IntPtr.Zero;
 
         #region P/Invoke
 
@@ -102,6 +103,17 @@ namespace Task_Flyout
         private const int WS_CLIPSIBLINGS = 0x04000000;
         private const int WS_EX_TOOLWINDOW = 0x00000080;
         private const int WS_EX_NOACTIVATE = 0x08000000;
+        private const int WS_EX_LAYERED = 0x00080000;
+
+        [DllImport("user32.dll")]
+        private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
+        private const uint LWA_ALPHA = 0x02;
+
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr CreateRoundRectRgn(int x1, int y1, int x2, int y2, int cx, int cy);
+
+        [DllImport("user32.dll")]
+        private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
         private const uint SWP_NOMOVE = 0x0002;
         private const uint SWP_NOSIZE = 0x0001;
         private const uint SWP_NOACTIVATE = 0x0010;
@@ -184,7 +196,8 @@ namespace Task_Flyout
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             IntPtr currentTaskbar = FindWindow("Shell_TrayWnd", null);
 
-            if (currentTaskbar != _taskbarHwnd || GetParent(hWnd) != currentTaskbar)
+            bool needsReparent = currentTaskbar != _taskbarHwnd || GetParent(hWnd) != currentTaskbar;
+            if (needsReparent)
             {
                 _taskbarHwnd = currentTaskbar;
                 _isParented = false;
@@ -193,7 +206,9 @@ namespace Task_Flyout
 
             PositionOnTaskbar();
 
-            if (!IsWindowVisible(hWnd))
+            // 只在 reparent 后或窗口被意外隐藏时才 ShowWindow
+            // 避免每 2 秒调 ShowWindow 改变 z-order，覆盖 FluentFlyout
+            if (needsReparent || !IsWindowVisible(hWnd))
                 ShowWindow(hWnd, SW_SHOWNOACTIVATE);
         }
 
@@ -253,11 +268,17 @@ namespace Task_Flyout
             int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
             exStyle |= WS_EX_TOOLWINDOW;
             exStyle |= WS_EX_NOACTIVATE;
+            exStyle |= WS_EX_LAYERED;
             SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
+
+            // 整体窗口半透明（~85% 不透明度），让任务栏背景透出
+            SetLayeredWindowAttributes(hWnd, 0, 218, LWA_ALPHA);
         }
 
         public void PositionOnTaskbar()
         {
+            if (_userHidden) return;
+
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
 
             if (_taskbarHwnd == IntPtr.Zero || !_isParented) return;
@@ -280,8 +301,19 @@ namespace Task_Flyout
             int x = widgetsOffset + (widgetsOffset > 0 ? gap : 0);
             int y = (taskbarHeight - pillHeight) / 2;
 
-            SetWindowPos(hWnd, IntPtr.Zero, x, y, pillWidth, pillHeight,
-                SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            // 如果检测到 FluentFlyout，把自己排在它后面（z-order 更低），避免遮挡
+            IntPtr insertAfter = _fluentFlyoutHwnd != IntPtr.Zero ? _fluentFlyoutHwnd : IntPtr.Zero;
+            uint flags = SWP_NOACTIVATE | SWP_SHOWWINDOW;
+            if (_fluentFlyoutHwnd == IntPtr.Zero)
+                flags |= SWP_NOZORDER;
+
+            SetWindowPos(hWnd, insertAfter, x, y, pillWidth, pillHeight, flags);
+
+            // 圆角裁剪窗口外形（Win32 region）
+            int cornerRadius = (int)(8 * scaleFactor);
+            IntPtr rgn = CreateRoundRectRgn(0, 0, pillWidth + 1, pillHeight + 1, cornerRadius, cornerRadius);
+            SetWindowRgn(hWnd, rgn, true);
+            // SetWindowRgn 接管 region 所有权，不需要 DeleteObject
         }
 
         [DllImport("gdi32.dll")]
@@ -317,6 +349,7 @@ namespace Task_Flyout
                 GetWindowThreadProcessId(ownHwnd, out uint ownPid);
 
                 int maxRightScreen = taskbarLeft;
+                _fluentFlyoutHwnd = IntPtr.Zero;
 
                 // 枚举 Shell_TrayWnd 的直接子窗口（FluentFlyout TaskbarWindow 通过 SetParent 挂载在这里，
                 // Win11 原生 Widgets 也是 DesktopWindowContentBridge 子窗口）
@@ -361,6 +394,10 @@ namespace Task_Flyout
                         Debug.WriteLine($"[WeatherBar] Widget detected: cls={cls} " +
                                         $"fullRc={rc.Left},{rc.Top},{rc.Right},{rc.Bottom} " +
                                         $"visibleRc={visibleRc.Left},{visibleRc.Top},{visibleRc.Right},{visibleRc.Bottom}");
+
+                        // 记住 FluentFlyout 的 HWND 用于 z-order 排列
+                        if (isFluentFlyout)
+                            _fluentFlyoutHwnd = child;
 
                         int right = visibleRc.Right;
                         if (right > maxRightScreen) maxRightScreen = right;
@@ -471,6 +508,8 @@ namespace Task_Flyout
             }
         }
 
+        private bool _isLightTheme;
+
         private void ApplyWindowsTheme()
         {
             try
@@ -478,23 +517,38 @@ namespace Task_Flyout
                 using var key = Registry.CurrentUser.OpenSubKey(
                     @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
                 var val = key?.GetValue("SystemUsesLightTheme");
-                bool lightTheme = val is int v && v == 1;
+                _isLightTheme = val is int v && v == 1;
 
-                TopBorder.BorderBrush = lightTheme
-                    ? new SolidColorBrush(Color.FromArgb(40, 0, 0, 0))
-                    : new SolidColorBrush(Color.FromArgb(60, 255, 255, 255));
+                if (_isLightTheme)
+                {
+                    TopBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0));
+                }
+                else
+                {
+                    TopBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255));
+                }
             }
             catch { }
         }
 
         private void MainBorder_PointerEntered(object sender, PointerRoutedEventArgs e)
         {
-            MainBorder.Background = new SolidColorBrush(Color.FromArgb(30, 255, 255, 255));
+            if (_isLightTheme)
+            {
+                MainBorder.Background = new SolidColorBrush(Color.FromArgb(153, 255, 255, 255)); // 0.6 opacity
+                TopBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(237, 255, 255, 255));
+            }
+            else
+            {
+                MainBorder.Background = new SolidColorBrush(Color.FromArgb(19, 255, 255, 255)); // ~0.075 opacity
+                TopBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(64, 255, 255, 255)); // ~0.25 opacity
+            }
         }
 
         private void MainBorder_PointerExited(object sender, PointerRoutedEventArgs e)
         {
             MainBorder.Background = new SolidColorBrush(Colors.Transparent);
+            ApplyWindowsTheme(); // restore resting border
         }
 
         public async Task RefreshWeatherAsync()
@@ -580,18 +634,21 @@ namespace Task_Flyout
                         : Color.FromArgb(255, 180, 180, 180));
                 }
 
+                // 告警激活时隐藏副字段，避免文字挤占
+                bool hasAlert = alert != null;
+
                 // Feels like
-                bool showFeels = enabledFields.Contains("feelslike") && !string.IsNullOrEmpty(info.FeelsLike);
+                bool showFeels = !hasAlert && enabledFields.Contains("feelslike") && !string.IsNullOrEmpty(info.FeelsLike);
                 TxtFeels.Visibility = showFeels ? Visibility.Visible : Visibility.Collapsed;
                 if (showFeels) TxtFeels.Text = info.FeelsLike;
 
                 // Humidity
-                bool showHum = enabledFields.Contains("humidity") && !string.IsNullOrEmpty(info.Humidity);
+                bool showHum = !hasAlert && enabledFields.Contains("humidity") && !string.IsNullOrEmpty(info.Humidity);
                 TxtHumidity.Visibility = showHum ? Visibility.Visible : Visibility.Collapsed;
                 if (showHum) TxtHumidity.Text = info.Humidity;
 
                 // Wind
-                bool showWind = enabledFields.Contains("wind") && !string.IsNullOrEmpty(info.WindSpeed);
+                bool showWind = !hasAlert && enabledFields.Contains("wind") && !string.IsNullOrEmpty(info.WindSpeed);
                 TxtWind.Visibility = showWind ? Visibility.Visible : Visibility.Collapsed;
                 if (showWind) TxtWind.Text = info.WindSpeed;
 
@@ -662,7 +719,11 @@ namespace Task_Flyout
         {
             _userHidden = true;
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            ShowWindow(hWnd, 0);
+            ShowWindow(hWnd, 0); // SW_HIDE
+            // 清除 region 并缩为 0，彻底消除残影
+            SetWindowRgn(hWnd, IntPtr.Zero, true);
+            SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
         }
     }
 }
