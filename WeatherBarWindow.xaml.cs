@@ -107,7 +107,11 @@ namespace Task_Flyout
 
         [DllImport("user32.dll")]
         private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
+        private const uint LWA_COLORKEY = 0x01;
         private const uint LWA_ALPHA = 0x02;
+
+        // 用一个极不可能出现的颜色作为透明 key（Win32 COLORREF 是 BGR）
+        private const uint TRANSPARENCY_KEY = 0x00010201; // R=1 G=2 B=1
 
         [DllImport("gdi32.dll")]
         private static extern IntPtr CreateRoundRectRgn(int x1, int y1, int x2, int y2, int cx, int cy);
@@ -271,8 +275,9 @@ namespace Task_Flyout
             exStyle |= WS_EX_LAYERED;
             SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
 
-            // 整体窗口半透明（~85% 不透明度），让任务栏背景透出
-            SetLayeredWindowAttributes(hWnd, 0, 218, LWA_ALPHA);
+            // COLORKEY: key color 区域完全透明（圆角外的像素）
+            // ALPHA: 非 key 区域整体 ~90% 不透明 → 类 Mica 半透明效果，文字保持清晰
+            SetLayeredWindowAttributes(hWnd, TRANSPARENCY_KEY, 230, LWA_COLORKEY | LWA_ALPHA);
         }
 
         public void PositionOnTaskbar()
@@ -519,13 +524,24 @@ namespace Task_Flyout
                 var val = key?.GetValue("SystemUsesLightTheme");
                 _isLightTheme = val is int v && v == 1;
 
+                var root = this.Content as FrameworkElement;
+                if (root == null) return;
+                var mainBorder = root.FindName("MainBorder") as Microsoft.UI.Xaml.Controls.Border;
+                var topBorder = root.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
+
                 if (_isLightTheme)
                 {
-                    TopBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0));
+                    if (mainBorder != null)
+                        mainBorder.Background = new SolidColorBrush(Color.FromArgb(255, 243, 243, 243));
+                    if (topBorder != null)
+                        topBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0));
                 }
                 else
                 {
-                    TopBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255));
+                    if (mainBorder != null)
+                        mainBorder.Background = new SolidColorBrush(Color.FromArgb(255, 44, 44, 44));
+                    if (topBorder != null)
+                        topBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255));
                 }
             }
             catch { }
@@ -533,22 +549,27 @@ namespace Task_Flyout
 
         private void MainBorder_PointerEntered(object sender, PointerRoutedEventArgs e)
         {
+            var border = sender as Microsoft.UI.Xaml.Controls.Border;
+            if (border == null) return;
+            var topBorder = (this.Content as FrameworkElement)?.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
+
             if (_isLightTheme)
             {
-                MainBorder.Background = new SolidColorBrush(Color.FromArgb(153, 255, 255, 255)); // 0.6 opacity
-                TopBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(237, 255, 255, 255));
+                border.Background = new SolidColorBrush(Color.FromArgb(255, 255, 255, 255));
+                if (topBorder != null)
+                    topBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(237, 255, 255, 255));
             }
             else
             {
-                MainBorder.Background = new SolidColorBrush(Color.FromArgb(19, 255, 255, 255)); // ~0.075 opacity
-                TopBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(64, 255, 255, 255)); // ~0.25 opacity
+                border.Background = new SolidColorBrush(Color.FromArgb(255, 60, 60, 60));
+                if (topBorder != null)
+                    topBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(64, 255, 255, 255));
             }
         }
 
         private void MainBorder_PointerExited(object sender, PointerRoutedEventArgs e)
         {
-            MainBorder.Background = new SolidColorBrush(Colors.Transparent);
-            ApplyWindowsTheme(); // restore resting border
+            ApplyWindowsTheme(); // restore resting Mica background + border
         }
 
         public async Task RefreshWeatherAsync()

@@ -4,7 +4,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <Grid x:Name="RootGrid" Background="Transparent">
+    <!-- #FF010201 = transparency key color, matched by SetLayeredWindowAttributes -->
+    <Grid x:Name="RootGrid" Background="#FF010201">
         <Border x:Name="MainBorder"
                 CornerRadius="6"
                 Background="Transparent"
