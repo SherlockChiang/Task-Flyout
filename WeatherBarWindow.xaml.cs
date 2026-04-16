@@ -676,10 +676,8 @@ namespace Task_Flyout
                 }
                 if (contentLogical <= 0) return;
 
-                // MainGrid has ScaleTransform 0.9 (render transform — visual only).
-                // Rendered content occupies `contentLogical * 0.9` DIPs. Add slack for the
-                // button chrome/padding and the pill's rounded inset so nothing gets clipped.
-                double logical = contentLogical * 0.9 + 48;
+                // ContentPanel Margin="10,0,10,0" = 20 DIPs. Add small slack for rounding.
+                double logical = contentLogical + 24;
 
                 if (logical < 80) logical = 80;
 
@@ -692,7 +690,7 @@ namespace Task_Flyout
             catch { }
         }
 
-        private void WeatherButton_Click(object sender, RoutedEventArgs e)
+        private void ContentPanel_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
         {
             App.OpenMainWindowInternal(win => win.NavigateToWeather());
         }
