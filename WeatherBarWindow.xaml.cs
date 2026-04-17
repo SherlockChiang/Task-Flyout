@@ -11,6 +11,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
+using Windows.Media.Control;
 using Windows.UI;
 
 
@@ -275,9 +276,8 @@ namespace Task_Flyout
             exStyle |= WS_EX_LAYERED;
             SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
 
-            // COLORKEY: key color 区域完全透明（圆角外的像素）
-            // ALPHA: 非 key 区域整体 ~90% 不透明 → 类 Mica 半透明效果，文字保持清晰
-            SetLayeredWindowAttributes(hWnd, TRANSPARENCY_KEY, 230, LWA_COLORKEY | LWA_ALPHA);
+            // 仅使用 LWA_ALPHA 实现整体半透明，圆角由 SetWindowRgn 裁剪
+            SetLayeredWindowAttributes(hWnd, 0, 230, LWA_ALPHA);
         }
 
         public void PositionOnTaskbar()
@@ -341,6 +341,28 @@ namespace Task_Flyout
         /// 检测任务栏上的 widget。FluentFlyout TaskbarWidget 是横跨屏幕的透明顶层窗口，
         /// 实际可见区域通过 window region 裁剪 —— 必须用 GetWindowRgn 才能拿到真实矩形。
         /// </summary>
+        private bool _isMediaActive;
+
+        private async void RefreshMediaPlaybackState()
+        {
+            try
+            {
+                var sessionManager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+                var current = sessionManager?.GetCurrentSession();
+                if (current == null) { _isMediaActive = false; return; }
+
+                var playback = current.GetPlaybackInfo();
+                var status = playback?.PlaybackStatus;
+                // Playing/Paused 状态下 FluentFlyout 都会显示媒体控件
+                _isMediaActive = status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
+                              || status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused;
+            }
+            catch
+            {
+                _isMediaActive = false;
+            }
+        }
+
         private int GetTaskbarWidgetsOffset(IntPtr ownHwnd, RECT taskbarScreenRect)
         {
             try
@@ -355,6 +377,9 @@ namespace Task_Flyout
 
                 int maxRightScreen = taskbarLeft;
                 _fluentFlyoutHwnd = IntPtr.Zero;
+
+                // 先刷新媒体播放状态，用于判断 FluentFlyout 是否应该避让
+                RefreshMediaPlaybackState();
 
                 // 枚举 Shell_TrayWnd 的直接子窗口（FluentFlyout TaskbarWindow 通过 SetParent 挂载在这里，
                 // Win11 原生 Widgets 也是 DesktopWindowContentBridge 子窗口）
@@ -382,15 +407,15 @@ namespace Task_Flyout
 
                         if (!isBridge && !isFluentFlyout) continue;
 
+                        // FluentFlyout: 只在有媒体正在播放时才避让
+                        if (isFluentFlyout && !_isMediaActive) continue;
+
                         if (!GetWindowRect(child, out RECT rc)) continue;
 
                         // FluentFlyout TaskbarWindow 覆盖整个任务栏宽度，必须用 window region
                         // 拿到真实的 widget 可见区域
-                        RECT visibleRc = rc;
-                        if (TryGetWindowVisibleRect(child, rc, out RECT rgnRc))
-                        {
-                            visibleRc = rgnRc;
-                        }
+                        bool hasRegion = TryGetWindowVisibleRect(child, rc, out RECT rgnRc);
+                        RECT visibleRc = hasRegion ? rgnRc : rc;
 
                         int vw = visibleRc.Right - visibleRc.Left;
                         if (vw <= 0 || vw > 600) continue;
@@ -398,7 +423,8 @@ namespace Task_Flyout
 
                         Debug.WriteLine($"[WeatherBar] Widget detected: cls={cls} " +
                                         $"fullRc={rc.Left},{rc.Top},{rc.Right},{rc.Bottom} " +
-                                        $"visibleRc={visibleRc.Left},{visibleRc.Top},{visibleRc.Right},{visibleRc.Bottom}");
+                                        $"visibleRc={visibleRc.Left},{visibleRc.Top},{visibleRc.Right},{visibleRc.Bottom} " +
+                                        $"hasRegion={hasRegion} mediaPlaying={_isMediaActive}");
 
                         // 记住 FluentFlyout 的 HWND 用于 z-order 排列
                         if (isFluentFlyout)
