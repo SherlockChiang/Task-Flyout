@@ -177,7 +177,7 @@ namespace Task_Flyout
         {
             if (ContentFrame.Content is CalendarPage page) page.ReloadFilters();
 
-            if (App.Current is App app && app.GetType().GetProperty("MyFlyoutWindow")?.GetValue(app) is FlyoutWindow flyout)
+            if (App.MyFlyoutWindow is FlyoutWindow flyout)
             {
                 flyout.ReloadFilters();
             }

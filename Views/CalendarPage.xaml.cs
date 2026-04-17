@@ -117,7 +117,7 @@ namespace Task_Flyout.Views
             try
             {
                 if (File.Exists(CacheFilePath))
-                    _localCache = JsonSerializer.Deserialize<AppCache>(File.ReadAllText(CacheFilePath)) ?? new();
+                    _localCache = JsonSerializer.Deserialize(File.ReadAllText(CacheFilePath), AppJsonContext.Default.AppCache) ?? new();
             }
             catch { _localCache = new(); }
         }
@@ -215,7 +215,7 @@ namespace Task_Flyout.Views
                 {
                     var dir = Path.GetDirectoryName(CacheFilePath);
                     if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                    File.WriteAllText(CacheFilePath, JsonSerializer.Serialize(_localCache));
+                    File.WriteAllText(CacheFilePath, JsonSerializer.Serialize(_localCache, AppJsonContext.Default.AppCache));
                 }
                 catch (IOException) { /* 忽略文件被占用的写入失败，不影响运行 */ }
 

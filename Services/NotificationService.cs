@@ -177,7 +177,7 @@ namespace Task_Flyout.Services
                 if (!System.IO.File.Exists(cachePath)) return null;
 
                 var json = System.IO.File.ReadAllText(cachePath);
-                var cache = System.Text.Json.JsonSerializer.Deserialize<AppCacheDto>(json);
+                var cache = System.Text.Json.JsonSerializer.Deserialize(json, AppJsonContext.Default.AppCache);
                 return cache?.DayItems;
             }
             catch { return null; }
@@ -196,10 +196,5 @@ namespace Task_Flyout.Services
             });
         }
 
-        private class AppCacheDto
-        {
-            public HashSet<string> MarkedDates { get; set; } = new();
-            public Dictionary<string, List<AgendaItem>> DayItems { get; set; } = new();
-        }
     }
 }

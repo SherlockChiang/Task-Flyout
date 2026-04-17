@@ -25,7 +25,7 @@ namespace Task_Flyout.Services
                 try
                 {
                     var json = File.ReadAllText(_filePath);
-                    var list = JsonSerializer.Deserialize<List<ConnectedAccountInfo>>(json);
+                    var list = JsonSerializer.Deserialize(json, AppJsonContext.Default.ListConnectedAccountInfo);
                     if (list != null)
                         foreach (var a in list) Accounts.Add(a);
                 }
@@ -68,7 +68,7 @@ namespace Task_Flyout.Services
         public void Save()
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_filePath));
-            var json = JsonSerializer.Serialize(Accounts, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(Accounts.ToList(), AppJsonContext.Default.ListConnectedAccountInfo);
             File.WriteAllText(_filePath, json);
 
             SyncToLegacySettings();

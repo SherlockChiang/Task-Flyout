@@ -248,7 +248,7 @@ namespace Task_Flyout
             {
                 if (File.Exists(CacheFilePath))
                 {
-                    _localCache = JsonSerializer.Deserialize<AppCache>(File.ReadAllText(CacheFilePath)) ?? new();
+                    _localCache = JsonSerializer.Deserialize(File.ReadAllText(CacheFilePath), AppJsonContext.Default.AppCache) ?? new();
                     MarkedDates = new HashSet<string>(_localCache.MarkedDates);
                     EventCounts.Clear();
                     foreach (var kvp in _localCache.DayItems)
@@ -267,7 +267,7 @@ namespace Task_Flyout
             {
                 Directory.CreateDirectory(System.IO.Path.GetDirectoryName(CacheFilePath));
                 _localCache.MarkedDates = MarkedDates;
-                await File.WriteAllTextAsync(CacheFilePath, JsonSerializer.Serialize(_localCache));
+                await File.WriteAllTextAsync(CacheFilePath, JsonSerializer.Serialize(_localCache, AppJsonContext.Default.AppCache));
             }
             catch { }
         }
