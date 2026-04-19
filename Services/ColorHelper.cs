@@ -6,22 +6,8 @@ namespace Task_Flyout.Services
     {
         public static readonly string[] MonetPalette = new[]
         {
-            "#4285F4", // Blue
-            "#EA4335", // Red
-            "#34A853", // Green
-            "#FBBC05", // Amber
-            "#FF6D01", // Orange
-            "#46BDC6", // Teal
-            "#7B1FA2", // Purple
-            "#F06292", // Pink
-            "#0097A7", // Cyan
-            "#689F38", // Light Green
-            "#5C6BC0", // Indigo
-            "#8D6E63", // Brown
-            "#00ACC1", // Dark Cyan
-            "#C0CA33", // Lime
-            "#AB47BC", // Medium Purple
-            "#FF8A65", // Light Orange
+            "#D5A5A1", "#B38B8D", "#C3D1C6", "#9CB4A3", "#758A7A", "#E6D4B8",
+            "#D2B88F", "#B49665", "#BBD0D9", "#92A6B9", "#6A7B92", "#B19FB6"
         };
 
         public static Color ParseHex(string hex)

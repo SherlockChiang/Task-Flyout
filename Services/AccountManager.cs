@@ -35,6 +35,8 @@ namespace Task_Flyout.Services
             {
                 MigrateFromLocalSettings();
             }
+
+            EnsureDefaultColors();
         }
 
         private void MigrateFromLocalSettings()

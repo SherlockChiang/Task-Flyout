@@ -305,12 +305,7 @@ namespace Task_Flyout.Views
         {
             BuildColorPaletteUI();
 
-            if (App.MyMainWindow != null)
-            {
-                App.MyMainWindow.RefreshAccountListUI();
-                App.MyMainWindow.RefreshCalendarColors();
-            }
-
+            App.MyMainWindow?.RefreshCalendarColors();
             App.MyFlyoutWindow?.ReloadFilters();
         }
 

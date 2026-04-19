@@ -26,7 +26,7 @@ namespace Task_Flyout.Services
                     var remoteCalendars = await provider.FetchCalendarListAsync();
                     var account = AccountManager.GetAccount(provider.ProviderName);
 
-                    if (account != null && remoteCalendars != null)
+                    if (account != null && remoteCalendars != null && remoteCalendars.Count > 0)
                     {
                         bool changed = false;
 

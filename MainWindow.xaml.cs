@@ -118,14 +118,6 @@ namespace Task_Flyout
             }
         }
 
-        public void RefreshAccountListUI()
-        {
-            var mgr = GetAccountManager();
-            if (mgr == null) return;
-            AccountListRepeater.ItemsSource = null;
-            AccountListRepeater.ItemsSource = mgr.Accounts;
-        }
-
         private void BtnAddAccount_Click(object sender, RoutedEventArgs e)
         {
             ContentFrame.Navigate(typeof(Views.AddAccountPage));
@@ -227,90 +219,6 @@ namespace Task_Flyout
             if (ContentFrame.Content is Views.CalendarPage page)
             {
                 page.ReloadFilters();
-            }
-
-            // Delay visual tree walk until after ItemsRepeater has finished layout
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                UpdateSidebarColorDots(AccountListRepeater);
-            });
-        }
-
-        private void UpdateSidebarColorDots(DependencyObject root)
-        {
-            if (root == null) return;
-            int count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(root);
-            for (int i = 0; i < count; i++)
-            {
-                var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(root, i);
-                if (child is Border border && border.Tag != null)
-                {
-                    string hex = null;
-                    if (border.Tag is SubscribedCalendarInfo calInfo) hex = calInfo.ColorHex;
-                    else if (border.Tag is ConnectedAccountInfo accInfo) hex = accInfo.TaskColorHex;
-
-                    if (hex != null)
-                    {
-                        border.Background = !string.IsNullOrEmpty(hex)
-                            ? new SolidColorBrush(Services.ColorHelper.ParseHex(hex))
-                            : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 150, 150, 150));
-                    }
-                }
-                UpdateSidebarColorDots(child);
-            }
-        }
-
-        private void ApplyColorToBorder(Border border, string hex)
-        {
-            border.Background = !string.IsNullOrEmpty(hex)
-                ? new SolidColorBrush(Services.ColorHelper.ParseHex(hex))
-                : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 150, 150, 150));
-        }
-
-        private void CalendarColorDot_Loaded(object sender, RoutedEventArgs e)
-        {
-            if (sender is Border border)
-            {
-                if (border.Tag is SubscribedCalendarInfo calInfo)
-                {
-                    ApplyColorToBorder(border, calInfo.ColorHex);
-                }
-                else
-                {
-                    // Tag binding not yet evaluated, wait for it
-                    long token = 0;
-                    token = border.RegisterPropertyChangedCallback(FrameworkElement.TagProperty, (s, dp) =>
-                    {
-                        if (s is Border b && b.Tag is SubscribedCalendarInfo ci)
-                        {
-                            ApplyColorToBorder(b, ci.ColorHex);
-                            b.UnregisterPropertyChangedCallback(FrameworkElement.TagProperty, token);
-                        }
-                    });
-                }
-            }
-        }
-
-        private void TaskColorDot_Loaded(object sender, RoutedEventArgs e)
-        {
-            if (sender is Border border)
-            {
-                if (border.Tag is ConnectedAccountInfo accountInfo)
-                {
-                    ApplyColorToBorder(border, accountInfo.TaskColorHex);
-                }
-                else
-                {
-                    long token = 0;
-                    token = border.RegisterPropertyChangedCallback(FrameworkElement.TagProperty, (s, dp) =>
-                    {
-                        if (s is Border b && b.Tag is ConnectedAccountInfo accInfo)
-                        {
-                            ApplyColorToBorder(b, accInfo.TaskColorHex);
-                            b.UnregisterPropertyChangedCallback(FrameworkElement.TagProperty, token);
-                        }
-                    });
-                }
             }
         }
 
