@@ -202,6 +202,11 @@ namespace Task_Flyout
             ContentFrame.Navigate(typeof(Views.WeatherPage));
         }
 
+        public void NavigateToAddAccount()
+        {
+            ContentFrame.Navigate(typeof(Views.AddAccountPage));
+        }
+
         public void NavigateToCalendarAndEdit(AgendaItem itemToEdit)
         {
             var calendarItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault();

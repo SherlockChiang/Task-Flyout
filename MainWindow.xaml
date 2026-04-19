@@ -10,11 +10,10 @@
         <MicaBackdrop Kind="BaseAlt"/>
     </Window.SystemBackdrop>
 
-    <Window.Resources>
-        <views:ProviderToBrushConverter x:Key="ColorHexToBrushConverter"/>
-    </Window.Resources>
-
     <Grid>
+        <Grid.Resources>
+            <views:ProviderToBrushConverter x:Key="ColorHexToBrushConverter"/>
+        </Grid.Resources>
         <NavigationView x:Name="MainNav" PaneDisplayMode="Left" IsSettingsVisible="True"
                         ItemInvoked="MainNav_ItemInvoked" BackRequested="MainNav_BackRequested">
 

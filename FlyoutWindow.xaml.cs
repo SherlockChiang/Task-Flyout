@@ -1050,6 +1050,14 @@ namespace Task_Flyout
             {
                 if (item.Title != null && item.Title.Contains("没有安排")) return;
 
+                string welcomeTitle = _loader.GetString("TextWelcomeTitle") ?? "未连接账户";
+                if (item.Title == welcomeTitle || item.Title == "未连接账户")
+                {
+                    _appWindow.Hide();
+                    App.OpenMainWindowInternal(win => win.NavigateToAddAccount());
+                    return;
+                }
+
                 _appWindow.Hide();
                 App.OpenMainWindowInternal(win => win.NavigateToCalendarAndEdit(item));
             }
