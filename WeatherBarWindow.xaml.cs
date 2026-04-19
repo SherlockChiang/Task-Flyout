@@ -629,9 +629,25 @@ namespace Task_Flyout
 
                 var enabledFields = weatherService.GetEnabledBarFields();
 
-                // Icon (alert icon overrides normal icon; icon pack layers override emoji)
+                // Icon: pack-bitmap > emoji. When an alert is active, try the pack's alert
+                // drawable first so imported icon packs are honored; otherwise fall back to the
+                // emoji alert glyph.
                 bool showIcon = enabledFields.Contains("icon");
-                bool useBitmap = showIcon && alert == null && info.IconLayerUris != null && info.IconLayerUris.Length > 0;
+                bool packActive = info.IconLayerUris != null && info.IconLayerUris.Length > 0;
+                string[] displayLayers = null;
+                if (showIcon)
+                {
+                    if (alert != null && packActive)
+                    {
+                        var alertLayers = IconPackService.Instance.TryResolveAlertLayers(alert.Type, info.IsDayTime);
+                        if (alertLayers != null && alertLayers.Length > 0) displayLayers = alertLayers;
+                    }
+                    else if (alert == null && packActive)
+                    {
+                        displayLayers = info.IconLayerUris;
+                    }
+                }
+                bool useBitmap = displayLayers != null && displayLayers.Length > 0;
                 var layerImages = new[] { WeatherIconImage, WeatherIconImage1, WeatherIconImage2, WeatherIconImage3 };
 
                 if (!showIcon)
@@ -642,14 +658,13 @@ namespace Task_Flyout
                 else if (useBitmap)
                 {
                     WeatherIcon.Visibility = Visibility.Collapsed;
-                    var layers = info.IconLayerUris;
                     for (int i = 0; i < layerImages.Length; i++)
                     {
-                        if (i < layers.Length && !string.IsNullOrEmpty(layers[i]))
+                        if (i < displayLayers.Length && !string.IsNullOrEmpty(displayLayers[i]))
                         {
                             try
                             {
-                                layerImages[i].Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(layers[i]));
+                                layerImages[i].Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(displayLayers[i]));
                                 layerImages[i].Visibility = Visibility.Visible;
                             }
                             catch { layerImages[i].Visibility = Visibility.Collapsed; }

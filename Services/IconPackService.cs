@@ -309,6 +309,28 @@ namespace Task_Flyout.Services
         }
 
         /// <summary>
+        /// Resolves pack layers for an alert type by picking a representative Open-Meteo code
+        /// for each alert kind. Returns an empty array if the pack has no matching drawable
+        /// (caller should then fall back to the emoji alert glyph).
+        /// </summary>
+        public string[] TryResolveAlertLayers(WeatherAlertType type, bool isDay)
+        {
+            int? code = type switch
+            {
+                WeatherAlertType.Thunderstorm => 95,
+                WeatherAlertType.FreezingRain => 56,
+                WeatherAlertType.HeavyRain => 65,
+                WeatherAlertType.Rain => 63,
+                WeatherAlertType.HeavySnow => 75,
+                WeatherAlertType.Snow => 71,
+                WeatherAlertType.Fog => 45,
+                _ => null
+            };
+            if (code == null) return Array.Empty<string>();
+            return TryResolveBitmapLayers(code.Value, isDay, isOpenMeteo: true);
+        }
+
+        /// <summary>
         /// Classifies rain intensity: 0 = not rain / drizzle, 1 = light, 2 = moderate, 3 = heavy.
         /// Used to decide how many overlay layers to stack on the base rain drawable.
         /// </summary>
