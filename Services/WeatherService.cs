@@ -12,26 +12,26 @@ namespace Task_Flyout.Services
     {
         public int Hour { get; set; }
         public DateTime RawTime { get; set; }
-        public string Time { get; set; }
-        public string Temperature { get; set; }
-        public string Icon { get; set; }
-        public string IconFont { get; set; }
-        public string Description { get; set; }
-        public string FeelsLike { get; set; }
-        public string Humidity { get; set; }
-        public string WindSpeed { get; set; }
-        public string WindDirection { get; set; }
-        public string Precipitation { get; set; }
-        public string PrecipProbability { get; set; }
-        public string UVIndex { get; set; }
-        public string Visibility { get; set; }
-        public string Pressure { get; set; }
-        public string AirQuality { get; set; }
-        public string PM25 { get; set; }
-        public string PM10 { get; set; }
-        public string PollenGrass { get; set; }
-        public string PollenBirch { get; set; }
-        public string PollenRagweed { get; set; }
+        public string Time { get; set; } = "";
+        public string Temperature { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public string IconFont { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string FeelsLike { get; set; } = "";
+        public string Humidity { get; set; } = "";
+        public string WindSpeed { get; set; } = "";
+        public string WindDirection { get; set; } = "";
+        public string Precipitation { get; set; } = "";
+        public string PrecipProbability { get; set; } = "";
+        public string UVIndex { get; set; } = "";
+        public string Visibility { get; set; } = "";
+        public string Pressure { get; set; } = "";
+        public string AirQuality { get; set; } = "";
+        public string PM25 { get; set; } = "";
+        public string PM10 { get; set; } = "";
+        public string PollenGrass { get; set; } = "";
+        public string PollenBirch { get; set; } = "";
+        public string PollenRagweed { get; set; } = "";
 
         // Raw numeric values used for alert detection
         public int WeatherCode { get; set; }
@@ -76,33 +76,33 @@ namespace Task_Flyout.Services
 
     public class WeatherInfo
     {
-        public string Temperature { get; set; }
-        public string Description { get; set; }
-        public string Icon { get; set; }
-        public string IconFont { get; set; }
-        public string IconBitmapUri { get; set; } // layer 0 convenience (same as IconLayerUris[0])
+        public string Temperature { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public string IconFont { get; set; } = "";
+        public string? IconBitmapUri { get; set; } // layer 0 convenience (same as IconLayerUris[0])
         public string[] IconLayerUris { get; set; } = Array.Empty<string>();
         public int RawWeatherCode { get; set; }
         public bool IsDayTime { get; set; }
-        public string City { get; set; }
-        public string Sunrise { get; set; }
-        public string Sunset { get; set; }
-        public string MoonPhase { get; set; }
-        public string FeelsLike { get; set; }
-        public string Humidity { get; set; }
-        public string WindSpeed { get; set; }
-        public string UVIndex { get; set; }
-        public string Visibility { get; set; }
-        public string Pressure { get; set; }
-        public string AirQuality { get; set; }
-        public string Pollen { get; set; }
+        public string City { get; set; } = "";
+        public string Sunrise { get; set; } = "";
+        public string Sunset { get; set; } = "";
+        public string MoonPhase { get; set; } = "";
+        public string FeelsLike { get; set; } = "";
+        public string Humidity { get; set; } = "";
+        public string WindSpeed { get; set; } = "";
+        public string UVIndex { get; set; } = "";
+        public string Visibility { get; set; } = "";
+        public string Pressure { get; set; } = "";
+        public string AirQuality { get; set; } = "";
+        public string Pollen { get; set; } = "";
         public List<HourlyWeather> HourlyForecast { get; set; } = new();
     }
 
     public class WeatherService
     {
         private static readonly HttpClient _httpClient = new HttpClient();
-        private WeatherInfo _cachedWeather;
+        private WeatherInfo? _cachedWeather;
         private DateTime _lastFetchTime = DateTime.MinValue;
         private readonly TimeSpan _cacheExpiry = TimeSpan.FromMinutes(30);
         private Dictionary<string, (double Lat, double Lon)> _lastSearchCoords = new();
@@ -207,7 +207,7 @@ namespace Task_Flyout.Services
         /// <summary>
         /// Scan upcoming hours for extreme weather, return the most urgent alert (or null).
         /// </summary>
-        public WeatherAlert DetectUpcomingAlert(WeatherInfo info)
+        public WeatherAlert? DetectUpcomingAlert(WeatherInfo? info)
         {
             if (info == null || info.HourlyForecast == null || info.HourlyForecast.Count == 0)
                 return null;
@@ -405,7 +405,7 @@ namespace Task_Flyout.Services
             return new List<string>();
         }
 
-        public async Task<WeatherInfo> GetWeatherAsync(bool forceRefresh = false)
+        public async Task<WeatherInfo?> GetWeatherAsync(bool forceRefresh = false)
         {
             if (!IsEnabled || string.IsNullOrWhiteSpace(City))
                 return null;

@@ -6,9 +6,9 @@ namespace Task_Flyout.Models
 {
     public class AgendaItem : INotifyPropertyChanged
     {
-        public string Id { get; set; }
-        public string Title { get; set; }
-        public string Subtitle { get; set; }
+        public string Id { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Subtitle { get; set; } = "";
         public bool IsTask { get; set; }
         public bool IsEvent { get; set; }
 
@@ -26,7 +26,7 @@ namespace Task_Flyout.Models
             }
         }
 
-        private string _location;
+        private string _location = "";
         public string Location
         {
             get => _location;
@@ -38,7 +38,7 @@ namespace Task_Flyout.Models
             }
         }
 
-        private string _description;
+        private string _description = "";
         public string Description
         {
             get => _description;
@@ -51,10 +51,10 @@ namespace Task_Flyout.Models
         }
 
         public string Provider { get; set; } = "Local";
-        public string CalendarId { get; set; }
-        public string CalendarName { get; set; }
-        public string DateKey { get; set; }
-        public string ColorHex { get; set; }
+        public string CalendarId { get; set; } = "";
+        public string CalendarName { get; set; } = "";
+        public string DateKey { get; set; } = "";
+        public string ColorHex { get; set; } = "";
 
         public DateTime? StartDateTime { get; set; }
         public DateTime? EndDateTime { get; set; }
@@ -64,8 +64,8 @@ namespace Task_Flyout.Models
         public Microsoft.UI.Xaml.Visibility HasDescription => string.IsNullOrWhiteSpace(Description) ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
 
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

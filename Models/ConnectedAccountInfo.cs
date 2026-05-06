@@ -6,8 +6,8 @@ namespace Task_Flyout.Models
 {
     public class SubscribedCalendarInfo : INotifyPropertyChanged
     {
-        public string Id { get; set; }
-        public string Name { get; set; }
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
 
         private bool _isVisible = true;
         public bool IsVisible
@@ -16,21 +16,21 @@ namespace Task_Flyout.Models
             set { if (_isVisible != value) { _isVisible = value; OnPropertyChanged(); } }
         }
 
-        private string _colorHex;
+        private string _colorHex = "";
         public string ColorHex
         {
             get => _colorHex;
             set { if (_colorHex != value) { _colorHex = value; OnPropertyChanged(); } }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string name = null)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
     public class ConnectedAccountInfo : INotifyPropertyChanged
     {
-        public string ProviderName { get; set; }
+        public string ProviderName { get; set; } = "";
 
         private bool _showEvents = true;
         public bool ShowEvents
@@ -46,7 +46,7 @@ namespace Task_Flyout.Models
             set { if (_showTasks != value) { _showTasks = value; OnPropertyChanged(); } }
         }
 
-        private string _taskColorHex;
+        private string _taskColorHex = "";
         public string TaskColorHex
         {
             get => _taskColorHex;
@@ -70,8 +70,8 @@ namespace Task_Flyout.Models
             _ => "#888888"
         };
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string name = null)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 }
