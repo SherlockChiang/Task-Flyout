@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
 using Microsoft.Windows.ApplicationModel.Resources;
+using System.Reflection;
 
 namespace Task_Flyout.Services
 {
@@ -29,8 +30,7 @@ namespace Task_Flyout.Services
 
             try
             {
-                string credPath = Path.Combine(AppContext.BaseDirectory, "credentials.json");
-                using (var stream = new FileStream(credPath, FileMode.Open, FileAccess.Read))
+                using (var stream = OpenCredentialsStream())
                 {
                     credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
                         GoogleClientSecrets.FromStream(stream).Secrets, scopes, "user", CancellationToken.None, new FileDataStore(tokenPath, true));
@@ -43,6 +43,23 @@ namespace Task_Flyout.Services
 
             CalendarSvc = new CalendarService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
             TasksSvc = new TasksService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
+        }
+
+        private Stream OpenCredentialsStream()
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            var resourceName = Array.Find(
+                assembly.GetManifestResourceNames(),
+                name => name.EndsWith(".credentials.json", StringComparison.OrdinalIgnoreCase));
+
+            Stream? stream = resourceName == null ? null : assembly.GetManifestResourceStream(resourceName);
+            if (stream != null) return stream;
+
+            string credPath = Path.Combine(AppContext.BaseDirectory, "credentials.json");
+            if (File.Exists(credPath))
+                return File.OpenRead(credPath);
+
+            throw new FileNotFoundException("Google OAuth credentials were not found.", "credentials.json");
         }
 
         public async Task<List<SubscribedCalendarInfo>> FetchCalendarListAsync()

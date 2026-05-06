@@ -418,8 +418,12 @@ namespace Task_Flyout
                         RECT visibleRc = hasRegion ? rgnRc : rc;
 
                         int vw = visibleRc.Right - visibleRc.Left;
-                        if (vw <= 0 || vw > 600) continue;
-                        if (visibleRc.Right > taskbarMidX) continue;
+                        int vh = visibleRc.Bottom - visibleRc.Top;
+                        int taskbarWidth = taskbarScreenRect.Right - taskbarScreenRect.Left;
+                        int maxWidgetWidth = Math.Min(900, Math.Max(360, (int)(taskbarWidth * 0.60)));
+                        if (vw <= 0 || vh <= 0 || vw > maxWidgetWidth) continue;
+                        if (visibleRc.Bottom <= taskbarTop || visibleRc.Top >= taskbarBottom) continue;
+                        if (visibleRc.Left >= taskbarMidX) continue;
 
                         Debug.WriteLine($"[WeatherBar] Widget detected: cls={cls} " +
                                         $"fullRc={rc.Left},{rc.Top},{rc.Right},{rc.Bottom} " +
@@ -430,7 +434,7 @@ namespace Task_Flyout
                         if (isFluentFlyout)
                             _fluentFlyoutHwnd = child;
 
-                        int right = visibleRc.Right;
+                        int right = Math.Min(visibleRc.Right, taskbarMidX);
                         if (right > maxRightScreen) maxRightScreen = right;
                     }
                 }
