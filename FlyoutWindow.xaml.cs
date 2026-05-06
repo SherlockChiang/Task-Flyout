@@ -662,9 +662,7 @@ namespace Task_Flyout
 
             if (_appWindow.IsVisible)
             {
-                _focusTimer.Stop();
-                _appWindow.Hide();
-                _lastHideTime = DateTime.Now;
+                HideFlyout(autoHide: false);
             }
             else
             {
@@ -693,7 +691,7 @@ namespace Task_Flyout
                 UpdateSelectedDateHeader();
                 RequestDotRefresh();
 
-                _focusTimer.Start();
+                UpdateAutoHideTimer();
 
                 _ = SyncAllDataAsync(true);
                 _ = RefreshWeatherAsync();
@@ -793,26 +791,48 @@ namespace Task_Flyout
             _focusTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
             _focusTimer.Tick += (s, e) =>
             {
-                if (_isPinned || !_appWindow.IsVisible) return;
+                if (_isPinned || !_appWindow.IsVisible)
+                {
+                    _focusTimer.Stop();
+                    return;
+                }
+
                 IntPtr fg = GetForegroundWindow();
                 IntPtr myHwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 if (fg != myHwnd && fg != IntPtr.Zero)
                 {
-                    _focusTimer.Stop();
-                    _appWindow.Hide();
-                    _lastHideTime = DateTime.Now;
+                    HideFlyout(autoHide: true);
                 }
             };
         }
 
         private void FlyoutWindow_Activated(object sender, WindowActivatedEventArgs args)
         {
-            if (args.WindowActivationState == WindowActivationState.Deactivated && !_isPinned)
+            if (args.WindowActivationState == WindowActivationState.Deactivated)
+            {
+                HideFlyout(autoHide: true);
+            }
+        }
+
+        private void HideFlyout(bool autoHide)
+        {
+            if (autoHide && _isPinned)
             {
                 _focusTimer.Stop();
-                _appWindow.Hide();
-                _lastHideTime = DateTime.Now;
+                return;
             }
+
+            _focusTimer.Stop();
+            _appWindow.Hide();
+            _lastHideTime = DateTime.Now;
+        }
+
+        private void UpdateAutoHideTimer()
+        {
+            if (_isPinned || !_appWindow.IsVisible)
+                _focusTimer.Stop();
+            else
+                _focusTimer.Start();
         }
 
         private bool IsItemVisible(AgendaItem item)
@@ -1027,13 +1047,13 @@ namespace Task_Flyout
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
-            _appWindow.Hide();
+            HideFlyout(autoHide: false);
             App.OpenMainWindowInternal(win => win.NavigateToSettings());
         }
 
         private void BtnWeather_Click(object sender, RoutedEventArgs e)
         {
-            _appWindow.Hide();
+            HideFlyout(autoHide: false);
             App.OpenMainWindowInternal(win => win.NavigateToWeather());
         }
 
@@ -1042,6 +1062,13 @@ namespace Task_Flyout
             _isPinned = !_isPinned;
             // E718 = Pin (pinned), E77A = Unpin (unpinned)
             PinIcon.Glyph = _isPinned ? "\uE718" : "\uE77A";
+            UpdateAutoHideTimer();
+
+            if (_isPinned)
+            {
+                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                BringWindowToTop(hWnd);
+            }
         }
 
         private void AgendaListControl_ItemClick(object sender, ItemClickEventArgs e)
@@ -1053,12 +1080,12 @@ namespace Task_Flyout
                 string welcomeTitle = _loader.GetString("TextWelcomeTitle") ?? "未连接账户";
                 if (item.Title == welcomeTitle || item.Title == "未连接账户")
                 {
-                    _appWindow.Hide();
+                    HideFlyout(autoHide: false);
                     App.OpenMainWindowInternal(win => win.NavigateToAddAccount());
                     return;
                 }
 
-                _appWindow.Hide();
+                HideFlyout(autoHide: false);
                 App.OpenMainWindowInternal(win => win.NavigateToCalendarAndEdit(item));
             }
         }
