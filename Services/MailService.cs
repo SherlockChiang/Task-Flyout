@@ -1,14 +1,21 @@
 using Azure.Core;
 using Azure.Identity;
 using Google.Apis.Gmail.v1;
+using MailKit;
+using MailKit.Net.Imap;
+using MailKit.Search;
+using MailKit.Security;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
+using MimeKit;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Windows.Security.Credentials;
 using Windows.Storage;
 using GmailMessage = Google.Apis.Gmail.v1.Data.Message;
 using GraphMessage = Microsoft.Graph.Models.Message;
@@ -29,6 +36,10 @@ namespace Task_Flyout.Services
         public string DisplayName { get; set; } = "";
         public string Address { get; set; } = "";
         public bool IsSetupComplete { get; set; }
+        public string ImapHost { get; set; } = "";
+        public int ImapPort { get; set; } = 993;
+        public bool ImapUseSsl { get; set; } = true;
+        public string ImapUserName { get; set; } = "";
 
         public string ProviderName => Kind switch
         {
@@ -98,6 +109,21 @@ namespace Task_Flyout.Services
             return _accounts;
         }
 
+        public bool RemoveAccount(string accountId)
+        {
+            EnsureAccountsLoaded();
+
+            var account = _accounts.FirstOrDefault(a => a.Id == accountId);
+            if (account == null) return false;
+
+            _accounts.Remove(account);
+            if (account.Kind == MailAccountKind.Imap)
+                RemoveImapPassword(account.Id);
+
+            SaveAccounts();
+            return true;
+        }
+
         public async Task<MailAccount> AddOutlookAccountAsync()
         {
             await EnsureOutlookAuthorizedAsync();
@@ -146,6 +172,54 @@ namespace Task_Flyout.Services
             return account;
         }
 
+        public async Task<MailAccount> AddImapAccountAsync(
+            string displayName,
+            string address,
+            string userName,
+            string password,
+            string host,
+            int port,
+            bool useSsl)
+        {
+            EnsureAccountsLoaded();
+
+            var account = new MailAccount
+            {
+                Kind = MailAccountKind.Imap,
+                DisplayName = string.IsNullOrWhiteSpace(displayName) ? "IMAP" : displayName.Trim(),
+                Address = address.Trim(),
+                ImapUserName = string.IsNullOrWhiteSpace(userName) ? address.Trim() : userName.Trim(),
+                ImapHost = host.Trim(),
+                ImapPort = port,
+                ImapUseSsl = useSsl,
+                IsSetupComplete = true
+            };
+
+            await TestImapConnectionAsync(account, password);
+
+            var existing = _accounts.FirstOrDefault(a =>
+                a.Kind == MailAccountKind.Imap &&
+                string.Equals(a.Address, account.Address, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(a.ImapHost, account.ImapHost, StringComparison.OrdinalIgnoreCase));
+
+            if (existing != null)
+            {
+                existing.DisplayName = account.DisplayName;
+                existing.ImapUserName = account.ImapUserName;
+                existing.ImapPort = account.ImapPort;
+                existing.ImapUseSsl = account.ImapUseSsl;
+                existing.IsSetupComplete = true;
+                SaveImapPassword(existing.Id, password);
+                SaveAccounts();
+                return existing;
+            }
+
+            _accounts.Add(account);
+            SaveImapPassword(account.Id, password);
+            SaveAccounts();
+            return account;
+        }
+
         public async Task<MailAccount> AddGoogleAccountAsync()
         {
             var gmail = await EnsureGoogleMailAuthorizedAsync();
@@ -175,6 +249,9 @@ namespace Task_Flyout.Services
         {
             if (account.Kind == MailAccountKind.Google && account.IsSetupComplete)
                 return await FetchGoogleFoldersAsync(account);
+
+            if (account.Kind == MailAccountKind.Imap && account.IsSetupComplete)
+                return await FetchImapFoldersAsync(account);
 
             if (account.Kind != MailAccountKind.Outlook || !account.IsSetupComplete)
             {
@@ -220,6 +297,9 @@ namespace Task_Flyout.Services
             if (account.Kind == MailAccountKind.Google)
                 return await FetchGoogleMessagesAsync(account, folder, unreadOnly, pageSize);
 
+            if (account.Kind == MailAccountKind.Imap)
+                return await FetchImapMessagesAsync(account, folder, unreadOnly, pageSize);
+
             if (account.Kind != MailAccountKind.Outlook || !account.IsSetupComplete || folder.IsPlaceholder)
                 return new List<MailItem>();
 
@@ -259,6 +339,80 @@ namespace Task_Flyout.Services
             }
 
             throw new InvalidOperationException("Google provider is not available.");
+        }
+
+        private async Task TestImapConnectionAsync(MailAccount account, string password)
+        {
+            using var client = new ImapClient();
+            await ConnectImapAsync(client, account, password);
+            await client.DisconnectAsync(true);
+        }
+
+        private async Task<List<MailFolder>> FetchImapFoldersAsync(MailAccount account)
+        {
+            using var client = new ImapClient();
+            await ConnectImapAsync(client, account, GetImapPassword(account.Id));
+
+            var result = new List<MailFolder>();
+            var folders = await client.GetFoldersAsync(client.PersonalNamespaces.FirstOrDefault() ?? client.PersonalNamespaces[0]);
+            foreach (var folder in folders.Where(folder => (folder.Attributes & FolderAttributes.NonExistent) == 0))
+            {
+                result.Add(new MailFolder
+                {
+                    AccountId = account.Id,
+                    Id = folder.FullName,
+                    DisplayName = string.IsNullOrWhiteSpace(folder.Name) ? folder.FullName : folder.Name,
+                    UnreadCount = folder.IsOpen ? folder.Count - folder.Recent : null
+                });
+            }
+
+            await client.DisconnectAsync(true);
+
+            return result
+                .OrderByDescending(folder => IsInboxName(folder.Id) || IsInboxName(folder.DisplayName))
+                .ThenBy(folder => folder.DisplayName)
+                .ToList();
+        }
+
+        private async Task<List<MailItem>> FetchImapMessagesAsync(MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize)
+        {
+            if (!account.IsSetupComplete || folder.IsPlaceholder)
+                return new List<MailItem>();
+
+            using var client = new ImapClient();
+            await ConnectImapAsync(client, account, GetImapPassword(account.Id));
+
+            var mailFolder = await client.GetFolderAsync(folder.Id);
+            await mailFolder.OpenAsync(FolderAccess.ReadOnly);
+
+            var query = unreadOnly ? MailKit.Search.SearchQuery.NotSeen : MailKit.Search.SearchQuery.All;
+            var ids = await mailFolder.SearchAsync(query);
+            int top = Math.Clamp(pageSize ?? PageSize, 10, 50);
+            var selectedIds = ids.Reverse().Take(top).ToList();
+
+            var items = new List<MailItem>();
+            foreach (var id in selectedIds)
+            {
+                var message = await mailFolder.GetMessageAsync(id);
+                items.Add(ToImapMailItem(account.Id, folder.Id, id.Id.ToString(), message));
+            }
+
+            await client.DisconnectAsync(true);
+            return items.OrderByDescending(item => item.RawReceivedTime).ToList();
+        }
+
+        private static async Task ConnectImapAsync(ImapClient client, MailAccount account, string password)
+        {
+            if (string.IsNullOrWhiteSpace(account.ImapHost))
+                throw new InvalidOperationException("IMAP server is required.");
+            if (string.IsNullOrWhiteSpace(account.ImapUserName))
+                throw new InvalidOperationException("IMAP user name is required.");
+            if (string.IsNullOrWhiteSpace(password))
+                throw new InvalidOperationException("IMAP password is required.");
+
+            var socketOptions = account.ImapUseSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable;
+            await client.ConnectAsync(account.ImapHost, account.ImapPort, socketOptions);
+            await client.AuthenticateAsync(account.ImapUserName, password);
         }
 
         private async Task<List<MailFolder>> FetchGoogleFoldersAsync(MailAccount account)
@@ -450,6 +604,32 @@ namespace Task_Flyout.Services
             };
         }
 
+        private static MailItem ToImapMailItem(string accountId, string folderId, string id, MimeMessage message)
+        {
+            string preview = message.TextBody ?? StripHtml(message.HtmlBody ?? "");
+            if (preview.Length > 240) preview = preview.Substring(0, 240);
+
+            return new MailItem
+            {
+                AccountId = accountId,
+                FolderId = folderId,
+                Id = id,
+                Subject = string.IsNullOrWhiteSpace(message.Subject) ? "(No subject)" : message.Subject,
+                Sender = message.From?.ToString() ?? "",
+                Preview = preview.Trim(),
+                RawReceivedTime = message.Date,
+                ReceivedTime = FormatReceivedTime(message.Date),
+                IsRead = true,
+                HasAttachments = message.Attachments.Any()
+            };
+        }
+
+        private static string StripHtml(string html)
+        {
+            if (string.IsNullOrWhiteSpace(html)) return "";
+            return Regex.Replace(html, "<.*?>", " ").Replace("&nbsp;", " ");
+        }
+
         private static string GetGoogleHeader(GmailMessage message, string name)
             => message.Payload?.Headers?
                 .FirstOrDefault(header => string.Equals(header.Name, name, StringComparison.OrdinalIgnoreCase))
@@ -466,6 +646,45 @@ namespace Task_Flyout.Services
             if (local.Date == now.Date.AddDays(-1))
                 return "昨天";
             return local.ToString("MM/dd");
+        }
+
+        private static bool IsInboxName(string value)
+            => string.Equals(value, "INBOX", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, "Inbox", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, "收件箱", StringComparison.OrdinalIgnoreCase);
+
+        private static string GetImapPassword(string accountId)
+        {
+            try
+            {
+                var vault = new PasswordVault();
+                var credential = vault.Retrieve("TaskFlyout.IMAP", accountId);
+                credential.RetrievePassword();
+                return credential.Password;
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        private static void SaveImapPassword(string accountId, string password)
+        {
+            var vault = new PasswordVault();
+            RemoveImapPassword(accountId);
+
+            vault.Add(new Windows.Security.Credentials.PasswordCredential("TaskFlyout.IMAP", accountId, password));
+        }
+
+        private static void RemoveImapPassword(string accountId)
+        {
+            var vault = new PasswordVault();
+            try
+            {
+                var existing = vault.Retrieve("TaskFlyout.IMAP", accountId);
+                vault.Remove(existing);
+            }
+            catch { }
         }
     }
 }

@@ -20,7 +20,7 @@ namespace Task_Flyout.Views
         private MailAccount? _selectedAccount;
         private MailFolder? _selectedFolder;
         private MailItem? _selectedItem;
-        private MailAccountKind? _draftKind;
+        private MailAccount? _selectedAccountForRemoval;
         private bool _isInitializing = true;
 
         public MailPage()
@@ -29,15 +29,15 @@ namespace Task_Flyout.Views
             Loaded += MailPage_Loaded;
         }
 
-        private void MailPage_Loaded(object sender, RoutedEventArgs e)
+        private async void MailPage_Loaded(object sender, RoutedEventArgs e)
         {
             _mailService = (App.Current as App)?.MailService;
             MailListView.ItemsSource = _items;
             _isInitializing = false;
-            RefreshAccounts();
+            await RefreshAccountsAsync();
         }
 
-        private void RefreshAccounts()
+        private async Task RefreshAccountsAsync(bool autoSelect = true)
         {
             if (_mailService == null) return;
 
@@ -67,8 +67,16 @@ namespace Task_Flyout.Views
             if (!hasAccounts)
             {
                 _items.Clear();
+                _selectedAccount = null;
+                _selectedFolder = null;
+                _selectedAccountForRemoval = null;
+                RemoveMailButton.IsEnabled = false;
                 ClearDetail();
+                return;
             }
+
+            if (autoSelect)
+                await SelectFirstAvailableFolderAsync();
         }
 
         private static string FormatAccountContent(MailAccount account)
@@ -86,11 +94,16 @@ namespace Task_Flyout.Views
 
         private async void AccountTree_Expanding(TreeView sender, TreeViewExpandingEventArgs args)
         {
-            if (_mailService == null || !_accountNodes.TryGetValue(args.Node, out var account)) return;
-            if (args.Node.Children.Count > 0 && !args.Node.HasUnrealizedChildren) return;
+            await LoadFoldersForNodeAsync(args.Node);
+        }
 
-            args.Node.Children.Clear();
-            args.Node.HasUnrealizedChildren = false;
+        private async Task LoadFoldersForNodeAsync(TreeViewNode node)
+        {
+            if (_mailService == null || !_accountNodes.TryGetValue(node, out var account)) return;
+            if (node.Children.Count > 0 && !node.HasUnrealizedChildren) return;
+
+            node.Children.Clear();
+            node.HasUnrealizedChildren = false;
 
             try
             {
@@ -102,7 +115,7 @@ namespace Task_Flyout.Views
                         Content = FormatFolderContent(folder),
                         HasUnrealizedChildren = false
                     };
-                    args.Node.Children.Add(child);
+                    node.Children.Add(child);
                     _folderNodes[child] = (account, folder);
                 }
             }
@@ -112,13 +125,65 @@ namespace Task_Flyout.Views
             }
         }
 
+        private async Task SelectFirstAvailableFolderAsync()
+        {
+            if (AccountTree.RootNodes.Count == 0) return;
+
+            var accountNode = AccountTree.RootNodes[0];
+            await LoadFoldersForNodeAsync(accountNode);
+            accountNode.IsExpanded = true;
+
+            var folderNode = accountNode.Children.FirstOrDefault(node =>
+                _folderNodes.TryGetValue(node, out var selection) && !selection.Folder.IsPlaceholder);
+            if (folderNode == null) return;
+
+            AccountTree.SelectedNode = folderNode;
+            var selected = _folderNodes[folderNode];
+            _selectedAccount = selected.Account;
+            _selectedFolder = selected.Folder;
+            await LoadMessagesAsync();
+        }
+
         private async void AccountTree_ItemInvoked(TreeView sender, TreeViewItemInvokedEventArgs args)
         {
             if (args.InvokedItem is not TreeViewNode node) return;
+
+            if (_accountNodes.TryGetValue(node, out var account))
+            {
+                _selectedAccountForRemoval = account;
+                RemoveMailButton.IsEnabled = true;
+                await SelectFirstFolderForAccountNodeAsync(node);
+                return;
+            }
+
             if (!_folderNodes.TryGetValue(node, out var selection)) return;
 
             _selectedAccount = selection.Account;
             _selectedFolder = selection.Folder;
+            _selectedAccountForRemoval = selection.Account;
+            RemoveMailButton.IsEnabled = true;
+            await LoadMessagesAsync();
+        }
+
+        private async Task SelectFirstFolderForAccountNodeAsync(TreeViewNode accountNode)
+        {
+            await LoadFoldersForNodeAsync(accountNode);
+            accountNode.IsExpanded = true;
+
+            var folderNode = accountNode.Children.FirstOrDefault(node =>
+                _folderNodes.TryGetValue(node, out var selection) && !selection.Folder.IsPlaceholder);
+            if (folderNode == null)
+            {
+                _items.Clear();
+                _selectedFolder = null;
+                ClearDetail();
+                return;
+            }
+
+            AccountTree.SelectedNode = folderNode;
+            var selected = _folderNodes[folderNode];
+            _selectedAccount = selected.Account;
+            _selectedFolder = selected.Folder;
             await LoadMessagesAsync();
         }
 
@@ -165,7 +230,7 @@ namespace Task_Flyout.Views
         {
             if (_selectedFolder == null)
             {
-                RefreshAccounts();
+                await RefreshAccountsAsync();
                 return;
             }
 
@@ -177,14 +242,42 @@ namespace Task_Flyout.Views
             ShowAddAccountPanel();
         }
 
+        private async void RemoveMailButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_mailService == null || _selectedAccountForRemoval == null) return;
+
+            var account = _selectedAccountForRemoval;
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = "删除邮箱账户",
+                Content = $"要从 Task Flyout 删除 {account.ProviderName} - {account.Subtitle} 吗？这不会删除邮箱服务器上的邮件。",
+                PrimaryButtonText = "删除",
+                CloseButtonText = "取消",
+                DefaultButton = ContentDialogButton.Close
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+
+            _mailService.RemoveAccount(account.Id);
+            _items.Clear();
+            _selectedAccount = null;
+            _selectedFolder = null;
+            _selectedItem = null;
+            _selectedAccountForRemoval = null;
+            RemoveMailButton.IsEnabled = false;
+            ClearDetail();
+            await RefreshAccountsAsync();
+        }
+
         private void ShowAddAccountPanel()
         {
             AddAccountPanel.Visibility = Visibility.Visible;
             DetailPanel.Visibility = Visibility.Collapsed;
             EmptyDetailPanel.Visibility = Visibility.Collapsed;
             AddStatusText.Text = "";
-            DraftAddressPanel.Visibility = Visibility.Collapsed;
-            _draftKind = null;
+            ImapSettingsPanel.Visibility = Visibility.Collapsed;
         }
 
         private async void AddOutlookButton_Click(object sender, RoutedEventArgs e)
@@ -198,7 +291,7 @@ namespace Task_Flyout.Views
             {
                 var account = await _mailService.AddOutlookAccountAsync();
                 AddStatusText.Text = $"已添加 {account.DisplayTitle}";
-                RefreshAccounts();
+                await RefreshAccountsAsync();
             }
             catch (Exception ex)
             {
@@ -217,7 +310,7 @@ namespace Task_Flyout.Views
 
         private void AddImapButton_Click(object sender, RoutedEventArgs e)
         {
-            StartDraftAccount(MailAccountKind.Imap);
+            ShowImapSettings();
         }
 
         private async Task AddGoogleAccountAsync()
@@ -231,7 +324,7 @@ namespace Task_Flyout.Views
             {
                 var account = await _mailService.AddGoogleAccountAsync();
                 AddStatusText.Text = $"已添加 {account.DisplayTitle}";
-                RefreshAccounts();
+                await RefreshAccountsAsync();
             }
             catch (Exception ex)
             {
@@ -243,38 +336,75 @@ namespace Task_Flyout.Views
             }
         }
 
-        private void StartDraftAccount(MailAccountKind kind)
+        private void ShowImapSettings()
         {
-            _draftKind = kind;
-            DraftAddressPanel.Visibility = Visibility.Visible;
-            DraftAddressBox.Text = "";
-            DraftAddressBox.PlaceholderText = kind == MailAccountKind.Google ? "name@gmail.com" : "name@example.com";
-            AddStatusText.Text = kind == MailAccountKind.Google
-                ? "Gmail 授权读取还未接入，先保存为待配置账户。"
-                : "IMAP 服务器设置还未接入，先保存为待配置账户。";
+            ImapSettingsPanel.Visibility = Visibility.Visible;
+            ImapDisplayNameBox.Text = "";
+            ImapAddressBox.Text = "";
+            ImapUserNameBox.Text = "";
+            ImapPasswordBox.Password = "";
+            ImapHostBox.Text = "";
+            ImapPortBox.Value = 993;
+            ImapSslToggle.IsOn = true;
+            AddStatusText.Text = "请输入 IMAP 服务器信息。Gmail/Outlook 建议优先使用 OAuth。";
         }
 
-        private void CancelDraftButton_Click(object sender, RoutedEventArgs e)
+        private void CancelImapButton_Click(object sender, RoutedEventArgs e)
         {
-            DraftAddressPanel.Visibility = Visibility.Collapsed;
-            _draftKind = null;
+            ImapSettingsPanel.Visibility = Visibility.Collapsed;
             AddStatusText.Text = "";
         }
 
-        private void SaveDraftButton_Click(object sender, RoutedEventArgs e)
+        private async void SaveImapButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_mailService == null || _draftKind == null) return;
+            if (_mailService == null) return;
 
-            string address = DraftAddressBox.Text.Trim();
+            string address = ImapAddressBox.Text.Trim();
+            string host = ImapHostBox.Text.Trim();
+            string userName = string.IsNullOrWhiteSpace(ImapUserNameBox.Text) ? address : ImapUserNameBox.Text.Trim();
+            string password = ImapPasswordBox.Password;
+            int port = double.IsNaN(ImapPortBox.Value) ? 993 : (int)ImapPortBox.Value;
             if (string.IsNullOrWhiteSpace(address))
             {
                 AddStatusText.Text = "请输入邮箱地址。";
                 return;
             }
+            if (string.IsNullOrWhiteSpace(host))
+            {
+                AddStatusText.Text = "请输入 IMAP 服务器。";
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                AddStatusText.Text = "请输入密码或应用专用密码。";
+                return;
+            }
 
-            _mailService.AddDraftAccount(_draftKind.Value, address);
-            AddStatusText.Text = "已保存待配置账户。";
-            RefreshAccounts();
+            SetAddButtonsEnabled(false);
+            AddStatusText.Text = "正在连接 IMAP 服务器...";
+
+            try
+            {
+                var account = await _mailService.AddImapAccountAsync(
+                    ImapDisplayNameBox.Text,
+                    address,
+                    userName,
+                    password,
+                    host,
+                    port,
+                    ImapSslToggle.IsOn);
+
+                AddStatusText.Text = $"已添加 {account.DisplayTitle}";
+                await RefreshAccountsAsync();
+            }
+            catch (Exception ex)
+            {
+                AddStatusText.Text = ex.Message;
+            }
+            finally
+            {
+                SetAddButtonsEnabled(true);
+            }
         }
 
         private void SetAddButtonsEnabled(bool isEnabled)
@@ -282,7 +412,7 @@ namespace Task_Flyout.Views
             AddOutlookButton.IsEnabled = isEnabled;
             AddGmailButton.IsEnabled = isEnabled;
             AddImapButton.IsEnabled = isEnabled;
-            SaveDraftButton.IsEnabled = isEnabled;
+            SaveImapButton.IsEnabled = isEnabled;
         }
 
         private void MailListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
