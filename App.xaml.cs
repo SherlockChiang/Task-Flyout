@@ -28,6 +28,7 @@ namespace Task_Flyout
         public SyncManager SyncManager { get; } = new SyncManager();
         public NotificationService NotificationService { get; private set; }
         public WeatherService WeatherService { get; } = new WeatherService();
+        public MailService MailService { get; } = new MailService();
 
         public App()
         {

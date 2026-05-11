@@ -71,6 +71,10 @@ namespace Task_Flyout
             {
                 MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Weather");
             }
+            else if (ContentFrame.SourcePageType == typeof(Views.MailPage))
+            {
+                MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Mail");
+            }
             else
             {
                 MainNav.SelectedItem = null;
@@ -187,6 +191,8 @@ namespace Task_Flyout
                 ContentFrame.Navigate(typeof(CalendarPage));
             else if (args.InvokedItemContainer is NavigationViewItem itemW && itemW.Tag?.ToString() == "Weather")
                 ContentFrame.Navigate(typeof(WeatherPage));
+            else if (args.InvokedItemContainer is NavigationViewItem itemM && itemM.Tag?.ToString() == "Mail")
+                ContentFrame.Navigate(typeof(MailPage));
         }
 
         public void NavigateToSettings()
@@ -200,6 +206,13 @@ namespace Task_Flyout
             var weatherItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Weather");
             if (weatherItem != null) MainNav.SelectedItem = weatherItem;
             ContentFrame.Navigate(typeof(Views.WeatherPage));
+        }
+
+        public void NavigateToMail()
+        {
+            var mailItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Mail");
+            if (mailItem != null) MainNav.SelectedItem = mailItem;
+            ContentFrame.Navigate(typeof(Views.MailPage));
         }
 
         public void NavigateToAddAccount()

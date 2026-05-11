@@ -30,6 +30,12 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
+                <NavigationViewItem x:Name="MailNavItem" Content="邮件" Tag="Mail">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE715;" FontFamily="Segoe MDL2 Assets"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+
                 <NavigationViewItemSeparator Margin="16,8,16,8"/>
 
                 <StackPanel x:Name="FooterContentPanel" Padding="16,0,24,16" Spacing="12">

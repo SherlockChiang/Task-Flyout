@@ -1,8 +1,10 @@
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Calendar.v3;
+using Google.Apis.Gmail.v1;
 using Google.Apis.Services;
 using Google.Apis.Tasks.v1;
 using Google.Apis.Util.Store;
+using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -19,30 +21,55 @@ namespace Task_Flyout.Services
         public string ProviderName => "Google";
         public CalendarService? CalendarSvc { get; private set; }
         public TasksService? TasksSvc { get; private set; }
+        public GmailService? GmailSvc { get; private set; }
         private ResourceLoader _loader = new ResourceLoader();
+        private static readonly string[] RequiredScopes =
+        {
+            CalendarService.Scope.Calendar,
+            TasksService.Scope.Tasks,
+            GmailService.Scope.GmailReadonly
+        };
+
         public async Task EnsureAuthorizedAsync()
         {
-            if (CalendarSvc != null && TasksSvc != null) return;
+            if (CalendarSvc != null && TasksSvc != null && GmailSvc != null) return;
 
-            string[] scopes = { CalendarService.Scope.Calendar, TasksService.Scope.Tasks };
             string tokenPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TaskFlyout", "GoogleToken");
-            UserCredential credential;
+            UserCredential credential = await AuthorizeAsync(tokenPath);
 
+            var grantedScopes = credential.Token?.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
+            if (!RequiredScopes.All(scope => grantedScopes.Contains(scope, StringComparer.OrdinalIgnoreCase)))
+            {
+                CalendarSvc = null;
+                TasksSvc = null;
+                GmailSvc = null;
+                if (Directory.Exists(tokenPath)) Directory.Delete(tokenPath, true);
+                credential = await AuthorizeAsync(tokenPath);
+            }
+
+            CalendarSvc = new CalendarService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
+            TasksSvc = new TasksService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
+            GmailSvc = new GmailService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
+        }
+
+        private async Task<UserCredential> AuthorizeAsync(string tokenPath)
+        {
             try
             {
                 using (var stream = OpenCredentialsStream())
                 {
-                    credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
-                        GoogleClientSecrets.FromStream(stream).Secrets, scopes, "user", CancellationToken.None, new FileDataStore(tokenPath, true));
+                    return await GoogleWebAuthorizationBroker.AuthorizeAsync(
+                        GoogleClientSecrets.FromStream(stream).Secrets,
+                        RequiredScopes,
+                        "user",
+                        CancellationToken.None,
+                        new FileDataStore(tokenPath, true));
                 }
             }
             catch (FileNotFoundException)
             {
                 throw new Exception(_loader.GetString("TextCredNotFound"));
             }
-
-            CalendarSvc = new CalendarService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
-            TasksSvc = new TasksService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
         }
 
         private Stream OpenCredentialsStream()

@@ -22,6 +22,7 @@
         <None Remove="credentials.json" />
         <None Remove="FlyoutWindow.xaml" />
         <None Remove="Views\CalendarPage.xaml" />
+        <None Remove="Views\MailPage.xaml" />
         <None Remove="Views\SettingsPage.xaml" />
         <None Remove="Views\WeatherPage.xaml" />
         </ItemGroup>
@@ -47,6 +48,7 @@
     <ItemGroup>
         <PackageReference Include="Azure.Identity" Version="1.21.0" />
         <PackageReference Include="Google.Apis.Calendar.v3" Version="1.73.0.4073" />
+        <PackageReference Include="Google.Apis.Gmail.v1" Version="1.74.0.4134" />
         <PackageReference Include="Google.Apis.Tasks.v1" Version="1.72.0.3958" />
         <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.1" />
         <PackageReference Include="Microsoft.Graph" Version="5.105.0" />
@@ -66,6 +68,12 @@
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
       <Content Include="Assets\FluentSystemIcons-Filled.ttf" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <Page Update="Views\MailPage.xaml">
+        <Generator>MSBuild:Compile</Generator>
+      </Page>
     </ItemGroup>
     
     <ItemGroup>
