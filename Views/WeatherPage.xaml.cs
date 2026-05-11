@@ -15,6 +15,7 @@ namespace Task_Flyout.Views
         private bool _isInitializing = true;
         private WeatherService _weatherService;
         private ResourceLoader _loader;
+        private WeatherInfo _currentWeatherInfo;
 
         private readonly string[] _commonFonts = new[]
         {
@@ -66,6 +67,8 @@ namespace Task_Flyout.Views
             UpdateSourceHint();
 
             RefreshIconSourceComboBox();
+
+            DailyForecastTitle.Text = lang == "en" ? "7-day forecast" : "\u672A\u6765 7 \u5929\u9884\u62A5";
 
             // Flyout Fields header
             FlyoutFieldsHeader.Text = GetSafeString("WeatherPage_FlyoutFields", "\u6D6E\u7A97\u663E\u793A\u5B57\u6BB5");
@@ -150,6 +153,25 @@ namespace Task_Flyout.Views
                 AddChip("\uE706", $"UV {info.UVIndex}");
 
             CurrentWeatherCard.Visibility = Visibility.Visible;
+        }
+
+        #endregion
+
+        #region Daily Forecast
+
+        private void UpdateDailyForecast(WeatherInfo info)
+        {
+            _currentWeatherInfo = info;
+
+            if (info?.DailyForecast == null || info.DailyForecast.Count == 0)
+            {
+                DailyForecastPanel.Visibility = Visibility.Collapsed;
+                DailyForecastListView.ItemsSource = null;
+                return;
+            }
+
+            DailyForecastListView.ItemsSource = info.DailyForecast.Take(7).ToList();
+            DailyForecastPanel.Visibility = Visibility.Visible;
         }
 
         #endregion
@@ -749,6 +771,7 @@ namespace Task_Flyout.Views
 
             LoadingRing.IsActive = true;
             ForecastPanel.Visibility = Visibility.Collapsed;
+            DailyForecastPanel.Visibility = Visibility.Collapsed;
 
             var info = await _weatherService.GetWeatherAsync(forceRefresh);
             _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh);
@@ -756,6 +779,7 @@ namespace Task_Flyout.Views
 
             // Update current weather card
             UpdateCurrentWeatherCard(info);
+            UpdateDailyForecast(info);
 
             if (info != null && info.HourlyForecast.Count > 0)
             {

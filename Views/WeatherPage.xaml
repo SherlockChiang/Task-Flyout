@@ -119,6 +119,64 @@
                 </Border>
             </StackPanel>
 
+            <!-- Daily Forecast -->
+            <StackPanel x:Name="DailyForecastPanel" Spacing="12" Visibility="Collapsed">
+                <TextBlock x:Name="DailyForecastTitle" FontWeight="SemiBold" FontSize="16"/>
+                <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="12">
+                    <ListView x:Name="DailyForecastListView" SelectionMode="None"
+                              ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                              ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                        <ListView.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="4"/>
+                            </ItemsPanelTemplate>
+                        </ListView.ItemsPanel>
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="Padding" Value="2"/>
+                                <Setter Property="MinWidth" Value="0"/>
+                                <Setter Property="MinHeight" Value="0"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:DailyWeather">
+                                <StackPanel Width="104" Spacing="8" Margin="4,8" HorizontalAlignment="Center">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{x:Bind DayLabel}" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="13"/>
+                                        <TextBlock Text="{x:Bind DateLabel}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    </StackPanel>
+                                    <Grid Width="40" Height="40" HorizontalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Icon}" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   FontFamily="{x:Bind IconFont}"
+                                                   Visibility="{x:Bind local:WeatherXamlHelpers.UriToCollapsed(IconLayer0Uri)}"/>
+                                        <Image Stretch="Uniform"
+                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer0Uri)}"
+                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer0Uri)}"/>
+                                        <Image Stretch="Uniform"
+                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer1Uri)}"
+                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer1Uri)}"/>
+                                        <Image Stretch="Uniform"
+                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer2Uri)}"
+                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer2Uri)}"/>
+                                        <Image Stretch="Uniform"
+                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer3Uri)}"
+                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer3Uri)}"/>
+                                    </Grid>
+                                    <TextBlock Text="{x:Bind TemperatureRange}" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="{x:Bind Description}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="WrapWholeWords" FontSize="12"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxHeight="36"/>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{x:Bind PrecipProbability}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                                        <TextBlock Text="{x:Bind WindSpeed}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Border>
+            </StackPanel>
+
             <ProgressRing x:Name="LoadingRing" IsActive="False" HorizontalAlignment="Left" Margin="0,12,0,0"/>
 
             <!-- Settings Card (moved to bottom) -->

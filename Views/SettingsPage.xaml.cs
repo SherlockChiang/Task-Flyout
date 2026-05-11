@@ -324,8 +324,8 @@ namespace Task_Flyout.Views
             if (this.XamlRoot?.Content is FrameworkElement rootElement)
                 rootElement.RequestedTheme = selectedTheme;
 
-            if (App.MyFlyoutWindow?.Content is FrameworkElement flyoutRoot)
-                flyoutRoot.RequestedTheme = selectedTheme;
+            App.ApplyConfiguredThemeToOpenWindows();
+            App.MyWeatherBar?.ApplyWindowsTheme();
         }
 
         private async void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

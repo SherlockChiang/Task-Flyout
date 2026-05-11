@@ -52,6 +52,29 @@ namespace Task_Flyout.Services
         public bool HasIconBitmap => IconLayerUris.Length > 0;
     }
 
+    public class DailyWeather
+    {
+        public DateTime Date { get; set; }
+        public string DayLabel { get; set; } = "";
+        public string DateLabel { get; set; } = "";
+        public string TemperatureRange { get; set; } = "";
+        public string HighTemperature { get; set; } = "";
+        public string LowTemperature { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public string IconFont { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string PrecipProbability { get; set; } = "";
+        public string Precipitation { get; set; } = "";
+        public string WindSpeed { get; set; } = "";
+        public string UVIndex { get; set; } = "";
+        public int WeatherCode { get; set; }
+        public string[] IconLayerUris { get; set; } = Array.Empty<string>();
+        public string IconLayer0Uri => IconLayerUris.Length > 0 ? IconLayerUris[0] : "";
+        public string IconLayer1Uri => IconLayerUris.Length > 1 ? IconLayerUris[1] : "";
+        public string IconLayer2Uri => IconLayerUris.Length > 2 ? IconLayerUris[2] : "";
+        public string IconLayer3Uri => IconLayerUris.Length > 3 ? IconLayerUris[3] : "";
+    }
+
     public enum WeatherAlertType
     {
         HeavyRain,
@@ -97,6 +120,7 @@ namespace Task_Flyout.Services
         public string AirQuality { get; set; } = "";
         public string Pollen { get; set; } = "";
         public List<HourlyWeather> HourlyForecast { get; set; } = new();
+        public List<DailyWeather> DailyForecast { get; set; } = new();
     }
 
     public class WeatherService
@@ -153,7 +177,7 @@ namespace Task_Flyout.Services
 
         public string EnabledBarFields
         {
-            get => ApplicationData.Current.LocalSettings.Values["WeatherBarFields"] as string ?? "icon,temperature,description";
+            get => ApplicationData.Current.LocalSettings.Values["WeatherBarFields"] as string ?? "icon,temperature,description,location";
             set => ApplicationData.Current.LocalSettings.Values["WeatherBarFields"] = value;
         }
 
@@ -331,6 +355,7 @@ namespace Task_Flyout.Services
             ("icon",         "\u56fe\u6807",     "Icon"),
             ("temperature",  "\u6e29\u5ea6",     "Temperature"),
             ("description",  "\u63cf\u8ff0",     "Description"),
+            ("location",     "\u5730\u70b9",     "Location"),
             ("feelslike",    "\u4f53\u611f",     "Feels like"),
             ("humidity",     "\u6e7f\u5ea6",     "Humidity"),
             ("wind",         "\u98ce\u901f",     "Wind"),
@@ -444,8 +469,9 @@ namespace Task_Flyout.Services
                 $"&hourly=temperature_2m,relative_humidity_2m,apparent_temperature," +
                 $"precipitation_probability,precipitation,weather_code," +
                 $"surface_pressure,visibility,wind_speed_10m,wind_direction_10m,uv_index" +
-                $"&daily=sunrise,sunset" +
-                $"&timezone=auto&forecast_days=2";
+                $"&daily=weather_code,temperature_2m_max,temperature_2m_min," +
+                $"precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max,sunrise,sunset" +
+                $"&timezone=auto&forecast_days=7";
 
             string aqUrl = $"https://air-quality-api.open-meteo.com/v1/air-quality?" +
                 $"latitude={CityLat}&longitude={CityLon}" +
@@ -524,8 +550,11 @@ namespace Task_Flyout.Services
                 Sunrise = sunriseTime,
                 Sunset = sunsetTime,
                 MoonPhase = GetMoonPhaseEmoji(DateTime.Today),
-                HourlyForecast = new()
+                HourlyForecast = new(),
+                DailyForecast = new()
             };
+
+            BuildOpenMeteoDailyForecast(info, daily, lang);
 
             int totalHours = times.GetArrayLength();
             int nowHour = DateTime.Now.Hour;
@@ -633,6 +662,71 @@ namespace Task_Flyout.Services
             }
 
             return info;
+        }
+
+        private void BuildOpenMeteoDailyForecast(WeatherInfo info, JsonElement daily, string lang)
+        {
+            try
+            {
+                var dates = daily.GetProperty("time");
+                var codes = daily.GetProperty("weather_code");
+                var maxTemps = daily.GetProperty("temperature_2m_max");
+                var minTemps = daily.GetProperty("temperature_2m_min");
+                var precipSum = daily.GetProperty("precipitation_sum");
+                var precipProb = daily.GetProperty("precipitation_probability_max");
+                var windMax = daily.GetProperty("wind_speed_10m_max");
+                var uvMax = daily.GetProperty("uv_index_max");
+
+                int count = Math.Min(dates.GetArrayLength(), 7);
+                for (int i = 0; i < count; i++)
+                {
+                    string dateText = dates[i].GetString() ?? "";
+                    if (!DateTime.TryParse(dateText, out var date)) continue;
+
+                    int code = codes[i].GetInt32();
+                    double high = maxTemps[i].GetDouble();
+                    double low = minTemps[i].GetDouble();
+                    double rain = precipSum[i].ValueKind != JsonValueKind.Null ? precipSum[i].GetDouble() : 0;
+                    double chance = precipProb[i].ValueKind != JsonValueKind.Null ? precipProb[i].GetDouble() : 0;
+                    double wind = windMax[i].ValueKind != JsonValueKind.Null ? windMax[i].GetDouble() : 0;
+                    double uv = uvMax[i].ValueKind != JsonValueKind.Null ? uvMax[i].GetDouble() : 0;
+
+                    info.DailyForecast.Add(new DailyWeather
+                    {
+                        Date = date,
+                        DayLabel = GetDailyDayLabel(date, lang),
+                        DateLabel = date.ToString(lang == "en" ? "MMM d" : "M月d日"),
+                        WeatherCode = code,
+                        HighTemperature = $"{high:F0}°",
+                        LowTemperature = $"{low:F0}°",
+                        TemperatureRange = $"{low:F0}° / {high:F0}°C",
+                        Icon = OpenMeteoCodeToIcon(code, IconFontFamily),
+                        IconFont = IconFontFamily,
+                        IconLayerUris = IconPackService.Instance.TryResolveBitmapLayers(code, true, isOpenMeteo: true),
+                        Description = OpenMeteoCodeToDescription(code, lang),
+                        PrecipProbability = $"{chance:F0}%",
+                        Precipitation = $"{rain:F1} mm",
+                        WindSpeed = $"{wind:F0} km/h",
+                        UVIndex = $"{uv:F1}"
+                    });
+                }
+            }
+            catch { }
+        }
+
+        private static string GetDailyDayLabel(DateTime date, string lang)
+        {
+            int days = (date.Date - DateTime.Today).Days;
+            if (lang == "en")
+            {
+                if (days == 0) return "Today";
+                if (days == 1) return "Tomorrow";
+                return date.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            if (days == 0) return "今天";
+            if (days == 1) return "明天";
+            return date.ToString("ddd", System.Globalization.CultureInfo.GetCultureInfo("zh-CN"));
         }
 
         private static string GetCurrentLanguage()
@@ -831,9 +925,77 @@ namespace Task_Flyout.Services
                 Pressure = string.IsNullOrEmpty(pressVal) ? "" : $"{pressVal} hPa"
             };
 
-            // wttr.in provides 3-hourly data; interpolate to hourly
+            // wttr.in provides a short daily forecast and 3-hourly data; interpolate hourly.
             if (root.TryGetProperty("weather", out var weatherArray) && weatherArray.GetArrayLength() > 0)
             {
+                for (int d = 0; d < weatherArray.GetArrayLength(); d++)
+                {
+                    var day = weatherArray[d];
+                    string dateRaw = day.TryGetProperty("date", out var dateEl) ? dateEl.GetString() : "";
+                    if (!DateTime.TryParse(dateRaw, out var date)) date = DateTime.Today.AddDays(d);
+
+                    string maxC = day.TryGetProperty("maxtempC", out var maxEl) ? maxEl.GetString() : "";
+                    string minC = day.TryGetProperty("mintempC", out var minEl) ? minEl.GetString() : "";
+                    string dailyUv = day.TryGetProperty("uvIndex", out var duvEl) ? duvEl.GetString() : "";
+                    string sunHour = day.TryGetProperty("sunHour", out var sunEl) ? sunEl.GetString() : "";
+
+                    string dayCode = "";
+                    string dayDesc = "";
+                    int maxRainChance = 0;
+                    string totalPrecip = "";
+                    string maxWind = "";
+
+                    if (day.TryGetProperty("hourly", out var dailyHourly) && dailyHourly.GetArrayLength() > 0)
+                    {
+                        var noon = dailyHourly.EnumerateArray()
+                            .FirstOrDefault(h => h.TryGetProperty("time", out var t) && t.GetString() == "1200");
+                        if (noon.ValueKind == JsonValueKind.Undefined)
+                            noon = dailyHourly[dailyHourly.GetArrayLength() / 2];
+
+                        dayCode = noon.TryGetProperty("weatherCode", out var dc) ? dc.GetString() : "";
+                        if (wttrLang == "zh" && noon.TryGetProperty("lang_zh", out var dz) && dz.GetArrayLength() > 0)
+                            dayDesc = dz[0].GetProperty("value").GetString();
+                        else if (noon.TryGetProperty("weatherDesc", out var dd) && dd.GetArrayLength() > 0)
+                            dayDesc = dd[0].GetProperty("value").GetString();
+
+                        foreach (var hour in dailyHourly.EnumerateArray())
+                        {
+                            if (hour.TryGetProperty("chanceofrain", out var rainChance)
+                                && int.TryParse(rainChance.GetString(), out var chance)
+                                && chance > maxRainChance)
+                                maxRainChance = chance;
+
+                            if (string.IsNullOrEmpty(totalPrecip) && hour.TryGetProperty("precipMM", out var precipEl))
+                                totalPrecip = precipEl.GetString();
+
+                            if (hour.TryGetProperty("windspeedKmph", out var windEl)
+                                && int.TryParse(windEl.GetString(), out var wind)
+                                && (string.IsNullOrEmpty(maxWind) || int.Parse(maxWind) < wind))
+                                maxWind = wind.ToString();
+                        }
+                    }
+
+                    int.TryParse(dayCode, out int rawDailyCode);
+                    info.DailyForecast.Add(new DailyWeather
+                    {
+                        Date = date,
+                        DayLabel = GetDailyDayLabel(date, lang),
+                        DateLabel = date.ToString(lang == "en" ? "MMM d" : "M月d日"),
+                        WeatherCode = rawDailyCode,
+                        HighTemperature = string.IsNullOrEmpty(maxC) ? "" : $"{maxC}°",
+                        LowTemperature = string.IsNullOrEmpty(minC) ? "" : $"{minC}°",
+                        TemperatureRange = string.IsNullOrEmpty(minC) || string.IsNullOrEmpty(maxC) ? "" : $"{minC}° / {maxC}°C",
+                        Icon = WttrCodeToIcon(dayCode, IconFontFamily),
+                        IconFont = IconFontFamily,
+                        IconLayerUris = IconPackService.Instance.TryResolveBitmapLayers(rawDailyCode, true, isOpenMeteo: false),
+                        Description = dayDesc,
+                        PrecipProbability = $"{maxRainChance}%",
+                        Precipitation = string.IsNullOrEmpty(totalPrecip) ? "" : $"{totalPrecip} mm",
+                        WindSpeed = string.IsNullOrEmpty(maxWind) ? "" : $"{maxWind} km/h",
+                        UVIndex = string.IsNullOrEmpty(dailyUv) ? sunHour : dailyUv
+                    });
+                }
+
                 var allHourlyRaw = new List<(int hour, string tempC, string code, string hDesc,
                     string hum, string ws, string flC, string pp, string uvi, string visKm, string press)>();
 

@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using System.Linq;
 using System;
 using Task_Flyout.Services;
+using Windows.Storage;
 using Windows.UI.ViewManagement;
 
 namespace Task_Flyout
@@ -54,6 +55,7 @@ namespace Task_Flyout
         {
             MainDispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
             MyFlyoutWindow = new FlyoutWindow();
+            ApplyConfiguredThemeToOpenWindows();
 
             NotificationService = new NotificationService(SyncManager);
             NotificationService.Initialize();
@@ -91,7 +93,12 @@ namespace Task_Flyout
 
         private void UiSettings_ColorValuesChanged(UISettings sender, object args)
         {
-            MainDispatcherQueue.TryEnqueue(() => UpdateTrayIconTheme());
+            MainDispatcherQueue.TryEnqueue(() =>
+            {
+                UpdateTrayIconTheme();
+                ApplyConfiguredThemeToOpenWindows();
+                MyWeatherBar?.ApplyWindowsTheme();
+            });
         }
 
         private void UpdateTrayIconTheme()
@@ -103,6 +110,28 @@ namespace Task_Flyout
             string iconName = isDarkTheme ? "TrayIcon_Dark.ico" : "TrayIcon_Light.ico";
 
             _trayIcon.IconSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri($"ms-appx:///Assets/{iconName}"));
+        }
+
+        public static ElementTheme GetConfiguredTheme()
+        {
+            string theme = ApplicationData.Current.LocalSettings.Values["AppTheme"] as string ?? "Default";
+            return theme switch
+            {
+                "Light" => ElementTheme.Light,
+                "Dark" => ElementTheme.Dark,
+                _ => ElementTheme.Default
+            };
+        }
+
+        public static void ApplyConfiguredThemeToOpenWindows()
+        {
+            var theme = GetConfiguredTheme();
+
+            if (MyMainWindow?.Content is FrameworkElement mainRoot)
+                mainRoot.RequestedTheme = theme;
+
+            if (MyFlyoutWindow?.Content is FrameworkElement flyoutRoot)
+                flyoutRoot.RequestedTheme = theme;
         }
 
         private void InitWeatherBar()
@@ -153,6 +182,7 @@ namespace Task_Flyout
                 if (MyMainWindow == null)
                 {
                     MyMainWindow = new MainWindow();
+                    ApplyConfiguredThemeToOpenWindows();
                     MyMainWindow.Closed += (s, args) => { MyMainWindow = null; };
                 }
 

@@ -49,6 +49,9 @@ namespace Task_Flyout
         [DllImport("user32.dll")]
         private static extern bool IsWindowVisible(IntPtr hWnd);
 
+        [DllImport("user32.dll")]
+        private static extern bool IsWindow(IntPtr hWnd);
+
         [DllImport("user32.dll", SetLastError = true)]
         private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
 
@@ -196,41 +199,58 @@ namespace Task_Flyout
 
         private void ReparentTimer_Tick(object sender, object e)
         {
-            if (_userHidden) return;
-
-            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            IntPtr currentTaskbar = FindWindow("Shell_TrayWnd", null);
-
-            bool needsReparent = currentTaskbar != _taskbarHwnd || GetParent(hWnd) != currentTaskbar;
-            if (needsReparent)
+            try
             {
-                _taskbarHwnd = currentTaskbar;
-                _isParented = false;
-                AttachToTaskbar();
+                if (_userHidden) return;
+
+                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
+
+                IntPtr currentTaskbar = FindWindow("Shell_TrayWnd", null);
+                if (currentTaskbar == IntPtr.Zero || !IsWindow(currentTaskbar))
+                {
+                    _taskbarHwnd = IntPtr.Zero;
+                    _isParented = false;
+                    return;
+                }
+
+                bool needsReparent = currentTaskbar != _taskbarHwnd || GetParent(hWnd) != currentTaskbar;
+                if (needsReparent)
+                {
+                    _taskbarHwnd = currentTaskbar;
+                    _isParented = false;
+                    AttachToTaskbar();
+                }
+
+                PositionOnTaskbar();
+
+                // 只在 reparent 后或窗口被意外隐藏时才 ShowWindow
+                // 避免每 2 秒调 ShowWindow 改变 z-order，覆盖 FluentFlyout
+                if ((needsReparent || !IsWindowVisible(hWnd)) && IsWindow(hWnd))
+                    ShowWindow(hWnd, SW_SHOWNOACTIVATE);
             }
-
-            PositionOnTaskbar();
-
-            // 只在 reparent 后或窗口被意外隐藏时才 ShowWindow
-            // 避免每 2 秒调 ShowWindow 改变 z-order，覆盖 FluentFlyout
-            if (needsReparent || !IsWindowVisible(hWnd))
-                ShowWindow(hWnd, SW_SHOWNOACTIVATE);
+            catch
+            {
+                _taskbarHwnd = IntPtr.Zero;
+                _isParented = false;
+            }
         }
 
         private void AttachToTaskbar()
         {
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
+
             if (_taskbarHwnd == IntPtr.Zero)
                 _taskbarHwnd = FindWindow("Shell_TrayWnd", null);
-            if (_taskbarHwnd == IntPtr.Zero) return;
+            if (_taskbarHwnd == IntPtr.Zero || !IsWindow(_taskbarHwnd)) return;
 
             int style = GetWindowLong(hWnd, GWL_STYLE);
             style &= ~WS_POPUP;
             style |= WS_CHILD | WS_CLIPSIBLINGS;
             SetWindowLong(hWnd, GWL_STYLE, style);
 
-            SetParent(hWnd, _taskbarHwnd);
-            _isParented = true;
+            _isParented = SetParent(hWnd, _taskbarHwnd) != IntPtr.Zero || GetParent(hWnd) == _taskbarHwnd;
         }
 
         private void InstallSubclass(IntPtr hWnd)
@@ -246,7 +266,11 @@ namespace Task_Flyout
 
             if (uMsg == WM_DISPLAYCHANGE || uMsg == WM_DPICHANGED || uMsg == WM_SETTINGCHANGE)
             {
-                DispatcherQueue.TryEnqueue(() => PositionOnTaskbar());
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    ApplyWindowsTheme();
+                    PositionOnTaskbar();
+                });
             }
 
             return DefSubclassProc(hWnd, uMsg, wParam, lParam);
@@ -282,13 +306,20 @@ namespace Task_Flyout
 
         public void PositionOnTaskbar()
         {
-            if (_userHidden) return;
+            try
+            {
+                if (_userHidden) return;
 
-            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
 
-            if (_taskbarHwnd == IntPtr.Zero || !_isParented) return;
-            if (!GetWindowRect(_taskbarHwnd, out RECT tbRect)) return;
-            if (!GetClientRect(_taskbarHwnd, out RECT tbClient)) return;
+                if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
+                if (_taskbarHwnd == IntPtr.Zero || !IsWindow(_taskbarHwnd) || !_isParented)
+                {
+                    _isParented = false;
+                    return;
+                }
+                if (!GetWindowRect(_taskbarHwnd, out RECT tbRect)) return;
+                if (!GetClientRect(_taskbarHwnd, out RECT tbClient)) return;
 
             double scaleFactor = GetDpiForWindow(_taskbarHwnd) / 96.0;
             int taskbarHeight = tbClient.Bottom - tbClient.Top;
@@ -312,13 +343,25 @@ namespace Task_Flyout
             if (_fluentFlyoutHwnd == IntPtr.Zero)
                 flags |= SWP_NOZORDER;
 
-            SetWindowPos(hWnd, insertAfter, x, y, pillWidth, pillHeight, flags);
+                if (insertAfter != IntPtr.Zero && !IsWindow(insertAfter))
+                {
+                    insertAfter = IntPtr.Zero;
+                    flags |= SWP_NOZORDER;
+                }
 
-            // 圆角裁剪窗口外形（Win32 region）
-            int cornerRadius = (int)(8 * scaleFactor);
-            IntPtr rgn = CreateRoundRectRgn(0, 0, pillWidth + 1, pillHeight + 1, cornerRadius, cornerRadius);
-            SetWindowRgn(hWnd, rgn, true);
-            // SetWindowRgn 接管 region 所有权，不需要 DeleteObject
+                SetWindowPos(hWnd, insertAfter, x, y, pillWidth, pillHeight, flags);
+
+                // 圆角裁剪窗口外形（Win32 region）
+                int cornerRadius = (int)(8 * scaleFactor);
+                IntPtr rgn = CreateRoundRectRgn(0, 0, pillWidth + 1, pillHeight + 1, cornerRadius, cornerRadius);
+                SetWindowRgn(hWnd, rgn, true);
+                // SetWindowRgn 接管 region 所有权，不需要 DeleteObject
+            }
+            catch
+            {
+                _taskbarHwnd = IntPtr.Zero;
+                _isParented = false;
+            }
         }
 
         [DllImport("gdi32.dll")]
@@ -545,7 +588,7 @@ namespace Task_Flyout
 
         private bool _isLightTheme;
 
-        private void ApplyWindowsTheme()
+        public void ApplyWindowsTheme()
         {
             try
             {
@@ -602,6 +645,18 @@ namespace Task_Flyout
             ApplyWindowsTheme(); // restore resting Mica background + border
         }
 
+        private static string FormatBarLocation(string city)
+        {
+            if (string.IsNullOrWhiteSpace(city)) return "";
+
+            string text = city.Trim();
+            int comma = text.IndexOf(',');
+            if (comma > 0)
+                text = text[..comma].Trim();
+
+            return text.Length > 18 ? text[..18] + "..." : text;
+        }
+
         public async Task RefreshWeatherAsync()
         {
             var weatherService = (App.Current as App)?.WeatherService;
@@ -612,6 +667,8 @@ namespace Task_Flyout
                     WeatherIcon.Text = "--";
                     TxtTemp.Text = "--";
                     TxtDesc.Text = "";
+                    TxtLocation.Text = "";
+                    TxtLocation.Visibility = Visibility.Collapsed;
                 });
                 return;
             }
@@ -628,6 +685,8 @@ namespace Task_Flyout
                     WeatherIcon.Text = "--";
                     TxtTemp.Text = "--";
                     TxtDesc.Text = "";
+                    TxtLocation.Text = "";
+                    TxtLocation.Visibility = Visibility.Collapsed;
                     return;
                 }
 
@@ -703,6 +762,11 @@ namespace Task_Flyout
                 // 告警激活时隐藏副字段，避免文字挤占
                 bool hasAlert = alert != null;
 
+                // Location
+                bool showLocation = !hasAlert && enabledFields.Contains("location") && !string.IsNullOrWhiteSpace(info.City);
+                TxtLocation.Visibility = showLocation ? Visibility.Visible : Visibility.Collapsed;
+                if (showLocation) TxtLocation.Text = FormatBarLocation(info.City);
+
                 // Feels like
                 bool showFeels = !hasAlert && enabledFields.Contains("feelslike") && !string.IsNullOrEmpty(info.FeelsLike);
                 TxtFeels.Visibility = showFeels ? Visibility.Visible : Visibility.Collapsed;
@@ -763,31 +827,49 @@ namespace Task_Flyout
 
         public void ShowBar()
         {
-            _userHidden = false;
-            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-
-            if (!_initialActivationDone)
+            try
             {
-                Activate();
-                _initialActivationDone = true;
+                _userHidden = false;
+                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
+
+                if (!_initialActivationDone)
+                {
+                    Activate();
+                    _initialActivationDone = true;
+                }
+
+                ApplyWindowsTheme();
+
+                if (!_isParented)
+                    AttachToTaskbar();
+
+                PositionOnTaskbar();
+                if (IsWindow(hWnd))
+                    ShowWindow(hWnd, SW_SHOWNOACTIVATE);
             }
-
-            if (!_isParented)
-                AttachToTaskbar();
-
-            PositionOnTaskbar();
-            ShowWindow(hWnd, SW_SHOWNOACTIVATE);
+            catch
+            {
+                _taskbarHwnd = IntPtr.Zero;
+                _isParented = false;
+            }
         }
 
         public void HideBar()
         {
-            _userHidden = true;
-            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            ShowWindow(hWnd, 0); // SW_HIDE
-            // 清除 region 并缩为 0，彻底消除残影
-            SetWindowRgn(hWnd, IntPtr.Zero, true);
-            SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0,
-                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+            try
+            {
+                _userHidden = true;
+                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
+
+                ShowWindow(hWnd, 0); // SW_HIDE
+                // 清除 region 并缩为 0，彻底消除残影
+                SetWindowRgn(hWnd, IntPtr.Zero, true);
+                SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+            catch { }
         }
     }
 }

@@ -38,6 +38,10 @@
                     <TextBlock x:Name="TxtDesc" Text="" FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TxtLocation" Text="" FontSize="12"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               VerticalAlignment="Center" Visibility="Collapsed"
+                               MaxWidth="120" TextTrimming="CharacterEllipsis"/>
                     <TextBlock x:Name="TxtFeels" Text="" FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                VerticalAlignment="Center" Visibility="Collapsed"/>
