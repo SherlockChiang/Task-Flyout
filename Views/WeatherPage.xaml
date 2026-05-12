@@ -188,6 +188,7 @@
 
                 <StackPanel Spacing="4">
                     <ToggleSwitch x:Name="WeatherBarToggle" Header="Taskbar Weather Bar" OnContent="On" OffContent="Off" Toggled="WeatherBarToggle_Toggled"/>
+                    <ToggleSwitch x:Name="WeatherBarTransparentToggle" Header="透明背景" OnContent="On" OffContent="Off" Toggled="WeatherBarTransparentToggle_Toggled"/>
                     <TextBlock x:Name="WeatherBarDesc" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap"/>
                 </StackPanel>
 

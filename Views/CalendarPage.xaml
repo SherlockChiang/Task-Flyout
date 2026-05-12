@@ -17,11 +17,123 @@
 
     <Grid Background="#01000000">
         <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260"/>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="340"/>
         </Grid.ColumnDefinitions>
 
-        <Grid Grid.Column="0" Padding="32,32,24,32">
+        <Grid Grid.Column="0" Background="{ThemeResource LayerFillColorAltBrush}" BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Padding="16,32,16,24" RowSpacing="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Text="日程账户" FontSize="18" FontWeight="SemiBold" Margin="4,0,0,8"/>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <ItemsRepeater x:Name="AccountListRepeater">
+                    <ItemsRepeater.Layout>
+                        <StackLayout Spacing="4"/>
+                    </ItemsRepeater.Layout>
+                    <ItemsRepeater.ItemTemplate>
+                        <DataTemplate>
+                            <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                      Background="Transparent" BorderThickness="0" Padding="0" IsExpanded="True">
+                                <Expander.Resources>
+                                    <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="Transparent"/>
+                                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="Transparent"/>
+                                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="Transparent"/>
+                                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="Transparent"/>
+                                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="Transparent"/>
+                                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="Transparent"/>
+                                    <SolidColorBrush x:Key="ExpanderContentBackground" Color="Transparent"/>
+                                    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="Transparent"/>
+                                </Expander.Resources>
+
+                                <Expander.Header>
+                                    <Grid HorizontalAlignment="Stretch" Margin="0,0,8,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Grid.Column="0" Glyph="&#xE77B;" FontSize="15" Margin="0,0,12,0"
+                                                  Foreground="{ThemeResource SystemAccentColor}" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"
+                                                   Text="{Binding ProviderName}" TextTrimming="CharacterEllipsis"/>
+                                        <Button Grid.Column="2" Padding="4" Background="Transparent" BorderThickness="0"
+                                                Tag="{Binding ProviderName}" Click="BtnRemoveAccount_Click"
+                                                ToolTipService.ToolTip="移除账户" VerticalAlignment="Center">
+                                            <FontIcon Glyph="&#xE711;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                                        </Button>
+                                    </Grid>
+                                </Expander.Header>
+
+                                <Expander.Content>
+                                    <StackPanel Spacing="0" Margin="0,4,0,0">
+                                        <ItemsRepeater ItemsSource="{Binding Calendars}">
+                                            <ItemsRepeater.Layout>
+                                                <StackLayout Spacing="0"/>
+                                            </ItemsRepeater.Layout>
+                                            <ItemsRepeater.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="32,0,0,8" ColumnSpacing="8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Grid.Column="0" Width="16" Height="16" CornerRadius="8"
+                                                                VerticalAlignment="Center"
+                                                                Background="{Binding ColorHex, Converter={StaticResource ProviderToBrushConverter}}"/>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
+                                                                   TextTrimming="CharacterEllipsis" FontSize="13"
+                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                                        <ToggleSwitch Grid.Column="2" IsOn="{Binding IsVisible, Mode=TwoWay}"
+                                                                      OffContent="" OnContent="" MinWidth="0" Margin="0"
+                                                                      Toggled="CalendarToggle_Toggled" VerticalAlignment="Center"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsRepeater.ItemTemplate>
+                                        </ItemsRepeater>
+
+                                        <Grid Margin="32,0,0,8" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Width="16" Height="16" CornerRadius="8"
+                                                    VerticalAlignment="Center"
+                                                    Background="{Binding TaskColorHex, Converter={StaticResource ProviderToBrushConverter}}"/>
+                                            <TextBlock Grid.Column="1" Text="待办任务" VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" FontSize="13"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <ToggleSwitch Grid.Column="2" IsOn="{Binding ShowTasks, Mode=TwoWay}"
+                                                          OffContent="" OnContent="" MinWidth="0" Margin="0"
+                                                          Toggled="AccountToggle_Toggled" Tag="{Binding ProviderName}" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Expander.Content>
+                            </Expander>
+                        </DataTemplate>
+                    </ItemsRepeater.ItemTemplate>
+                </ItemsRepeater>
+            </ScrollViewer>
+
+            <Button Grid.Row="2" x:Name="BtnAddAccount" HorizontalAlignment="Stretch" Click="BtnAddAccount_Click" Margin="0,8,0,0">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE710;" FontSize="14"/>
+                    <TextBlock Text="添加账户"/>
+                </StackPanel>
+            </Button>
+
+            <Button Grid.Row="3" Content="强制立即同步" HorizontalAlignment="Stretch" Click="BtnForceSync_Click"/>
+        </Grid>
+
+        <Grid Grid.Column="1" Padding="32,32,24,32">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -129,7 +241,7 @@
             </GridView>
         </Grid>
 
-        <Grid Grid.Column="1" Background="{ThemeResource LayerFillColorAltBrush}" BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}" BorderThickness="1,0,0,0" Padding="24,32,24,0">
+        <Grid Grid.Column="2" Background="{ThemeResource LayerFillColorAltBrush}" BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}" BorderThickness="1,0,0,0" Padding="24,32,24,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>

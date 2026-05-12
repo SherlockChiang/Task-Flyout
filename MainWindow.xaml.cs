@@ -26,13 +26,10 @@ namespace Task_Flyout
             SetTitleBar(null);
             this.AppWindow.Closing += AppWindow_Closing;
 
-            MainNav.PaneOpening += (s, e) => FooterContentPanel.Visibility = Visibility.Visible;
-            MainNav.PaneClosing += (s, e) => FooterContentPanel.Visibility = Visibility.Collapsed;
-            FooterContentPanel.Visibility = MainNav.IsPaneOpen ? Visibility.Visible : Visibility.Collapsed;
+            FooterContentPanel.Visibility = Visibility.Collapsed;
 
             ContentFrame.Navigated += ContentFrame_Navigated;
 
-            RefreshAccountList();
             RefreshWeatherNavIconAsync();
 
             var calendarItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault();
@@ -108,18 +105,14 @@ namespace Task_Flyout
 
         public async void RefreshAccountList()
         {
-            var mgr = GetAccountManager();
-            if (mgr == null) return;
-
-            AccountListRepeater.ItemsSource = null;
-            AccountListRepeater.ItemsSource = mgr.Accounts;
+            if (ContentFrame.Content is CalendarPage page)
+            {
+                page.RefreshAccountList();
+                return;
+            }
 
             if (App.Current is App app)
-            {
                 await app.SyncManager.SyncAllCalendarsAsync();
-                AccountListRepeater.ItemsSource = null;
-                AccountListRepeater.ItemsSource = mgr.Accounts;
-            }
         }
 
         private void BtnAddAccount_Click(object sender, RoutedEventArgs e)

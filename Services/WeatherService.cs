@@ -181,6 +181,12 @@ namespace Task_Flyout.Services
             set => ApplicationData.Current.LocalSettings.Values["WeatherBarFields"] = value;
         }
 
+        public bool WeatherBarTransparentBackground
+        {
+            get => ApplicationData.Current.LocalSettings.Values["WeatherBarTransparentBackground"] as bool? ?? false;
+            set => ApplicationData.Current.LocalSettings.Values["WeatherBarTransparentBackground"] = value;
+        }
+
         public bool BarAlertsEnabled
         {
             get => ApplicationData.Current.LocalSettings.Values["WeatherBarAlertsEnabled"] as bool? ?? true;

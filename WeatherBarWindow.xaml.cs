@@ -300,8 +300,14 @@ namespace Task_Flyout
             exStyle |= WS_EX_LAYERED;
             SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
 
-            // 仅使用 LWA_ALPHA 实现整体半透明，圆角由 SetWindowRgn 裁剪
-            SetLayeredWindowAttributes(hWnd, 0, 230, LWA_ALPHA);
+            ApplyLayeredOpacity(hWnd);
+        }
+
+        private void ApplyLayeredOpacity(IntPtr hWnd)
+        {
+            var weatherService = (App.Current as App)?.WeatherService;
+            byte alpha = weatherService?.WeatherBarTransparentBackground == true ? (byte)255 : (byte)230;
+            SetLayeredWindowAttributes(hWnd, 0, alpha, LWA_ALPHA);
         }
 
         public void PositionOnTaskbar()
@@ -601,6 +607,18 @@ namespace Task_Flyout
                 if (root == null) return;
                 var mainBorder = root.FindName("MainBorder") as Microsoft.UI.Xaml.Controls.Border;
                 var topBorder = root.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
+                var weatherService = (App.Current as App)?.WeatherService;
+                bool transparent = weatherService?.WeatherBarTransparentBackground == true;
+                ApplyLayeredOpacity(WinRT.Interop.WindowNative.GetWindowHandle(this));
+
+                if (transparent)
+                {
+                    if (mainBorder != null)
+                        mainBorder.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+                    if (topBorder != null)
+                        topBorder.BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+                    return;
+                }
 
                 if (_isLightTheme)
                 {
@@ -624,6 +642,10 @@ namespace Task_Flyout
         {
             var border = sender as Microsoft.UI.Xaml.Controls.Border;
             if (border == null) return;
+            var weatherService = (App.Current as App)?.WeatherService;
+            if (weatherService?.WeatherBarTransparentBackground == true)
+                return;
+
             var topBorder = (this.Content as FrameworkElement)?.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
 
             if (_isLightTheme)

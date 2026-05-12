@@ -6,9 +6,7 @@ using Microsoft.UI.Xaml.Media;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
 using Task_Flyout.Services;
@@ -92,8 +90,6 @@ namespace Task_Flyout.Views
         private AgendaItem _itemBeingEdited;
         private ResourceLoader _loader;
 
-        private readonly string CacheFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TaskFlyout", "local_cache_winui3.json");
-
         private void TaskCheckBox_Tapped(object sender, TappedRoutedEventArgs e)
         {
             e.Handled = true;
@@ -108,18 +104,14 @@ namespace Task_Flyout.Views
             LoadCache();
             this.Loaded += (s, e) =>
             {
+                RefreshAccountList();
                 LoadCalendar(_viewDate);
             };
         }
 
         private void LoadCache()
         {
-            try
-            {
-                if (File.Exists(CacheFilePath))
-                    _localCache = JsonSerializer.Deserialize(File.ReadAllText(CacheFilePath), AppJsonContext.Default.AppCache) ?? new();
-            }
-            catch { _localCache = new(); }
+            _localCache = _syncManager?.GetLocalCache() ?? new AppCache();
         }
 
         private void LoadCalendar(DateTime date)
@@ -167,7 +159,7 @@ namespace Task_Flyout.Views
 
         private System.Threading.CancellationTokenSource _syncCts;
 
-        private async Task SyncMonthDataAsync()
+        private async Task SyncMonthDataAsync(bool forceRefresh = false)
         {
             if (_syncManager == null || SyncProgress == null) return;
 
@@ -190,34 +182,13 @@ namespace Task_Flyout.Views
                 var start = DayCells.First().Date;
                 var end = DayCells.Last().Date.AddDays(1);
 
-                var allItems = await _syncManager.GetAllDataAsync(start, end);
+                var allItems = await _syncManager.GetAllDataAsync(start, end, forceRefresh);
 
                 if (token.IsCancellationRequested) return;
 
                 if (CalendarGrid == null) return;
 
-                for (var d = start; d < end; d = d.AddDays(1))
-                {
-                    _localCache.DayItems.Remove(d.ToString("yyyy-MM-dd"));
-                }
-
-                foreach (var item in allItems)
-                {
-                    if (!_localCache.DayItems.ContainsKey(item.DateKey))
-                        _localCache.DayItems[item.DateKey] = new List<AgendaItem>();
-
-                    var list = _localCache.DayItems[item.DateKey];
-                    list.RemoveAll(x => x.Id == item.Id);
-                    list.Add(item);
-                }
-
-                try
-                {
-                    var dir = Path.GetDirectoryName(CacheFilePath);
-                    if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                    File.WriteAllText(CacheFilePath, JsonSerializer.Serialize(_localCache, AppJsonContext.Default.AppCache));
-                }
-                catch (IOException) { /* 忽略文件被占用的写入失败，不影响运行 */ }
+                _localCache = _syncManager.GetLocalCache();
 
                 foreach (var cell in DayCells)
                 {
@@ -293,6 +264,65 @@ namespace Task_Flyout.Views
         private void BtnNextMonth_Click(object sender, RoutedEventArgs e) => LoadCalendar(_viewDate = _viewDate.AddMonths(1));
         private void BtnToday_Click(object sender, RoutedEventArgs e) => LoadCalendar(_viewDate = DateTime.Today);
 
+        public async void RefreshAccountList()
+        {
+            var mgr = _syncManager?.AccountManager;
+            if (mgr == null || AccountListRepeater == null) return;
+
+            AccountListRepeater.ItemsSource = null;
+            AccountListRepeater.ItemsSource = mgr.Accounts;
+
+            await _syncManager.SyncAllCalendarsAsync();
+            AccountListRepeater.ItemsSource = null;
+            AccountListRepeater.ItemsSource = mgr.Accounts;
+        }
+
+        private void BtnAddAccount_Click(object sender, RoutedEventArgs e)
+        {
+            App.MyMainWindow?.NavigateToAddAccount();
+        }
+
+        private async void BtnRemoveAccount_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not string providerName) return;
+
+            var dialog = new ContentDialog
+            {
+                Title = _loader.GetString("TextRemoveAccountTitle") ?? "移除账户",
+                Content = string.Format(_loader.GetString("TextRemoveAccountContent") ?? "确定要移除 {0} 账户吗？", providerName),
+                PrimaryButtonText = _loader.GetString("TextConfirm") ?? "确定",
+                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "取消",
+                XamlRoot = XamlRoot,
+                DefaultButton = ContentDialogButton.Close
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+
+            _syncManager?.AccountManager.RemoveAccount(providerName);
+            RefreshAccountList();
+            ForceSync();
+        }
+
+        private void AccountToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            _syncManager?.AccountManager.Save();
+            ReloadFilters();
+            App.MyFlyoutWindow?.ReloadFilters();
+        }
+
+        private void CalendarToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            _syncManager?.AccountManager.Save();
+            ReloadFilters();
+            App.MyFlyoutWindow?.ReloadFilters();
+        }
+
+        private void BtnForceSync_Click(object sender, RoutedEventArgs e)
+        {
+            ForceSync();
+        }
+
         private void CalendarGrid_ItemClick(object sender, ItemClickEventArgs e)
         {
             if (e.ClickedItem is DayCellViewModel cell) UpdateSideBar(cell);
@@ -357,7 +387,7 @@ namespace Task_Flyout.Views
                     cb.IsEnabled = false;
                     item.IsCompleted = (cb.IsChecked == true);
                     await _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, item.IsCompleted);
-                    _ = SyncMonthDataAsync();
+                    _ = SyncMonthDataAsync(forceRefresh: true);
                 }
                 catch { item.IsCompleted = !item.IsCompleted; }
                 finally { cb.IsEnabled = true; }
@@ -392,7 +422,7 @@ namespace Task_Flyout.Views
 
         public void ForceSync()
         {
-            _ = SyncMonthDataAsync();
+            _ = SyncMonthDataAsync(forceRefresh: true);
         }
 
         private void EditRadioType_Changed(object sender, RoutedEventArgs e)
@@ -543,7 +573,7 @@ namespace Task_Flyout.Views
                     await _syncManager.CreateItemAsync(
                         EditTxtTitle.Text, isEvent, isAllDay, EditDatePicker.Date.DateTime,
                         newStartTime ?? TimeSpan.Zero, newEndTime ?? TimeSpan.Zero, EditTxtLocation.Text, providerName);
-                    _ = SyncMonthDataAsync();
+                    _ = SyncMonthDataAsync(forceRefresh: true);
                 }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"新建失败: {ex.Message}"); }
             }
@@ -562,6 +592,7 @@ namespace Task_Flyout.Views
                         orig.Subtitle = newSubtitleText;
                         if (!_localCache.DayItems.ContainsKey(newDateKey)) _localCache.DayItems[newDateKey] = new List<AgendaItem>();
                         _localCache.DayItems[newDateKey].Add(orig);
+                        _ = _syncManager.SaveLocalCacheAsync();
                     }
                 }
                 LoadCalendar(_viewDate);
@@ -574,7 +605,7 @@ namespace Task_Flyout.Views
                             _itemBeingEdited.Provider, _itemBeingEdited.Id, _itemBeingEdited.IsEvent,
                             EditTxtTitle.Text, EditTxtLocation.Text, EditTxtDescription.Text,
                             EditDatePicker.Date.DateTime, newStartTime, newEndTime);
-                        _ = SyncMonthDataAsync();
+                        _ = SyncMonthDataAsync(forceRefresh: true);
                     }
                     catch { }
                 }
@@ -588,6 +619,7 @@ namespace Task_Flyout.Views
                 if (_localCache.DayItems.TryGetValue(_itemBeingEdited.DateKey, out var list))
                 {
                     list.RemoveAll(x => x.Id == _itemBeingEdited.Id);
+                    _ = _syncManager.SaveLocalCacheAsync();
                 }
                 LoadCalendar(_viewDate);
 

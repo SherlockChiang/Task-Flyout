@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
 
@@ -9,6 +11,13 @@ namespace Task_Flyout.Services
     public class SyncManager
     {
         private readonly List<ISyncProvider> _providers = new();
+        private AppCache _cache = new();
+        private bool _cacheLoaded;
+        private readonly object _cacheLock = new();
+        private static readonly string CacheFilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "TaskFlyout", "local_cache_winui3.json");
+
         public IReadOnlyList<ISyncProvider> Providers => _providers;
         public AccountManager AccountManager { get; } = new AccountManager();
 
@@ -65,8 +74,28 @@ namespace Task_Flyout.Services
             AccountManager.EnsureDefaultColors();
         }
 
-        public async Task<List<AgendaItem>> GetAllDataAsync(DateTime min, DateTime max)
+        public AppCache GetLocalCache()
         {
+            EnsureCacheLoaded();
+            return _cache;
+        }
+
+        public async Task SaveLocalCacheAsync()
+        {
+            EnsureCacheLoaded();
+            RebuildMarkedDates();
+            await SaveCacheAsync();
+        }
+
+        public async Task<List<AgendaItem>> GetAllDataAsync(DateTime min, DateTime max, bool forceRefresh = false)
+        {
+            EnsureCacheLoaded();
+            min = min.Date;
+            max = max.Date;
+
+            if (!forceRefresh && IsRangeCached(min, max))
+                return GetCachedItems(min, max);
+
             var allItems = new List<AgendaItem>();
             var activeProviders = _providers.Where(p => AccountManager.IsConnected(p.ProviderName)).ToList();
 
@@ -85,6 +114,9 @@ namespace Task_Flyout.Services
             {
                 if (result != null) allItems.AddRange(result);
             }
+
+            MergeIntoCache(min, max, allItems);
+            await SaveCacheAsync();
 
             return allItems;
         }
@@ -123,5 +155,133 @@ namespace Task_Flyout.Services
 
         public ISyncProvider GetProvider(string providerName)
             => _providers.FirstOrDefault(p => p.ProviderName == providerName);
+
+        private void EnsureCacheLoaded()
+        {
+            if (_cacheLoaded) return;
+            _cacheLoaded = true;
+
+            try
+            {
+                if (File.Exists(CacheFilePath))
+                {
+                    string json = File.ReadAllText(CacheFilePath);
+                    _cache = JsonSerializer.Deserialize(json, AppJsonContext.Default.AppCache) ?? new AppCache();
+                }
+            }
+            catch
+            {
+                _cache = new AppCache();
+            }
+
+            _cache.MarkedDates ??= new HashSet<string>();
+            _cache.DayItems ??= new Dictionary<string, List<AgendaItem>>();
+            _cache.CachedRanges ??= new List<AgendaCacheRange>();
+        }
+
+        private async Task SaveCacheAsync()
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(CacheFilePath));
+                string json;
+                lock (_cacheLock)
+                {
+                    json = JsonSerializer.Serialize(_cache, AppJsonContext.Default.AppCache);
+                }
+                await File.WriteAllTextAsync(CacheFilePath, json);
+            }
+            catch { }
+        }
+
+        private bool IsRangeCached(DateTime min, DateTime max)
+        {
+            string start = min.ToString("yyyy-MM-dd");
+            string end = max.AddDays(-1).ToString("yyyy-MM-dd");
+
+            return _cache.CachedRanges.Any(range =>
+                string.Compare(range.StartDateKey, start, StringComparison.Ordinal) <= 0 &&
+                string.Compare(range.EndDateKey, end, StringComparison.Ordinal) >= 0);
+        }
+
+        private List<AgendaItem> GetCachedItems(DateTime min, DateTime max)
+        {
+            string start = min.ToString("yyyy-MM-dd");
+            string end = max.AddDays(-1).ToString("yyyy-MM-dd");
+
+            return _cache.DayItems
+                .Where(kvp =>
+                    string.Compare(kvp.Key, start, StringComparison.Ordinal) >= 0 &&
+                    string.Compare(kvp.Key, end, StringComparison.Ordinal) <= 0)
+                .SelectMany(kvp => kvp.Value)
+                .ToList();
+        }
+
+        private void MergeIntoCache(DateTime min, DateTime max, List<AgendaItem> items)
+        {
+            string start = min.ToString("yyyy-MM-dd");
+            string end = max.AddDays(-1).ToString("yyyy-MM-dd");
+
+            lock (_cacheLock)
+            {
+                for (var d = min; d < max; d = d.AddDays(1))
+                    _cache.DayItems.Remove(d.ToString("yyyy-MM-dd"));
+
+                foreach (var item in items.Where(item => !string.IsNullOrWhiteSpace(item.DateKey)))
+                {
+                    if (!_cache.DayItems.ContainsKey(item.DateKey))
+                        _cache.DayItems[item.DateKey] = new List<AgendaItem>();
+
+                    _cache.DayItems[item.DateKey].Add(item);
+                }
+
+                _cache.CachedRanges.RemoveAll(range =>
+                    string.Compare(range.EndDateKey, start, StringComparison.Ordinal) >= 0 &&
+                    string.Compare(range.StartDateKey, end, StringComparison.Ordinal) <= 0);
+
+                _cache.CachedRanges.Add(new AgendaCacheRange { StartDateKey = start, EndDateKey = end });
+                MergeCacheRanges();
+                RebuildMarkedDates();
+            }
+        }
+
+        private void MergeCacheRanges()
+        {
+            var ranges = _cache.CachedRanges
+                .Where(range => !string.IsNullOrWhiteSpace(range.StartDateKey) && !string.IsNullOrWhiteSpace(range.EndDateKey))
+                .OrderBy(range => range.StartDateKey)
+                .ToList();
+
+            var merged = new List<AgendaCacheRange>();
+            foreach (var range in ranges)
+            {
+                if (merged.Count == 0)
+                {
+                    merged.Add(range);
+                    continue;
+                }
+
+                var last = merged[^1];
+                if (string.Compare(range.StartDateKey, last.EndDateKey, StringComparison.Ordinal) <= 0)
+                {
+                    if (string.Compare(range.EndDateKey, last.EndDateKey, StringComparison.Ordinal) > 0)
+                        last.EndDateKey = range.EndDateKey;
+                }
+                else
+                {
+                    merged.Add(range);
+                }
+            }
+
+            _cache.CachedRanges = merged;
+        }
+
+        private void RebuildMarkedDates()
+        {
+            _cache.MarkedDates = _cache.DayItems
+                .Where(kvp => kvp.Value.Any(AccountManager.IsItemVisible))
+                .Select(kvp => kvp.Key)
+                .ToHashSet();
+        }
     }
 }

@@ -25,6 +25,13 @@ namespace Task_Flyout
     {
         public HashSet<string> MarkedDates { get; set; } = new();
         public Dictionary<string, List<AgendaItem>> DayItems { get; set; } = new();
+        public List<AgendaCacheRange> CachedRanges { get; set; } = new();
+    }
+
+    public class AgendaCacheRange
+    {
+        public string StartDateKey { get; set; } = "";
+        public string EndDateKey { get; set; } = "";
     }
 
     public partial class ColorHexToBrushConverter : IValueConverter
@@ -80,10 +87,6 @@ namespace Task_Flyout
         private bool _isDotRefreshPending = false;
 
         private ScrollViewer _activeScrollViewer;
-
-        private readonly string CacheFilePath =
-            System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "TaskFlyout", "local_cache_winui3.json");
 
         public ObservableCollection<AgendaItem> AgendaItems { get; set; } = new();
         public HashSet<string> MarkedDates { get; set; } = new();
@@ -213,7 +216,7 @@ namespace Task_Flyout
         {
             int intervalMin = Windows.Storage.ApplicationData.Current.LocalSettings.Values["SyncIntervalMinutes"] as int? ?? 15;
             _syncTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(intervalMin) };
-            _syncTimer.Tick += async (s, e) => await SyncAllDataAsync(true);
+            _syncTimer.Tick += async (s, e) => await SyncAllDataAsync(true, forceRefresh: true);
             _syncTimer.Start();
         }
 
@@ -246,9 +249,9 @@ namespace Task_Flyout
         {
             try
             {
-                if (File.Exists(CacheFilePath))
+                if (_syncManager != null)
                 {
-                    _localCache = JsonSerializer.Deserialize(File.ReadAllText(CacheFilePath), AppJsonContext.Default.AppCache) ?? new();
+                    _localCache = _syncManager.GetLocalCache();
                     MarkedDates = new HashSet<string>(_localCache.MarkedDates);
                     EventCounts.Clear();
                     foreach (var kvp in _localCache.DayItems)
@@ -265,9 +268,8 @@ namespace Task_Flyout
         {
             try
             {
-                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(CacheFilePath));
-                _localCache.MarkedDates = MarkedDates;
-                await File.WriteAllTextAsync(CacheFilePath, JsonSerializer.Serialize(_localCache, AppJsonContext.Default.AppCache));
+                if (_syncManager != null)
+                    await _syncManager.SaveLocalCacheAsync();
             }
             catch { }
         }
@@ -551,7 +553,7 @@ namespace Task_Flyout
             AdjustWindowHeight();
         }
 
-        private async Task SyncAllDataAsync(bool silent)
+        private async Task SyncAllDataAsync(bool silent, bool forceRefresh = false)
         {
             var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
 
@@ -589,7 +591,7 @@ namespace Task_Flyout
                 var min = DateTime.Today.AddYears(-1);
                 var max = DateTime.Today.AddYears(3);
 
-                var allItems = await Task.Run(async () => await _syncManager.GetAllDataAsync(min, max));
+                var allItems = await Task.Run(async () => await _syncManager.GetAllDataAsync(min, max, forceRefresh));
 
                 var tempDayItems = new Dictionary<string, List<AgendaItem>>();
                 var tempMarkedDates = new HashSet<string>();
@@ -623,7 +625,7 @@ namespace Task_Flyout
                     }
                 }
 
-                _localCache.DayItems = tempDayItems;
+                _localCache = _syncManager.GetLocalCache();
                 MarkedDates = tempMarkedDates;
                 EventCounts = tempEventCounts;
                 await SaveCache();
