@@ -134,23 +134,36 @@ namespace Task_Flyout.Services
         }
 
         public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, string providerName = null)
+            => await CreateItemAsync(title, isEvent, isAllDay, targetDate, startTime, endTime, location, EventRecurrenceKind.None, providerName);
+
+        public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, EventRecurrenceKind recurrence, string providerName = null)
         {
             var provider = providerName != null ? _providers.FirstOrDefault(p => p.ProviderName == providerName) : _providers.FirstOrDefault();
             if (provider == null) return;
 
             if (isEvent)
-                await provider.CreateEventAsync(title, targetDate, startTime, endTime, location, isAllDay);
+                await provider.CreateEventAsync(title, targetDate, startTime, endTime, location, isAllDay, recurrence);
             else
                 await provider.CreateTaskAsync(title, targetDate, startTime, isAllDay);
         }
 
         public async Task DeleteItemAsync(string providerName, string itemId, bool isEvent)
+            => await DeleteItemAsync(providerName, itemId, isEvent, RecurringDeleteMode.Single, null, "");
+
+        public async Task DeleteItemAsync(string providerName, string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode, DateTime? occurrenceDate, string recurringEventId)
         {
             var provider = _providers.FirstOrDefault(p => p.ProviderName == providerName);
             if (provider != null)
             {
-                await provider.DeleteItemAsync(itemId, isEvent);
+                await provider.DeleteItemAsync(itemId, isEvent, recurringDeleteMode, occurrenceDate, recurringEventId);
             }
+        }
+
+        public async Task RemoveAccountAsync(string providerName)
+        {
+            AccountManager.RemoveAccount(providerName);
+            RemoveProviderFromCache(providerName);
+            await SaveCacheAsync();
         }
 
         public ISyncProvider GetProvider(string providerName)
@@ -177,6 +190,22 @@ namespace Task_Flyout.Services
             _cache.MarkedDates ??= new HashSet<string>();
             _cache.DayItems ??= new Dictionary<string, List<AgendaItem>>();
             _cache.CachedRanges ??= new List<AgendaCacheRange>();
+        }
+
+        private void RemoveProviderFromCache(string providerName)
+        {
+            EnsureCacheLoaded();
+            lock (_cacheLock)
+            {
+                foreach (var key in _cache.DayItems.Keys.ToList())
+                {
+                    _cache.DayItems[key].RemoveAll(item => string.Equals(item.Provider, providerName, StringComparison.OrdinalIgnoreCase));
+                    if (_cache.DayItems[key].Count == 0)
+                        _cache.DayItems.Remove(key);
+                }
+
+                RebuildMarkedDates();
+            }
         }
 
         private async Task SaveCacheAsync()

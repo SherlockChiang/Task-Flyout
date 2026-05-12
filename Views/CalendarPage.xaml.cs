@@ -317,9 +317,12 @@ namespace Task_Flyout.Views
             var result = await dialog.ShowAsync();
             if (result != ContentDialogResult.Primary) return;
 
-            _syncManager?.AccountManager.RemoveAccount(providerName);
+            if (_syncManager != null)
+                await _syncManager.RemoveAccountAsync(providerName);
             RefreshAccountList();
-            ForceSync();
+            LoadCache();
+            LoadCalendar(_viewDate);
+            App.MyFlyoutWindow?.ReloadFilters();
         }
 
         private void AccountToggle_Toggled(object sender, RoutedEventArgs e)
@@ -377,7 +380,13 @@ namespace Task_Flyout.Views
                         IsCompleted = item.IsCompleted,
                         Provider = item.Provider,
                         CalendarId = item.CalendarId,
-                        DateKey = item.DateKey
+                        CalendarName = item.CalendarName,
+                        ColorHex = item.ColorHex,
+                        DateKey = item.DateKey,
+                        StartDateTime = item.StartDateTime,
+                        EndDateTime = item.EndDateTime,
+                        IsRecurring = item.IsRecurring,
+                        RecurringEventId = item.RecurringEventId
                     };
                     PopulateItemColor(displayItem);
                     SelectedDayItems.Add(displayItem);
@@ -450,6 +459,8 @@ namespace Task_Flyout.Views
             bool isEvent = EditRadioEvent.IsChecked == true;
             EditTxtLocation.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
             EditEndTimePicker.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
+            EditRecurrenceComboBox.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
+            if (!isEvent) EditRecurrenceComboBox.SelectedIndex = 0;
             EditStartTimePicker.Header = isEvent ? _loader.GetString("TextStartTime") : _loader.GetString("TextDueTime");
         }
 
@@ -492,6 +503,8 @@ namespace Task_Flyout.Views
             EditCmbProvider.IsEnabled = true;
             EditRadioEvent.IsEnabled = true;
             EditRadioTask.IsEnabled = true;
+            EditRecurrenceComboBox.SelectedIndex = 0;
+            EditRecurrenceComboBox.IsEnabled = true;
 
             EditTxtTitle.Text = "";
             EditTxtLocation.Text = "";
@@ -523,6 +536,8 @@ namespace Task_Flyout.Views
             EditRadioTask.IsChecked = item.IsTask;
             EditRadioEvent.IsEnabled = false;
             EditRadioTask.IsEnabled = false;
+            EditRecurrenceComboBox.SelectedIndex = 0;
+            EditRecurrenceComboBox.IsEnabled = false;
 
             if (DateTime.TryParse(item.DateKey, out var d)) EditDatePicker.Date = d;
 
@@ -583,6 +598,7 @@ namespace Task_Flyout.Views
             bool isEvent = EditRadioEvent.IsChecked == true;
             bool isAllDay = EditChkAllDay.IsChecked == true;
             string providerName = (EditCmbProvider.SelectedItem as ComboBoxItem)?.Tag.ToString() ?? "Google";
+            var recurrence = GetSelectedRecurrence();
 
             if (_itemBeingEdited == null)
             {
@@ -590,7 +606,7 @@ namespace Task_Flyout.Views
                 {
                     await _syncManager.CreateItemAsync(
                         EditTxtTitle.Text, isEvent, isAllDay, EditDatePicker.Date.DateTime,
-                        newStartTime ?? TimeSpan.Zero, newEndTime ?? TimeSpan.Zero, EditTxtLocation.Text, providerName);
+                        newStartTime ?? TimeSpan.Zero, newEndTime ?? TimeSpan.Zero, EditTxtLocation.Text, recurrence, providerName);
                     _ = SyncMonthDataAsync(forceRefresh: true);
                 }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"新建失败: {ex.Message}"); }
@@ -634,6 +650,13 @@ namespace Task_Flyout.Views
         {
             if (_itemBeingEdited != null)
             {
+                var deleteMode = await GetRecurringDeleteModeAsync(_itemBeingEdited);
+                if (deleteMode == null)
+                {
+                    args.Cancel = true;
+                    return;
+                }
+
                 if (_localCache.DayItems.TryGetValue(_itemBeingEdited.DateKey, out var list))
                 {
                     list.RemoveAll(x => x.Id == _itemBeingEdited.Id);
@@ -645,11 +668,92 @@ namespace Task_Flyout.Views
                 {
                     try
                     {
-                        await _syncManager.DeleteItemAsync(_itemBeingEdited.Provider, _itemBeingEdited.Id, _itemBeingEdited.IsEvent);
+                        DateTime? occurrenceDate = _itemBeingEdited.StartDateTime;
+                        if (!occurrenceDate.HasValue && DateTime.TryParse(_itemBeingEdited.DateKey, out var parsedDate))
+                            occurrenceDate = parsedDate;
+
+                        await _syncManager.DeleteItemAsync(
+                            _itemBeingEdited.Provider,
+                            _itemBeingEdited.Id,
+                            _itemBeingEdited.IsEvent,
+                            deleteMode.Value,
+                            occurrenceDate,
+                            _itemBeingEdited.RecurringEventId);
+                        _ = SyncMonthDataAsync(forceRefresh: true);
                     }
                     catch { }
                 }
             }
+        }
+
+        private EventRecurrenceKind GetSelectedRecurrence()
+        {
+            if (EditRadioEvent.IsChecked != true) return EventRecurrenceKind.None;
+            if (EditRecurrenceComboBox.SelectedItem is ComboBoxItem item &&
+                Enum.TryParse<EventRecurrenceKind>(item.Tag?.ToString(), out var recurrence))
+                return recurrence;
+            return EventRecurrenceKind.None;
+        }
+
+        private async Task<RecurringDeleteMode?> GetRecurringDeleteModeAsync(AgendaItem item)
+        {
+            if (!item.IsEvent || !item.IsRecurring)
+                return RecurringDeleteMode.Single;
+
+            RecurringDeleteMode? selectedMode = null;
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = "删除重复日程",
+                CloseButtonText = "取消",
+                DefaultButton = ContentDialogButton.Close
+            };
+
+            var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(new TextBlock
+            {
+                Text = "请选择要删除的范围。",
+                TextWrapping = TextWrapping.Wrap
+            });
+
+            var singleButton = CreateDeleteModeButton("仅删除此事件");
+            singleButton.Click += (_, _) =>
+            {
+                selectedMode = RecurringDeleteMode.Single;
+                dialog.Hide();
+            };
+
+            var followingButton = CreateDeleteModeButton("删除此事件和之后事件");
+            followingButton.Click += (_, _) =>
+            {
+                selectedMode = RecurringDeleteMode.ThisAndFollowing;
+                dialog.Hide();
+            };
+
+            var allButton = CreateDeleteModeButton("删除所有重复事件");
+            allButton.Click += (_, _) =>
+            {
+                selectedMode = RecurringDeleteMode.All;
+                dialog.Hide();
+            };
+
+            panel.Children.Add(singleButton);
+            panel.Children.Add(followingButton);
+            panel.Children.Add(allButton);
+            dialog.Content = panel;
+
+            await dialog.ShowAsync();
+            return selectedMode;
+        }
+
+        private static Button CreateDeleteModeButton(string text)
+        {
+            return new Button
+            {
+                Content = text,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Left
+            };
         }
     }
 }

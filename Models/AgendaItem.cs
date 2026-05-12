@@ -55,6 +55,8 @@ namespace Task_Flyout.Models
         public string CalendarName { get; set; } = "";
         public string DateKey { get; set; } = "";
         public string ColorHex { get; set; } = "";
+        public bool IsRecurring { get; set; }
+        public string RecurringEventId { get; set; } = "";
 
         public DateTime? StartDateTime { get; set; }
         public DateTime? EndDateTime { get; set; }

@@ -330,6 +330,13 @@
                     <RadioButton x:Uid="CalendarDialog_RadioEvent" x:Name="EditRadioEvent" Content="日程" IsChecked="True" Checked="EditRadioType_Changed"/>
                     <RadioButton x:Uid="CalendarDialog_RadioTask" x:Name="EditRadioTask" Content="任务" Checked="EditRadioType_Changed"/>
                 </StackPanel>
+                <ComboBox x:Name="EditRecurrenceComboBox" Header="重复" HorizontalAlignment="Stretch">
+                    <ComboBoxItem Content="不重复" Tag="None"/>
+                    <ComboBoxItem Content="每天" Tag="Daily"/>
+                    <ComboBoxItem Content="每周" Tag="Weekly"/>
+                    <ComboBoxItem Content="每月" Tag="Monthly"/>
+                    <ComboBoxItem Content="每年" Tag="Yearly"/>
+                </ComboBox>
 
                 <TextBox x:Uid="CalendarDialog_TitleInput" x:Name="EditTxtTitle" Header="名称" PlaceholderText="日程名称"/>
                 <TextBox x:Uid="CalendarDialog_LocationInput" x:Name="EditTxtLocation" Header="地点 (选填)" PlaceholderText="添加位置信息"/>

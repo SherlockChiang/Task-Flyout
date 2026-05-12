@@ -170,7 +170,7 @@ namespace Task_Flyout.Services
                     req.QueryParameters.StartDateTime = startDate.ToString("o");
                     req.QueryParameters.EndDateTime = endDate.ToString("o");
                     req.QueryParameters.Top = 500;
-                    req.QueryParameters.Select = new[] { "id", "subject", "start", "end", "isAllDay", "location", "bodyPreview", "calendar" };
+                    req.QueryParameters.Select = new[] { "id", "subject", "start", "end", "isAllDay", "location", "bodyPreview", "calendar", "recurrence", "seriesMasterId", "type" };
                 });
 
                 if (events?.Value != null)
@@ -212,7 +212,9 @@ namespace Task_Flyout.Services
                             CalendarName = calName,
                             DateKey = start.ToString("yyyy-MM-dd"),
                             StartDateTime = start,
-                            EndDateTime = end
+                            EndDateTime = end,
+                            IsRecurring = ev.Recurrence != null || !string.IsNullOrWhiteSpace(ev.SeriesMasterId),
+                            RecurringEventId = ev.SeriesMasterId ?? ""
                         });
                     }
                 }
@@ -350,7 +352,7 @@ namespace Task_Flyout.Services
             await _graphClient.Me.Todo.Lists[listId].Tasks[taskId].PatchAsync(updateTask);
         }
 
-        public async Task CreateEventAsync(string title, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, bool isAllDay)
+        public async Task CreateEventAsync(string title, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, bool isAllDay, EventRecurrenceKind recurrence = EventRecurrenceKind.None)
         {
             await EnsureAuthorizedAsync();
             var newEvent = new Event
@@ -374,6 +376,9 @@ namespace Task_Flyout.Services
                 newEvent.IsAllDay = false;
             }
 
+            if (recurrence != EventRecurrenceKind.None)
+                newEvent.Recurrence = CreateMicrosoftRecurrence(recurrence, targetDate);
+
             await _graphClient.Me.Events.PostAsync(newEvent);
         }
 
@@ -391,19 +396,64 @@ namespace Task_Flyout.Services
             await _graphClient.Me.Todo.Lists[listId].Tasks.PostAsync(newTask);
         }
 
-        public async Task DeleteItemAsync(string itemId, bool isEvent)
+        public async Task DeleteItemAsync(string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode = RecurringDeleteMode.Single, DateTime? occurrenceDate = null, string recurringEventId = "")
         {
             await EnsureAuthorizedAsync();
 
             if (isEvent)
             {
-                await _graphClient.Me.Events[itemId].DeleteAsync();
+                if (recurringDeleteMode == RecurringDeleteMode.All && !string.IsNullOrWhiteSpace(recurringEventId))
+                {
+                    await _graphClient.Me.Events[recurringEventId].DeleteAsync();
+                }
+                else if (recurringDeleteMode == RecurringDeleteMode.ThisAndFollowing && !string.IsNullOrWhiteSpace(recurringEventId) && occurrenceDate.HasValue)
+                {
+                    var master = await _graphClient.Me.Events[recurringEventId].GetAsync(request =>
+                    {
+                        request.QueryParameters.Select = new[] { "id", "recurrence" };
+                    });
+
+                    if (master?.Recurrence?.Range != null)
+                    {
+                        master.Recurrence.Range.Type = RecurrenceRangeType.EndDate;
+                        master.Recurrence.Range.EndDate = DateOnly.FromDateTime(occurrenceDate.Value.Date.AddDays(-1));
+                        await _graphClient.Me.Events[recurringEventId].PatchAsync(new Event { Recurrence = master.Recurrence });
+                    }
+                }
+                else
+                {
+                    await _graphClient.Me.Events[itemId].DeleteAsync();
+                }
             }
             else
             {
                 var listId = await GetDefaultTodoListIdAsync();
                 await _graphClient.Me.Todo.Lists[listId].Tasks[itemId].DeleteAsync();
             }
+        }
+
+        private static PatternedRecurrence CreateMicrosoftRecurrence(EventRecurrenceKind recurrence, DateTime startDate)
+        {
+            return new PatternedRecurrence
+            {
+                Pattern = new RecurrencePattern
+                {
+                    Type = recurrence switch
+                    {
+                        EventRecurrenceKind.Daily => RecurrencePatternType.Daily,
+                        EventRecurrenceKind.Weekly => RecurrencePatternType.Weekly,
+                        EventRecurrenceKind.Monthly => RecurrencePatternType.AbsoluteMonthly,
+                        EventRecurrenceKind.Yearly => RecurrencePatternType.AbsoluteYearly,
+                        _ => RecurrencePatternType.Daily
+                    },
+                    Interval = 1
+                },
+                Range = new RecurrenceRange
+                {
+                    Type = RecurrenceRangeType.NoEnd,
+                    StartDate = DateOnly.FromDateTime(startDate.Date)
+                }
+            };
         }
     }
 }

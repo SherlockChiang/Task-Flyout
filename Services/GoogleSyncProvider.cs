@@ -168,7 +168,9 @@ namespace Task_Flyout.Services
                                     CalendarName = cal.Name,
                                     DateKey = date.Value.ToString("yyyy-MM-dd"),
                                     StartDateTime = ev.Start?.DateTime,
-                                    EndDateTime = endDate2
+                                    EndDateTime = endDate2,
+                                    IsRecurring = !string.IsNullOrWhiteSpace(ev.RecurringEventId) || ev.Recurrence?.Count > 0,
+                                    RecurringEventId = ev.RecurringEventId ?? ""
                                 });
                             }
                         }
@@ -261,7 +263,7 @@ namespace Task_Flyout.Services
             await updateRequest.ExecuteAsync();
         }
 
-        public async Task CreateEventAsync(string title, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, bool isAllDay)
+        public async Task CreateEventAsync(string title, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, bool isAllDay, EventRecurrenceKind recurrence = EventRecurrenceKind.None)
         {
             var newEvent = new Google.Apis.Calendar.v3.Data.Event
             {
@@ -282,6 +284,10 @@ namespace Task_Flyout.Services
                 newEvent.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = exactStart };
                 newEvent.End = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = exactEnd };
             }
+
+            if (recurrence != EventRecurrenceKind.None)
+                newEvent.Recurrence = new List<string> { $"RRULE:FREQ={ToGoogleFrequency(recurrence)}" };
+
             await CalendarSvc.Events.Insert(newEvent, "primary").ExecuteAsync();
         }
 
@@ -294,13 +300,26 @@ namespace Task_Flyout.Services
             await TasksSvc.Tasks.Insert(newTask, "@default").ExecuteAsync();
         }
 
-        public async Task DeleteItemAsync(string itemId, bool isEvent)
+        public async Task DeleteItemAsync(string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode = RecurringDeleteMode.Single, DateTime? occurrenceDate = null, string recurringEventId = "")
         {
             if (isEvent)
             {
                 if (CalendarSvc != null)
                 {
-                    await CalendarSvc.Events.Delete("primary", itemId).ExecuteAsync();
+                    if (recurringDeleteMode == RecurringDeleteMode.All && !string.IsNullOrWhiteSpace(recurringEventId))
+                    {
+                        await CalendarSvc.Events.Delete("primary", recurringEventId).ExecuteAsync();
+                    }
+                    else if (recurringDeleteMode == RecurringDeleteMode.ThisAndFollowing && !string.IsNullOrWhiteSpace(recurringEventId) && occurrenceDate.HasValue)
+                    {
+                        var master = await CalendarSvc.Events.Get("primary", recurringEventId).ExecuteAsync();
+                        master.Recurrence = ClampGoogleRecurrence(master.Recurrence, occurrenceDate.Value.AddDays(-1));
+                        await CalendarSvc.Events.Update(master, "primary", recurringEventId).ExecuteAsync();
+                    }
+                    else
+                    {
+                        await CalendarSvc.Events.Delete("primary", itemId).ExecuteAsync();
+                    }
                 }
             }
             else
@@ -310,6 +329,36 @@ namespace Task_Flyout.Services
                     await TasksSvc.Tasks.Delete("@default", itemId).ExecuteAsync();
                 }
             }
+        }
+
+        private static string ToGoogleFrequency(EventRecurrenceKind recurrence) => recurrence switch
+        {
+            EventRecurrenceKind.Daily => "DAILY",
+            EventRecurrenceKind.Weekly => "WEEKLY",
+            EventRecurrenceKind.Monthly => "MONTHLY",
+            EventRecurrenceKind.Yearly => "YEARLY",
+            _ => "DAILY"
+        };
+
+        private static List<string> ClampGoogleRecurrence(IList<string>? recurrence, DateTime untilDate)
+        {
+            var result = recurrence?.ToList() ?? new List<string>();
+            string until = untilDate.Date.ToString("yyyyMMdd") + "T235959Z";
+
+            for (int i = 0; i < result.Count; i++)
+            {
+                if (!result[i].StartsWith("RRULE:", StringComparison.OrdinalIgnoreCase)) continue;
+
+                var parts = result[i].Split(';')
+                    .Where(part => !part.StartsWith("UNTIL=", StringComparison.OrdinalIgnoreCase) &&
+                                   !part.StartsWith("COUNT=", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                parts.Add($"UNTIL={until}");
+                result[i] = string.Join(";", parts);
+                return result;
+            }
+
+            return result;
         }
     }
 }
