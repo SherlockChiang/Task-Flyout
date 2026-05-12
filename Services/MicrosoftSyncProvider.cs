@@ -20,7 +20,16 @@ namespace Task_Flyout.Services
 
         private string _defaultTodoListId;
 
-        private readonly string[] _scopes = new[] { "Calendars.ReadWrite", "Tasks.ReadWrite" };
+        private readonly string[] _scopes = new[]
+        {
+            "Calendars.ReadWrite",
+            "Tasks.ReadWrite",
+            "Mail.ReadWrite",
+            "Mail.Send",
+            "User.Read"
+        };
+
+        public GraphServiceClient? GraphClient => _graphClient;
 
         public async Task EnsureAuthorizedAsync()
         {

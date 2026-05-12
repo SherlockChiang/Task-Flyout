@@ -1,5 +1,3 @@
-using Azure.Core;
-using Azure.Identity;
 using Google.Apis.Gmail.v1;
 using Google.Apis.Gmail.v1.Data;
 using MailKit;
@@ -18,6 +16,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Task_Flyout.Models;
 using Windows.Security.Credentials;
 using Windows.Storage;
 using GmailMessage = Google.Apis.Gmail.v1.Data.Message;
@@ -104,7 +103,6 @@ namespace Task_Flyout.Services
         private GraphServiceClient? _outlookClient;
         private List<MailAccount> _accounts = new();
         private bool _accountsLoaded;
-        private readonly string[] _outlookScopes = new[] { "Mail.Read", "Mail.ReadWrite", "Mail.Send", "User.Read" };
         private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(10);
         private readonly Dictionary<string, CacheEntry<List<MailFolder>>> _folderCache = new();
         private readonly Dictionary<string, CacheEntry<List<MailItem>>> _messageCache = new();
@@ -171,6 +169,7 @@ namespace Task_Flyout.Services
 
             _accounts.Add(account);
             SaveAccounts();
+            await EnsureMicrosoftAgendaAccountAsync();
             return account;
         }
 
@@ -667,59 +666,36 @@ namespace Task_Flyout.Services
         private async Task EnsureOutlookAuthorizedAsync()
         {
             if (_outlookClient != null) return;
+            if (App.Current is App app &&
+                app.SyncManager.GetProvider("Microsoft") is MicrosoftSyncProvider microsoftProvider)
+            {
+                await microsoftProvider.EnsureAuthorizedAsync();
+                _outlookClient = microsoftProvider.GraphClient;
+            }
 
-            string appDataPath = GetAppDataPath();
-            Directory.CreateDirectory(appDataPath);
-            string authRecordPath = Path.Combine(appDataPath, "ms_mail_auth_record.bin");
+            if (_outlookClient == null)
+                throw new InvalidOperationException("Microsoft provider is not available.");
+        }
 
-            AuthenticationRecord? authRecord = null;
+        private async Task EnsureMicrosoftAgendaAccountAsync()
+        {
+            if (App.Current is not App app) return;
+
+            var accountManager = app.SyncManager.AccountManager;
+            if (accountManager.IsConnected("Microsoft")) return;
+
+            if (app.SyncManager.GetProvider("Microsoft") is not MicrosoftSyncProvider provider) return;
+
+            var connected = new ConnectedAccountInfo { ProviderName = "Microsoft" };
             try
             {
-                if (File.Exists(authRecordPath))
-                {
-                    using var stream = File.OpenRead(authRecordPath);
-                    authRecord = await AuthenticationRecord.DeserializeAsync(stream);
-                }
+                var calendars = await provider.FetchCalendarListAsync();
+                foreach (var calendar in calendars)
+                    connected.Calendars.Add(calendar);
             }
             catch { }
 
-            var options = new InteractiveBrowserCredentialOptions
-            {
-                TenantId = "common",
-                ClientId = Secrets.MicrosoftClientId,
-                AuthorityHost = AzureAuthorityHosts.AzurePublicCloud,
-                RedirectUri = new Uri("http://localhost"),
-                TokenCachePersistenceOptions = new TokenCachePersistenceOptions { Name = "TaskFlyout_MSAL_Cache" },
-                AuthenticationRecord = authRecord
-            };
-
-            var credential = new InteractiveBrowserCredential(options);
-            var tokenContext = new TokenRequestContext(_outlookScopes);
-
-            try
-            {
-                if (authRecord == null)
-                {
-                    authRecord = await credential.AuthenticateAsync(tokenContext);
-                    using var stream = File.Create(authRecordPath);
-                    await authRecord.SerializeAsync(stream);
-                }
-                else
-                {
-                    await credential.GetTokenAsync(tokenContext);
-                }
-            }
-            catch
-            {
-                if (File.Exists(authRecordPath)) File.Delete(authRecordPath);
-                options.AuthenticationRecord = null;
-
-                authRecord = await credential.AuthenticateAsync(tokenContext);
-                using var stream = File.Create(authRecordPath);
-                await authRecord.SerializeAsync(stream);
-            }
-
-            _outlookClient = new GraphServiceClient(credential, _outlookScopes);
+            accountManager.AddAccount(connected);
         }
 
         private void EnsureAccountsLoaded()

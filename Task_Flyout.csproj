@@ -53,7 +53,6 @@
         <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.1" />
         <PackageReference Include="MailKit" Version="4.14.1" />
         <PackageReference Include="Microsoft.Graph" Version="5.105.0" />
-        <PackageReference Include="Microsoft.Kiota.Abstractions" Version="2.0.0" />
         <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7705" />
         <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260209005" />
     </ItemGroup>
