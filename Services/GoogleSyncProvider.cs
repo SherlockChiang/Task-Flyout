@@ -27,7 +27,9 @@ namespace Task_Flyout.Services
         {
             CalendarService.Scope.Calendar,
             TasksService.Scope.Tasks,
-            GmailService.Scope.GmailReadonly
+            GmailService.Scope.GmailReadonly,
+            GmailService.Scope.GmailSend,
+            GmailService.Scope.GmailModify
         };
 
         public async Task EnsureAuthorizedAsync()

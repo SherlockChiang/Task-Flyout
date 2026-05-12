@@ -25,6 +25,12 @@
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <ToggleSwitch x:Name="UnreadOnlyToggle" Header="仅未读" Toggled="UnreadOnlyToggle_Toggled"/>
+                <Button x:Name="ComposeButton" Click="ComposeButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE724;" FontSize="14"/>
+                        <TextBlock Text="写邮件"/>
+                    </StackPanel>
+                </Button>
                 <Button x:Name="RefreshButton" Click="RefreshButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <FontIcon Glyph="&#xE72C;" FontSize="14"/>
@@ -155,13 +161,25 @@
 
                     <StackPanel x:Name="DetailPanel" Visibility="Collapsed" Spacing="14">
                         <TextBlock x:Name="DetailSubject" FontSize="22" FontWeight="SemiBold" TextWrapping="WrapWholeWords"/>
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <TextBlock x:Name="DetailSender" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                            <TextBlock x:Name="DetailTime" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                        </StackPanel>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="发件人" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                                <TextBlock x:Name="DetailSender" FontSize="14" TextWrapping="WrapWholeWords"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="3" HorizontalAlignment="Right">
+                                <TextBlock Text="时间" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Right"/>
+                                <TextBlock x:Name="DetailTime" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Right"/>
+                            </StackPanel>
+                        </Grid>
                         <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
-                        <TextBlock x:Name="DetailPreview" FontSize="14" TextWrapping="WrapWholeWords"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="380">
+                            <TextBlock x:Name="DetailPreview" FontSize="14" TextWrapping="WrapWholeWords"
+                                       LineHeight="22"/>
+                        </ScrollViewer>
                         <Button x:Name="OpenInBrowserButton" HorizontalAlignment="Left" Click="OpenInBrowserButton_Click">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE8A7;" FontSize="14"/>
@@ -231,6 +249,17 @@
                                                    Minimum="1" Maximum="65535" SpinButtonPlacementMode="Inline"/>
                                     </Grid>
                                     <ToggleSwitch x:Name="ImapSslToggle" Header="使用 SSL/TLS" IsOn="True"/>
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="120"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="SmtpHostBox" Header="SMTP 服务器" PlaceholderText="smtp.example.com"/>
+                                        <NumberBox Grid.Column="1" x:Name="SmtpPortBox" Header="端口" Value="587"
+                                                   Minimum="1" Maximum="65535" SpinButtonPlacementMode="Inline"/>
+                                    </Grid>
+                                    <TextBox x:Name="SmtpUserNameBox" Header="SMTP 用户名" PlaceholderText="默认使用 IMAP 用户名"/>
+                                    <ToggleSwitch x:Name="SmtpSslToggle" Header="SMTP 使用 SSL/TLS" IsOn="False"/>
                                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                                         <Button Content="取消" Click="CancelImapButton_Click"/>
                                         <Button x:Name="SaveImapButton" Content="连接并保存 IMAP 账户" Click="SaveImapButton_Click"/>
@@ -238,6 +267,32 @@
                                 </StackPanel>
 
                                 <TextBlock x:Name="AddStatusText" Text="" FontSize="13"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           TextWrapping="WrapWholeWords"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <Grid x:Name="ComposePanel" Visibility="Collapsed"
+                          Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel MaxWidth="640" HorizontalAlignment="Stretch" VerticalAlignment="Top" Spacing="12">
+                                <TextBlock Text="写邮件" FontSize="24" FontWeight="SemiBold"/>
+                                <ComboBox x:Name="ComposeFromBox" Header="发件人" HorizontalAlignment="Stretch"/>
+                                <TextBox x:Name="ComposeToBox" Header="收件人" PlaceholderText="name@example.com; other@example.com"/>
+                                <TextBox x:Name="ComposeSubjectBox" Header="标题"/>
+                                <TextBox x:Name="ComposeBodyBox" Header="内容" AcceptsReturn="True"
+                                         TextWrapping="Wrap" MinHeight="220"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                    <Button Content="取消" Click="CancelComposeButton_Click"/>
+                                    <Button x:Name="SendComposeButton" Click="SendComposeButton_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon Glyph="&#xE724;" FontSize="14"/>
+                                            <TextBlock Text="发送"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <TextBlock x:Name="ComposeStatusText" FontSize="13"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                            TextWrapping="WrapWholeWords"/>
                             </StackPanel>

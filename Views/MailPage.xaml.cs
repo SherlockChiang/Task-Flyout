@@ -97,17 +97,17 @@ namespace Task_Flyout.Views
             await LoadFoldersForNodeAsync(args.Node);
         }
 
-        private async Task LoadFoldersForNodeAsync(TreeViewNode node)
+        private async Task LoadFoldersForNodeAsync(TreeViewNode node, bool forceRefresh = false)
         {
             if (_mailService == null || !_accountNodes.TryGetValue(node, out var account)) return;
-            if (node.Children.Count > 0 && !node.HasUnrealizedChildren) return;
+            if (!forceRefresh && node.Children.Count > 0 && !node.HasUnrealizedChildren) return;
 
             node.Children.Clear();
             node.HasUnrealizedChildren = false;
 
             try
             {
-                var folders = await _mailService.FetchFoldersAsync(account);
+                var folders = await _mailService.FetchFoldersAsync(account, forceRefresh);
                 foreach (var folder in folders)
                 {
                     var child = new TreeViewNode
@@ -187,7 +187,7 @@ namespace Task_Flyout.Views
             await LoadMessagesAsync();
         }
 
-        private async Task LoadMessagesAsync()
+        private async Task LoadMessagesAsync(bool forceRefresh = false)
         {
             if (_mailService == null || _selectedAccount == null || _selectedFolder == null) return;
 
@@ -199,7 +199,7 @@ namespace Task_Flyout.Views
 
             try
             {
-                var messages = await _mailService.FetchMessagesAsync(_selectedAccount, _selectedFolder, UnreadOnlyToggle.IsOn);
+                var messages = await _mailService.FetchMessagesAsync(_selectedAccount, _selectedFolder, UnreadOnlyToggle.IsOn, forceRefresh: forceRefresh);
                 _items.Clear();
                 foreach (var item in messages.OrderByDescending(item => item.RawReceivedTime))
                     _items.Add(item);
@@ -234,7 +234,7 @@ namespace Task_Flyout.Views
                 return;
             }
 
-            await LoadMessagesAsync();
+            await LoadMessagesAsync(forceRefresh: true);
         }
 
         private void AddMailButton_Click(object sender, RoutedEventArgs e)
@@ -274,10 +274,52 @@ namespace Task_Flyout.Views
         private void ShowAddAccountPanel()
         {
             AddAccountPanel.Visibility = Visibility.Visible;
+            ComposePanel.Visibility = Visibility.Collapsed;
             DetailPanel.Visibility = Visibility.Collapsed;
             EmptyDetailPanel.Visibility = Visibility.Collapsed;
             AddStatusText.Text = "";
             ImapSettingsPanel.Visibility = Visibility.Collapsed;
+        }
+
+        private void ComposeButton_Click(object sender, RoutedEventArgs e)
+        {
+            ShowComposePanel();
+        }
+
+        private void ShowComposePanel()
+        {
+            if (_mailService == null) return;
+
+            ComposeFromBox.Items.Clear();
+            var accounts = _mailService.GetAccounts().Where(account => account.IsSetupComplete).ToList();
+            foreach (var account in accounts)
+            {
+                ComposeFromBox.Items.Add(new ComboBoxItem
+                {
+                    Content = $"{account.ProviderName} - {account.Subtitle}",
+                    Tag = account.Id
+                });
+            }
+
+            if (_selectedAccount != null)
+            {
+                var selected = ComposeFromBox.Items.OfType<ComboBoxItem>()
+                    .FirstOrDefault(item => item.Tag?.ToString() == _selectedAccount.Id);
+                if (selected != null) ComposeFromBox.SelectedItem = selected;
+            }
+
+            if (ComposeFromBox.SelectedItem == null && ComposeFromBox.Items.Count > 0)
+                ComposeFromBox.SelectedIndex = 0;
+
+            ComposeToBox.Text = "";
+            ComposeSubjectBox.Text = "";
+            ComposeBodyBox.Text = "";
+            ComposeStatusText.Text = accounts.Count == 0 ? "请先添加邮箱账户。" : "";
+
+            ComposePanel.Visibility = Visibility.Visible;
+            AddAccountPanel.Visibility = Visibility.Collapsed;
+            DetailPanel.Visibility = Visibility.Collapsed;
+            EmptyDetailPanel.Visibility = Visibility.Collapsed;
         }
 
         private async void AddOutlookButton_Click(object sender, RoutedEventArgs e)
@@ -346,6 +388,10 @@ namespace Task_Flyout.Views
             ImapHostBox.Text = "";
             ImapPortBox.Value = 993;
             ImapSslToggle.IsOn = true;
+            SmtpHostBox.Text = "";
+            SmtpPortBox.Value = 587;
+            SmtpUserNameBox.Text = "";
+            SmtpSslToggle.IsOn = false;
             AddStatusText.Text = "请输入 IMAP 服务器信息。Gmail/Outlook 建议优先使用 OAuth。";
         }
 
@@ -364,6 +410,9 @@ namespace Task_Flyout.Views
             string userName = string.IsNullOrWhiteSpace(ImapUserNameBox.Text) ? address : ImapUserNameBox.Text.Trim();
             string password = ImapPasswordBox.Password;
             int port = double.IsNaN(ImapPortBox.Value) ? 993 : (int)ImapPortBox.Value;
+            string smtpHost = SmtpHostBox.Text.Trim();
+            int smtpPort = double.IsNaN(SmtpPortBox.Value) ? 587 : (int)SmtpPortBox.Value;
+            string smtpUserName = SmtpUserNameBox.Text.Trim();
             if (string.IsNullOrWhiteSpace(address))
             {
                 AddStatusText.Text = "请输入邮箱地址。";
@@ -379,6 +428,11 @@ namespace Task_Flyout.Views
                 AddStatusText.Text = "请输入密码或应用专用密码。";
                 return;
             }
+            if (string.IsNullOrWhiteSpace(smtpHost))
+            {
+                AddStatusText.Text = "请输入 SMTP 服务器，IMAP 账户需要它来发送邮件。";
+                return;
+            }
 
             SetAddButtonsEnabled(false);
             AddStatusText.Text = "正在连接 IMAP 服务器...";
@@ -392,7 +446,11 @@ namespace Task_Flyout.Views
                     password,
                     host,
                     port,
-                    ImapSslToggle.IsOn);
+                    ImapSslToggle.IsOn,
+                    smtpHost,
+                    smtpPort,
+                    SmtpSslToggle.IsOn,
+                    smtpUserName);
 
                 AddStatusText.Text = $"已添加 {account.DisplayTitle}";
                 await RefreshAccountsAsync();
@@ -415,7 +473,7 @@ namespace Task_Flyout.Views
             SaveImapButton.IsEnabled = isEnabled;
         }
 
-        private void MailListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void MailListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (MailListView.SelectedItem is not MailItem item)
             {
@@ -425,21 +483,95 @@ namespace Task_Flyout.Views
 
             _selectedItem = item;
             AddAccountPanel.Visibility = Visibility.Collapsed;
+            ComposePanel.Visibility = Visibility.Collapsed;
             EmptyDetailPanel.Visibility = Visibility.Collapsed;
             DetailPanel.Visibility = Visibility.Visible;
             DetailSubject.Text = item.Subject;
             DetailSender.Text = item.Sender;
             DetailTime.Text = item.RawReceivedTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? item.ReceivedTime;
-            DetailPreview.Text = string.IsNullOrWhiteSpace(item.Preview) ? "没有可用预览。" : item.Preview;
+            DetailPreview.Text = string.IsNullOrWhiteSpace(item.BodyText)
+                ? string.IsNullOrWhiteSpace(item.Preview) ? "没有可用正文。" : item.Preview
+                : item.BodyText;
             OpenInBrowserButton.IsEnabled = !string.IsNullOrWhiteSpace(item.WebLink);
+
+            if (_mailService != null && _selectedAccount != null && !item.IsRead)
+            {
+                try
+                {
+                    await _mailService.MarkAsReadAsync(_selectedAccount, item);
+                    if (UnreadOnlyToggle.IsOn)
+                    {
+                        await LoadMessagesAsync();
+                    }
+                    else
+                    {
+                        var index = _items.IndexOf(item);
+                        if (index >= 0)
+                            _items[index] = item;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageListSubtitle.Text = ex.Message;
+                }
+            }
         }
 
         private void ClearDetail()
         {
             _selectedItem = null;
             DetailPanel.Visibility = Visibility.Collapsed;
-            if (AddAccountPanel.Visibility != Visibility.Visible)
+            if (AddAccountPanel.Visibility != Visibility.Visible && ComposePanel.Visibility != Visibility.Visible)
                 EmptyDetailPanel.Visibility = Visibility.Visible;
+        }
+
+        private void CancelComposeButton_Click(object sender, RoutedEventArgs e)
+        {
+            ComposePanel.Visibility = Visibility.Collapsed;
+            ClearDetail();
+        }
+
+        private async void SendComposeButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_mailService == null) return;
+
+            if (ComposeFromBox.SelectedItem is not ComboBoxItem selectedFrom)
+            {
+                ComposeStatusText.Text = "请选择发件人。";
+                return;
+            }
+
+            var account = _mailService.GetAccounts().FirstOrDefault(a => a.Id == selectedFrom.Tag?.ToString());
+            if (account == null)
+            {
+                ComposeStatusText.Text = "找不到发件人账户。";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(ComposeToBox.Text))
+            {
+                ComposeStatusText.Text = "请输入收件人。";
+                return;
+            }
+
+            SendComposeButton.IsEnabled = false;
+            ComposeStatusText.Text = "正在发送...";
+
+            try
+            {
+                await _mailService.SendMailAsync(account, ComposeToBox.Text, ComposeSubjectBox.Text, ComposeBodyBox.Text);
+                ComposeStatusText.Text = "邮件已发送。";
+                ComposePanel.Visibility = Visibility.Collapsed;
+                ClearDetail();
+            }
+            catch (Exception ex)
+            {
+                ComposeStatusText.Text = ex.Message;
+            }
+            finally
+            {
+                SendComposeButton.IsEnabled = true;
+            }
         }
 
         private async void OpenInBrowserButton_Click(object sender, RoutedEventArgs e)
