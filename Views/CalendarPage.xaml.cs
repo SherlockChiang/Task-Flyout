@@ -89,6 +89,8 @@ namespace Task_Flyout.Views
         private AppCache _localCache = new();
         private AgendaItem _itemBeingEdited;
         private ResourceLoader _loader;
+        private bool _isAccountPaneCollapsed;
+        private bool _isTimelinePaneCollapsed;
 
         private void TaskCheckBox_Tapped(object sender, TappedRoutedEventArgs e)
         {
@@ -263,6 +265,22 @@ namespace Task_Flyout.Views
         private void BtnPrevMonth_Click(object sender, RoutedEventArgs e) => LoadCalendar(_viewDate = _viewDate.AddMonths(-1));
         private void BtnNextMonth_Click(object sender, RoutedEventArgs e) => LoadCalendar(_viewDate = _viewDate.AddMonths(1));
         private void BtnToday_Click(object sender, RoutedEventArgs e) => LoadCalendar(_viewDate = DateTime.Today);
+
+        private void ToggleAccountPane_Click(object sender, RoutedEventArgs e)
+        {
+            _isAccountPaneCollapsed = !_isAccountPaneCollapsed;
+            AccountColumn.Width = _isAccountPaneCollapsed ? new GridLength(0) : new GridLength(260);
+            AccountPane.Visibility = _isAccountPaneCollapsed ? Visibility.Collapsed : Visibility.Visible;
+            ToggleAccountPaneIcon.Glyph = _isAccountPaneCollapsed ? "\uE76C" : "\uE76B";
+        }
+
+        private void ToggleTimelinePane_Click(object sender, RoutedEventArgs e)
+        {
+            _isTimelinePaneCollapsed = !_isTimelinePaneCollapsed;
+            TimelineColumn.Width = _isTimelinePaneCollapsed ? new GridLength(0) : new GridLength(340);
+            TimelinePane.Visibility = _isTimelinePaneCollapsed ? Visibility.Collapsed : Visibility.Visible;
+            ToggleTimelinePaneIcon.Glyph = _isTimelinePaneCollapsed ? "\uE76B" : "\uE76C";
+        }
 
         public async void RefreshAccountList()
         {

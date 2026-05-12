@@ -1,4 +1,5 @@
 using Microsoft.UI;
+using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
@@ -610,13 +611,18 @@ namespace Task_Flyout
                 var weatherService = (App.Current as App)?.WeatherService;
                 bool transparent = weatherService?.WeatherBarTransparentBackground == true;
                 ApplyLayeredOpacity(WinRT.Interop.WindowNative.GetWindowHandle(this));
+                SystemBackdrop = transparent
+                    ? new DesktopAcrylicBackdrop()
+                    : null;
 
                 if (transparent)
                 {
                     if (mainBorder != null)
-                        mainBorder.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+                        mainBorder.Background = CreateTaskbarMaterialBrush(_isLightTheme);
                     if (topBorder != null)
-                        topBorder.BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+                        topBorder.BorderBrush = new SolidColorBrush(_isLightTheme
+                            ? Color.FromArgb(40, 255, 255, 255)
+                            : Color.FromArgb(45, 255, 255, 255));
                     return;
                 }
 
@@ -644,7 +650,10 @@ namespace Task_Flyout
             if (border == null) return;
             var weatherService = (App.Current as App)?.WeatherService;
             if (weatherService?.WeatherBarTransparentBackground == true)
+            {
+                border.Background = CreateTaskbarMaterialBrush(_isLightTheme, hovered: true);
                 return;
+            }
 
             var topBorder = (this.Content as FrameworkElement)?.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
 
@@ -665,6 +674,14 @@ namespace Task_Flyout
         private void MainBorder_PointerExited(object sender, PointerRoutedEventArgs e)
         {
             ApplyWindowsTheme(); // restore resting Mica background + border
+        }
+
+        private static Brush CreateTaskbarMaterialBrush(bool isLightTheme, bool hovered = false)
+        {
+            var color = isLightTheme
+                ? hovered ? Color.FromArgb(120, 255, 255, 255) : Color.FromArgb(88, 255, 255, 255)
+                : hovered ? Color.FromArgb(128, 34, 34, 38) : Color.FromArgb(94, 34, 34, 38);
+            return new SolidColorBrush(color);
         }
 
         private static string FormatBarLocation(string city)

@@ -17,12 +17,12 @@
 
     <Grid Background="#01000000">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="260"/>
+            <ColumnDefinition x:Name="AccountColumn" Width="260"/>
             <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="340"/>
+            <ColumnDefinition x:Name="TimelineColumn" Width="340"/>
         </Grid.ColumnDefinitions>
 
-        <Grid Grid.Column="0" Background="{ThemeResource LayerFillColorAltBrush}" BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Padding="16,32,16,24" RowSpacing="12">
+        <Grid x:Name="AccountPane" Grid.Column="0" Background="{ThemeResource LayerFillColorAltBrush}" BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Padding="16,32,16,24" RowSpacing="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -30,7 +30,13 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Text="日程账户" FontSize="18" FontWeight="SemiBold" Margin="4,0,0,8"/>
+            <Grid Margin="4,0,0,8">
+                <TextBlock Text="日程账户" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                <Button HorizontalAlignment="Right" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
+                        Click="ToggleAccountPane_Click" ToolTipService.ToolTip="折叠账户">
+                    <FontIcon Glyph="&#xE76B;" FontSize="12"/>
+                </Button>
+            </Grid>
 
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                 <ItemsRepeater x:Name="AccountListRepeater">
@@ -141,6 +147,10 @@
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Margin="0,0,0,24">
+                <Button x:Name="ToggleAccountPaneButton" Width="40" Height="36" Padding="0" Background="Transparent" BorderThickness="0"
+                        Click="ToggleAccountPane_Click" ToolTipService.ToolTip="显示/隐藏账户">
+                    <FontIcon x:Name="ToggleAccountPaneIcon" Glyph="&#xE76B;" FontSize="12"/>
+                </Button>
                 <Button x:Name="BtnMonthYear" Content="2026年 3月" FontSize="28" FontWeight="Bold" Background="Transparent" BorderThickness="0" Padding="8,4" Margin="-8,0,0,0" Foreground="{ThemeResource TextFillColorPrimaryBrush}">
                     <Button.Flyout>
                         <Flyout x:Name="MonthYearFlyout" Opened="MonthYearFlyout_Opened">
@@ -185,6 +195,10 @@
                     </StackPanel>
                 </Border>
                 <Button x:Uid="CalendarPage_BtnToday" Content="今天" Click="BtnToday_Click" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" Margin="8,0,0,0" FontWeight="SemiBold" CornerRadius="6"/>
+                <Button x:Name="ToggleTimelinePaneButton" Width="40" Height="36" Padding="0" Background="Transparent" BorderThickness="0"
+                        Click="ToggleTimelinePane_Click" ToolTipService.ToolTip="显示/隐藏日程">
+                    <FontIcon x:Name="ToggleTimelinePaneIcon" Glyph="&#xE76C;" FontSize="12"/>
+                </Button>
                 <ProgressRing x:Name="SyncProgress" IsActive="False" Width="20" Height="20" VerticalAlignment="Center" Margin="16,0,0,0"/>
             </StackPanel>
 
@@ -241,13 +255,17 @@
             </GridView>
         </Grid>
 
-        <Grid Grid.Column="2" Background="{ThemeResource LayerFillColorAltBrush}" BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}" BorderThickness="1,0,0,0" Padding="24,32,24,0">
+        <Grid x:Name="TimelinePane" Grid.Column="2" Background="{ThemeResource LayerFillColorAltBrush}" BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}" BorderThickness="1,0,0,0" Padding="24,32,24,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <Grid Grid.Row="0" Margin="4,0,0,20">
                 <TextBlock x:Uid="CalendarPage_AllAgendas" x:Name="TxtSideBarDate" Text="全部日程" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+                <Button HorizontalAlignment="Right" Margin="0,0,72,0" VerticalAlignment="Center" Width="32" Height="32" Padding="0"
+                        Background="Transparent" BorderThickness="0" Click="ToggleTimelinePane_Click" ToolTipService.ToolTip="折叠日程">
+                    <FontIcon Glyph="&#xE76C;" FontSize="12"/>
+                </Button>
                 <Button x:Uid="CalendarPage_BtnAdd" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource AccentButtonStyle}" Padding="12,4" Click="BtnAddNew_Click">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <FontIcon Glyph="&#xE710;" FontSize="14"/>
