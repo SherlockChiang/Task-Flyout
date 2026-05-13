@@ -896,6 +896,8 @@ namespace Task_Flyout.Services
         private static MailItem ToOutlookMailItem(string accountId, string folderId, GraphMessage message)
         {
             var received = message.ReceivedDateTime;
+            var content = message.Body?.Content ?? "";
+            var isHtml = message.Body?.ContentType == BodyType.Html || HasHtmlContentTags(content);
             return new MailItem
             {
                 AccountId = accountId,
@@ -907,10 +909,8 @@ namespace Task_Flyout.Services
                     ?? "",
                 SenderAddress = message.From?.EmailAddress?.Address ?? "",
                 Preview = message.BodyPreview ?? "",
-                BodyText = CleanMailBody(message.Body?.ContentType == BodyType.Html
-                    ? StripHtml(message.Body?.Content ?? "")
-                    : message.Body?.Content ?? message.BodyPreview ?? ""),
-                HtmlBody = message.Body?.ContentType == BodyType.Html ? message.Body?.Content ?? "" : "",
+                BodyText = CleanMailBody(isHtml ? StripHtml(content) : content),
+                HtmlBody = isHtml ? content : "",
                 RawReceivedTime = received,
                 ReceivedTime = FormatReceivedTime(received),
                 IsRead = message.IsRead == true,
@@ -969,6 +969,11 @@ namespace Task_Flyout.Services
             string senderAddress = ExtractEmailAddress(sender);
             string body = ExtractGoogleBody(message.Payload);
             string htmlBody = ExtractGoogleHtmlBody(message.Payload);
+            if (string.IsNullOrWhiteSpace(htmlBody) && HasHtmlContentTags(body))
+            {
+                htmlBody = body;
+                body = CleanMailBody(StripHtml(htmlBody));
+            }
             string preview = string.IsNullOrWhiteSpace(body) ? message.Snippet ?? "" : Truncate(body, 240);
             DateTimeOffset? received = null;
             if (message.InternalDate.HasValue)
@@ -995,7 +1000,11 @@ namespace Task_Flyout.Services
 
         private static MailItem ToImapMailItem(string accountId, string folderId, string id, MimeMessage message, bool isRead)
         {
-            string body = CleanMailBody(message.TextBody ?? StripHtml(message.HtmlBody ?? ""));
+            string rawText = message.TextBody ?? "";
+            string htmlBody = !string.IsNullOrWhiteSpace(message.HtmlBody)
+                ? message.HtmlBody
+                : HasHtmlContentTags(rawText) ? rawText : "";
+            string body = CleanMailBody(!string.IsNullOrWhiteSpace(htmlBody) ? StripHtml(htmlBody) : rawText);
             string preview = Truncate(body, 240);
 
             return new MailItem
@@ -1008,7 +1017,7 @@ namespace Task_Flyout.Services
                 SenderAddress = message.From?.Mailboxes?.FirstOrDefault()?.Address ?? "",
                 Preview = preview.Trim(),
                 BodyText = body,
-                HtmlBody = message.HtmlBody ?? "",
+                HtmlBody = htmlBody,
                 RawReceivedTime = message.Date,
                 ReceivedTime = FormatReceivedTime(message.Date),
                 IsRead = isRead,
@@ -1019,13 +1028,66 @@ namespace Task_Flyout.Services
         private static string StripHtml(string html)
         {
             if (string.IsNullOrWhiteSpace(html)) return "";
-            return WebUtility.HtmlDecode(Regex.Replace(html, "<.*?>", " ").Replace("&nbsp;", " "));
+            var value = RemoveNonContentHtmlBlocks(html);
+            return WebUtility.HtmlDecode(Regex.Replace(value, "<.*?>", " ").Replace("&nbsp;", " "));
         }
 
         private static string CleanMailBody(string value)
         {
             if (string.IsNullOrWhiteSpace(value)) return "";
+            value = RemoveNonContentHtmlBlocks(value);
+            value = RemoveCssNoise(value);
             return Regex.Replace(WebUtility.HtmlDecode(value), @"[ \t]{2,}", " ").Trim();
+        }
+
+        private static bool HasHtmlContentTags(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            return Regex.IsMatch(value, @"<\s*(html|body|table|tr|td|div|span|p|br|img|a|h[1-6]|ul|ol|li)\b", RegexOptions.IgnoreCase);
+        }
+
+        private static string RemoveNonContentHtmlBlocks(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "";
+
+            value = Regex.Replace(value, @"<\s*(head|script)\b[^>]*>.*?<\s*/\s*\1\s*>", " ", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            value = Regex.Replace(value, @"<\s*(meta|link)\b[^>]*/?\s*>", " ", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            return value;
+        }
+
+        private static string RemoveCssNoise(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "";
+
+            var lines = value
+                .Replace("\r\n", "\n")
+                .Replace('\r', '\n')
+                .Split('\n');
+
+            var kept = new List<string>();
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed)) continue;
+                if (IsCssNoiseLine(trimmed)) continue;
+                kept.Add(line);
+            }
+
+            return string.Join("\n", kept);
+        }
+
+        private static bool IsCssNoiseLine(string line)
+        {
+            if (line == "{" || line == "}") return true;
+            if (line.StartsWith("@media", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("@font-face", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("@-moz", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("@supports", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (Regex.IsMatch(line, @"^[.#][\w\-#.:\s,>+~\[\]=""']+\{?$")) return true;
+            if (Regex.IsMatch(line, @"^[a-zA-Z\-]+\s*:\s*[^。！？；，、]*;?$")) return true;
+            if (Regex.IsMatch(line, @"^[a-zA-Z][\w\-#.\s,>+~\[\]=""']+\s*\{")) return true;
+            return false;
         }
 
         private bool TryGetCachedFolders(string key, out List<MailFolder> folders)

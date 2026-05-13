@@ -563,7 +563,7 @@ namespace Task_Flyout.Views
             DetailSubject.Text = item.Subject;
             DetailSender.Text = item.Sender;
             DetailTime.Text = item.RawReceivedTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? item.ReceivedTime;
-            RenderMailBody(item);
+            await RenderMailBodyAsync(item);
             ReplyButton.IsEnabled = _selectedAccount != null;
             OpenInBrowserButton.IsEnabled = !string.IsNullOrWhiteSpace(item.WebLink);
 
@@ -600,38 +600,51 @@ namespace Task_Flyout.Views
                 EmptyDetailPanel.Visibility = Visibility.Visible;
         }
 
-        private void RenderMailBody(MailItem item)
+        private async Task RenderMailBodyAsync(MailItem item)
         {
             if (!string.IsNullOrWhiteSpace(item.HtmlBody))
             {
-                DetailPreview.Text = "";
-                DetailTextScrollViewer.Visibility = Visibility.Collapsed;
-                DetailHtmlView.Visibility = Visibility.Visible;
-                DetailHtmlView.NavigateToString(BuildMailHtmlDocument(item.HtmlBody));
-                return;
+                var htmlDocument = BuildMailHtmlDocument(item.HtmlBody);
+                if (HasVisibleHtmlContent(htmlDocument))
+                {
+                    try
+                    {
+                        var itemId = item.Id;
+                        DetailPreview.Text = "";
+                        DetailTextScrollViewer.Visibility = Visibility.Collapsed;
+                        DetailHtmlView.Visibility = Visibility.Visible;
+                        await DetailHtmlView.EnsureCoreWebView2Async();
+                        if (_selectedItem?.Id != itemId) return;
+                        DetailHtmlView.NavigateToString(htmlDocument);
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"HTML mail render failed: {ex.Message}");
+                    }
+                }
             }
 
             DetailHtmlView.Visibility = Visibility.Collapsed;
             DetailTextScrollViewer.Visibility = Visibility.Visible;
-            DetailPreview.Text = string.IsNullOrWhiteSpace(item.BodyText)
+            var fallbackText = item.BodyText;
+            if (string.IsNullOrWhiteSpace(fallbackText) && !string.IsNullOrWhiteSpace(item.HtmlBody))
+                fallbackText = BuildPlainTextFallback(item.HtmlBody);
+
+            DetailPreview.Text = string.IsNullOrWhiteSpace(fallbackText)
                 ? string.IsNullOrWhiteSpace(item.Preview) ? "没有可用正文。" : item.Preview
-                : item.BodyText;
+                : fallbackText;
         }
 
         private static string BuildMailHtmlDocument(string html)
         {
             var safeHtml = SanitizeMailHtml(html);
-            return """
-<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+            var baseStyle = """
 <style>
 html, body {
     margin: 0;
     padding: 0;
-    background: transparent;
+    background: #ffffff;
     color: #202020;
     font-family: "Segoe UI", Arial, sans-serif;
     font-size: 14px;
@@ -644,6 +657,28 @@ table { max-width: 100%; border-collapse: collapse; }
 a { color: #2563eb; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 </style>
+""";
+
+            if (System.Text.RegularExpressions.Regex.IsMatch(safeHtml, @"<\s*html\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            {
+                if (System.Text.RegularExpressions.Regex.IsMatch(safeHtml, @"<\s*/\s*head\s*>", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                    return System.Text.RegularExpressions.Regex.Replace(safeHtml, @"<\s*/\s*head\s*>", baseStyle + "</head>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                return System.Text.RegularExpressions.Regex.Replace(
+                    safeHtml,
+                    @"<\s*html\b[^>]*>",
+                    match => match.Value + baseStyle,
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase,
+                    TimeSpan.FromMilliseconds(100));
+            }
+
+            return """
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+""" + baseStyle + """
 </head>
 <body>
 """ + safeHtml + """
@@ -663,10 +698,73 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
             value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+on\w+\s*=\s*[^\s>]+", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             value = System.Text.RegularExpressions.Regex.Replace(value, @"(href|src)\s*=\s*(['""])\s*javascript:.*?\2", "$1=\"#\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
 
-            if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"<\s*(html|body|table|div|p|span|br|img|a)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-                value = $"<pre>{WebUtility.HtmlEncode(value)}</pre>";
+            if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"<\s*(html|head|body|style|table|div|p|span|br|img|a|meta)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                value = $"<pre>{WebUtility.HtmlEncode(RemoveCssNoise(value))}</pre>";
 
             return value;
+        }
+
+        private static bool HasVisibleHtmlContent(string html)
+        {
+            if (string.IsNullOrWhiteSpace(html)) return false;
+
+            var withoutNonContent = System.Text.RegularExpressions.Regex.Replace(
+                html,
+                @"<\s*(head|style|script|meta|link)\b[^>]*>.*?<\s*/\s*\1\s*>|<\s*(meta|link)\b[^>]*/?\s*>",
+                " ",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+
+            if (System.Text.RegularExpressions.Regex.IsMatch(withoutNonContent, @"<\s*(img|table|div|p|span|td|a|h[1-6])\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                return true;
+
+            var text = System.Text.RegularExpressions.Regex.Replace(withoutNonContent, "<.*?>", " ");
+            text = WebUtility.HtmlDecode(text).Trim();
+            return text.Length > 0;
+        }
+
+        private static string RemoveCssNoise(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "";
+
+            var lines = value
+                .Replace("\r\n", "\n")
+                .Replace('\r', '\n')
+                .Split('\n');
+
+            var kept = new List<string>();
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed)) continue;
+                if (IsCssNoiseLine(trimmed)) continue;
+                kept.Add(line);
+            }
+
+            return string.Join("\n", kept).Trim();
+        }
+
+        private static string BuildPlainTextFallback(string value)
+        {
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(head|style|script)\b[^>]*>.*?<\s*/\s*\1\s*>", " ", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(meta|link)\b[^>]*/?\s*>", " ", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            value = System.Text.RegularExpressions.Regex.Replace(value, "<.*?>", " ");
+            value = RemoveCssNoise(value);
+            value = WebUtility.HtmlDecode(value);
+            return System.Text.RegularExpressions.Regex.Replace(value, @"[ \t]{2,}", " ").Trim();
+        }
+
+        private static bool IsCssNoiseLine(string line)
+        {
+            if (line == "{" || line == "}") return true;
+            if (line.StartsWith("@media", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("@font-face", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("@-moz", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("@supports", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (System.Text.RegularExpressions.Regex.IsMatch(line, @"^[.#][\w\-#.:\s,>+~\[\]=""']+\{?$")) return true;
+            if (System.Text.RegularExpressions.Regex.IsMatch(line, @"^[a-zA-Z\-]+\s*:\s*[^。！？；，、]*;?$")) return true;
+            if (System.Text.RegularExpressions.Regex.IsMatch(line, @"^[a-zA-Z][\w\-#.\s,>+~\[\]=""']+\s*\{")) return true;
+            return false;
         }
 
         private void CancelComposeButton_Click(object sender, RoutedEventArgs e)

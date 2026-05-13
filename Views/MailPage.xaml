@@ -152,16 +152,23 @@
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="8"
-                    Padding="24">
+                    Padding="16">
                 <Grid>
                     <StackPanel x:Name="EmptyDetailPanel" Spacing="8" VerticalAlignment="Center" HorizontalAlignment="Center">
                         <FontIcon Glyph="&#xE715;" FontSize="36" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
                         <TextBlock Text="选择一封邮件查看预览" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
 
-                    <StackPanel x:Name="DetailPanel" Visibility="Collapsed" Spacing="14">
-                        <TextBlock x:Name="DetailSubject" FontSize="22" FontWeight="SemiBold" TextWrapping="WrapWholeWords"/>
-                        <Grid ColumnSpacing="12">
+                    <Grid x:Name="DetailPanel" Visibility="Collapsed" RowSpacing="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock x:Name="DetailSubject" FontSize="20" FontWeight="SemiBold" TextWrapping="WrapWholeWords"/>
+                        <Grid Grid.Row="1" ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
@@ -175,15 +182,15 @@
                                 <TextBlock x:Name="DetailTime" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Right"/>
                             </StackPanel>
                         </Grid>
-                        <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
-                        <Grid MinHeight="260" MaxHeight="520">
+                        <Border Grid.Row="2" Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+                        <Grid Grid.Row="3" MinHeight="320">
                             <WebView2 x:Name="DetailHtmlView" Visibility="Collapsed"/>
                             <ScrollViewer x:Name="DetailTextScrollViewer" VerticalScrollBarVisibility="Auto">
                                 <TextBlock x:Name="DetailPreview" FontSize="14" TextWrapping="WrapWholeWords"
                                            LineHeight="22"/>
                             </ScrollViewer>
                         </Grid>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8">
                             <Button x:Name="ReplyButton" HorizontalAlignment="Left" Click="ReplyButton_Click">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <FontIcon Glyph="&#xE97A;" FontSize="14"/>
@@ -197,7 +204,7 @@
                                 </StackPanel>
                             </Button>
                         </StackPanel>
-                    </StackPanel>
+                    </Grid>
 
                     <Grid x:Name="AddAccountPanel" Visibility="Collapsed"
                           Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
