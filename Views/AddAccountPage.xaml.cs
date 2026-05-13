@@ -138,13 +138,13 @@ namespace Task_Flyout.Views
             }
         }
 
-        private static AccountManager GetAccountManager()
+        private static AccountManager? GetAccountManager()
         {
             if (App.Current is App app) return app.SyncManager.AccountManager;
             return null;
         }
 
-        private static SyncManager GetSyncManager()
+        private static SyncManager? GetSyncManager()
         {
             if (App.Current is App app) return app.SyncManager;
             return null;

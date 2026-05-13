@@ -74,19 +74,19 @@ namespace Task_Flyout
     {
         private AppWindow _appWindow;
         private AppCache _localCache = new();
-        private DispatcherTimer _syncTimer;
-        private DispatcherTimer _clockTimer;
-        private DispatcherTimer _focusTimer;
-        private SyncManager _syncManager;
+        private DispatcherTimer? _syncTimer;
+        private DispatcherTimer? _clockTimer;
+        private DispatcherTimer? _focusTimer;
+        private SyncManager _syncManager = null!;
         private ResourceLoader _loader;
 
         private DateTime _lastHideTime = DateTime.MinValue;
         private bool _isPinned = false;
 
-        private DispatcherTimer _dotRefreshTimer;
+        private DispatcherTimer? _dotRefreshTimer;
         private bool _isDotRefreshPending = false;
 
-        private ScrollViewer _activeScrollViewer;
+        private ScrollViewer? _activeScrollViewer;
 
         public ObservableCollection<AgendaItem> AgendaItems { get; set; } = new();
         public HashSet<string> MarkedDates { get; set; } = new();
@@ -156,8 +156,8 @@ namespace Task_Flyout
             _ = RefreshWeatherAsync();
         }
 
-        private void OnScrollViewerViewChanging(object sender, ScrollViewerViewChangingEventArgs e) => RequestDotRefresh();
-        private void OnScrollViewerViewChanged(object sender, ScrollViewerViewChangedEventArgs e) => RequestDotRefresh();
+        private void OnScrollViewerViewChanging(object? sender, ScrollViewerViewChangingEventArgs e) => RequestDotRefresh();
+        private void OnScrollViewerViewChanged(object? sender, ScrollViewerViewChangedEventArgs e) => RequestDotRefresh();
 
         private void HookActiveScrollViewer()
         {
@@ -820,11 +820,11 @@ namespace Task_Flyout
         {
             if (autoHide && _isPinned)
             {
-                _focusTimer.Stop();
+                _focusTimer?.Stop();
                 return;
             }
 
-            _focusTimer.Stop();
+            _focusTimer?.Stop();
             _appWindow.Hide();
             _lastHideTime = DateTime.Now;
         }
@@ -832,9 +832,9 @@ namespace Task_Flyout
         private void UpdateAutoHideTimer()
         {
             if (_isPinned || !_appWindow.IsVisible)
-                _focusTimer.Stop();
+                _focusTimer?.Stop();
             else
-                _focusTimer.Start();
+                _focusTimer?.Start();
         }
 
         private bool IsItemVisible(AgendaItem item)
@@ -1041,7 +1041,7 @@ namespace Task_Flyout
 
         private static string GetWeatherLang()
         {
-            string appLang = Windows.Storage.ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
+            string? appLang = Windows.Storage.ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
             if (string.IsNullOrEmpty(appLang))
                 appLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
             return appLang.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "en" : "zh";

@@ -20,7 +20,7 @@ namespace Task_Flyout.Views
     {
         public object Convert(object value, Type targetType, object parameter, string language)
         {
-            string colorHex = value as string;
+            string? colorHex = value as string;
             if (!string.IsNullOrEmpty(colorHex) && colorHex.StartsWith("#"))
                 return new SolidColorBrush(Services.ColorHelper.ParseHex(colorHex));
 
@@ -33,7 +33,7 @@ namespace Task_Flyout.Views
     {
         public object Convert(object value, Type targetType, object parameter, string language)
         {
-            string colorHex = value as string;
+            string? colorHex = value as string;
             if (!string.IsNullOrEmpty(colorHex) && colorHex.StartsWith("#"))
             {
                 return Services.ColorHelper.ShouldUseWhiteText(colorHex)
@@ -85,9 +85,9 @@ namespace Task_Flyout.Views
         public ObservableCollection<AgendaItem> SelectedDayItems { get; set; } = new();
 
         private DateTime _viewDate = DateTime.Today;
-        private SyncManager _syncManager;
+        private SyncManager? _syncManager;
         private AppCache _localCache = new();
-        private AgendaItem _itemBeingEdited;
+        private AgendaItem? _itemBeingEdited;
         private ResourceLoader _loader;
         private bool _isAccountPaneCollapsed;
         private bool _isTimelinePaneCollapsed;
@@ -159,7 +159,7 @@ namespace Task_Flyout.Views
             _ = SyncMonthDataAsync();
         }
 
-        private System.Threading.CancellationTokenSource _syncCts;
+        private System.Threading.CancellationTokenSource? _syncCts;
 
         private async Task SyncMonthDataAsync(bool forceRefresh = false)
         {
@@ -224,8 +224,8 @@ namespace Task_Flyout.Views
                 point.Position.Y >= 0 && point.Position.Y <= CalendarGrid.ActualHeight)
             {
                 var delta = e.GetCurrentPoint(this).Properties.MouseWheelDelta;
-                if (delta > 0) BtnPrevMonth_Click(null, null);
-                else if (delta < 0) BtnNextMonth_Click(null, null);
+                if (delta > 0) BtnPrevMonth_Click(sender, new RoutedEventArgs());
+                else if (delta < 0) BtnNextMonth_Click(sender, new RoutedEventArgs());
                 e.Handled = true;
             }
         }
@@ -284,8 +284,8 @@ namespace Task_Flyout.Views
 
         public async void RefreshAccountList()
         {
-            var mgr = _syncManager?.AccountManager;
-            if (mgr == null || AccountListRepeater == null) return;
+            if (_syncManager == null || AccountListRepeater == null) return;
+            var mgr = _syncManager.AccountManager;
 
             AccountListRepeater.ItemsSource = null;
             AccountListRepeater.ItemsSource = mgr.Accounts;
@@ -414,7 +414,8 @@ namespace Task_Flyout.Views
                 {
                     cb.IsEnabled = false;
                     item.IsCompleted = (cb.IsChecked == true);
-                    await _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, item.IsCompleted);
+                    if (_syncManager != null)
+                        await _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, item.IsCompleted);
                     _ = SyncMonthDataAsync(forceRefresh: true);
                 }
                 catch { item.IsCompleted = !item.IsCompleted; }
@@ -453,7 +454,7 @@ namespace Task_Flyout.Views
             _ = SyncMonthDataAsync(forceRefresh: true);
         }
 
-        private void EditRadioType_Changed(object sender, RoutedEventArgs e)
+        private void EditRadioType_Changed(object? sender, RoutedEventArgs? e)
         {
             if (EditTxtLocation == null || EditEndTimePicker == null) return;
 
@@ -465,7 +466,7 @@ namespace Task_Flyout.Views
             EditStartTimePicker.Header = isEvent ? _loader.GetString("TextStartTime") : _loader.GetString("TextDueTime");
         }
 
-        private void SetupEditProviderComboBox(string forceSelectProvider = null)
+        private void SetupEditProviderComboBox(string? forceSelectProvider = null)
         {
             EditCmbProvider.Items.Clear();
             var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
@@ -605,10 +606,13 @@ namespace Task_Flyout.Views
             {
                 try
                 {
-                    await _syncManager.CreateItemAsync(
-                        EditTxtTitle.Text, isEvent, isAllDay, EditDatePicker.Date.DateTime,
-                        newStartTime ?? TimeSpan.Zero, newEndTime ?? TimeSpan.Zero, EditTxtLocation.Text, recurrence, providerName);
-                    _ = SyncMonthDataAsync(forceRefresh: true);
+                    if (_syncManager != null)
+                    {
+                        await _syncManager.CreateItemAsync(
+                            EditTxtTitle.Text, isEvent, isAllDay, EditDatePicker.Date.DateTime,
+                            newStartTime ?? TimeSpan.Zero, newEndTime ?? TimeSpan.Zero, EditTxtLocation.Text, recurrence, providerName);
+                        _ = SyncMonthDataAsync(forceRefresh: true);
+                    }
                 }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"新建失败: {ex.Message}"); }
             }
@@ -627,7 +631,8 @@ namespace Task_Flyout.Views
                         orig.Subtitle = newSubtitleText;
                         if (!_localCache.DayItems.ContainsKey(newDateKey)) _localCache.DayItems[newDateKey] = new List<AgendaItem>();
                         _localCache.DayItems[newDateKey].Add(orig);
-                        _ = _syncManager.SaveLocalCacheAsync();
+                        if (_syncManager != null)
+                            _ = _syncManager.SaveLocalCacheAsync();
                     }
                 }
                 LoadCalendar(_viewDate);
@@ -673,7 +678,8 @@ namespace Task_Flyout.Views
             if (_localCache.DayItems.TryGetValue(itemToDelete.DateKey, out var list))
                 {
                 list.RemoveAll(x => x.Id == itemToDelete.Id);
-                    _ = _syncManager.SaveLocalCacheAsync();
+                    if (_syncManager != null)
+                        _ = _syncManager.SaveLocalCacheAsync();
                 }
                 LoadCalendar(_viewDate);
 

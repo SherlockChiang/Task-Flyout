@@ -133,10 +133,10 @@ namespace Task_Flyout.Services
             if (provider != null) await provider.UpdateItemAsync(itemId, isEvent, title, location, description, targetDate, startTime, endTime);
         }
 
-        public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, string providerName = null)
+        public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, string? providerName = null)
             => await CreateItemAsync(title, isEvent, isAllDay, targetDate, startTime, endTime, location, EventRecurrenceKind.None, providerName);
 
-        public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, EventRecurrenceKind recurrence, string providerName = null)
+        public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, EventRecurrenceKind recurrence, string? providerName = null)
         {
             var provider = providerName != null ? _providers.FirstOrDefault(p => p.ProviderName == providerName) : _providers.FirstOrDefault();
             if (provider == null) return;
@@ -166,7 +166,7 @@ namespace Task_Flyout.Services
             await SaveCacheAsync();
         }
 
-        public ISyncProvider GetProvider(string providerName)
+        public ISyncProvider? GetProvider(string providerName)
             => _providers.FirstOrDefault(p => p.ProviderName == providerName);
 
         private void EnsureCacheLoaded()
@@ -178,7 +178,7 @@ namespace Task_Flyout.Services
             {
                 if (File.Exists(CacheFilePath))
                 {
-                    string json = ProtectedLocalStore.ReadText(CacheFilePath);
+                    string? json = ProtectedLocalStore.ReadText(CacheFilePath);
                     if (!string.IsNullOrWhiteSpace(json))
                         _cache = JsonSerializer.Deserialize(json, AppJsonContext.Default.AppCache) ?? new AppCache();
                 }
@@ -213,7 +213,9 @@ namespace Task_Flyout.Services
         {
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(CacheFilePath));
+            var directory = Path.GetDirectoryName(CacheFilePath);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
                 string json;
                 lock (_cacheLock)
                 {

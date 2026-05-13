@@ -13,9 +13,9 @@ namespace Task_Flyout.Views
     public sealed partial class WeatherPage : Page
     {
         private bool _isInitializing = true;
-        private WeatherService _weatherService;
+        private WeatherService _weatherService = null!;
         private ResourceLoader _loader;
-        private WeatherInfo _currentWeatherInfo;
+        private WeatherInfo? _currentWeatherInfo;
 
         private readonly string[] _commonFonts = new[]
         {
@@ -45,8 +45,8 @@ namespace Task_Flyout.Views
 
         private async void WeatherPage_Loaded(object sender, RoutedEventArgs e)
         {
-            _weatherService = (App.Current as App)?.WeatherService;
-            if (_weatherService == null) return;
+            if ((App.Current as App)?.WeatherService is not WeatherService weatherService) return;
+            _weatherService = weatherService;
 
             WeatherToggle.IsOn = _weatherService.IsEnabled;
             CitySearchBox.Text = _weatherService.City;
@@ -105,7 +105,7 @@ namespace Task_Flyout.Views
 
         #region Current Weather Card
 
-        private void UpdateCurrentWeatherCard(WeatherInfo info)
+        private void UpdateCurrentWeatherCard(WeatherInfo? info)
         {
             if (info == null)
             {
@@ -350,7 +350,7 @@ namespace Task_Flyout.Views
 
         private static string GetCurrentLang()
         {
-            string appLang = Windows.Storage.ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
+            string? appLang = Windows.Storage.ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
             if (string.IsNullOrEmpty(appLang))
                 appLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
             return appLang.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "en" : "zh";
@@ -454,7 +454,7 @@ namespace Task_Flyout.Views
 
         #endregion
 
-        private static void ApplyIconLayers(string[] layers, TextBlock emojiBlock, params Image[] images)
+        private static void ApplyIconLayers(string[]? layers, TextBlock emojiBlock, params Image[] images)
         {
             bool useBitmap = layers != null && layers.Length > 0;
             emojiBlock.Visibility = useBitmap ? Visibility.Collapsed : Visibility.Visible;
@@ -716,7 +716,7 @@ namespace Task_Flyout.Views
             string lang = GetCurrentLang();
             var items = new List<StackPanel>();
 
-            void AddField(string glyph, string label, string value)
+            void AddField(string glyph, string label, string? value)
             {
                 if (string.IsNullOrEmpty(value)) return;
                 var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Padding = new Thickness(4, 6, 4, 6) };
@@ -757,7 +757,7 @@ namespace Task_Flyout.Views
             DetailFieldsRepeater.ItemsSource = items;
         }
 
-        private static string FormatAqi(string aqi, string lang)
+        private static string? FormatAqi(string? aqi, string lang)
         {
             if (string.IsNullOrEmpty(aqi)) return null;
             if (!double.TryParse(aqi, out var val)) return aqi;
@@ -786,6 +786,12 @@ namespace Task_Flyout.Views
             App.RefreshWeatherBar();
 
             // Update current weather card
+            if (info == null)
+            {
+                UpdateCurrentWeatherCard(null);
+                return;
+            }
+
             UpdateCurrentWeatherCard(info);
             UpdateDailyForecast(info);
 

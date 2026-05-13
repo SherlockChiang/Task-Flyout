@@ -21,8 +21,8 @@ namespace Task_Flyout
     public sealed partial class WeatherBarWindow : Window
     {
         private AppWindow _appWindow;
-        private DispatcherTimer _refreshTimer;
-        private DispatcherTimer _reparentTimer;
+        private DispatcherTimer _refreshTimer = null!;
+        private DispatcherTimer _reparentTimer = null!;
         private bool _initialActivationDone;
         private IntPtr _taskbarHwnd = IntPtr.Zero;
         private bool _isParented;
@@ -54,10 +54,10 @@ namespace Task_Flyout
         private static extern bool IsWindow(IntPtr hWnd);
 
         [DllImport("user32.dll", SetLastError = true)]
-        private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+        private static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
 
         [DllImport("user32.dll", SetLastError = true)]
-        private static extern IntPtr FindWindowEx(IntPtr hWndParent, IntPtr hWndChildAfter, string lpszClass, string lpszWindow);
+        private static extern IntPtr FindWindowEx(IntPtr hWndParent, IntPtr hWndChildAfter, string? lpszClass, string? lpszWindow);
 
         [DllImport("user32.dll")]
         private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
@@ -135,7 +135,7 @@ namespace Task_Flyout
         private const uint WM_SETTINGCHANGE = 0x001A;
         private const uint WM_DPICHANGED = 0x02E0;
 
-        private SUBCLASSPROC _subclassProc;
+        private SUBCLASSPROC _subclassProc = null!;
 
         #endregion
 
@@ -198,7 +198,7 @@ namespace Task_Flyout
 
         private FrameworkElement? _contentPanel;
 
-        private void ReparentTimer_Tick(object sender, object e)
+        private void ReparentTimer_Tick(object? sender, object e)
         {
             try
             {
@@ -736,7 +736,7 @@ namespace Task_Flyout
                 // emoji alert glyph.
                 bool showIcon = enabledFields.Contains("icon");
                 bool packActive = info.IconLayerUris != null && info.IconLayerUris.Length > 0;
-                string[] displayLayers = null;
+                string[]? displayLayers = null;
                 if (showIcon)
                 {
                     if (alert != null && packActive)
@@ -762,7 +762,7 @@ namespace Task_Flyout
                     WeatherIcon.Visibility = Visibility.Collapsed;
                     for (int i = 0; i < layerImages.Length; i++)
                     {
-                        if (i < displayLayers.Length && !string.IsNullOrEmpty(displayLayers[i]))
+                        if (i < displayLayers!.Length && !string.IsNullOrEmpty(displayLayers[i]))
                         {
                             try
                             {

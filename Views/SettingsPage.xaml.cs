@@ -342,7 +342,7 @@ namespace Task_Flyout.Views
 
             if (LanguageComboBox.SelectedItem is ComboBoxItem item && item.Tag != null)
             {
-                string langCode = item.Tag.ToString();
+                string langCode = item.Tag.ToString() ?? "zh";
                 ApplicationData.Current.LocalSettings.Values["AppLang"] = langCode;
                 Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = langCode;
             }

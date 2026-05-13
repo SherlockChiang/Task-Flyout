@@ -14,7 +14,7 @@ namespace Task_Flyout.Services
     {
         private readonly SyncManager _syncManager;
         private readonly HashSet<string> _notifiedIds = new();
-        private DispatcherTimer _timer;
+        private DispatcherTimer? _timer;
         private int _reminderMinutes;
 
         public NotificationService(SyncManager syncManager)
@@ -167,7 +167,7 @@ namespace Task_Flyout.Services
             }
         }
 
-        private Dictionary<string, List<AgendaItem>> LoadCacheItems()
+        private Dictionary<string, List<AgendaItem>>? LoadCacheItems()
         {
             try
             {

@@ -14,19 +14,19 @@ namespace Task_Flyout
         public RelayCommand(System.Action execute) => _execute = execute;
         public bool CanExecute(object? parameter) => true;
         public void Execute(object? parameter) => _execute();
-        public event System.EventHandler? CanExecuteChanged;
+        public event System.EventHandler? CanExecuteChanged { add { } remove { } }
     }
 
     public partial class App : Application
     {
         private H.NotifyIcon.TaskbarIcon? _trayIcon;
-        private UISettings _uiSettings;
+        private UISettings _uiSettings = null!;
         public static FlyoutWindow? MyFlyoutWindow { get; private set; }
         public static MainWindow? MyMainWindow { get; private set; }
         public static WeatherBarWindow? MyWeatherBar { get; private set; }
-        public static Microsoft.UI.Dispatching.DispatcherQueue MainDispatcherQueue { get; private set; }
+        public static Microsoft.UI.Dispatching.DispatcherQueue MainDispatcherQueue { get; private set; } = null!;
         public SyncManager SyncManager { get; } = new SyncManager();
-        public NotificationService NotificationService { get; private set; }
+        public NotificationService NotificationService { get; private set; } = null!;
         public WeatherService WeatherService { get; } = new WeatherService();
         public MailService MailService { get; } = new MailService();
 
@@ -180,7 +180,7 @@ namespace Task_Flyout
             });
         }
 
-        public static void OpenMainWindowInternal(Action<MainWindow> onOpened = null)
+        public static void OpenMainWindowInternal(Action<MainWindow>? onOpened = null)
         {
             MainDispatcherQueue.TryEnqueue(() =>
             {

@@ -201,10 +201,10 @@ namespace Task_Flyout.Views
         private Task WaitUntilLoadedAsync()
         {
             var tcs = new TaskCompletionSource();
-            RoutedEventHandler handler = null;
+            RoutedEventHandler? handler = null;
             handler = (_, _) =>
             {
-                Loaded -= handler;
+                Loaded -= handler!;
                 tcs.TrySetResult();
             };
             Loaded += handler;

@@ -123,6 +123,9 @@ namespace Task_Flyout.Services
 
         public async Task<List<AgendaItem>> FetchDataAsync(DateTime min, DateTime max)
         {
+            await EnsureAuthorizedAsync();
+            var calendarSvc = CalendarSvc!;
+            var tasksSvc = TasksSvc!;
             var items = new List<AgendaItem>();
 
             // Fetch events from all calendars
@@ -136,12 +139,12 @@ namespace Task_Flyout.Services
             foreach (var cal in calendars)
             {
                 var recurrenceKinds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                string pageToken = null;
+                string? pageToken = null;
                 do
                 {
                     try
                     {
-                        var req = CalendarSvc.Events.List(cal.Id);
+                        var req = calendarSvc.Events.List(cal.Id);
                         req.TimeMinDateTimeOffset = min;
                         req.TimeMaxDateTimeOffset = max;
                         req.SingleEvents = true;
@@ -152,10 +155,10 @@ namespace Task_Flyout.Services
                         {
                             foreach (var ev in events.Items)
                             {
-                                DateTime? date = ev.Start?.DateTime ?? (DateTime.TryParse(ev.Start?.Date, out var d) ? d : null);
+                                DateTime? date = ev.Start?.DateTimeDateTimeOffset?.DateTime ?? (DateTime.TryParse(ev.Start?.Date, out var d) ? d : null);
                                 if (date == null) continue;
 
-                                var endDate2 = ev.End?.DateTime ?? (DateTime.TryParse(ev.End?.Date, out var ed) ? ed : (DateTime?)null);
+                                var endDate2 = ev.End?.DateTimeDateTimeOffset?.DateTime ?? (DateTime.TryParse(ev.End?.Date, out var ed) ? ed : (DateTime?)null);
                                 string recurringEventId = ev.RecurringEventId ?? "";
                                 string recurrenceKind = GetGoogleRecurrenceKind(ev.Recurrence);
                                 if (recurrenceKind == "None" && !string.IsNullOrWhiteSpace(recurringEventId))
@@ -163,17 +166,17 @@ namespace Task_Flyout.Services
 
                                 items.Add(new AgendaItem
                                 {
-                                    Id = ev.Id,
-                                    Title = ev.Summary,
-                                    Subtitle = ev.Start?.DateTime == null ? _loader.GetString("TextAllDay") : ev.Start.DateTime.Value.ToString("HH:mm"),
-                                    Location = ev.Location,
-                                    Description = ev.Description,
+                                    Id = ev.Id ?? "",
+                                    Title = ev.Summary ?? "",
+                                    Subtitle = ev.Start?.DateTimeDateTimeOffset == null ? _loader.GetString("TextAllDay") : ev.Start.DateTimeDateTimeOffset.Value.ToString("HH:mm"),
+                                    Location = ev.Location ?? "",
+                                    Description = ev.Description ?? "",
                                     IsEvent = true,
                                     Provider = ProviderName,
                                     CalendarId = cal.Id,
                                     CalendarName = cal.Name,
                                     DateKey = date.Value.ToString("yyyy-MM-dd"),
-                                    StartDateTime = ev.Start?.DateTime,
+                                    StartDateTime = ev.Start?.DateTimeDateTimeOffset?.DateTime,
                                     EndDateTime = endDate2,
                                     IsRecurring = !string.IsNullOrWhiteSpace(recurringEventId) || ev.Recurrence?.Count > 0,
                                     RecurringEventId = recurringEventId,
@@ -192,10 +195,10 @@ namespace Task_Flyout.Services
             }
 
             // Fetch tasks from @default list
-            string taskPageToken = null;
+            string? taskPageToken = null;
             do
             {
-                var tasksReq = TasksSvc.Tasks.List("@default");
+                var tasksReq = tasksSvc.Tasks.List("@default");
                 tasksReq.ShowHidden = true; tasksReq.MaxResults = 100; tasksReq.PageToken = taskPageToken;
                 var tasks = await tasksReq.ExecuteAsync().ConfigureAwait(false);
                 if (tasks?.Items != null)
@@ -210,13 +213,13 @@ namespace Task_Flyout.Services
 
                         items.Add(new AgendaItem
                         {
-                            Id = t.Id,
-                            Title = t.Title,
+                            Id = t.Id ?? "",
+                            Title = t.Title ?? "",
                             Subtitle = _loader.GetString("TextTask"),
                             IsEvent = false,
                             IsTask = true,
                             IsCompleted = isDone,
-                            Description = t.Notes,
+                            Description = t.Notes ?? "",
                             Provider = ProviderName,
                             DateKey = taskDate.ToString("yyyy-MM-dd")
                         });
@@ -232,7 +235,9 @@ namespace Task_Flyout.Services
         {
             if (isEvent)
             {
-                var ev = await CalendarSvc.Events.Get("primary", itemId).ExecuteAsync();
+                await EnsureAuthorizedAsync();
+                var calendarSvc = CalendarSvc!;
+                var ev = await calendarSvc.Events.Get("primary", itemId).ExecuteAsync();
                 ev.Summary = title;
                 ev.Location = location;
                 ev.Description = description;
@@ -251,22 +256,25 @@ namespace Task_Flyout.Services
                     ev.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { Date = targetDate.ToString("yyyy-MM-dd") };
                     ev.End = new Google.Apis.Calendar.v3.Data.EventDateTime { Date = targetDate.AddDays(1).ToString("yyyy-MM-dd") };
                 }
-                await CalendarSvc.Events.Update(ev, "primary", itemId).ExecuteAsync();
+                await calendarSvc.Events.Update(ev, "primary", itemId).ExecuteAsync();
             }
             else
             {
-                var task = await TasksSvc.Tasks.Get("@default", itemId).ExecuteAsync();
+                await EnsureAuthorizedAsync();
+                var tasksSvc = TasksSvc!;
+                var task = await tasksSvc.Tasks.Get("@default", itemId).ExecuteAsync();
                 task.Title = title;
                 task.Notes = description;
                 task.Due = targetDate.ToString("yyyy-MM-dd'T'00:00:00.000'Z'");
-                await TasksSvc.Tasks.Update(task, "@default", itemId).ExecuteAsync();
+                await tasksSvc.Tasks.Update(task, "@default", itemId).ExecuteAsync();
             }
         }
 
         public async Task UpdateTaskStatusAsync(string taskId, bool isCompleted)
         {
             var status = isCompleted ? "completed" : "needsAction";
-            var updateRequest = TasksSvc.Tasks.Patch(new Google.Apis.Tasks.v1.Data.Task { Id = taskId, Status = status }, "@default", taskId);
+            await EnsureAuthorizedAsync();
+            var updateRequest = TasksSvc!.Tasks.Patch(new Google.Apis.Tasks.v1.Data.Task { Id = taskId, Status = status }, "@default", taskId);
             await updateRequest.ExecuteAsync();
         }
 
@@ -295,7 +303,8 @@ namespace Task_Flyout.Services
             if (recurrence != EventRecurrenceKind.None)
                 newEvent.Recurrence = new List<string> { $"RRULE:FREQ={ToGoogleFrequency(recurrence)}" };
 
-            await CalendarSvc.Events.Insert(newEvent, "primary").ExecuteAsync();
+            await EnsureAuthorizedAsync();
+            await CalendarSvc!.Events.Insert(newEvent, "primary").ExecuteAsync();
         }
 
         public async Task CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay)
@@ -304,7 +313,8 @@ namespace Task_Flyout.Services
 
             newTask.Due = targetDate.ToString("yyyy-MM-dd'T'00:00:00.000'Z'");
 
-            await TasksSvc.Tasks.Insert(newTask, "@default").ExecuteAsync();
+            await EnsureAuthorizedAsync();
+            await TasksSvc!.Tasks.Insert(newTask, "@default").ExecuteAsync();
         }
 
         public async Task DeleteItemAsync(string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode = RecurringDeleteMode.Single, DateTime? occurrenceDate = null, string recurringEventId = "")
@@ -355,7 +365,8 @@ namespace Task_Flyout.Services
 
             try
             {
-                var master = await CalendarSvc.Events.Get(calendarId, eventId).ExecuteAsync();
+                await EnsureAuthorizedAsync();
+                var master = await CalendarSvc!.Events.Get(calendarId, eventId).ExecuteAsync();
                 cached = GetGoogleRecurrenceKind(master.Recurrence);
             }
             catch

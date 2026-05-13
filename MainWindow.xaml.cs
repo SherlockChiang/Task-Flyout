@@ -97,7 +97,7 @@ namespace Task_Flyout
             }
         }
 
-        private Services.AccountManager GetAccountManager()
+        private Services.AccountManager? GetAccountManager()
         {
             if (App.Current is App app) return app.SyncManager.AccountManager;
             return null;

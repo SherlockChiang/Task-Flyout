@@ -717,7 +717,7 @@ namespace Task_Flyout.Services
                     var message = await mailFolder.GetMessageAsync(id);
                     items.Add(ToImapMailItem(account.Id, folder.Id, id.Id.ToString(), message, isRead));
                 }
-                catch (Exception ex)
+                catch
                 {
                     items.Add(new MailItem
                     {
@@ -868,7 +868,7 @@ namespace Task_Flyout.Services
 
             try
             {
-                string json = ProtectedLocalStore.ReadText(path);
+                string? json = ProtectedLocalStore.ReadText(path);
                 if (!string.IsNullOrWhiteSpace(json))
                     _accounts = JsonSerializer.Deserialize(json, AppJsonContext.Default.ListMailAccount) ?? new List<MailAccount>();
             }

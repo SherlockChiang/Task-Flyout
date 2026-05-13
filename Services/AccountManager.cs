@@ -72,7 +72,9 @@ namespace Task_Flyout.Services
 
         public void Save()
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_filePath));
+            var directory = Path.GetDirectoryName(_filePath);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
             var json = JsonSerializer.Serialize(Accounts.ToList(), AppJsonContext.Default.ListConnectedAccountInfo);
             ProtectedLocalStore.WriteText(_filePath, json);
 
@@ -94,7 +96,7 @@ namespace Task_Flyout.Services
             settings.Values["ShowMSTasks"] = ms?.ShowTasks ?? true;
         }
 
-        public ConnectedAccountInfo GetAccount(string providerName)
+        public ConnectedAccountInfo? GetAccount(string providerName)
             => Accounts.FirstOrDefault(a => a.ProviderName == providerName);
 
         public bool IsConnected(string providerName)
@@ -147,7 +149,7 @@ namespace Task_Flyout.Services
             return true;
         }
 
-        public string GetColorForItem(AgendaItem item)
+        public string? GetColorForItem(AgendaItem item)
         {
             if (item == null || string.IsNullOrEmpty(item.Provider)) return null;
 

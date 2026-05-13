@@ -419,9 +419,9 @@ namespace Task_Flyout.Services
                     _lastSearchCoords.Clear();
                     foreach (var item in results.EnumerateArray())
                     {
-                        string name = item.GetProperty("name").GetString();
-                        string admin1 = item.TryGetProperty("admin1", out var a1) ? a1.GetString() : "";
-                        string country = item.TryGetProperty("country", out var c) ? c.GetString() : "";
+                        string name = item.GetProperty("name").GetString() ?? "";
+                        string admin1 = item.TryGetProperty("admin1", out var a1) ? a1.GetString() ?? "" : "";
+                        string country = item.TryGetProperty("country", out var c) ? c.GetString() ?? "" : "";
                         double lat = item.GetProperty("latitude").GetDouble();
                         double lon = item.GetProperty("longitude").GetDouble();
 
@@ -490,10 +490,10 @@ namespace Task_Flyout.Services
             var forecastTask = _httpClient.GetStringAsync(forecastUrl);
             Task<string> aqTask;
             try { aqTask = _httpClient.GetStringAsync(aqUrl); }
-            catch { aqTask = Task.FromResult<string>(null); }
+            catch { aqTask = Task.FromResult(""); }
 
             string forecastJson = await forecastTask;
-            string aqJson = null;
+            string? aqJson = null;
             try { aqJson = await aqTask; } catch { }
 
             using var forecastDoc = JsonDocument.Parse(forecastJson);
@@ -543,8 +543,8 @@ namespace Task_Flyout.Services
                 catch { }
             }
 
-            string sunrise = daily.GetProperty("sunrise")[0].GetString();
-            string sunset = daily.GetProperty("sunset")[0].GetString();
+            string sunrise = daily.GetProperty("sunrise")[0].GetString() ?? "";
+            string sunset = daily.GetProperty("sunset")[0].GetString() ?? "";
             string sunriseTime = sunrise.Contains("T") ? sunrise.Split('T')[1] : sunrise;
             string sunsetTime = sunset.Contains("T") ? sunset.Split('T')[1] : sunset;
 
@@ -568,7 +568,7 @@ namespace Task_Flyout.Services
             // Build hourly data: 24 hours from current hour
             for (int i = 0; i < Math.Min(totalHours, 48); i++)
             {
-                string timeStr = times[i].GetString();
+                string timeStr = times[i].GetString() ?? "";
                 if (!DateTime.TryParse(timeStr, out var dt)) continue;
 
                 // Only include hours from now through next 23 hours
@@ -737,7 +737,7 @@ namespace Task_Flyout.Services
 
         private static string GetCurrentLanguage()
         {
-            string appLang = ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
+            string? appLang = ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
             if (string.IsNullOrEmpty(appLang))
                 appLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
             return appLang.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "en" : "zh";
@@ -894,20 +894,20 @@ namespace Task_Flyout.Services
             var root = doc.RootElement;
 
             var current = root.GetProperty("current_condition")[0];
-            string tempC = current.GetProperty("temp_C").GetString();
-            string weatherCode = current.GetProperty("weatherCode").GetString();
-            string humidityVal = current.TryGetProperty("humidity", out var h) ? h.GetString() : "";
-            string windVal = current.TryGetProperty("windspeedKmph", out var w) ? w.GetString() : "";
-            string flVal = current.TryGetProperty("FeelsLikeC", out var fl) ? fl.GetString() : "";
-            string visVal = current.TryGetProperty("visibility", out var vis) ? vis.GetString() : "";
-            string pressVal = current.TryGetProperty("pressure", out var pr) ? pr.GetString() : "";
-            string uvVal = current.TryGetProperty("uvIndex", out var uv) ? uv.GetString() : "";
+            string tempC = current.GetProperty("temp_C").GetString() ?? "";
+            string weatherCode = current.GetProperty("weatherCode").GetString() ?? "";
+            string humidityVal = current.TryGetProperty("humidity", out var h) ? h.GetString() ?? "" : "";
+            string windVal = current.TryGetProperty("windspeedKmph", out var w) ? w.GetString() ?? "" : "";
+            string flVal = current.TryGetProperty("FeelsLikeC", out var fl) ? fl.GetString() ?? "" : "";
+            string visVal = current.TryGetProperty("visibility", out var vis) ? vis.GetString() ?? "" : "";
+            string pressVal = current.TryGetProperty("pressure", out var pr) ? pr.GetString() ?? "" : "";
+            string uvVal = current.TryGetProperty("uvIndex", out var uv) ? uv.GetString() ?? "" : "";
 
             string desc = "";
             if (wttrLang == "zh" && current.TryGetProperty("lang_zh", out var langZh) && langZh.GetArrayLength() > 0)
-                desc = langZh[0].GetProperty("value").GetString();
+                desc = langZh[0].GetProperty("value").GetString() ?? "";
             else if (current.TryGetProperty("weatherDesc", out var wDesc) && wDesc.GetArrayLength() > 0)
-                desc = wDesc[0].GetProperty("value").GetString();
+                desc = wDesc[0].GetProperty("value").GetString() ?? "";
 
             int.TryParse(weatherCode, out int wttrRawCode);
             bool wttrIsDay = DateTime.Now.Hour >= 6 && DateTime.Now.Hour < 18;
@@ -937,13 +937,13 @@ namespace Task_Flyout.Services
                 for (int d = 0; d < weatherArray.GetArrayLength(); d++)
                 {
                     var day = weatherArray[d];
-                    string dateRaw = day.TryGetProperty("date", out var dateEl) ? dateEl.GetString() : "";
+                    string dateRaw = day.TryGetProperty("date", out var dateEl) ? dateEl.GetString() ?? "" : "";
                     if (!DateTime.TryParse(dateRaw, out var date)) date = DateTime.Today.AddDays(d);
 
-                    string maxC = day.TryGetProperty("maxtempC", out var maxEl) ? maxEl.GetString() : "";
-                    string minC = day.TryGetProperty("mintempC", out var minEl) ? minEl.GetString() : "";
-                    string dailyUv = day.TryGetProperty("uvIndex", out var duvEl) ? duvEl.GetString() : "";
-                    string sunHour = day.TryGetProperty("sunHour", out var sunEl) ? sunEl.GetString() : "";
+                    string maxC = day.TryGetProperty("maxtempC", out var maxEl) ? maxEl.GetString() ?? "" : "";
+                    string minC = day.TryGetProperty("mintempC", out var minEl) ? minEl.GetString() ?? "" : "";
+                    string dailyUv = day.TryGetProperty("uvIndex", out var duvEl) ? duvEl.GetString() ?? "" : "";
+                    string sunHour = day.TryGetProperty("sunHour", out var sunEl) ? sunEl.GetString() ?? "" : "";
 
                     string dayCode = "";
                     string dayDesc = "";
@@ -958,11 +958,11 @@ namespace Task_Flyout.Services
                         if (noon.ValueKind == JsonValueKind.Undefined)
                             noon = dailyHourly[dailyHourly.GetArrayLength() / 2];
 
-                        dayCode = noon.TryGetProperty("weatherCode", out var dc) ? dc.GetString() : "";
+                        dayCode = noon.TryGetProperty("weatherCode", out var dc) ? dc.GetString() ?? "" : "";
                         if (wttrLang == "zh" && noon.TryGetProperty("lang_zh", out var dz) && dz.GetArrayLength() > 0)
-                            dayDesc = dz[0].GetProperty("value").GetString();
+                            dayDesc = dz[0].GetProperty("value").GetString() ?? "";
                         else if (noon.TryGetProperty("weatherDesc", out var dd) && dd.GetArrayLength() > 0)
-                            dayDesc = dd[0].GetProperty("value").GetString();
+                            dayDesc = dd[0].GetProperty("value").GetString() ?? "";
 
                         foreach (var hour in dailyHourly.EnumerateArray())
                         {
@@ -972,7 +972,7 @@ namespace Task_Flyout.Services
                                 maxRainChance = chance;
 
                             if (string.IsNullOrEmpty(totalPrecip) && hour.TryGetProperty("precipMM", out var precipEl))
-                                totalPrecip = precipEl.GetString();
+                                totalPrecip = precipEl.GetString() ?? "";
 
                             if (hour.TryGetProperty("windspeedKmph", out var windEl)
                                 && int.TryParse(windEl.GetString(), out var wind)
@@ -1011,27 +1011,27 @@ namespace Task_Flyout.Services
                     if (!day.TryGetProperty("hourly", out var hourlyArray)) continue;
                     foreach (var hour in hourlyArray.EnumerateArray())
                     {
-                        string timeRaw = hour.GetProperty("time").GetString();
-                        int hourVal = int.Parse(timeRaw) / 100;
+                        string timeRaw = hour.GetProperty("time").GetString() ?? "0";
+                        int hourVal = int.TryParse(timeRaw, out var parsedHour) ? parsedHour / 100 : 0;
 
                         string hd = "";
                         if (wttrLang == "zh" && hour.TryGetProperty("lang_zh", out var hLang) && hLang.GetArrayLength() > 0)
-                            hd = hLang[0].GetProperty("value").GetString();
+                            hd = hLang[0].GetProperty("value").GetString() ?? "";
                         else if (hour.TryGetProperty("weatherDesc", out var hdesc) && hdesc.GetArrayLength() > 0)
-                            hd = hdesc[0].GetProperty("value").GetString();
+                            hd = hdesc[0].GetProperty("value").GetString() ?? "";
 
                         allHourlyRaw.Add((
                             hourVal + d * 24,
-                            hour.GetProperty("tempC").GetString(),
-                            hour.GetProperty("weatherCode").GetString(),
+                            hour.GetProperty("tempC").GetString() ?? "",
+                            hour.GetProperty("weatherCode").GetString() ?? "",
                             hd,
-                            hour.TryGetProperty("humidity", out var hh) ? hh.GetString() : "",
-                            hour.TryGetProperty("windspeedKmph", out var ww) ? ww.GetString() : "",
-                            hour.TryGetProperty("FeelsLikeC", out var ff) ? ff.GetString() : "",
-                            hour.TryGetProperty("chanceofrain", out var cr) ? cr.GetString() : "",
-                            hour.TryGetProperty("uvIndex", out var ui) ? ui.GetString() : "",
-                            hour.TryGetProperty("visibility", out var vv) ? vv.GetString() : "",
-                            hour.TryGetProperty("pressure", out var pp) ? pp.GetString() : ""
+                            hour.TryGetProperty("humidity", out var hh) ? hh.GetString() ?? "" : "",
+                            hour.TryGetProperty("windspeedKmph", out var ww) ? ww.GetString() ?? "" : "",
+                            hour.TryGetProperty("FeelsLikeC", out var ff) ? ff.GetString() ?? "" : "",
+                            hour.TryGetProperty("chanceofrain", out var cr) ? cr.GetString() ?? "" : "",
+                            hour.TryGetProperty("uvIndex", out var ui) ? ui.GetString() ?? "" : "",
+                            hour.TryGetProperty("visibility", out var vv) ? vv.GetString() ?? "" : "",
+                            hour.TryGetProperty("pressure", out var pp) ? pp.GetString() ?? "" : ""
                         ));
                     }
                 }

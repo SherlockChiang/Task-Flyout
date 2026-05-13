@@ -16,9 +16,9 @@ namespace Task_Flyout.Services
     {
         public string ProviderName => "Microsoft";
         private ResourceLoader _loader = new ResourceLoader();
-        private GraphServiceClient _graphClient;
+        private GraphServiceClient _graphClient = null!;
 
-        private string _defaultTodoListId;
+        private string _defaultTodoListId = "";
 
         private readonly string[] _scopes = new[]
         {
@@ -39,7 +39,7 @@ namespace Task_Flyout.Services
             Directory.CreateDirectory(appDataPath);
             string authRecordPath = Path.Combine(appDataPath, "ms_auth_record.bin");
 
-            AuthenticationRecord authRecord = null;
+            AuthenticationRecord? authRecord = null;
 
             try
             {
@@ -105,8 +105,8 @@ namespace Task_Flyout.Services
                     {
                         result.Add(new SubscribedCalendarInfo
                         {
-                            Id = cal.Id,
-                            Name = cal.Name ?? cal.Id,
+                            Id = cal.Id ?? "",
+                            Name = cal.Name ?? cal.Id ?? "",
                             IsVisible = true
                         });
                     }
@@ -120,14 +120,14 @@ namespace Task_Flyout.Services
             return result;
         }
 
-        private async Task<string> GetDefaultTodoListIdAsync()
+        private async Task<string?> GetDefaultTodoListIdAsync()
         {
             if (!string.IsNullOrEmpty(_defaultTodoListId)) return _defaultTodoListId;
 
             try
             {
                 var lists = await _graphClient.Me.Todo.Lists.GetAsync();
-                _defaultTodoListId = lists?.Value?.FirstOrDefault()?.Id;
+                _defaultTodoListId = lists?.Value?.FirstOrDefault()?.Id ?? "";
                 System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] 成功获取默认列表 ID: {_defaultTodoListId}");
                 return _defaultTodoListId;
             }
@@ -158,7 +158,10 @@ namespace Task_Flyout.Services
                 if (calendars?.Value != null)
                 {
                     foreach (var cal in calendars.Value)
-                        calendarMap[cal.Id] = cal.Name ?? cal.Id;
+                    {
+                        if (!string.IsNullOrEmpty(cal.Id))
+                            calendarMap[cal.Id] = cal.Name ?? cal.Id;
+                    }
                 }
             }
             catch { }
@@ -181,8 +184,8 @@ namespace Task_Flyout.Services
                     {
                         DateTime.TryParse(ev.Start?.DateTime, out var start);
 
-                        string calId = null;
-                        string calName = null;
+                        string? calId = null;
+                        string? calName = null;
                         // Try to extract calendar info from the event
                         if (ev.AdditionalData != null && ev.AdditionalData.TryGetValue("calendar@odata.associationLink", out var calLink))
                         {
@@ -206,16 +209,16 @@ namespace Task_Flyout.Services
 
                         results.Add(new AgendaItem
                         {
-                            Id = ev.Id,
-                            Title = ev.Subject,
+                            Id = ev.Id ?? "",
+                            Title = ev.Subject ?? "",
                             Subtitle = ev.IsAllDay == true ? _loader.GetString("TextAllDay") : start.ToString("HH:mm"),
                             Location = ev.Location?.DisplayName ?? "",
                             Description = ev.BodyPreview ?? "",
                             IsEvent = true,
                             IsTask = false,
                             Provider = ProviderName,
-                            CalendarId = calId,
-                            CalendarName = calName,
+                            CalendarId = calId ?? "",
+                            CalendarName = calName ?? "",
                             DateKey = start.ToString("yyyy-MM-dd"),
                             StartDateTime = start,
                             EndDateTime = end,
@@ -273,8 +276,8 @@ namespace Task_Flyout.Services
 
                             results.Add(new AgendaItem
                             {
-                                Id = task.Id,
-                                Title = task.Title,
+                                Id = task.Id ?? "",
+                                Title = task.Title ?? "",
                                 Subtitle = _loader.GetString("TextTask"),
                                 Description = task.Body?.Content ?? "",
                                 IsEvent = false,
