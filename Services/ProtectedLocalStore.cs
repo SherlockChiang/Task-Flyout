@@ -22,7 +22,7 @@ namespace Task_Flyout.Services
                 var decrypted = ProtectedData.Unprotect(bytes, Entropy, DataProtectionScope.CurrentUser);
                 return Encoding.UTF8.GetString(decrypted);
             }
-            catch
+            catch (CryptographicException)
             {
                 try
                 {

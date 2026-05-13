@@ -51,8 +51,9 @@
         <PackageReference Include="Google.Apis.Gmail.v1" Version="1.74.0.4134" />
         <PackageReference Include="Google.Apis.Tasks.v1" Version="1.72.0.3958" />
         <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.1" />
-        <PackageReference Include="MailKit" Version="4.14.1" />
+        <PackageReference Include="MailKit" Version="4.16.0" />
         <PackageReference Include="Microsoft.Graph" Version="5.105.0" />
+        <PackageReference Include="Microsoft.Kiota.Abstractions" Version="1.22.0" />
         <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7705" />
         <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260209005" />
     </ItemGroup>

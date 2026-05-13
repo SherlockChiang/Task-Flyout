@@ -727,7 +727,7 @@ namespace Task_Flyout.Services
                         Subject = "无法读取此邮件",
                         Sender = account.DisplayTitle,
                         Preview = "IMAP 服务器返回了无效的 FETCH 响应。",
-                        BodyText = ex.Message,
+                        BodyText = "无法加载此邮件的正文内容。",
                         IsRead = isRead
                     });
                 }
@@ -868,8 +868,9 @@ namespace Task_Flyout.Services
 
             try
             {
-                string json = File.ReadAllText(path);
-                _accounts = JsonSerializer.Deserialize(json, AppJsonContext.Default.ListMailAccount) ?? new List<MailAccount>();
+                string json = ProtectedLocalStore.ReadText(path);
+                if (!string.IsNullOrWhiteSpace(json))
+                    _accounts = JsonSerializer.Deserialize(json, AppJsonContext.Default.ListMailAccount) ?? new List<MailAccount>();
             }
             catch
             {
@@ -881,7 +882,7 @@ namespace Task_Flyout.Services
         {
             Directory.CreateDirectory(GetAppDataPath());
             string json = JsonSerializer.Serialize(_accounts, AppJsonContext.Default.ListMailAccount);
-            File.WriteAllText(GetAccountsPath(), json);
+            ProtectedLocalStore.WriteText(GetAccountsPath(), json);
         }
 
         private static string GetAppDataPath()
@@ -1050,7 +1051,7 @@ namespace Task_Flyout.Services
         {
             if (string.IsNullOrWhiteSpace(value)) return "";
 
-            value = Regex.Replace(value, @"<\s*(head|script)\b[^>]*>.*?<\s*/\s*\1\s*>", " ", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            value = Regex.Replace(value, @"<\s*(head|script|noscript|svg)\b[^>]*>.*?<\s*/\s*\1\s*>", " ", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             value = Regex.Replace(value, @"<\s*(meta|link)\b[^>]*/?\s*>", " ", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             return value;
         }

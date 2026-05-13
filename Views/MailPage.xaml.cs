@@ -123,7 +123,8 @@ namespace Task_Flyout.Views
             }
             catch (Exception ex)
             {
-                AddStatusText.Text = ex.Message;
+                System.Diagnostics.Debug.WriteLine($"Load folders failed: {ex.Message}");
+                AddStatusText.Text = "加载文件夹失败，请稍后重试。";
             }
         }
 
@@ -282,7 +283,8 @@ namespace Task_Flyout.Views
             }
             catch (Exception ex)
             {
-                MessageListSubtitle.Text = ex.Message;
+                System.Diagnostics.Debug.WriteLine($"Load messages failed: {ex.Message}");
+                MessageListSubtitle.Text = "加载邮件失败，请稍后重试。";
             }
             finally
             {
@@ -410,7 +412,8 @@ namespace Task_Flyout.Views
             }
             catch (Exception ex)
             {
-                AddStatusText.Text = ex.Message;
+                System.Diagnostics.Debug.WriteLine($"Add Outlook account failed: {ex.Message}");
+                AddStatusText.Text = "添加 Outlook 账户失败，请检查授权或网络连接。";
             }
             finally
             {
@@ -443,7 +446,8 @@ namespace Task_Flyout.Views
             }
             catch (Exception ex)
             {
-                AddStatusText.Text = ex.Message;
+                System.Diagnostics.Debug.WriteLine($"Add Google account failed: {ex.Message}");
+                AddStatusText.Text = "添加 Gmail 账户失败，请检查授权或网络连接。";
             }
             finally
             {
@@ -530,7 +534,8 @@ namespace Task_Flyout.Views
             }
             catch (Exception ex)
             {
-                AddStatusText.Text = ex.Message;
+                System.Diagnostics.Debug.WriteLine($"Add IMAP account failed: {ex.Message}");
+                AddStatusText.Text = "连接 IMAP 服务器失败，请检查服务器设置和凭据。";
             }
             finally
             {
@@ -584,7 +589,8 @@ namespace Task_Flyout.Views
                 }
                 catch (Exception ex)
                 {
-                    MessageListSubtitle.Text = ex.Message;
+                    System.Diagnostics.Debug.WriteLine($"Mark as read failed: {ex.Message}");
+                    MessageListSubtitle.Text = "标记已读失败。";
                 }
             }
         }
@@ -600,6 +606,8 @@ namespace Task_Flyout.Views
                 EmptyDetailPanel.Visibility = Visibility.Visible;
         }
 
+        private bool _webView2Configured;
+
         private async Task RenderMailBodyAsync(MailItem item)
         {
             if (!string.IsNullOrWhiteSpace(item.HtmlBody))
@@ -614,6 +622,31 @@ namespace Task_Flyout.Views
                         DetailTextScrollViewer.Visibility = Visibility.Collapsed;
                         DetailHtmlView.Visibility = Visibility.Visible;
                         await DetailHtmlView.EnsureCoreWebView2Async();
+                        if (!_webView2Configured)
+                        {
+                            _webView2Configured = true;
+                            var settings = DetailHtmlView.CoreWebView2.Settings;
+                            settings.IsScriptEnabled = false;
+                            settings.IsWebMessageEnabled = false;
+                            settings.AreDefaultContextMenusEnabled = false;
+                            settings.AreDevToolsEnabled = false;
+                            settings.IsStatusBarEnabled = false;
+                            settings.IsPinchZoomEnabled = false;
+                            settings.IsSwipeNavigationEnabled = false;
+                            DetailHtmlView.CoreWebView2.NavigationStarting += (_, args) =>
+                            {
+                                if (!args.IsRedirected && args.Uri != "about:blank")
+                                {
+                                    args.Cancel = true;
+                                    OpenSafeExternalUri(args.Uri);
+                                }
+                            };
+                            DetailHtmlView.CoreWebView2.NewWindowRequested += (_, args) =>
+                            {
+                                args.Handled = true;
+                                OpenSafeExternalUri(args.Uri);
+                            };
+                        }
                         if (_selectedItem?.Id != itemId) return;
                         DetailHtmlView.NavigateToString(htmlDocument);
                         return;
@@ -687,16 +720,34 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 """;
         }
 
+        private static void OpenSafeExternalUri(string uriText)
+        {
+            if (!Uri.TryCreate(uriText, UriKind.Absolute, out var uri)) return;
+            if (uri.Scheme != "http" && uri.Scheme != "https") return;
+            _ = Launcher.LaunchUriAsync(uri);
+        }
+
         private static string SanitizeMailHtml(string html)
         {
             if (string.IsNullOrWhiteSpace(html)) return "";
 
             var value = html;
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select)\b[^>]*>.*?<\s*/\s*\1\s*>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select)\b[^>]*/?\s*>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            // Remove block-level dangerous elements (paired tags)
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*>.*?<\s*/\s*\1\s*>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            // Remove self-closing / standalone dangerous elements
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*/?\s*>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            // Remove event handler attributes (on*)
             value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+on\w+\s*=\s*(['""]).*?\1", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
             value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+on\w+\s*=\s*[^\s>]+", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"(href|src)\s*=\s*(['""])\s*javascript:.*?\2", "$1=\"#\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            // Remove javascript: and vbscript: URIs
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"(href|src|action|formaction|data)\s*=\s*(['""])\s*(javascript|vbscript|data):.*?\2", "$1=\"#\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"(href|src|action|formaction|data)\s*=\s*(javascript|vbscript|data):[^\s>]+", "$1=\"#\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            // Block remote resources such as tracking pixels. Links remain clickable through the WebView navigation handler.
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"\s(src|srcset|background)\s*=\s*(['""])\s*https?://.*?\2", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"\s(src|srcset|background)\s*=\s*https?://[^\s>]+", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            // Remove dangerous CSS in style attributes (expression, url(), -moz-binding, behavior)
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"style\s*=\s*(['""])[^'""]*\b(expression|url\s*\(|-moz-binding|behavior)\b[^'""]*\1", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"url\s*\(\s*(['""]?)https?://.*?\1\s*\)", "none", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
 
             if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"<\s*(html|head|body|style|table|div|p|span|br|img|a|meta)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
                 value = $"<pre>{WebUtility.HtmlEncode(RemoveCssNoise(value))}</pre>";
@@ -814,7 +865,8 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
             }
             catch (Exception ex)
             {
-                ComposeStatusText.Text = ex.Message;
+                System.Diagnostics.Debug.WriteLine($"Send mail failed: {ex.Message}");
+                ComposeStatusText.Text = "发送邮件失败，请检查网络连接和账户设置。";
             }
             finally
             {
@@ -825,7 +877,9 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
         private async void OpenInBrowserButton_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedItem == null || string.IsNullOrWhiteSpace(_selectedItem.WebLink)) return;
-            await Launcher.LaunchUriAsync(new Uri(_selectedItem.WebLink));
+            if (Uri.TryCreate(_selectedItem.WebLink, UriKind.Absolute, out var uri) &&
+                (uri.Scheme == "http" || uri.Scheme == "https"))
+                await Launcher.LaunchUriAsync(uri);
         }
 
         private static string GetReplyRecipient(MailItem item)

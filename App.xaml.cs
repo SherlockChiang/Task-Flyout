@@ -36,13 +36,16 @@ namespace Task_Flyout
             this.UnhandledException += (sender, e) =>
             {
                 e.Handled = true;
-                string errorMsg = $"Fatal Error! Please contact us! \nTime：{DateTime.Now}\nError：{e.Exception.Message}\n\nStack:\n{e.Exception.StackTrace}";
+                string errorMsg = $"Fatal Error! Please contact us! \nTime：{DateTime.Now:yyyy-MM-dd HH:mm:ss}\nError：{e.Exception.Message}\n\nStack:\n{e.Exception.StackTrace}";
 
-                string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                string logPath = System.IO.Path.Combine(desktopPath, "TaskFlyout_CrashLog.txt");
+                string logDir = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "TaskFlyout", "Logs");
+                string logPath = System.IO.Path.Combine(logDir, "TaskFlyout_CrashLog.txt");
 
                 try
                 {
+                    System.IO.Directory.CreateDirectory(logDir);
                     System.IO.File.WriteAllText(logPath, errorMsg);
                 }
                 catch { }
