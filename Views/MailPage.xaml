@@ -176,16 +176,27 @@
                             </StackPanel>
                         </Grid>
                         <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="380">
-                            <TextBlock x:Name="DetailPreview" FontSize="14" TextWrapping="WrapWholeWords"
-                                       LineHeight="22"/>
-                        </ScrollViewer>
-                        <Button x:Name="OpenInBrowserButton" HorizontalAlignment="Left" Click="OpenInBrowserButton_Click">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <FontIcon Glyph="&#xE8A7;" FontSize="14"/>
-                                <TextBlock Text="在浏览器中打开"/>
-                            </StackPanel>
-                        </Button>
+                        <Grid MinHeight="260" MaxHeight="520">
+                            <WebView2 x:Name="DetailHtmlView" Visibility="Collapsed"/>
+                            <ScrollViewer x:Name="DetailTextScrollViewer" VerticalScrollBarVisibility="Auto">
+                                <TextBlock x:Name="DetailPreview" FontSize="14" TextWrapping="WrapWholeWords"
+                                           LineHeight="22"/>
+                            </ScrollViewer>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="ReplyButton" HorizontalAlignment="Left" Click="ReplyButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE97A;" FontSize="14"/>
+                                    <TextBlock Text="回复"/>
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="OpenInBrowserButton" HorizontalAlignment="Left" Click="OpenInBrowserButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE8A7;" FontSize="14"/>
+                                    <TextBlock Text="在浏览器中打开"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </StackPanel>
 
                     <Grid x:Name="AddAccountPanel" Visibility="Collapsed"
@@ -275,23 +286,31 @@
 
                     <Grid x:Name="ComposePanel" Visibility="Collapsed"
                           Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel MaxWidth="640" HorizontalAlignment="Stretch" VerticalAlignment="Top" Spacing="12">
-                                <TextBlock Text="写邮件" FontSize="24" FontWeight="SemiBold"/>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      HorizontalScrollMode="Disabled">
+                            <StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Top" Spacing="12">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="ComposeTitleText" Text="写邮件" FontSize="24" FontWeight="SemiBold"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                        <Button Content="取消" Click="CancelComposeButton_Click"/>
+                                        <Button x:Name="SendComposeButton" Click="SendComposeButton_Click">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE724;" FontSize="14"/>
+                                                <TextBlock Text="发送"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
                                 <ComboBox x:Name="ComposeFromBox" Header="发件人" HorizontalAlignment="Stretch"/>
                                 <TextBox x:Name="ComposeToBox" Header="收件人" PlaceholderText="name@example.com; other@example.com"/>
                                 <TextBox x:Name="ComposeSubjectBox" Header="标题"/>
                                 <TextBox x:Name="ComposeBodyBox" Header="内容" AcceptsReturn="True"
                                          TextWrapping="Wrap" MinHeight="220"/>
-                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                                    <Button Content="取消" Click="CancelComposeButton_Click"/>
-                                    <Button x:Name="SendComposeButton" Click="SendComposeButton_Click">
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <FontIcon Glyph="&#xE724;" FontSize="14"/>
-                                            <TextBlock Text="发送"/>
-                                        </StackPanel>
-                                    </Button>
-                                </StackPanel>
                                 <TextBlock x:Name="ComposeStatusText" FontSize="13"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                            TextWrapping="WrapWholeWords"/>

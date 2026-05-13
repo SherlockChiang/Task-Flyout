@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Windows.System;
@@ -22,6 +23,7 @@ namespace Task_Flyout.Views
         private MailItem? _selectedItem;
         private MailAccount? _selectedAccountForRemoval;
         private bool _isInitializing = true;
+        private bool _isLoadingMessages;
 
         public MailPage()
         {
@@ -141,7 +143,71 @@ namespace Task_Flyout.Views
             var selected = _folderNodes[folderNode];
             _selectedAccount = selected.Account;
             _selectedFolder = selected.Folder;
-            await LoadMessagesAsync();
+                await LoadMessagesAsync();
+        }
+
+        public async Task OpenMessageAsync(string accountId, string folderId, string messageId)
+        {
+            if (!IsLoaded)
+                await WaitUntilLoadedAsync();
+
+            _mailService ??= (App.Current as App)?.MailService;
+            MailListView.ItemsSource ??= _items;
+            _isInitializing = false;
+            if (_mailService == null) return;
+
+            await RefreshAccountsAsync(autoSelect: false);
+
+            var accountNode = _accountNodes.FirstOrDefault(pair => pair.Value.Id == accountId).Key;
+            if (accountNode == null) return;
+
+            await LoadFoldersForNodeAsync(accountNode);
+            accountNode.IsExpanded = true;
+
+            var folderNode = accountNode.Children.FirstOrDefault(node =>
+                _folderNodes.TryGetValue(node, out var selection) &&
+                string.Equals(selection.Folder.Id, folderId, StringComparison.Ordinal));
+            if (folderNode == null) return;
+
+            AccountTree.SelectedNode = folderNode;
+            var selected = _folderNodes[folderNode];
+            _selectedAccount = selected.Account;
+            _selectedFolder = selected.Folder;
+            _selectedAccountForRemoval = selected.Account;
+            RemoveMailButton.IsEnabled = true;
+            UnreadOnlyToggle.IsOn = false;
+
+            await LoadMessagesAsync(forceRefresh: false);
+
+            var target = _items.FirstOrDefault(item => item.Id == messageId);
+            if (target == null)
+            {
+                target = _mailService.TryGetCachedMessage(accountId, folderId, messageId);
+                if (target != null)
+                {
+                    _items.Insert(0, target);
+                    MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {_items.Count} 封邮件";
+                }
+            }
+
+            if (target != null)
+            {
+                MailListView.SelectedItem = target;
+                MailListView.ScrollIntoView(target);
+            }
+        }
+
+        private Task WaitUntilLoadedAsync()
+        {
+            var tcs = new TaskCompletionSource();
+            RoutedEventHandler handler = null;
+            handler = (_, _) =>
+            {
+                Loaded -= handler;
+                tcs.TrySetResult();
+            };
+            Loaded += handler;
+            return tcs.Task;
         }
 
         private async void AccountTree_ItemInvoked(TreeView sender, TreeViewItemInvokedEventArgs args)
@@ -191,6 +257,7 @@ namespace Task_Flyout.Views
         {
             if (_mailService == null || _selectedAccount == null || _selectedFolder == null) return;
 
+            _isLoadingMessages = true;
             AddAccountPanel.Visibility = Visibility.Collapsed;
             LoadingRing.IsActive = true;
             RefreshButton.IsEnabled = false;
@@ -200,12 +267,16 @@ namespace Task_Flyout.Views
             try
             {
                 var messages = await _mailService.FetchMessagesAsync(_selectedAccount, _selectedFolder, UnreadOnlyToggle.IsOn, forceRefresh: forceRefresh);
+                var previousSelectedId = _selectedItem?.Id;
                 _items.Clear();
                 foreach (var item in messages.OrderByDescending(item => item.RawReceivedTime))
                     _items.Add(item);
 
                 MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {_items.Count} 封邮件";
-                MailListView.SelectedIndex = _items.Count > 0 ? 0 : -1;
+                var itemToSelect = !string.IsNullOrWhiteSpace(previousSelectedId)
+                    ? _items.FirstOrDefault(item => item.Id == previousSelectedId)
+                    : null;
+                MailListView.SelectedItem = itemToSelect ?? (_items.Count > 0 ? _items[0] : null);
                 if (_items.Count == 0)
                     ClearDetail();
             }
@@ -215,6 +286,7 @@ namespace Task_Flyout.Views
             }
             finally
             {
+                _isLoadingMessages = false;
                 LoadingRing.IsActive = false;
                 RefreshButton.IsEnabled = true;
             }
@@ -286,10 +358,11 @@ namespace Task_Flyout.Views
             ShowComposePanel();
         }
 
-        private void ShowComposePanel()
+        private void ShowComposePanel(MailItem? replyTo = null)
         {
             if (_mailService == null) return;
 
+            ComposeTitleText.Text = replyTo == null ? "写邮件" : "回复邮件";
             ComposeFromBox.Items.Clear();
             var accounts = _mailService.GetAccounts().Where(account => account.IsSetupComplete).ToList();
             foreach (var account in accounts)
@@ -311,9 +384,9 @@ namespace Task_Flyout.Views
             if (ComposeFromBox.SelectedItem == null && ComposeFromBox.Items.Count > 0)
                 ComposeFromBox.SelectedIndex = 0;
 
-            ComposeToBox.Text = "";
-            ComposeSubjectBox.Text = "";
-            ComposeBodyBox.Text = "";
+            ComposeToBox.Text = replyTo == null ? "" : GetReplyRecipient(replyTo);
+            ComposeSubjectBox.Text = replyTo == null ? "" : CreateReplySubject(replyTo.Subject);
+            ComposeBodyBox.Text = replyTo == null ? "" : CreateReplyBody(replyTo);
             ComposeStatusText.Text = accounts.Count == 0 ? "请先添加邮箱账户。" : "";
 
             ComposePanel.Visibility = Visibility.Visible;
@@ -477,7 +550,8 @@ namespace Task_Flyout.Views
         {
             if (MailListView.SelectedItem is not MailItem item)
             {
-                ClearDetail();
+                if (!_isLoadingMessages)
+                    ClearDetail();
                 return;
             }
 
@@ -489,9 +563,8 @@ namespace Task_Flyout.Views
             DetailSubject.Text = item.Subject;
             DetailSender.Text = item.Sender;
             DetailTime.Text = item.RawReceivedTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? item.ReceivedTime;
-            DetailPreview.Text = string.IsNullOrWhiteSpace(item.BodyText)
-                ? string.IsNullOrWhiteSpace(item.Preview) ? "没有可用正文。" : item.Preview
-                : item.BodyText;
+            RenderMailBody(item);
+            ReplyButton.IsEnabled = _selectedAccount != null;
             OpenInBrowserButton.IsEnabled = !string.IsNullOrWhiteSpace(item.WebLink);
 
             if (_mailService != null && _selectedAccount != null && !item.IsRead)
@@ -501,13 +574,12 @@ namespace Task_Flyout.Views
                     await _mailService.MarkAsReadAsync(_selectedAccount, item);
                     if (UnreadOnlyToggle.IsOn)
                     {
-                        await LoadMessagesAsync();
+                        _items.Remove(item);
+                        MessageListSubtitle.Text = _selectedAccount != null ? $"{_selectedAccount.DisplayTitle} · {_items.Count} 封邮件" : MessageListSubtitle.Text;
                     }
                     else
                     {
-                        var index = _items.IndexOf(item);
-                        if (index >= 0)
-                            _items[index] = item;
+                        MailListView.SelectedItem = item;
                     }
                 }
                 catch (Exception ex)
@@ -521,14 +593,92 @@ namespace Task_Flyout.Views
         {
             _selectedItem = null;
             DetailPanel.Visibility = Visibility.Collapsed;
+            DetailHtmlView.Visibility = Visibility.Collapsed;
+            DetailTextScrollViewer.Visibility = Visibility.Visible;
+            DetailPreview.Text = "";
             if (AddAccountPanel.Visibility != Visibility.Visible && ComposePanel.Visibility != Visibility.Visible)
                 EmptyDetailPanel.Visibility = Visibility.Visible;
+        }
+
+        private void RenderMailBody(MailItem item)
+        {
+            if (!string.IsNullOrWhiteSpace(item.HtmlBody))
+            {
+                DetailPreview.Text = "";
+                DetailTextScrollViewer.Visibility = Visibility.Collapsed;
+                DetailHtmlView.Visibility = Visibility.Visible;
+                DetailHtmlView.NavigateToString(BuildMailHtmlDocument(item.HtmlBody));
+                return;
+            }
+
+            DetailHtmlView.Visibility = Visibility.Collapsed;
+            DetailTextScrollViewer.Visibility = Visibility.Visible;
+            DetailPreview.Text = string.IsNullOrWhiteSpace(item.BodyText)
+                ? string.IsNullOrWhiteSpace(item.Preview) ? "没有可用正文。" : item.Preview
+                : item.BodyText;
+        }
+
+        private static string BuildMailHtmlDocument(string html)
+        {
+            var safeHtml = SanitizeMailHtml(html);
+            return """
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    color: #202020;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+body { padding: 2px; }
+img { max-width: 100%; height: auto; }
+table { max-width: 100%; border-collapse: collapse; }
+a { color: #2563eb; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+""" + safeHtml + """
+</body>
+</html>
+""";
+        }
+
+        private static string SanitizeMailHtml(string html)
+        {
+            if (string.IsNullOrWhiteSpace(html)) return "";
+
+            var value = html;
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select)\b[^>]*>.*?<\s*/\s*\1\s*>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select)\b[^>]*/?\s*>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+on\w+\s*=\s*(['""]).*?\1", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+on\w+\s*=\s*[^\s>]+", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"(href|src)\s*=\s*(['""])\s*javascript:.*?\2", "$1=\"#\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+
+            if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"<\s*(html|body|table|div|p|span|br|img|a)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                value = $"<pre>{WebUtility.HtmlEncode(value)}</pre>";
+
+            return value;
         }
 
         private void CancelComposeButton_Click(object sender, RoutedEventArgs e)
         {
             ComposePanel.Visibility = Visibility.Collapsed;
             ClearDetail();
+        }
+
+        private void ReplyButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedItem == null) return;
+            ShowComposePanel(_selectedItem);
         }
 
         private async void SendComposeButton_Click(object sender, RoutedEventArgs e)
@@ -578,6 +728,22 @@ namespace Task_Flyout.Views
         {
             if (_selectedItem == null || string.IsNullOrWhiteSpace(_selectedItem.WebLink)) return;
             await Launcher.LaunchUriAsync(new Uri(_selectedItem.WebLink));
+        }
+
+        private static string GetReplyRecipient(MailItem item)
+            => string.IsNullOrWhiteSpace(item.SenderAddress) ? item.Sender : item.SenderAddress;
+
+        private static string CreateReplySubject(string subject)
+        {
+            if (string.IsNullOrWhiteSpace(subject)) return "Re:";
+            return subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? subject : $"Re: {subject}";
+        }
+
+        private static string CreateReplyBody(MailItem item)
+        {
+            var received = item.RawReceivedTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? item.ReceivedTime;
+            var original = string.IsNullOrWhiteSpace(item.BodyText) ? item.Preview : item.BodyText;
+            return $"\r\n\r\n---- 原始邮件 ----\r\n发件人: {item.Sender}\r\n时间: {received}\r\n主题: {item.Subject}\r\n\r\n{original}";
         }
     }
 }

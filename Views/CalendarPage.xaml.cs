@@ -386,7 +386,8 @@ namespace Task_Flyout.Views
                         StartDateTime = item.StartDateTime,
                         EndDateTime = item.EndDateTime,
                         IsRecurring = item.IsRecurring,
-                        RecurringEventId = item.RecurringEventId
+                        RecurringEventId = item.RecurringEventId,
+                        RecurrenceKind = item.RecurrenceKind
                     };
                     PopulateItemColor(displayItem);
                     SelectedDayItems.Add(displayItem);
@@ -536,7 +537,7 @@ namespace Task_Flyout.Views
             EditRadioTask.IsChecked = item.IsTask;
             EditRadioEvent.IsEnabled = false;
             EditRadioTask.IsEnabled = false;
-            EditRecurrenceComboBox.SelectedIndex = 0;
+            SelectRecurrenceKind(item.RecurrenceKind);
             EditRecurrenceComboBox.IsEnabled = false;
 
             if (DateTime.TryParse(item.DateKey, out var d)) EditDatePicker.Date = d;
@@ -646,44 +647,55 @@ namespace Task_Flyout.Views
             }
         }
 
-        private async void EditDialog_SecondaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private void EditDialog_SecondaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
         {
-            if (_itemBeingEdited != null)
+            if (_itemBeingEdited == null) return;
+
+            var itemToDelete = _itemBeingEdited;
+            args.Cancel = true;
+            sender.Hide();
+
+            _ = DispatcherQueue.TryEnqueue(async () =>
             {
-                var deleteMode = await GetRecurringDeleteModeAsync(_itemBeingEdited);
+                await Task.Delay(120);
+                await DeleteAgendaItemWithPromptAsync(itemToDelete);
+            });
+        }
+
+        private async Task DeleteAgendaItemWithPromptAsync(AgendaItem itemToDelete)
+        {
+            var deleteMode = await GetRecurringDeleteModeAsync(itemToDelete);
                 if (deleteMode == null)
                 {
-                    args.Cancel = true;
                     return;
                 }
 
-                if (_localCache.DayItems.TryGetValue(_itemBeingEdited.DateKey, out var list))
+            if (_localCache.DayItems.TryGetValue(itemToDelete.DateKey, out var list))
                 {
-                    list.RemoveAll(x => x.Id == _itemBeingEdited.Id);
+                list.RemoveAll(x => x.Id == itemToDelete.Id);
                     _ = _syncManager.SaveLocalCacheAsync();
                 }
                 LoadCalendar(_viewDate);
 
-                if (_syncManager != null && !string.IsNullOrEmpty(_itemBeingEdited.Id))
+            if (_syncManager != null && !string.IsNullOrEmpty(itemToDelete.Id))
                 {
                     try
                     {
-                        DateTime? occurrenceDate = _itemBeingEdited.StartDateTime;
-                        if (!occurrenceDate.HasValue && DateTime.TryParse(_itemBeingEdited.DateKey, out var parsedDate))
+                    DateTime? occurrenceDate = itemToDelete.StartDateTime;
+                    if (!occurrenceDate.HasValue && DateTime.TryParse(itemToDelete.DateKey, out var parsedDate))
                             occurrenceDate = parsedDate;
 
                         await _syncManager.DeleteItemAsync(
-                            _itemBeingEdited.Provider,
-                            _itemBeingEdited.Id,
-                            _itemBeingEdited.IsEvent,
+                        itemToDelete.Provider,
+                        itemToDelete.Id,
+                        itemToDelete.IsEvent,
                             deleteMode.Value,
                             occurrenceDate,
-                            _itemBeingEdited.RecurringEventId);
+                        itemToDelete.RecurringEventId);
                         _ = SyncMonthDataAsync(forceRefresh: true);
                     }
                     catch { }
                 }
-            }
         }
 
         private EventRecurrenceKind GetSelectedRecurrence()
@@ -693,6 +705,14 @@ namespace Task_Flyout.Views
                 Enum.TryParse<EventRecurrenceKind>(item.Tag?.ToString(), out var recurrence))
                 return recurrence;
             return EventRecurrenceKind.None;
+        }
+
+        private void SelectRecurrenceKind(string recurrenceKind)
+        {
+            var selected = EditRecurrenceComboBox.Items
+                .OfType<ComboBoxItem>()
+                .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), recurrenceKind, StringComparison.OrdinalIgnoreCase));
+            EditRecurrenceComboBox.SelectedItem = selected ?? EditRecurrenceComboBox.Items.FirstOrDefault();
         }
 
         private async Task<RecurringDeleteMode?> GetRecurringDeleteModeAsync(AgendaItem item)

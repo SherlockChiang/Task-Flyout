@@ -208,6 +208,19 @@ namespace Task_Flyout
             ContentFrame.Navigate(typeof(Views.MailPage));
         }
 
+        public void NavigateToMailMessage(string accountId, string folderId, string messageId)
+        {
+            var mailItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Mail");
+            if (mailItem != null) MainNav.SelectedItem = mailItem;
+            ContentFrame.Navigate(typeof(Views.MailPage));
+
+            DispatcherQueue.TryEnqueue(async () =>
+            {
+                if (ContentFrame.Content is Views.MailPage mailPage)
+                    await mailPage.OpenMessageAsync(accountId, folderId, messageId);
+            });
+        }
+
         public void NavigateToAddAccount()
         {
             ContentFrame.Navigate(typeof(Views.AddAccountPage));

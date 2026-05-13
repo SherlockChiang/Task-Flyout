@@ -52,6 +52,7 @@ namespace Task_Flyout.Views
 
             BackgroundToggle.IsOn = settings.Values["RunInBackground"] as bool? ?? true;
             NotifyToggle.IsOn = settings.Values["NotifyEnabled"] as bool? ?? true;
+            MailPollingToggle.IsOn = settings.Values["MailPollingEnabled"] as bool? ?? true;
             ShowSecondsToggle.IsOn = settings.Values["ShowSeconds"] as bool? ?? false;
 
             // 👉 这里已经支持多语言了！只需在英文 resw 中添加键名 TextMinutes，值为 Minutes 即可。
@@ -65,11 +66,18 @@ namespace Task_Flyout.Views
             foreach (int m in new[] { 5, 15, 30, 60 })
                 SyncIntervalComboBox.Items.Add(new ComboBoxItem { Content = $"{m} {minuteStr}", Tag = m.ToString() });
 
+            MailPollingIntervalComboBox.Items.Clear();
+            foreach (int m in new[] { 1, 5, 10, 15, 30, 60 })
+                MailPollingIntervalComboBox.Items.Add(new ComboBoxItem { Content = $"{m} {minuteStr}", Tag = m.ToString() });
+
             int notifyMin = settings.Values["NotifyMinutes"] as int? ?? 15;
             SelectComboByTag(NotifyTimeComboBox, notifyMin.ToString());
 
             int syncMin = settings.Values["SyncIntervalMinutes"] as int? ?? 15;
             SelectComboByTag(SyncIntervalComboBox, syncMin.ToString());
+
+            int mailPollingMin = settings.Values["MailPollingIntervalMinutes"] as int? ?? 15;
+            SelectComboByTag(MailPollingIntervalComboBox, mailPollingMin.ToString());
 
             try
             {
@@ -393,6 +401,25 @@ namespace Task_Flyout.Views
             {
                 ApplicationData.Current.LocalSettings.Values["SyncIntervalMinutes"] = minutes;
                 App.MyFlyoutWindow?.UpdateSyncInterval(minutes);
+            }
+        }
+
+        private void MailPollingToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            ApplicationData.Current.LocalSettings.Values["MailPollingEnabled"] = MailPollingToggle.IsOn;
+            if (App.Current is App app)
+                app.MailService.UpdateMailPollingSettings();
+        }
+
+        private void MailPollingIntervalComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isInitializing) return;
+            if (MailPollingIntervalComboBox.SelectedItem is ComboBoxItem item && item.Tag is string tag && int.TryParse(tag, out int minutes))
+            {
+                ApplicationData.Current.LocalSettings.Values["MailPollingIntervalMinutes"] = minutes;
+                if (App.Current is App app)
+                    app.MailService.UpdateMailPollingSettings();
             }
         }
 

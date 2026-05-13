@@ -176,6 +176,7 @@ namespace Task_Flyout.Services
                 if (events?.Value != null)
                 {
                     System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] 获取到 {events.Value.Count} 个日程");
+                    var recurrenceKinds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                     foreach (var ev in events.Value)
                     {
                         DateTime.TryParse(ev.Start?.DateTime, out var start);
@@ -198,6 +199,11 @@ namespace Task_Flyout.Services
                             calendarMap.TryGetValue(calId, out calName);
 
                         DateTime.TryParse(ev.End?.DateTime, out var end);
+                        string recurringEventId = ev.SeriesMasterId ?? "";
+                        string recurrenceKind = GetMicrosoftRecurrenceKind(ev.Recurrence);
+                        if (recurrenceKind == "None" && !string.IsNullOrWhiteSpace(recurringEventId))
+                            recurrenceKind = await GetMicrosoftMasterRecurrenceKindAsync(recurringEventId, recurrenceKinds);
+
                         results.Add(new AgendaItem
                         {
                             Id = ev.Id,
@@ -213,8 +219,9 @@ namespace Task_Flyout.Services
                             DateKey = start.ToString("yyyy-MM-dd"),
                             StartDateTime = start,
                             EndDateTime = end,
-                            IsRecurring = ev.Recurrence != null || !string.IsNullOrWhiteSpace(ev.SeriesMasterId),
-                            RecurringEventId = ev.SeriesMasterId ?? ""
+                            IsRecurring = ev.Recurrence != null || !string.IsNullOrWhiteSpace(recurringEventId),
+                            RecurringEventId = recurringEventId,
+                            RecurrenceKind = recurrenceKind
                         });
                     }
                 }
@@ -453,6 +460,40 @@ namespace Task_Flyout.Services
                     Type = RecurrenceRangeType.NoEnd,
                     StartDate = DateOnly.FromDateTime(startDate.Date)
                 }
+            };
+        }
+
+        private async Task<string> GetMicrosoftMasterRecurrenceKindAsync(string eventId, Dictionary<string, string> cache)
+        {
+            if (cache.TryGetValue(eventId, out var cached))
+                return cached;
+
+            try
+            {
+                var master = await _graphClient.Me.Events[eventId].GetAsync(request =>
+                {
+                    request.QueryParameters.Select = new[] { "id", "recurrence" };
+                });
+                cached = GetMicrosoftRecurrenceKind(master?.Recurrence);
+            }
+            catch
+            {
+                cached = "None";
+            }
+
+            cache[eventId] = cached;
+            return cached;
+        }
+
+        private static string GetMicrosoftRecurrenceKind(PatternedRecurrence? recurrence)
+        {
+            return recurrence?.Pattern?.Type switch
+            {
+                RecurrencePatternType.Daily => "Daily",
+                RecurrencePatternType.Weekly => "Weekly",
+                RecurrencePatternType.AbsoluteMonthly or RecurrencePatternType.RelativeMonthly => "Monthly",
+                RecurrencePatternType.AbsoluteYearly or RecurrencePatternType.RelativeYearly => "Yearly",
+                _ => "None"
             };
         }
     }

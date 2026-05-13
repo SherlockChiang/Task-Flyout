@@ -135,6 +135,7 @@ namespace Task_Flyout.Services
 
             foreach (var cal in calendars)
             {
+                var recurrenceKinds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 string pageToken = null;
                 do
                 {
@@ -155,6 +156,11 @@ namespace Task_Flyout.Services
                                 if (date == null) continue;
 
                                 var endDate2 = ev.End?.DateTime ?? (DateTime.TryParse(ev.End?.Date, out var ed) ? ed : (DateTime?)null);
+                                string recurringEventId = ev.RecurringEventId ?? "";
+                                string recurrenceKind = GetGoogleRecurrenceKind(ev.Recurrence);
+                                if (recurrenceKind == "None" && !string.IsNullOrWhiteSpace(recurringEventId))
+                                    recurrenceKind = await GetGoogleMasterRecurrenceKindAsync(cal.Id, recurringEventId, recurrenceKinds);
+
                                 items.Add(new AgendaItem
                                 {
                                     Id = ev.Id,
@@ -169,8 +175,9 @@ namespace Task_Flyout.Services
                                     DateKey = date.Value.ToString("yyyy-MM-dd"),
                                     StartDateTime = ev.Start?.DateTime,
                                     EndDateTime = endDate2,
-                                    IsRecurring = !string.IsNullOrWhiteSpace(ev.RecurringEventId) || ev.Recurrence?.Count > 0,
-                                    RecurringEventId = ev.RecurringEventId ?? ""
+                                    IsRecurring = !string.IsNullOrWhiteSpace(recurringEventId) || ev.Recurrence?.Count > 0,
+                                    RecurringEventId = recurringEventId,
+                                    RecurrenceKind = recurrenceKind
                                 });
                             }
                         }
@@ -339,6 +346,38 @@ namespace Task_Flyout.Services
             EventRecurrenceKind.Yearly => "YEARLY",
             _ => "DAILY"
         };
+
+        private async Task<string> GetGoogleMasterRecurrenceKindAsync(string calendarId, string eventId, Dictionary<string, string> cache)
+        {
+            string cacheKey = $"{calendarId}|{eventId}";
+            if (cache.TryGetValue(cacheKey, out var cached))
+                return cached;
+
+            try
+            {
+                var master = await CalendarSvc.Events.Get(calendarId, eventId).ExecuteAsync();
+                cached = GetGoogleRecurrenceKind(master.Recurrence);
+            }
+            catch
+            {
+                cached = "None";
+            }
+
+            cache[cacheKey] = cached;
+            return cached;
+        }
+
+        private static string GetGoogleRecurrenceKind(IList<string>? recurrence)
+        {
+            var rule = recurrence?.FirstOrDefault(item => item.StartsWith("RRULE:", StringComparison.OrdinalIgnoreCase));
+            if (string.IsNullOrWhiteSpace(rule)) return "None";
+
+            if (rule.Contains("FREQ=DAILY", StringComparison.OrdinalIgnoreCase)) return "Daily";
+            if (rule.Contains("FREQ=WEEKLY", StringComparison.OrdinalIgnoreCase)) return "Weekly";
+            if (rule.Contains("FREQ=MONTHLY", StringComparison.OrdinalIgnoreCase)) return "Monthly";
+            if (rule.Contains("FREQ=YEARLY", StringComparison.OrdinalIgnoreCase)) return "Yearly";
+            return "None";
+        }
 
         private static List<string> ClampGoogleRecurrence(IList<string>? recurrence, DateTime untilDate)
         {

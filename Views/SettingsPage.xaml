@@ -46,6 +46,12 @@
             </StackPanel>
 
             <StackPanel Spacing="8">
+                <TextBlock Text="邮件同步" FontWeight="SemiBold" FontSize="16"/>
+                <ToggleSwitch x:Name="MailPollingToggle" Header="定时抓取新邮件并显示 Windows 通知" IsOn="True" Toggled="MailPollingToggle_Toggled"/>
+                <ComboBox x:Name="MailPollingIntervalComboBox" Header="新邮件检查间隔" Width="200" SelectionChanged="MailPollingIntervalComboBox_SelectionChanged" />
+            </StackPanel>
+
+            <StackPanel Spacing="8">
                 <TextBlock x:Uid="SettingsPage_System" Text="系统与常规" FontWeight="SemiBold" FontSize="16"/>
                 
                 <ComboBox x:Uid="SettingsPage_SyncInterval" x:Name="SyncIntervalComboBox" Header="自动同步间隔" Width="200" SelectionChanged="SyncIntervalComboBox_SelectionChanged" />

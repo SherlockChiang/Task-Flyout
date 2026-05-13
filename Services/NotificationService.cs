@@ -3,6 +3,7 @@ using Microsoft.Windows.AppNotifications.Builder;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using Task_Flyout.Models;
 using Microsoft.UI.Xaml;
 using Windows.Storage;
@@ -176,7 +177,8 @@ namespace Task_Flyout.Services
 
                 if (!System.IO.File.Exists(cachePath)) return null;
 
-                var json = System.IO.File.ReadAllText(cachePath);
+                var json = ProtectedLocalStore.ReadText(cachePath);
+                if (string.IsNullOrWhiteSpace(json)) return null;
                 var cache = System.Text.Json.JsonSerializer.Deserialize(json, AppJsonContext.Default.AppCache);
                 return cache?.DayItems;
             }
@@ -190,10 +192,37 @@ namespace Task_Flyout.Services
 
         private void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)
         {
+            var arguments = ParseArguments(args.Argument);
             App.MainDispatcherQueue?.TryEnqueue(() =>
             {
-                App.OpenMainWindowInternal();
+                if (arguments.TryGetValue("action", out var action) &&
+                    action == "openMail" &&
+                    arguments.TryGetValue("accountId", out var accountId) &&
+                    arguments.TryGetValue("folderId", out var folderId) &&
+                    arguments.TryGetValue("messageId", out var messageId))
+                {
+                    App.OpenMainWindowInternal(window => window.NavigateToMailMessage(accountId, folderId, messageId));
+                }
+                else
+                {
+                    App.OpenMainWindowInternal();
+                }
             });
+        }
+
+        private static Dictionary<string, string> ParseArguments(string argument)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(argument)) return result;
+
+            foreach (var pair in argument.Split('&', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = pair.Split('=', 2);
+                if (parts.Length != 2) continue;
+                result[WebUtility.UrlDecode(parts[0])] = WebUtility.UrlDecode(parts[1]);
+            }
+
+            return result;
         }
 
     }

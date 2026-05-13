@@ -62,6 +62,7 @@ namespace Task_Flyout
             NotificationService.Initialize();
             if (NotificationService.IsEnabled)
                 NotificationService.StartPeriodicCheck();
+            MailService.StartMailPolling();
 
             _trayIcon = (H.NotifyIcon.TaskbarIcon)Resources["MyTrayIcon"];
             _uiSettings = new UISettings();
@@ -197,6 +198,7 @@ namespace Task_Flyout
         private void ExitAppInternal()
         {
             NotificationService?.Stop();
+            MailService?.StopMailPolling();
             _trayIcon?.Dispose();
             MyWeatherBar?.Close();
             MyFlyoutWindow?.Close();

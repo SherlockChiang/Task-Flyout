@@ -8,6 +8,7 @@ namespace Task_Flyout
     [JsonSerializable(typeof(AppCache))]
     [JsonSerializable(typeof(List<ConnectedAccountInfo>))]
     [JsonSerializable(typeof(List<MailAccount>))]
+    [JsonSerializable(typeof(MailPersistentCache))]
     [JsonSerializable(typeof(Dictionary<string, List<AgendaItem>>))]
     [JsonSourceGenerationOptions(WriteIndented = true)]
     internal partial class AppJsonContext : JsonSerializerContext

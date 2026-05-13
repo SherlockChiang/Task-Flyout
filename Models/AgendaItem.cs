@@ -57,6 +57,7 @@ namespace Task_Flyout.Models
         public string ColorHex { get; set; } = "";
         public bool IsRecurring { get; set; }
         public string RecurringEventId { get; set; } = "";
+        public string RecurrenceKind { get; set; } = "None";
 
         public DateTime? StartDateTime { get; set; }
         public DateTime? EndDateTime { get; set; }

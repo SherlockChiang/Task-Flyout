@@ -178,8 +178,9 @@ namespace Task_Flyout.Services
             {
                 if (File.Exists(CacheFilePath))
                 {
-                    string json = File.ReadAllText(CacheFilePath);
-                    _cache = JsonSerializer.Deserialize(json, AppJsonContext.Default.AppCache) ?? new AppCache();
+                    string json = ProtectedLocalStore.ReadText(CacheFilePath);
+                    if (!string.IsNullOrWhiteSpace(json))
+                        _cache = JsonSerializer.Deserialize(json, AppJsonContext.Default.AppCache) ?? new AppCache();
                 }
             }
             catch
@@ -218,7 +219,7 @@ namespace Task_Flyout.Services
                 {
                     json = JsonSerializer.Serialize(_cache, AppJsonContext.Default.AppCache);
                 }
-                await File.WriteAllTextAsync(CacheFilePath, json);
+                await ProtectedLocalStore.WriteTextAsync(CacheFilePath, json);
             }
             catch { }
         }

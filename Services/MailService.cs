@@ -4,6 +4,9 @@ using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Search;
 using MailKit.Security;
+using Microsoft.UI.Xaml;
+using Microsoft.Windows.AppNotifications;
+using Microsoft.Windows.AppNotifications.Builder;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using MimeKit;
@@ -86,8 +89,10 @@ namespace Task_Flyout.Services
         public string Id { get; set; } = "";
         public string Subject { get; set; } = "";
         public string Sender { get; set; } = "";
+        public string SenderAddress { get; set; } = "";
         public string Preview { get; set; } = "";
         public string BodyText { get; set; } = "";
+        public string HtmlBody { get; set; } = "";
         public string ReceivedTime { get; set; } = "";
         public DateTimeOffset? RawReceivedTime { get; set; }
         public bool IsRead { get; set; }
@@ -98,6 +103,13 @@ namespace Task_Flyout.Services
         public string AttachmentMarker => HasAttachments ? "📎" : "";
     }
 
+    public class MailPersistentCache
+    {
+        public Dictionary<string, List<MailFolder>> Folders { get; set; } = new();
+        public Dictionary<string, List<MailItem>> Messages { get; set; } = new();
+        public Dictionary<string, long> LastSeenInboxTicks { get; set; } = new();
+    }
+
     public class MailService
     {
         private GraphServiceClient? _outlookClient;
@@ -106,6 +118,12 @@ namespace Task_Flyout.Services
         private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(10);
         private readonly Dictionary<string, CacheEntry<List<MailFolder>>> _folderCache = new();
         private readonly Dictionary<string, CacheEntry<List<MailItem>>> _messageCache = new();
+        private readonly HashSet<string> _knownUnreadIds = new(StringComparer.Ordinal);
+        private DispatcherTimer? _pollTimer;
+        private bool _isPollingMail;
+        private bool _knownUnreadLoaded;
+        private MailPersistentCache? _persistentCache;
+        private bool _persistentCacheLoaded;
 
         private sealed class CacheEntry<T>
         {
@@ -117,6 +135,18 @@ namespace Task_Flyout.Services
         {
             get => ApplicationData.Current.LocalSettings.Values["MailPageSize"] as int? ?? 25;
             set => ApplicationData.Current.LocalSettings.Values["MailPageSize"] = value;
+        }
+
+        public bool MailPollingEnabled
+        {
+            get => ApplicationData.Current.LocalSettings.Values["MailPollingEnabled"] as bool? ?? true;
+            set => ApplicationData.Current.LocalSettings.Values["MailPollingEnabled"] = value;
+        }
+
+        public int MailPollingIntervalMinutes
+        {
+            get => ApplicationData.Current.LocalSettings.Values["MailPollingIntervalMinutes"] as int? ?? 15;
+            set => ApplicationData.Current.LocalSettings.Values["MailPollingIntervalMinutes"] = Math.Clamp(value, 1, 240);
         }
 
         public IReadOnlyList<MailAccount> GetAccounts()
@@ -139,6 +169,37 @@ namespace Task_Flyout.Services
             ClearAccountCache(account.Id);
             SaveAccounts();
             return true;
+        }
+
+        public void StartMailPolling()
+        {
+            StopMailPolling();
+            if (!MailPollingEnabled) return;
+
+            _pollTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMinutes(Math.Max(1, MailPollingIntervalMinutes))
+            };
+            _pollTimer.Tick += async (_, _) => await CheckNewMailAsync();
+            _pollTimer.Start();
+            _ = CheckNewMailAsync();
+        }
+
+        public void StopMailPolling()
+        {
+            if (_pollTimer != null)
+            {
+                _pollTimer.Stop();
+                _pollTimer = null;
+            }
+        }
+
+        public void UpdateMailPollingSettings()
+        {
+            if (MailPollingEnabled)
+                StartMailPolling();
+            else
+                StopMailPolling();
         }
 
         public async Task<MailAccount> AddOutlookAccountAsync()
@@ -329,6 +390,7 @@ namespace Task_Flyout.Services
             }
 
             _folderCache[cacheKey] = new CacheEntry<List<MailFolder>> { Value = folders };
+            UpdatePersistentFolders(cacheKey, folders);
             return folders;
         }
 
@@ -377,6 +439,7 @@ namespace Task_Flyout.Services
             }
 
             _messageCache[cacheKey] = new CacheEntry<List<MailItem>> { Value = messages };
+            UpdatePersistentMessages(cacheKey, messages);
             return messages;
         }
 
@@ -479,11 +542,82 @@ namespace Task_Flyout.Services
             var message = CreateMimeMessage(account, to, subject, body);
 
             using var client = new MailKit.Net.Smtp.SmtpClient();
-            var socketOptions = account.SmtpUseSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable;
+            var socketOptions = GetSmtpSocketOptions(account);
             await client.ConnectAsync(account.SmtpHost, account.SmtpPort, socketOptions);
             await client.AuthenticateAsync(string.IsNullOrWhiteSpace(account.SmtpUserName) ? account.ImapUserName : account.SmtpUserName, password);
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
+        }
+
+        private async Task CheckNewMailAsync()
+        {
+            if (_isPollingMail || !MailPollingEnabled) return;
+
+            _isPollingMail = true;
+            try
+            {
+                EnsureAccountsLoaded();
+                LoadKnownUnreadIds();
+                EnsurePersistentCacheLoaded();
+
+                var currentUnreadIds = new HashSet<string>(StringComparer.Ordinal);
+                var newItems = new List<(MailAccount Account, MailItem Item)>();
+
+                foreach (var account in _accounts.Where(account => account.IsSetupComplete))
+                {
+                    try
+                    {
+                        var folders = await FetchFoldersAsync(account, forceRefresh: false);
+                        var inbox = folders.FirstOrDefault(folder => IsInboxName(folder.Id) || IsInboxName(folder.DisplayName))
+                                    ?? folders.FirstOrDefault(folder => !folder.IsPlaceholder);
+                        if (inbox == null) continue;
+
+                        var unreadItems = await FetchMessagesAsync(account, inbox, unreadOnly: true, pageSize: 5, forceRefresh: true);
+                        MergeMessagesIntoPersistentCache(account.Id, inbox.Id, unreadItems);
+
+                        string inboxKey = $"{account.Id}|{inbox.Id}";
+                        long previousSeenTicks = GetLastSeenInboxTicks(inboxKey);
+                        long newestTicks = previousSeenTicks;
+                        bool hasBaseline = previousSeenTicks > 0;
+
+                        foreach (var item in unreadItems)
+                        {
+                            string key = GetMailNotificationKey(item);
+                            currentUnreadIds.Add(key);
+                            long itemTicks = GetMailReceivedTicks(item);
+                            if (itemTicks > newestTicks)
+                                newestTicks = itemTicks;
+
+                            if (hasBaseline &&
+                                itemTicks > previousSeenTicks &&
+                                !_knownUnreadIds.Contains(key))
+                            {
+                                newItems.Add((account, item));
+                            }
+                        }
+
+                        if (newestTicks > previousSeenTicks)
+                            SetLastSeenInboxTicks(inboxKey, newestTicks);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Mail polling failed for {account.DisplayTitle}: {ex.Message}");
+                    }
+                }
+
+                foreach (var pair in newItems.Take(5))
+                    SendNewMailNotification(pair.Account, pair.Item);
+
+                _knownUnreadIds.Clear();
+                foreach (var id in currentUnreadIds.Take(500))
+                    _knownUnreadIds.Add(id);
+                SaveKnownUnreadIds();
+                SavePersistentCache();
+            }
+            finally
+            {
+                _isPollingMail = false;
+            }
         }
 
         private async Task<GmailService> EnsureGoogleMailAuthorizedAsync()
@@ -517,12 +651,20 @@ namespace Task_Flyout.Services
             var folders = await client.GetFoldersAsync(client.PersonalNamespaces.FirstOrDefault() ?? client.PersonalNamespaces[0]);
             foreach (var folder in folders.Where(folder => (folder.Attributes & FolderAttributes.NonExistent) == 0))
             {
+                int? unreadCount = null;
+                try
+                {
+                    await folder.StatusAsync(StatusItems.Unread);
+                    unreadCount = folder.Unread;
+                }
+                catch { }
+
                 result.Add(new MailFolder
                 {
                     AccountId = account.Id,
                     Id = folder.FullName,
                     DisplayName = string.IsNullOrWhiteSpace(folder.Name) ? folder.FullName : folder.Name,
-                    UnreadCount = folder.IsOpen ? folder.Count - folder.Recent : null
+                    UnreadCount = unreadCount
                 });
             }
 
@@ -563,13 +705,13 @@ namespace Task_Flyout.Services
             catch
             {
                 // Some IMAP servers return malformed FETCH responses for flags.
-                // Keep loading messages and fall back to read state defaults.
+                // Keep loading messages and fall back to per-message flag fetches.
             }
 
             var items = new List<MailItem>();
             foreach (var id in selectedIds)
             {
-                bool isRead = flagsById.TryGetValue(id.Id, out var flags) && flags?.HasFlag(MessageFlags.Seen) == true;
+                bool isRead = unreadOnly ? false : await GetImapReadStateAsync(mailFolder, id, flagsById);
                 try
                 {
                     var message = await mailFolder.GetMessageAsync(id);
@@ -607,6 +749,24 @@ namespace Task_Flyout.Services
             var socketOptions = account.ImapUseSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable;
             await client.ConnectAsync(account.ImapHost, account.ImapPort, socketOptions);
             await client.AuthenticateAsync(account.ImapUserName, password);
+        }
+
+        private static async Task<bool> GetImapReadStateAsync(IMailFolder folder, UniqueId id, Dictionary<uint, MessageFlags?> flagsById)
+        {
+            if (flagsById.TryGetValue(id.Id, out var cachedFlags))
+                return cachedFlags?.HasFlag(MessageFlags.Seen) == true;
+
+            try
+            {
+                var summaries = await folder.FetchAsync(new[] { id }, MessageSummaryItems.Flags);
+                var flags = summaries.FirstOrDefault()?.Flags;
+                return flags?.HasFlag(MessageFlags.Seen) == true;
+            }
+            catch
+            {
+                // If the server refuses flag fetches, prefer not to show a false unread dot.
+                return true;
+            }
         }
 
         private async Task<List<MailFolder>> FetchGoogleFoldersAsync(MailAccount account)
@@ -730,6 +890,9 @@ namespace Task_Flyout.Services
         private static string GetAccountsPath()
             => Path.Combine(GetAppDataPath(), "mail_accounts.json");
 
+        private static string GetMailCachePath()
+            => Path.Combine(GetAppDataPath(), "mail_cache.json");
+
         private static MailItem ToOutlookMailItem(string accountId, string folderId, GraphMessage message)
         {
             var received = message.ReceivedDateTime;
@@ -742,8 +905,12 @@ namespace Task_Flyout.Services
                 Sender = message.From?.EmailAddress?.Name
                     ?? message.From?.EmailAddress?.Address
                     ?? "",
+                SenderAddress = message.From?.EmailAddress?.Address ?? "",
                 Preview = message.BodyPreview ?? "",
-                BodyText = CleanMailBody(message.Body?.Content ?? message.BodyPreview ?? ""),
+                BodyText = CleanMailBody(message.Body?.ContentType == BodyType.Html
+                    ? StripHtml(message.Body?.Content ?? "")
+                    : message.Body?.Content ?? message.BodyPreview ?? ""),
+                HtmlBody = message.Body?.ContentType == BodyType.Html ? message.Body?.Content ?? "" : "",
                 RawReceivedTime = received,
                 ReceivedTime = FormatReceivedTime(received),
                 IsRead = message.IsRead == true,
@@ -763,6 +930,19 @@ namespace Task_Flyout.Services
             message.Subject = subject;
             message.Body = new TextPart("plain") { Text = body };
             return message;
+        }
+
+        private static SecureSocketOptions GetSmtpSocketOptions(MailAccount account)
+        {
+            if (account.SmtpPort == 465)
+                return SecureSocketOptions.SslOnConnect;
+
+            if (account.SmtpPort == 587)
+                return SecureSocketOptions.StartTls;
+
+            return account.SmtpUseSsl
+                ? SecureSocketOptions.StartTls
+                : SecureSocketOptions.StartTlsWhenAvailable;
         }
 
         private static List<string> ParseRecipients(string value)
@@ -786,7 +966,9 @@ namespace Task_Flyout.Services
         {
             string subject = GetGoogleHeader(message, "Subject");
             string sender = GetGoogleHeader(message, "From");
+            string senderAddress = ExtractEmailAddress(sender);
             string body = ExtractGoogleBody(message.Payload);
+            string htmlBody = ExtractGoogleHtmlBody(message.Payload);
             string preview = string.IsNullOrWhiteSpace(body) ? message.Snippet ?? "" : Truncate(body, 240);
             DateTimeOffset? received = null;
             if (message.InternalDate.HasValue)
@@ -799,8 +981,10 @@ namespace Task_Flyout.Services
                 Id = message.Id ?? "",
                 Subject = string.IsNullOrWhiteSpace(subject) ? "(No subject)" : subject,
                 Sender = sender,
+                SenderAddress = senderAddress,
                 Preview = preview,
                 BodyText = body,
+                HtmlBody = htmlBody,
                 RawReceivedTime = received,
                 ReceivedTime = FormatReceivedTime(received),
                 IsRead = message.LabelIds?.Contains("UNREAD") != true,
@@ -821,8 +1005,10 @@ namespace Task_Flyout.Services
                 Id = id,
                 Subject = string.IsNullOrWhiteSpace(message.Subject) ? "(No subject)" : message.Subject,
                 Sender = message.From?.ToString() ?? "",
+                SenderAddress = message.From?.Mailboxes?.FirstOrDefault()?.Address ?? "",
                 Preview = preview.Trim(),
                 BodyText = body,
+                HtmlBody = message.HtmlBody ?? "",
                 RawReceivedTime = message.Date,
                 ReceivedTime = FormatReceivedTime(message.Date),
                 IsRead = isRead,
@@ -850,6 +1036,14 @@ namespace Task_Flyout.Services
                 return true;
             }
 
+            EnsurePersistentCacheLoaded();
+            if (_persistentCache?.Folders.TryGetValue(key, out var persistentFolders) == true)
+            {
+                folders = persistentFolders;
+                _folderCache[key] = new CacheEntry<List<MailFolder>> { Value = folders };
+                return true;
+            }
+
             folders = new List<MailFolder>();
             return false;
         }
@@ -859,6 +1053,14 @@ namespace Task_Flyout.Services
             if (_messageCache.TryGetValue(key, out var entry) && DateTimeOffset.Now - entry.CreatedAt < CacheLifetime)
             {
                 messages = entry.Value;
+                return true;
+            }
+
+            EnsurePersistentCacheLoaded();
+            if (_persistentCache?.Messages.TryGetValue(key, out var persistentMessages) == true)
+            {
+                messages = persistentMessages;
+                _messageCache[key] = new CacheEntry<List<MailItem>> { Value = messages };
                 return true;
             }
 
@@ -872,6 +1074,15 @@ namespace Task_Flyout.Services
 
             foreach (var key in _messageCache.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
                 _messageCache.Remove(key);
+
+            EnsurePersistentCacheLoaded();
+            if (_persistentCache != null)
+            {
+                _persistentCache.Folders.Remove(accountId);
+                foreach (var key in _persistentCache.Messages.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
+                    _persistentCache.Messages.Remove(key);
+                SavePersistentCache();
+            }
         }
 
         private void UpdateCachedReadState(MailItem item)
@@ -889,10 +1100,189 @@ namespace Task_Flyout.Services
                 if (pair.Key.StartsWith($"{item.AccountId}|{item.FolderId}|True|", StringComparison.Ordinal))
                     pair.Value.Value.RemoveAll(message => message.Id == item.Id);
             }
+
+            EnsurePersistentCacheLoaded();
+            if (_persistentCache == null) return;
+
+            foreach (var pair in _persistentCache.Messages.ToList())
+            {
+                var cached = pair.Value.FirstOrDefault(message =>
+                    message.AccountId == item.AccountId &&
+                    message.FolderId == item.FolderId &&
+                    message.Id == item.Id);
+
+                if (cached != null)
+                    cached.IsRead = true;
+
+                if (pair.Key.StartsWith($"{item.AccountId}|{item.FolderId}|True|", StringComparison.Ordinal))
+                    pair.Value.RemoveAll(message => message.Id == item.Id);
+            }
+            SavePersistentCache();
         }
 
         private static string GetMessageCacheKey(string accountId, string folderId, bool unreadOnly, int pageSize)
             => $"{accountId}|{folderId}|{unreadOnly}|{pageSize}";
+
+        private void EnsurePersistentCacheLoaded()
+        {
+            if (_persistentCacheLoaded) return;
+            _persistentCacheLoaded = true;
+
+            try
+            {
+                var path = GetMailCachePath();
+                if (File.Exists(path))
+                {
+                    var json = ProtectedLocalStore.ReadText(path);
+                    if (!string.IsNullOrWhiteSpace(json))
+                        _persistentCache = JsonSerializer.Deserialize(json, AppJsonContext.Default.MailPersistentCache);
+                }
+            }
+            catch { }
+
+            _persistentCache ??= new MailPersistentCache();
+        }
+
+        private void SavePersistentCache()
+        {
+            try
+            {
+                EnsurePersistentCacheLoaded();
+                Directory.CreateDirectory(GetAppDataPath());
+                var json = JsonSerializer.Serialize(_persistentCache, AppJsonContext.Default.MailPersistentCache);
+                ProtectedLocalStore.WriteText(GetMailCachePath(), json);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Save mail cache failed: {ex.Message}");
+            }
+        }
+
+        private void UpdatePersistentFolders(string key, List<MailFolder> folders)
+        {
+            EnsurePersistentCacheLoaded();
+            if (_persistentCache == null) return;
+
+            _persistentCache.Folders[key] = folders;
+            SavePersistentCache();
+        }
+
+        private void UpdatePersistentMessages(string key, List<MailItem> messages)
+        {
+            EnsurePersistentCacheLoaded();
+            if (_persistentCache == null) return;
+
+            _persistentCache.Messages[key] = messages;
+            SavePersistentCache();
+        }
+
+        private void MergeMessagesIntoPersistentCache(string accountId, string folderId, List<MailItem> newMessages)
+        {
+            EnsurePersistentCacheLoaded();
+            if (_persistentCache == null || newMessages.Count == 0) return;
+
+            int pageSize = PageSize;
+            foreach (bool unreadOnly in new[] { true, false })
+            {
+                var key = GetMessageCacheKey(accountId, folderId, unreadOnly, pageSize);
+                var existing = _persistentCache.Messages.TryGetValue(key, out var cached)
+                    ? cached
+                    : new List<MailItem>();
+
+                foreach (var message in newMessages)
+                {
+                    if (unreadOnly && message.IsRead) continue;
+                    existing.RemoveAll(item => item.Id == message.Id);
+                    existing.Add(message);
+                }
+
+                _persistentCache.Messages[key] = existing
+                    .OrderByDescending(item => item.RawReceivedTime)
+                    .Take(Math.Clamp(pageSize, 10, 50))
+                    .ToList();
+
+                _messageCache[key] = new CacheEntry<List<MailItem>> { Value = _persistentCache.Messages[key] };
+            }
+
+            SavePersistentCache();
+        }
+
+        public MailItem? TryGetCachedMessage(string accountId, string folderId, string messageId)
+        {
+            EnsurePersistentCacheLoaded();
+
+            foreach (var pair in _messageCache.Concat(_persistentCache?.Messages.ToDictionary(
+                         entry => entry.Key,
+                         entry => new CacheEntry<List<MailItem>> { Value = entry.Value }) ?? new Dictionary<string, CacheEntry<List<MailItem>>>()))
+            {
+                var item = pair.Value.Value.FirstOrDefault(message =>
+                    message.AccountId == accountId &&
+                    message.FolderId == folderId &&
+                    message.Id == messageId);
+                if (item != null) return item;
+            }
+
+            return null;
+        }
+
+        private void LoadKnownUnreadIds()
+        {
+            if (_knownUnreadLoaded) return;
+            _knownUnreadLoaded = true;
+
+            var raw = ApplicationData.Current.LocalSettings.Values["MailKnownUnreadIds"] as string ?? "";
+            foreach (var id in raw.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                _knownUnreadIds.Add(id);
+        }
+
+        private void SaveKnownUnreadIds()
+        {
+            ApplicationData.Current.LocalSettings.Values["MailKnownUnreadIds"] = string.Join('\n', _knownUnreadIds);
+        }
+
+        private long GetLastSeenInboxTicks(string inboxKey)
+        {
+            EnsurePersistentCacheLoaded();
+            return _persistentCache?.LastSeenInboxTicks.TryGetValue(inboxKey, out var ticks) == true ? ticks : 0;
+        }
+
+        private void SetLastSeenInboxTicks(string inboxKey, long ticks)
+        {
+            EnsurePersistentCacheLoaded();
+            if (_persistentCache == null) return;
+            _persistentCache.LastSeenInboxTicks[inboxKey] = ticks;
+        }
+
+        private static long GetMailReceivedTicks(MailItem item)
+            => item.RawReceivedTime?.UtcTicks ?? 0;
+
+        private static string GetMailNotificationKey(MailItem item)
+            => $"{item.AccountId}|{item.FolderId}|{item.Id}";
+
+        private static void SendNewMailNotification(MailAccount account, MailItem item)
+        {
+            try
+            {
+                var sender = string.IsNullOrWhiteSpace(item.Sender) ? account.DisplayTitle : item.Sender;
+                var subject = string.IsNullOrWhiteSpace(item.Subject) ? "(No subject)" : item.Subject;
+
+                var notification = new AppNotificationBuilder()
+                    .AddText($"新邮件 · {account.DisplayTitle}")
+                    .AddText(subject)
+                    .AddText(sender)
+                    .AddArgument("action", "openMail")
+                    .AddArgument("accountId", item.AccountId)
+                    .AddArgument("folderId", item.FolderId)
+                    .AddArgument("messageId", item.Id)
+                    .BuildNotification();
+
+                AppNotificationManager.Default.Show(notification);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"New mail notification failed: {ex.Message}");
+            }
+        }
 
         private static bool IsVisibleGoogleLabel(Label label)
         {
@@ -932,13 +1322,10 @@ namespace Task_Flyout.Services
             if (part == null) return "";
 
             if (part.Body?.Data != null &&
-                (string.Equals(part.MimeType, "text/plain", StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(part.MimeType, "text/html", StringComparison.OrdinalIgnoreCase)))
+                string.Equals(part.MimeType, "text/plain", StringComparison.OrdinalIgnoreCase))
             {
                 var text = DecodeBase64Url(part.Body.Data);
-                return string.Equals(part.MimeType, "text/html", StringComparison.OrdinalIgnoreCase)
-                    ? CleanMailBody(StripHtml(text))
-                    : CleanMailBody(text);
+                return CleanMailBody(text);
             }
 
             if (part.Parts == null) return "";
@@ -947,7 +1334,27 @@ namespace Task_Flyout.Services
                 .Select(ExtractGoogleBody)
                 .FirstOrDefault(body => !string.IsNullOrWhiteSpace(body));
 
-            return plain ?? "";
+            if (!string.IsNullOrWhiteSpace(plain)) return plain;
+
+            var html = ExtractGoogleHtmlBody(part);
+            return string.IsNullOrWhiteSpace(html) ? "" : CleanMailBody(StripHtml(html));
+        }
+
+        private static string ExtractGoogleHtmlBody(GmailMessagePart? part)
+        {
+            if (part == null) return "";
+
+            if (part.Body?.Data != null &&
+                string.Equals(part.MimeType, "text/html", StringComparison.OrdinalIgnoreCase))
+            {
+                return DecodeBase64Url(part.Body.Data);
+            }
+
+            if (part.Parts == null) return "";
+
+            return part.Parts
+                .Select(ExtractGoogleHtmlBody)
+                .FirstOrDefault(body => !string.IsNullOrWhiteSpace(body)) ?? "";
         }
 
         private static bool HasGoogleAttachments(GmailMessagePart? part)
@@ -975,6 +1382,21 @@ namespace Task_Flyout.Services
             => message.Payload?.Headers?
                 .FirstOrDefault(header => string.Equals(header.Name, name, StringComparison.OrdinalIgnoreCase))
                 ?.Value ?? "";
+
+        private static string ExtractEmailAddress(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "";
+
+            try
+            {
+                return MailboxAddress.Parse(value).Address;
+            }
+            catch
+            {
+                var match = Regex.Match(value, @"[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}", RegexOptions.IgnoreCase);
+                return match.Success ? match.Value : value;
+            }
+        }
 
         private static string FormatReceivedTime(DateTimeOffset? received)
         {
