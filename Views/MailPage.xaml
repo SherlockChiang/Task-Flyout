@@ -61,8 +61,12 @@
                         Padding="8">
                     <TreeView x:Name="AccountTree"
                               SelectionMode="Single"
+                              CanDragItems="True"
+                              CanReorderItems="True"
+                              AllowDrop="True"
                               Expanding="AccountTree_Expanding"
-                              ItemInvoked="AccountTree_ItemInvoked"/>
+                              ItemInvoked="AccountTree_ItemInvoked"
+                              DragItemsCompleted="AccountTree_DragItemsCompleted"/>
                 </Border>
 
                 <Button Grid.Row="1" x:Name="RemoveMailButton" HorizontalAlignment="Stretch" IsEnabled="False" Click="RemoveMailButton_Click">

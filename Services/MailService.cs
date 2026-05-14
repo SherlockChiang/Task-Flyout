@@ -108,6 +108,8 @@ namespace Task_Flyout.Services
         public Dictionary<string, List<MailFolder>> Folders { get; set; } = new();
         public Dictionary<string, List<MailItem>> Messages { get; set; } = new();
         public Dictionary<string, long> LastSeenInboxTicks { get; set; } = new();
+        public List<string> AccountOrder { get; set; } = new();
+        public Dictionary<string, List<string>> FolderOrder { get; set; } = new();
     }
 
     public class MailService
@@ -152,7 +154,41 @@ namespace Task_Flyout.Services
         public IReadOnlyList<MailAccount> GetAccounts()
         {
             EnsureAccountsLoaded();
-            return _accounts;
+            return ApplyAccountOrder(_accounts);
+        }
+
+        public void SaveMailAccountOrder(IEnumerable<string> accountIds)
+        {
+            EnsureAccountsLoaded();
+            EnsurePersistentCacheLoaded();
+            if (_persistentCache == null) return;
+
+            var knownIds = _accounts.Select(account => account.Id).ToHashSet(StringComparer.Ordinal);
+            _persistentCache.AccountOrder = accountIds
+                .Where(id => knownIds.Contains(id))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            SavePersistentCache();
+        }
+
+        public void SaveMailFolderOrder(string accountId, IEnumerable<string> folderIds)
+        {
+            EnsurePersistentCacheLoaded();
+            if (_persistentCache == null) return;
+
+            _persistentCache.FolderOrder[accountId] = folderIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            if (_persistentCache.Folders.TryGetValue(accountId, out var folders))
+            {
+                var orderedFolders = ApplyFolderOrder(accountId, folders);
+                _persistentCache.Folders[accountId] = orderedFolders;
+                _folderCache[accountId] = new CacheEntry<List<MailFolder>> { Value = orderedFolders };
+            }
+
+            SavePersistentCache();
         }
 
         public bool RemoveAccount(string accountId)
@@ -389,6 +425,7 @@ namespace Task_Flyout.Services
                     .ToList() ?? new List<MailFolder>();
             }
 
+            folders = ApplyFolderOrder(cacheKey, folders);
             _folderCache[cacheKey] = new CacheEntry<List<MailFolder>> { Value = folders };
             UpdatePersistentFolders(cacheKey, folders);
             return folders;
@@ -1095,14 +1132,14 @@ namespace Task_Flyout.Services
         {
             if (_folderCache.TryGetValue(key, out var entry) && DateTimeOffset.Now - entry.CreatedAt < CacheLifetime)
             {
-                folders = entry.Value;
+                folders = ApplyFolderOrder(key, entry.Value);
                 return true;
             }
 
             EnsurePersistentCacheLoaded();
             if (_persistentCache?.Folders.TryGetValue(key, out var persistentFolders) == true)
             {
-                folders = persistentFolders;
+                folders = ApplyFolderOrder(key, persistentFolders);
                 _folderCache[key] = new CacheEntry<List<MailFolder>> { Value = folders };
                 return true;
             }
@@ -1204,6 +1241,11 @@ namespace Task_Flyout.Services
             catch { }
 
             _persistentCache ??= new MailPersistentCache();
+            _persistentCache.Folders ??= new Dictionary<string, List<MailFolder>>();
+            _persistentCache.Messages ??= new Dictionary<string, List<MailItem>>();
+            _persistentCache.LastSeenInboxTicks ??= new Dictionary<string, long>();
+            _persistentCache.AccountOrder ??= new List<string>();
+            _persistentCache.FolderOrder ??= new Dictionary<string, List<string>>();
         }
 
         private void SavePersistentCache()
@@ -1226,8 +1268,53 @@ namespace Task_Flyout.Services
             EnsurePersistentCacheLoaded();
             if (_persistentCache == null) return;
 
-            _persistentCache.Folders[key] = folders;
+            _persistentCache.Folders[key] = ApplyFolderOrder(key, folders);
             SavePersistentCache();
+        }
+
+        private List<MailAccount> ApplyAccountOrder(IEnumerable<MailAccount> accounts)
+        {
+            EnsurePersistentCacheLoaded();
+            var accountList = accounts.ToList();
+            var order = _persistentCache?.AccountOrder;
+            if (order == null || order.Count == 0) return accountList;
+
+            var orderIndex = order
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select((id, index) => new { id, index })
+                .GroupBy(item => item.id, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First().index, StringComparer.Ordinal);
+
+            return accountList
+                .Select((account, originalIndex) => new { account, originalIndex })
+                .OrderBy(item => orderIndex.TryGetValue(item.account.Id, out var index) ? index : int.MaxValue)
+                .ThenBy(item => item.originalIndex)
+                .Select(item => item.account)
+                .ToList();
+        }
+
+        private List<MailFolder> ApplyFolderOrder(string accountId, IEnumerable<MailFolder> folders)
+        {
+            EnsurePersistentCacheLoaded();
+            var folderList = folders.ToList();
+            if (_persistentCache == null ||
+                !_persistentCache.FolderOrder.TryGetValue(accountId, out var order) ||
+                order == null ||
+                order.Count == 0)
+                return folderList;
+
+            var orderIndex = order
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select((id, index) => new { id, index })
+                .GroupBy(item => item.id, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First().index, StringComparer.Ordinal);
+
+            return folderList
+                .Select((folder, originalIndex) => new { folder, originalIndex })
+                .OrderBy(item => orderIndex.TryGetValue(item.folder.Id, out var index) ? index : int.MaxValue)
+                .ThenBy(item => item.originalIndex)
+                .Select(item => item.folder)
+                .ToList();
         }
 
         private void UpdatePersistentMessages(string key, List<MailItem> messages)

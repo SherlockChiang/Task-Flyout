@@ -107,6 +107,37 @@ namespace Task_Flyout.Views
             await LoadFoldersForNodeAsync(args.Node);
         }
 
+        private void AccountTree_DragItemsCompleted(TreeView sender, TreeViewDragItemsCompletedEventArgs args)
+        {
+            SaveAccountTreeOrder();
+        }
+
+        private void SaveAccountTreeOrder()
+        {
+            if (_mailService == null) return;
+
+            var accountOrder = AccountTree.RootNodes
+                .Where(node => _accountNodes.ContainsKey(node))
+                .Select(node => _accountNodes[node].Id)
+                .ToList();
+            _mailService.SaveMailAccountOrder(accountOrder);
+
+            foreach (var accountNode in AccountTree.RootNodes)
+            {
+                if (!_accountNodes.TryGetValue(accountNode, out var account)) continue;
+
+                var folderOrder = accountNode.Children
+                    .Where(node =>
+                        _folderNodes.TryGetValue(node, out var selection) &&
+                        string.Equals(selection.Account.Id, account.Id, StringComparison.Ordinal))
+                    .Select(node => _folderNodes[node].Folder.Id)
+                    .ToList();
+
+                if (folderOrder.Count > 0)
+                    _mailService.SaveMailFolderOrder(account.Id, folderOrder);
+            }
+        }
+
         private async Task LoadFoldersForNodeAsync(TreeViewNode node, bool forceRefresh = false)
         {
             if (_mailService == null || !_accountNodes.TryGetValue(node, out var account)) return;
@@ -726,6 +757,30 @@ namespace Task_Flyout.Views
             var border = isDarkTheme ? "#3a3a3a" : "#e5e7eb";
             var link = isDarkTheme ? "#8ab4f8" : "#2563eb";
             var scheme = isDarkTheme ? "dark" : "light";
+            var darkOverride = isDarkTheme
+                ? $$"""
+html, body, .mail-shell {
+    background: {{background}} !important;
+    color: {{text}} !important;
+}
+body *:not(img):not(video):not(canvas) {
+    color: {{text}} !important;
+    border-color: {{border}} !important;
+}
+body table, body tbody, body thead, body tfoot, body tr, body td, body th,
+body div, body section, body article, body header, body footer, body main,
+body p, body span, body font, body center, body blockquote, body dl, body dt, body dd,
+body ul, body ol, body li {
+    background-color: transparent !important;
+}
+body [bgcolor] {
+    background-color: transparent !important;
+}
+body a, body a * {
+    color: {{link}} !important;
+}
+"""
+                : "";
             var baseStyle = $$"""
 <style>
 :root { color-scheme: {{scheme}}; }
@@ -749,6 +804,7 @@ body, div, p, span, td, th, li, blockquote { color: inherit; }
 body { background-color: {{background}} !important; }
 .mail-shell { min-height: 100vh; background: {{background}}; color: {{text}}; }
 .mail-shell * { scrollbar-color: {{muted}} {{background}}; }
+{{darkOverride}}
 @media (prefers-color-scheme: dark) {
     html, body { background: {{background}}; color: {{text}}; }
 }

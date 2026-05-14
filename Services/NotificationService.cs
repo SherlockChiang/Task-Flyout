@@ -192,7 +192,12 @@ namespace Task_Flyout.Services
 
         private void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)
         {
-            var arguments = ParseArguments(args.Argument);
+            OpenFromActivationArguments(args.Argument);
+        }
+
+        public static void OpenFromActivationArguments(string argument)
+        {
+            var arguments = ParseArguments(argument);
             App.MainDispatcherQueue?.TryEnqueue(() =>
             {
                 if (arguments.TryGetValue("action", out var action) &&

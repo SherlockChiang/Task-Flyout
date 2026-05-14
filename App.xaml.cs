@@ -94,6 +94,51 @@ namespace Task_Flyout
                     }
                 }
             }
+
+            HandleLaunchActivation(args);
+        }
+
+        private static void HandleLaunchActivation(LaunchActivatedEventArgs args)
+        {
+            try
+            {
+                var activationArgs = Microsoft.Windows.AppLifecycle.AppInstance.GetCurrent().GetActivatedEventArgs();
+                if (activationArgs.Kind == Microsoft.Windows.AppLifecycle.ExtendedActivationKind.AppNotification &&
+                    activationArgs.Data is Microsoft.Windows.AppNotifications.AppNotificationActivatedEventArgs notificationArgs)
+                {
+                    NotificationService.OpenFromActivationArguments(notificationArgs.Argument);
+                    return;
+                }
+            }
+            catch
+            {
+                // Older activation paths can still surface as command-line arguments.
+            }
+
+            var activationArgument = GetToastActivationArgument(args?.Arguments);
+            if (!string.IsNullOrWhiteSpace(activationArgument))
+                NotificationService.OpenFromActivationArguments(activationArgument);
+        }
+
+        private static string? GetToastActivationArgument(string? launchArguments)
+        {
+            const string prefix = "----AppNotificationActivated:";
+
+            if (!string.IsNullOrWhiteSpace(launchArguments))
+            {
+                var prefixIndex = launchArguments.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+                if (prefixIndex >= 0)
+                    return launchArguments[(prefixIndex + prefix.Length)..].Trim().Trim('"');
+            }
+
+            foreach (var argument in Environment.GetCommandLineArgs())
+            {
+                var prefixIndex = argument.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+                if (prefixIndex >= 0)
+                    return argument[(prefixIndex + prefix.Length)..].Trim().Trim('"');
+            }
+
+            return null;
         }
 
         private void UiSettings_ColorValuesChanged(UISettings sender, object args)

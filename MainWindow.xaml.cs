@@ -233,13 +233,21 @@ namespace Task_Flyout
         {
             var mailItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Mail");
             if (mailItem != null) MainNav.SelectedItem = mailItem;
-            ContentFrame.Navigate(typeof(Views.MailPage));
 
-            DispatcherQueue.TryEnqueue(async () =>
+            void OpenAfterNavigate(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs args)
             {
-                if (ContentFrame.Content is Views.MailPage mailPage)
-                    await mailPage.OpenMessageAsync(accountId, folderId, messageId);
-            });
+                if (args.SourcePageType != typeof(Views.MailPage)) return;
+
+                ContentFrame.Navigated -= OpenAfterNavigate;
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    if (ContentFrame.Content is Views.MailPage mailPage)
+                        await mailPage.OpenMessageAsync(accountId, folderId, messageId);
+                });
+            }
+
+            ContentFrame.Navigated += OpenAfterNavigate;
+            ContentFrame.Navigate(typeof(Views.MailPage));
         }
 
         public void NavigateToAddAccount()
