@@ -11,7 +11,7 @@
 	<Identity
     Name="Uranus92.TaskFlyout"
     Publisher="CN=Chiang"
-    Version="1.2.12.32" />
+    Version="1.2.12.33" />
 
 	<mp:PhoneIdentity PhoneProductId="2397882d-bfcd-481c-b217-774742fc81ff" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 

@@ -610,6 +610,7 @@ namespace Task_Flyout.Views
         }
 
         private bool _webView2Configured;
+        private bool _isInternalMailHtmlNavigation;
 
         private async Task RenderMailBodyAsync(MailItem item)
         {
@@ -643,11 +644,18 @@ namespace Task_Flyout.Views
                             settings.IsSwipeNavigationEnabled = false;
                             DetailHtmlView.CoreWebView2.NavigationStarting += (_, args) =>
                             {
+                                if (_isInternalMailHtmlNavigation)
+                                    return;
+
                                 if (!args.IsRedirected && args.Uri != "about:blank")
                                 {
                                     args.Cancel = true;
                                     OpenSafeExternalUri(args.Uri);
                                 }
+                            };
+                            DetailHtmlView.CoreWebView2.NavigationCompleted += (_, _) =>
+                            {
+                                _isInternalMailHtmlNavigation = false;
                             };
                             DetailHtmlView.CoreWebView2.NewWindowRequested += (_, args) =>
                             {
@@ -656,11 +664,13 @@ namespace Task_Flyout.Views
                             };
                         }
                         if (_selectedItem?.Id != itemId) return;
+                        _isInternalMailHtmlNavigation = true;
                         DetailHtmlView.NavigateToString(htmlDocument);
                         return;
                     }
                     catch (Exception ex)
                     {
+                        _isInternalMailHtmlNavigation = false;
                         System.Diagnostics.Debug.WriteLine($"HTML mail render failed: {ex.Message}");
                     }
                 }
