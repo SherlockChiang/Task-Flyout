@@ -191,6 +191,12 @@
                             </ScrollViewer>
                         </Grid>
                         <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="TrustSenderButton" HorizontalAlignment="Left" Click="TrustSenderButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE72E;" FontSize="14"/>
+                                    <TextBlock x:Name="TrustSenderButtonText" Text="信任此来源"/>
+                                </StackPanel>
+                            </Button>
                             <Button x:Name="ReplyButton" HorizontalAlignment="Left" Click="ReplyButton_Click">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <FontIcon Glyph="&#xE97A;" FontSize="14"/>

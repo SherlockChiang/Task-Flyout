@@ -22,6 +22,7 @@ namespace Task_Flyout.Views
         private MailFolder? _selectedFolder;
         private MailItem? _selectedItem;
         private MailAccount? _selectedAccountForRemoval;
+        private readonly MailTrustStore _mailTrustStore = new();
         private bool _isInitializing = true;
         private bool _isLoadingMessages;
 
@@ -568,6 +569,7 @@ namespace Task_Flyout.Views
             DetailSubject.Text = item.Subject;
             DetailSender.Text = item.Sender;
             DetailTime.Text = item.RawReceivedTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? item.ReceivedTime;
+            UpdateTrustButton(item);
             await RenderMailBodyAsync(item);
             ReplyButton.IsEnabled = _selectedAccount != null;
             OpenInBrowserButton.IsEnabled = !string.IsNullOrWhiteSpace(item.WebLink);
@@ -602,6 +604,7 @@ namespace Task_Flyout.Views
             DetailHtmlView.Visibility = Visibility.Collapsed;
             DetailTextScrollViewer.Visibility = Visibility.Visible;
             DetailPreview.Text = "";
+            TrustSenderButton.IsEnabled = false;
             if (AddAccountPanel.Visibility != Visibility.Visible && ComposePanel.Visibility != Visibility.Visible)
                 EmptyDetailPanel.Visibility = Visibility.Visible;
         }
@@ -612,9 +615,14 @@ namespace Task_Flyout.Views
         {
             if (!string.IsNullOrWhiteSpace(item.HtmlBody))
             {
-                var htmlDocument = BuildMailHtmlDocument(item.HtmlBody);
-                if (HasVisibleHtmlContent(htmlDocument))
+                var trusted = _mailTrustStore.IsTrusted(item);
+                var html = trusted
+                    ? SanitizeTrustedMailHtml(item.HtmlBody)
+                    : SanitizeMailHtml(item.HtmlBody);
+
+                if (trusted || HasVisibleHtmlContent(html))
                 {
+                    var htmlDocument = BuildMailHtmlDocument(html, alreadySanitized: true);
                     try
                     {
                         var itemId = item.Id;
@@ -658,6 +666,11 @@ namespace Task_Flyout.Views
                 }
             }
 
+            ShowPlainTextMailBody(item);
+        }
+
+        private void ShowPlainTextMailBody(MailItem item)
+        {
             DetailHtmlView.Visibility = Visibility.Collapsed;
             DetailTextScrollViewer.Visibility = Visibility.Visible;
             var fallbackText = item.BodyText;
@@ -669,9 +682,18 @@ namespace Task_Flyout.Views
                 : fallbackText;
         }
 
-        private static string BuildMailHtmlDocument(string html)
+        private void UpdateTrustButton(MailItem item)
         {
-            var safeHtml = SanitizeMailHtml(html);
+            var source = MailTrustStore.GetDisplaySource(item);
+            var trusted = _mailTrustStore.IsTrusted(item);
+            TrustSenderButton.IsEnabled = source != "未知来源";
+            TrustSenderButtonText.Text = trusted ? "取消信任来源" : "信任此来源";
+            ToolTipService.SetToolTip(TrustSenderButton, trusted ? $"已信任：{source}" : $"信任后将允许加载此来源的远程邮件内容：{source}");
+        }
+
+        private static string BuildMailHtmlDocument(string html, bool alreadySanitized = false)
+        {
+            var safeHtml = alreadySanitized ? html : SanitizeMailHtml(html);
             var baseStyle = """
 <style>
 html, body {
@@ -755,6 +777,25 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
             return value;
         }
 
+        private static string SanitizeTrustedMailHtml(string html)
+        {
+            if (string.IsNullOrWhiteSpace(html)) return "";
+
+            var value = html;
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*>.*?<\s*/\s*\1\s*>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*/?\s*>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+on\w+\s*=\s*(['""]).*?\1", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+on\w+\s*=\s*[^\s>]+", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"(href|action|formaction)\s*=\s*(['""])\s*(javascript|vbscript):.*?\2", "$1=\"#\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"(href|action|formaction)\s*=\s*(javascript|vbscript):[^\s>]+", "$1=\"#\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"style\s*=\s*(['""])[^'""]*\b(expression|-moz-binding|behavior)\b[^'""]*\1", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+
+            if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"<\s*(html|head|body|style|table|div|p|span|br|img|a|meta)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                value = $"<pre>{WebUtility.HtmlEncode(RemoveCssNoise(value))}</pre>";
+
+            return value;
+        }
+
         private static bool HasVisibleHtmlContent(string html)
         {
             if (string.IsNullOrWhiteSpace(html)) return false;
@@ -765,12 +806,18 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
                 " ",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
 
-            if (System.Text.RegularExpressions.Regex.IsMatch(withoutNonContent, @"<\s*(img|table|div|p|span|td|a|h[1-6])\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-                return true;
-
             var text = System.Text.RegularExpressions.Regex.Replace(withoutNonContent, "<.*?>", " ");
             text = WebUtility.HtmlDecode(text).Trim();
-            return text.Length > 0;
+            if (text.Length > 0)
+                return true;
+
+            if (System.Text.RegularExpressions.Regex.IsMatch(
+                    withoutNonContent,
+                    @"<\s*img\b[^>]+\bsrc\s*=\s*(['""])(?!https?://|cid:|data:)[^'""]+\1",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                return true;
+
+            return false;
         }
 
         private static string RemoveCssNoise(string value)
@@ -880,6 +927,19 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
             if (Uri.TryCreate(_selectedItem.WebLink, UriKind.Absolute, out var uri) &&
                 (uri.Scheme == "http" || uri.Scheme == "https"))
                 await Launcher.LaunchUriAsync(uri);
+        }
+
+        private async void TrustSenderButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedItem == null) return;
+
+            if (_mailTrustStore.IsTrusted(_selectedItem))
+                _mailTrustStore.Untrust(_selectedItem);
+            else
+                _mailTrustStore.Trust(_selectedItem);
+
+            UpdateTrustButton(_selectedItem);
+            await RenderMailBodyAsync(_selectedItem);
         }
 
         private static string GetReplyRecipient(MailItem item)
