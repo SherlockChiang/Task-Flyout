@@ -74,6 +74,10 @@ namespace Task_Flyout
             {
                 MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Mail");
             }
+            else if (ContentFrame.SourcePageType == typeof(Views.RssPage))
+            {
+                MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Rss");
+            }
             else
             {
                 MainNav.SelectedItem = null;
@@ -198,6 +202,8 @@ namespace Task_Flyout
                 ContentFrame.Navigate(typeof(WeatherPage));
             else if (args.InvokedItemContainer is NavigationViewItem itemM && itemM.Tag?.ToString() == "Mail")
                 ContentFrame.Navigate(typeof(MailPage));
+            else if (args.InvokedItemContainer is NavigationViewItem itemR && itemR.Tag?.ToString() == "Rss")
+                ContentFrame.Navigate(typeof(RssPage));
         }
 
         public void NavigateToSettings()
