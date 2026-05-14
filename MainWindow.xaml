@@ -24,6 +24,12 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
+                <NavigationViewItem x:Name="TasksNavItem" Content="任务" Tag="Tasks">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE73E;" FontFamily="Segoe MDL2 Assets"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+
                 <NavigationViewItem x:Uid="MainWindow_NavWeather" x:Name="WeatherNavItem" Content="天气" Tag="Weather">
                     <NavigationViewItem.Icon>
                         <FontIcon x:Name="WeatherNavIcon" Glyph="&#xF8BA;" FontFamily="ms-appx:///Assets/FluentSystemIcons-Filled.ttf#FluentSystemIcons-Filled"/>

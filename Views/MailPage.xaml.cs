@@ -30,6 +30,7 @@ namespace Task_Flyout.Views
         {
             InitializeComponent();
             Loaded += MailPage_Loaded;
+            ActualThemeChanged += MailPage_ActualThemeChanged;
         }
 
         private async void MailPage_Loaded(object sender, RoutedEventArgs e)
@@ -38,6 +39,12 @@ namespace Task_Flyout.Views
             MailListView.ItemsSource = _items;
             _isInitializing = false;
             await RefreshAccountsAsync();
+        }
+
+        private async void MailPage_ActualThemeChanged(FrameworkElement sender, object args)
+        {
+            if (_selectedItem != null && DetailPanel.Visibility == Visibility.Visible)
+                await RenderMailBodyAsync(_selectedItem);
         }
 
         private async Task RefreshAccountsAsync(bool autoSelect = true)
@@ -623,7 +630,7 @@ namespace Task_Flyout.Views
 
                 if (trusted || HasVisibleHtmlContent(html))
                 {
-                    var htmlDocument = BuildMailHtmlDocument(html, alreadySanitized: true);
+                    var htmlDocument = BuildMailHtmlDocument(html, IsDarkThemeActive(), alreadySanitized: true);
                     try
                     {
                         var itemId = item.Id;
@@ -701,16 +708,32 @@ namespace Task_Flyout.Views
             ToolTipService.SetToolTip(TrustSenderButton, trusted ? $"已信任：{source}" : $"信任后将允许加载此来源的远程邮件内容：{source}");
         }
 
-        private static string BuildMailHtmlDocument(string html, bool alreadySanitized = false)
+        private bool IsDarkThemeActive()
+        {
+            var theme = ActualTheme;
+            if (theme == ElementTheme.Default && App.MyMainWindow?.Content is FrameworkElement root)
+                theme = root.ActualTheme;
+
+            return theme == ElementTheme.Dark;
+        }
+
+        private static string BuildMailHtmlDocument(string html, bool isDarkTheme, bool alreadySanitized = false)
         {
             var safeHtml = alreadySanitized ? html : SanitizeMailHtml(html);
-            var baseStyle = """
+            var background = isDarkTheme ? "#1f1f1f" : "#ffffff";
+            var text = isDarkTheme ? "#f3f3f3" : "#202020";
+            var muted = isDarkTheme ? "#d7d7d7" : "#4b5563";
+            var border = isDarkTheme ? "#3a3a3a" : "#e5e7eb";
+            var link = isDarkTheme ? "#8ab4f8" : "#2563eb";
+            var scheme = isDarkTheme ? "dark" : "light";
+            var baseStyle = $$"""
 <style>
+:root { color-scheme: {{scheme}}; }
 html, body {
     margin: 0;
     padding: 0;
-    background: #ffffff;
-    color: #202020;
+    background: {{background}};
+    color: {{text}};
     font-family: "Segoe UI", Arial, sans-serif;
     font-size: 14px;
     line-height: 1.45;
@@ -719,8 +742,16 @@ html, body {
 body { padding: 2px; }
 img { max-width: 100%; height: auto; }
 table { max-width: 100%; border-collapse: collapse; }
-a { color: #2563eb; }
+td, th { border-color: {{border}}; }
+a { color: {{link}}; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+body, div, p, span, td, th, li, blockquote { color: inherit; }
+body { background-color: {{background}} !important; }
+.mail-shell { min-height: 100vh; background: {{background}}; color: {{text}}; }
+.mail-shell * { scrollbar-color: {{muted}} {{background}}; }
+@media (prefers-color-scheme: dark) {
+    html, body { background: {{background}}; color: {{text}}; }
+}
 </style>
 """;
 
@@ -746,7 +777,9 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 """ + baseStyle + """
 </head>
 <body>
+<div class="mail-shell">
 """ + safeHtml + """
+</div>
 </body>
 </html>
 """;

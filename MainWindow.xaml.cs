@@ -64,6 +64,10 @@ namespace Task_Flyout
             {
                 MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Calendar");
             }
+            else if (ContentFrame.SourcePageType == typeof(Views.TasksPage))
+            {
+                MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Tasks");
+            }
             else if (ContentFrame.SourcePageType == typeof(Views.WeatherPage))
             {
                 MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Weather");
@@ -108,6 +112,12 @@ namespace Task_Flyout
             if (ContentFrame.Content is CalendarPage page)
             {
                 page.RefreshAccountList();
+                return;
+            }
+
+            if (ContentFrame.Content is TasksPage tasksPage)
+            {
+                tasksPage.RefreshAccountList();
                 return;
             }
 
@@ -165,6 +175,7 @@ namespace Task_Flyout
         private void BroadcastFilterChange()
         {
             if (ContentFrame.Content is CalendarPage page) page.ReloadFilters();
+            if (ContentFrame.Content is TasksPage tasksPage) tasksPage.ReloadFilters();
 
             if (App.MyFlyoutWindow is FlyoutWindow flyout)
             {
@@ -175,6 +186,7 @@ namespace Task_Flyout
         private void BtnForceSync_Click(object sender, RoutedEventArgs e)
         {
             if (ContentFrame.Content is CalendarPage page) page.ForceSync();
+            if (ContentFrame.Content is TasksPage tasksPage) tasksPage.ForceSync();
         }
 
         private void MainNav_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
@@ -182,6 +194,8 @@ namespace Task_Flyout
             if (args.IsSettingsInvoked) ContentFrame.Navigate(typeof(SettingsPage));
             else if (args.InvokedItemContainer is NavigationViewItem item && item.Tag?.ToString() == "Calendar")
                 ContentFrame.Navigate(typeof(CalendarPage));
+            else if (args.InvokedItemContainer is NavigationViewItem itemT && itemT.Tag?.ToString() == "Tasks")
+                ContentFrame.Navigate(typeof(TasksPage));
             else if (args.InvokedItemContainer is NavigationViewItem itemW && itemW.Tag?.ToString() == "Weather")
                 ContentFrame.Navigate(typeof(WeatherPage));
             else if (args.InvokedItemContainer is NavigationViewItem itemM && itemM.Tag?.ToString() == "Mail")
@@ -206,6 +220,13 @@ namespace Task_Flyout
             var mailItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Mail");
             if (mailItem != null) MainNav.SelectedItem = mailItem;
             ContentFrame.Navigate(typeof(Views.MailPage));
+        }
+
+        public void NavigateToTasks()
+        {
+            var tasksItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Tasks");
+            if (tasksItem != null) MainNav.SelectedItem = tasksItem;
+            ContentFrame.Navigate(typeof(Views.TasksPage));
         }
 
         public void NavigateToMailMessage(string accountId, string folderId, string messageId)
