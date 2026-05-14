@@ -451,7 +451,26 @@ namespace Task_Flyout.Views
 
         public void ForceSync()
         {
-            _ = SyncMonthDataAsync(forceRefresh: true);
+            _ = ForceSyncAllDataAsync();
+        }
+
+        private async Task ForceSyncAllDataAsync()
+        {
+            if (_syncManager == null || SyncProgress == null) return;
+
+            SyncProgress.IsActive = true;
+            try
+            {
+                var min = DateTime.Today.AddYears(-1);
+                var max = DateTime.Today.AddYears(3);
+                await _syncManager.GetAllDataAsync(min, max, forceRefresh: true);
+                _localCache = _syncManager.GetLocalCache();
+                LoadCalendar(_viewDate);
+            }
+            finally
+            {
+                SyncProgress.IsActive = false;
+            }
         }
 
         private void EditRadioType_Changed(object? sender, RoutedEventArgs? e)

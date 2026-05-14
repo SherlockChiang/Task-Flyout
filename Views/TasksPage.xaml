@@ -161,11 +161,19 @@
                     </StackPanel>
                 </StackPanel>
                 <ProgressRing x:Name="SyncProgress" Width="24" Height="24" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                <Button HorizontalAlignment="Right"
+                        Margin="0,0,36,0"
+                        Click="AddTaskButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE710;" FontSize="14"/>
+                        <TextBlock Text="添加任务"/>
+                    </StackPanel>
+                </Button>
             </Grid>
 
-            <Grid Grid.Row="1" RowSpacing="20">
+            <Grid Grid.Row="1" RowSpacing="14">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
@@ -179,6 +187,7 @@
                     <ListView Grid.Row="1"
                               x:Name="PendingTasksList"
                               ItemsSource="{x:Bind PendingTasks}"
+                              MaxHeight="360"
                               SelectionMode="None"
                               ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <ListView.ItemTemplate>
@@ -220,11 +229,29 @@
                                                        Visibility="{x:Bind HasDescription}"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         </StackPanel>
+                                        <Button Grid.Column="3"
+                                                Width="32"
+                                                Height="32"
+                                                Padding="0"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Click="DeleteTaskButton_Click"
+                                                ToolTipService.ToolTip="删除任务">
+                                            <FontIcon Glyph="&#xE74D;" FontSize="14"/>
+                                        </Button>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
+                    <TextBlock x:Name="PendingEmptyText"
+                               Grid.Row="1"
+                               Text="已经没有未完成任务"
+                               HorizontalAlignment="Center"
+                               Margin="0,24,0,28"
+                               FontSize="14"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               Visibility="Collapsed"/>
                 </Grid>
 
                 <Border Grid.Row="1" Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
@@ -285,6 +312,16 @@
                                                        Visibility="{x:Bind HasDescription}"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         </StackPanel>
+                                        <Button Grid.Column="3"
+                                                Width="32"
+                                                Height="32"
+                                                Padding="0"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Click="DeleteTaskButton_Click"
+                                                ToolTipService.ToolTip="删除任务">
+                                            <FontIcon Glyph="&#xE74D;" FontSize="14"/>
+                                        </Button>
                                     </Grid>
                                 </Border>
                             </DataTemplate>

@@ -69,8 +69,8 @@ namespace Task_Flyout.Views
             try
             {
                 SyncProgress.IsActive = true;
-                var min = DateTime.Today.AddDays(-30);
-                var max = DateTime.Today.AddDays(365);
+                var min = DateTime.Today.AddYears(-1);
+                var max = DateTime.Today.AddYears(3);
                 await _syncManager.GetAllDataAsync(min, max, forceRefresh);
                 LoadCache();
                 ReloadTasks();
@@ -111,7 +111,11 @@ namespace Task_Flyout.Views
 
             PendingHeaderText.Text = $"待完成 ({PendingTasks.Count})";
             CompletedHeaderText.Text = $"已完成 ({CompletedTasks.Count})";
-            TaskSummaryText.Text = $"{PendingTasks.Count} 个待完成，{CompletedTasks.Count} 个已完成";
+            TaskSummaryText.Text = PendingTasks.Count == 0
+                ? $"已经没有未完成任务，{CompletedTasks.Count} 个已完成"
+                : $"{PendingTasks.Count} 个待完成，{CompletedTasks.Count} 个已完成";
+            PendingTasksList.Visibility = PendingTasks.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+            PendingEmptyText.Visibility = PendingTasks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private bool IsItemVisible(AgendaItem item)
@@ -171,12 +175,146 @@ namespace Task_Flyout.Views
             }
         }
 
+        private async void AddTaskButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_syncManager == null) return;
+
+            var providerNames = _syncManager.Providers
+                .Where(provider => _syncManager.AccountManager.IsConnected(provider.ProviderName))
+                .Select(provider => provider.ProviderName)
+                .ToList();
+
+            if (providerNames.Count == 0)
+            {
+                await new ContentDialog
+                {
+                    Title = "没有可用账户",
+                    Content = "请先添加并登录一个支持任务的账户。",
+                    CloseButtonText = "确定",
+                    XamlRoot = XamlRoot
+                }.ShowAsync();
+                return;
+            }
+
+            var titleBox = new TextBox
+            {
+                Header = "标题",
+                PlaceholderText = "任务名称"
+            };
+            var providerBox = new ComboBox
+            {
+                Header = "账户",
+                ItemsSource = providerNames,
+                SelectedIndex = 0,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            var datePicker = new DatePicker
+            {
+                Header = "日期",
+                Date = DateTimeOffset.Now
+            };
+            var timePicker = new TimePicker
+            {
+                Header = "时间",
+                Time = new TimeSpan(9, 0, 0)
+            };
+            var panel = new StackPanel { Spacing = 12 };
+            panel.Children.Add(titleBox);
+            panel.Children.Add(providerBox);
+            panel.Children.Add(datePicker);
+            panel.Children.Add(timePicker);
+
+            var dialog = new ContentDialog
+            {
+                Title = "添加任务",
+                Content = panel,
+                PrimaryButtonText = "保存",
+                CloseButtonText = "取消",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = XamlRoot
+            };
+
+            dialog.PrimaryButtonClick += async (_, args) =>
+            {
+                var title = titleBox.Text.Trim();
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    args.Cancel = true;
+                    titleBox.PlaceholderText = "请输入任务名称";
+                    titleBox.Focus(FocusState.Programmatic);
+                    return;
+                }
+
+                var deferral = args.GetDeferral();
+                try
+                {
+                    var providerName = providerBox.SelectedItem?.ToString();
+                    var targetDate = datePicker.Date.DateTime.Date;
+                    await _syncManager.CreateItemAsync(title, isEvent: false, isAllDay: false, targetDate, timePicker.Time, timePicker.Time, "", providerName);
+                    await SyncTasksAsync(forceRefresh: true);
+                    App.MyFlyoutWindow?.ReloadFilters();
+                }
+                finally
+                {
+                    deferral.Complete();
+                }
+            };
+
+            await dialog.ShowAsync();
+        }
+
+        private async void DeleteTaskButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_syncManager == null || sender is not Button button || button.DataContext is not AgendaItem item)
+                return;
+
+            var dialog = new ContentDialog
+            {
+                Title = "删除任务",
+                Content = $"确定要删除“{item.Title}”吗？",
+                PrimaryButtonText = "删除",
+                CloseButtonText = "取消",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = XamlRoot
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+
+            try
+            {
+                button.IsEnabled = false;
+
+                if (!string.IsNullOrWhiteSpace(item.Provider) && !string.IsNullOrWhiteSpace(item.Id))
+                    await _syncManager.DeleteItemAsync(item.Provider, item.Id, isEvent: false);
+
+                RemoveTaskFromCache(item);
+                await _syncManager.SaveLocalCacheAsync();
+                ReloadTasks();
+                App.MyFlyoutWindow?.ReloadFilters();
+            }
+            finally
+            {
+                button.IsEnabled = true;
+            }
+        }
+
         private void SetTaskCompletionInCache(AgendaItem target, bool isCompleted)
         {
             foreach (var task in _localCache.DayItems.Values.SelectMany(items => items)
                          .Where(item => item.IsTask && IsSameTask(item, target)))
             {
                 task.IsCompleted = isCompleted;
+            }
+        }
+
+        private void RemoveTaskFromCache(AgendaItem target)
+        {
+            foreach (var key in _localCache.DayItems.Keys.ToList())
+            {
+                _localCache.DayItems[key].RemoveAll(item => item.IsTask && IsSameTask(item, target));
+                if (_localCache.DayItems[key].Count == 0)
+                    _localCache.DayItems.Remove(key);
             }
         }
 

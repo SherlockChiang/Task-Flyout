@@ -26,8 +26,6 @@ namespace Task_Flyout
             SetTitleBar(null);
             this.AppWindow.Closing += AppWindow_Closing;
 
-            FooterContentPanel.Visibility = Visibility.Collapsed;
-
             ContentFrame.Navigated += ContentFrame_Navigated;
 
             RefreshWeatherNavIconAsync();
