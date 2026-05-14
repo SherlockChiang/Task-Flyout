@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -649,6 +650,7 @@ namespace Task_Flyout.Views
 
         private bool _webView2Configured;
         private bool _isInternalMailHtmlNavigation;
+        private static bool _mailWebViewCachePathConfigured;
 
         private async Task RenderMailBodyAsync(MailItem item)
         {
@@ -668,11 +670,16 @@ namespace Task_Flyout.Views
                         DetailPreview.Text = "";
                         DetailTextScrollViewer.Visibility = Visibility.Collapsed;
                         DetailHtmlView.Visibility = Visibility.Visible;
+                        EnsureMailWebViewCachePathConfigured();
                         await DetailHtmlView.EnsureCoreWebView2Async();
                         if (!_webView2Configured)
                         {
+                            var coreWebView = DetailHtmlView.CoreWebView2;
+                            if (coreWebView == null)
+                                throw new InvalidOperationException("Mail WebView2 failed to initialize.");
+
                             _webView2Configured = true;
-                            var settings = DetailHtmlView.CoreWebView2.Settings;
+                            var settings = coreWebView.Settings;
                             settings.IsScriptEnabled = false;
                             settings.IsWebMessageEnabled = false;
                             settings.AreDefaultContextMenusEnabled = false;
@@ -680,7 +687,7 @@ namespace Task_Flyout.Views
                             settings.IsStatusBarEnabled = false;
                             settings.IsPinchZoomEnabled = false;
                             settings.IsSwipeNavigationEnabled = false;
-                            DetailHtmlView.CoreWebView2.NavigationStarting += (_, args) =>
+                            coreWebView.NavigationStarting += (_, args) =>
                             {
                                 if (_isInternalMailHtmlNavigation)
                                     return;
@@ -691,11 +698,11 @@ namespace Task_Flyout.Views
                                     OpenSafeExternalUri(args.Uri);
                                 }
                             };
-                            DetailHtmlView.CoreWebView2.NavigationCompleted += (_, _) =>
+                            coreWebView.NavigationCompleted += (_, _) =>
                             {
                                 _isInternalMailHtmlNavigation = false;
                             };
-                            DetailHtmlView.CoreWebView2.NewWindowRequested += (_, args) =>
+                            coreWebView.NewWindowRequested += (_, args) =>
                             {
                                 args.Handled = true;
                                 OpenSafeExternalUri(args.Uri);
@@ -715,6 +722,19 @@ namespace Task_Flyout.Views
             }
 
             ShowPlainTextMailBody(item);
+        }
+
+        private static void EnsureMailWebViewCachePathConfigured()
+        {
+            if (_mailWebViewCachePathConfigured) return;
+
+            var cachePath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "TaskFlyout",
+                "MailWebView2Cache");
+            Directory.CreateDirectory(cachePath);
+            Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", cachePath, EnvironmentVariableTarget.Process);
+            _mailWebViewCachePathConfigured = true;
         }
 
         private void ShowPlainTextMailBody(MailItem item)

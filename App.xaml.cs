@@ -19,6 +19,14 @@ namespace Task_Flyout
 
     public partial class App : Application
     {
+        private const int SW_RESTORE = 9;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
         private H.NotifyIcon.TaskbarIcon? _trayIcon;
         private UISettings _uiSettings = null!;
         public static FlyoutWindow? MyFlyoutWindow { get; private set; }
@@ -238,9 +246,29 @@ namespace Task_Flyout
 
                 MyMainWindow.Activate();
                 MyMainWindow.AppWindow.Show();
+                BringMainWindowToFront();
 
                 onOpened?.Invoke(MyMainWindow);
             });
+        }
+
+        private static void BringMainWindowToFront()
+        {
+            if (MyMainWindow == null) return;
+
+            try
+            {
+                var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(MyMainWindow);
+                if (hWnd == IntPtr.Zero) return;
+
+                ShowWindow(hWnd, SW_RESTORE);
+                MyMainWindow.Activate();
+                SetForegroundWindow(hWnd);
+            }
+            catch
+            {
+                MyMainWindow.Activate();
+            }
         }
 
         private void ExitAppInternal()
