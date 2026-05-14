@@ -160,7 +160,13 @@
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
                 </StackPanel>
-                <ProgressRing x:Name="SyncProgress" Width="24" Height="24" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                <ProgressRing x:Name="SyncProgress"
+                              Width="24"
+                              Height="24"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Center"
+                              IsActive="False"
+                              Visibility="Collapsed"/>
                 <Button HorizontalAlignment="Right"
                         Margin="0,0,36,0"
                         Click="AddTaskButton_Click">

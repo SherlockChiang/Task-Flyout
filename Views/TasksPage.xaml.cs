@@ -35,7 +35,7 @@ namespace Task_Flyout.Views
             ReloadTasks();
 
             if (PendingTasks.Count == 0 && CompletedTasks.Count == 0)
-                await SyncTasksAsync(forceRefresh: false);
+                await SyncTasksAsync(forceRefresh: false, fullRange: false);
         }
 
         private void LoadCache()
@@ -59,26 +59,32 @@ namespace Task_Flyout.Views
 
         public void ForceSync()
         {
-            _ = SyncTasksAsync(forceRefresh: true);
+            _ = SyncTasksAsync(forceRefresh: true, fullRange: true);
         }
 
-        private async Task SyncTasksAsync(bool forceRefresh)
+        private async Task SyncTasksAsync(bool forceRefresh, bool fullRange)
         {
             if (_syncManager == null || SyncProgress == null) return;
 
             try
             {
-                SyncProgress.IsActive = true;
-                var min = DateTime.Today.AddYears(-1);
-                var max = DateTime.Today.AddYears(3);
+                SetSyncProgress(true);
+                var min = fullRange ? DateTime.Today.AddYears(-1) : DateTime.Today.AddDays(-30);
+                var max = fullRange ? DateTime.Today.AddYears(3) : DateTime.Today.AddDays(365);
                 await _syncManager.GetAllDataAsync(min, max, forceRefresh);
                 LoadCache();
                 ReloadTasks();
             }
             finally
             {
-                SyncProgress.IsActive = false;
+                SetSyncProgress(false);
             }
+        }
+
+        private void SetSyncProgress(bool isActive)
+        {
+            SyncProgress.IsActive = isActive;
+            SyncProgress.Visibility = isActive ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void ReloadTasks()
@@ -251,7 +257,7 @@ namespace Task_Flyout.Views
                     var providerName = providerBox.SelectedItem?.ToString();
                     var targetDate = datePicker.Date.DateTime.Date;
                     await _syncManager.CreateItemAsync(title, isEvent: false, isAllDay: false, targetDate, timePicker.Time, timePicker.Time, "", providerName);
-                    await SyncTasksAsync(forceRefresh: true);
+                    await SyncTasksAsync(forceRefresh: true, fullRange: true);
                     App.MyFlyoutWindow?.ReloadFilters();
                 }
                 finally
