@@ -235,8 +235,11 @@ namespace Task_Flyout
 
         public void NavigateToMailMessage(string accountId, string folderId, string messageId)
         {
-            var mailItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Mail");
-            if (mailItem != null) MainNav.SelectedItem = mailItem;
+            if (ContentFrame.Content is Views.MailPage existingMailPage)
+            {
+                existingMailPage.OpenMessageAsync(accountId, folderId, messageId);
+                return;
+            }
 
             void OpenAfterNavigate(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs args)
             {
@@ -251,6 +254,7 @@ namespace Task_Flyout
             }
 
             ContentFrame.Navigated += OpenAfterNavigate;
+            MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Mail");
             ContentFrame.Navigate(typeof(Views.MailPage));
         }
 

@@ -17,7 +17,40 @@ namespace Task_Flyout.Services
         public string Title { get; set; } = "";
         public string Url { get; set; } = "";
         public string FolderId { get; set; } = "";
+        public string ImageUrl { get; set; } = "";
+        public string LocalImagePath { get; set; } = "";
         public DateTimeOffset LastFetchedAt { get; set; }
+        public Microsoft.UI.Xaml.Media.ImageSource? ImageSource
+        {
+            get
+            {
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(LocalImagePath) && File.Exists(LocalImagePath))
+                        return new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(LocalImagePath));
+                }
+                catch { }
+
+                return null;
+            }
+        }
+
+        public Microsoft.UI.Xaml.Visibility HasImage
+        {
+            get
+            {
+                try
+                {
+                    return !string.IsNullOrWhiteSpace(LocalImagePath) && File.Exists(LocalImagePath)
+                        ? Microsoft.UI.Xaml.Visibility.Visible
+                        : Microsoft.UI.Xaml.Visibility.Collapsed;
+                }
+                catch
+                {
+                    return Microsoft.UI.Xaml.Visibility.Collapsed;
+                }
+            }
+        }
     }
 
     public class RssFolder
@@ -221,30 +254,13 @@ namespace Task_Flyout.Services
             Save();
         }
 
-        public async Task<List<RssArticle>> LoadMoreArticlesAsync(string? subscriptionId, string? folderId, int skip, int take)
+        public Task<List<RssArticle>> LoadMoreArticlesAsync(string? subscriptionId, string? folderId, int skip, int take)
         {
             EnsureLoaded();
-            var eligibleSubscriptions = GetSubscriptionsForFilter(subscriptionId, folderId).ToList();
-
-            if (subscriptionId == null)
-            {
-                var nextSubscriptions = eligibleSubscriptions
-                    .Where(ShouldRefresh)
-                    .Take(3)
-                    .ToList();
-                foreach (var subscription in nextSubscriptions)
-                    await RefreshSubscriptionAsync(subscription, force: false);
-            }
-            else if (_cache.Subscriptions.FirstOrDefault(item => item.Id == subscriptionId) is { } subscription && ShouldRefresh(subscription))
-            {
-                await RefreshSubscriptionAsync(subscription, force: false);
-            }
-
-            Save();
-            return GetCachedArticles(subscriptionId, folderId)
+            return Task.FromResult(GetCachedArticles(subscriptionId, folderId)
                 .Skip(skip)
                 .Take(take)
-                .ToList();
+                .ToList());
         }
 
         public async Task RefreshSubscriptionAsync(RssSubscription subscription, bool force)
@@ -259,6 +275,11 @@ namespace Task_Flyout.Services
 
             if (!string.IsNullOrWhiteSpace(parsed.FeedTitle))
                 subscription.Title = parsed.FeedTitle;
+            if (!string.IsNullOrWhiteSpace(parsed.FeedImageUrl))
+            {
+                subscription.ImageUrl = parsed.FeedImageUrl;
+                subscription.LocalImagePath = await CacheImageAsync(parsed.FeedImageUrl);
+            }
 
             foreach (var article in parsed.Articles)
             {
@@ -283,6 +304,7 @@ namespace Task_Flyout.Services
 
             subscription.LastFetchedAt = DateTimeOffset.Now;
             TrimCache();
+            Save();
         }
 
         private bool ShouldRefresh(RssSubscription subscription)
@@ -299,15 +321,19 @@ namespace Task_Flyout.Services
             return url;
         }
 
-        private (string FeedTitle, List<RssArticle> Articles) ParseFeed(RssSubscription subscription, string xml)
+        private (string FeedTitle, string FeedImageUrl, List<RssArticle> Articles) ParseFeed(RssSubscription subscription, string xml)
         {
             var doc = XDocument.Parse(xml);
             var root = doc.Root;
-            if (root == null) return ("", new List<RssArticle>());
+            if (root == null) return ("", "", new List<RssArticle>());
 
             var feedTitle = GetElementValue(root.Element("channel"), "title")
                             ?? GetElementValue(root, "title")
                             ?? subscription.Title;
+            var feedImageUrl = GetElementValue(root.Element("channel")?.Element("image"), "url")
+                               ?? GetElementValue(root, "logo")
+                               ?? GetElementValue(root, "icon")
+                               ?? "";
 
             var items = root.Element("channel")?.Elements("item") ?? Enumerable.Empty<XElement>();
             var articles = items.Any()
@@ -316,7 +342,7 @@ namespace Task_Flyout.Services
                     .Select(entry => ParseAtomEntry(subscription, feedTitle, entry))
                     .ToList();
 
-            return (feedTitle, articles.Where(article => !string.IsNullOrWhiteSpace(article.Title)).ToList());
+            return (feedTitle, feedImageUrl, articles.Where(article => !string.IsNullOrWhiteSpace(article.Title)).ToList());
         }
 
         private static RssArticle ParseRssItem(RssSubscription subscription, string feedTitle, XElement item)
@@ -453,6 +479,8 @@ namespace Task_Flyout.Services
                 subscription.Title ??= "";
                 subscription.Url ??= "";
                 subscription.FolderId ??= "";
+                subscription.ImageUrl ??= "";
+                subscription.LocalImagePath ??= "";
             }
 
             foreach (var folder in _cache.Folders)
@@ -540,9 +568,13 @@ CREATE TABLE IF NOT EXISTS rss_subscriptions (
     title TEXT NOT NULL,
     url TEXT NOT NULL,
     folder_id TEXT NOT NULL DEFAULT '',
+    image_url TEXT NOT NULL DEFAULT '',
+    local_image_path TEXT NOT NULL DEFAULT '',
     last_fetched_ticks INTEGER NOT NULL DEFAULT 0
 );
 """);
+            TryAddColumn(connection, "rss_subscriptions", "image_url", "TEXT NOT NULL DEFAULT ''");
+            TryAddColumn(connection, "rss_subscriptions", "local_image_path", "TEXT NOT NULL DEFAULT ''");
             ExecuteNonQuery(connection, """
 CREATE TABLE IF NOT EXISTS rss_articles (
     id TEXT PRIMARY KEY,
@@ -586,7 +618,7 @@ CREATE TABLE IF NOT EXISTS rss_articles (
 
             using (var command = connection.CreateCommand())
             {
-                command.CommandText = "SELECT id, title, url, folder_id, last_fetched_ticks FROM rss_subscriptions ORDER BY title;";
+                command.CommandText = "SELECT id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks FROM rss_subscriptions ORDER BY title;";
                 using var reader = command.ExecuteReader();
                 while (reader.Read())
                 {
@@ -596,7 +628,9 @@ CREATE TABLE IF NOT EXISTS rss_articles (
                         Title = reader.GetString(1),
                         Url = reader.GetString(2),
                         FolderId = reader.GetString(3),
-                        LastFetchedAt = FromTicks(reader.GetInt64(4))
+                        ImageUrl = reader.GetString(4),
+                        LocalImagePath = reader.GetString(5),
+                        LastFetchedAt = FromTicks(reader.GetInt64(6))
                     });
                 }
             }
@@ -656,13 +690,15 @@ LIMIT 1000;
                 using var command = connection.CreateCommand();
                 command.Transaction = transaction;
                 command.CommandText = """
-INSERT INTO rss_subscriptions(id, title, url, folder_id, last_fetched_ticks)
-VALUES ($id, $title, $url, $folderId, $lastFetchedTicks);
+INSERT INTO rss_subscriptions(id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks)
+VALUES ($id, $title, $url, $folderId, $imageUrl, $localImagePath, $lastFetchedTicks);
 """;
                 command.Parameters.AddWithValue("$id", subscription.Id ?? "");
                 command.Parameters.AddWithValue("$title", subscription.Title ?? "");
                 command.Parameters.AddWithValue("$url", subscription.Url ?? "");
                 command.Parameters.AddWithValue("$folderId", subscription.FolderId ?? "");
+                command.Parameters.AddWithValue("$imageUrl", subscription.ImageUrl ?? "");
+                command.Parameters.AddWithValue("$localImagePath", subscription.LocalImagePath ?? "");
                 command.Parameters.AddWithValue("$lastFetchedTicks", ToTicks(subscription.LastFetchedAt));
                 command.ExecuteNonQuery();
             }
@@ -725,6 +761,8 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
                 subscription.Title ??= "";
                 subscription.Url ??= "";
                 subscription.FolderId ??= "";
+                subscription.ImageUrl ??= "";
+                subscription.LocalImagePath ??= "";
             }
 
             foreach (var folder in _cache.Folders)
@@ -764,6 +802,17 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
             command.Transaction = transaction;
             command.CommandText = sql;
             command.ExecuteNonQuery();
+        }
+
+        private static void TryAddColumn(SqliteConnection connection, string table, string column, string definition)
+        {
+            try
+            {
+                ExecuteNonQuery(connection, $"ALTER TABLE {table} ADD COLUMN {column} {definition};");
+            }
+            catch (SqliteException ex) when (ex.SqliteErrorCode == 1)
+            {
+            }
         }
 
         private static long ToTicks(DateTimeOffset value)

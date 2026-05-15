@@ -35,6 +35,7 @@ namespace Task_Flyout.Views
         private ScrollViewer? _articleScrollViewer;
         private RssArticle? _selectedArticle;
         private bool _rssWebViewConfigured;
+        private bool _isInternalArticleNavigation;
 
         public RssPage()
         {
@@ -123,12 +124,15 @@ namespace Task_Flyout.Views
         {
             var node = new TreeViewNode
             {
-                Content = string.IsNullOrWhiteSpace(subscription.Title) ? subscription.Url : subscription.Title,
+                Content = CreateSubscriptionNodeContent(subscription),
                 HasUnrealizedChildren = false
             };
             parent.Children.Add(node);
             _subscriptionNodes[node] = subscription;
         }
+
+        private static string CreateSubscriptionNodeContent(RssSubscription subscription)
+            => string.IsNullOrWhiteSpace(subscription.Title) ? subscription.Url : subscription.Title;
 
         private async void RssPage_ActualThemeChanged(FrameworkElement sender, object args)
         {
@@ -195,7 +199,7 @@ namespace Task_Flyout.Views
                 _hasMore = items.Count == PageSize;
                 ArticleListSubtitle.Text = Articles.Count == 0
                     ? "暂无文章"
-                    : _hasMore ? $"{Articles.Count} 篇文章，向下滚动加载更多" : $"{Articles.Count} 篇文章";
+                    : _hasMore ? $"{Articles.Count} 篇文章，点击加载更多" : $"{Articles.Count} 篇文章";
             }
             catch (Exception ex)
             {
@@ -221,6 +225,7 @@ namespace Task_Flyout.Views
 
             if (node == _allNode)
             {
+                ShowArticleList();
                 _selectedSubscriptionId = null;
                 _selectedFolderId = null;
                 ArticleListTitle.Text = "全部文章";
@@ -228,6 +233,7 @@ namespace Task_Flyout.Views
             }
             else if (_folderNodes.TryGetValue(node, out var folder))
             {
+                ShowArticleList();
                 _selectedSubscriptionId = null;
                 _selectedFolderId = folder.Id;
                 ArticleListTitle.Text = folder.Name;
@@ -235,6 +241,7 @@ namespace Task_Flyout.Views
             }
             else if (_subscriptionNodes.TryGetValue(node, out var subscription))
             {
+                ShowArticleList();
                 _selectedSubscriptionId = subscription.Id;
                 _selectedFolderId = null;
                 ArticleListTitle.Text = subscription.Title;
@@ -242,6 +249,7 @@ namespace Task_Flyout.Views
             }
             else if (node.Content?.ToString() == "未分类")
             {
+                ShowArticleList();
                 _selectedSubscriptionId = null;
                 _selectedFolderId = "";
                 ArticleListTitle.Text = "未分类";
@@ -610,6 +618,14 @@ namespace Task_Flyout.Views
             ResetAndLoadCachedArticles();
         }
 
+        private async void LoadMoreButton_Click(object sender, RoutedEventArgs e)
+        {
+            ShowArticleList();
+            if (!_hasMore)
+                _hasMore = true;
+            await LoadMoreArticlesAsync();
+        }
+
         private void AttachArticleScrollViewer()
         {
             if (_articleScrollViewer != null) return;
@@ -672,9 +688,16 @@ namespace Task_Flyout.Views
                     settings.IsPinchZoomEnabled = true;
                     RssArticleWebView.CoreWebView2.NavigationStarting += (_, args) =>
                     {
+                        if (_isInternalArticleNavigation)
+                            return;
+
                         if (args.Uri == "about:blank") return;
                         args.Cancel = true;
                         OpenSafeExternalUri(args.Uri);
+                    };
+                    RssArticleWebView.CoreWebView2.NavigationCompleted += (_, _) =>
+                    {
+                        _isInternalArticleNavigation = false;
                     };
                     RssArticleWebView.CoreWebView2.NewWindowRequested += (_, args) =>
                     {
@@ -683,6 +706,7 @@ namespace Task_Flyout.Views
                     };
                 }
 
+                _isInternalArticleNavigation = true;
                 RssArticleWebView.NavigateToString(BuildArticleHtml(article, IsDarkThemeActive()));
             }
             catch (Exception ex)
@@ -694,10 +718,16 @@ namespace Task_Flyout.Views
 
         private void BackToArticleListButton_Click(object sender, RoutedEventArgs e)
         {
+            ShowArticleList();
+        }
+
+        private void ShowArticleList()
+        {
             ArticleReaderPanel.Visibility = Visibility.Collapsed;
             ArticleListHeader.Visibility = Visibility.Visible;
             ArticleList.Visibility = Visibility.Visible;
             _selectedArticle = null;
+            _isInternalArticleNavigation = false;
         }
 
         private void OpenArticleInBrowserButton_Click(object sender, RoutedEventArgs e)
