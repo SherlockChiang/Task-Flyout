@@ -10,9 +10,8 @@ namespace Task_Flyout.Services
     public sealed class MailTrustStore
     {
         private readonly HashSet<string> _trustedSources = new(StringComparer.OrdinalIgnoreCase);
-        private static readonly string FilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "TaskFlyout", "trusted_mail_sources.json");
+        private const string StoreScope = "mail";
+        private const string TrustedSourcesKey = "trusted_sources";
 
         public MailTrustStore()
         {
@@ -54,7 +53,7 @@ namespace Task_Flyout.Services
         {
             try
             {
-                var json = ProtectedLocalStore.ReadText(FilePath);
+                var json = LocalSqliteStore.ReadProtectedText(StoreScope, TrustedSourcesKey);
                 if (string.IsNullOrWhiteSpace(json)) return;
 
                 var values = JsonSerializer.Deserialize(json, AppJsonContext.Default.HashSetString);
@@ -73,7 +72,7 @@ namespace Task_Flyout.Services
         private void Save()
         {
             var json = JsonSerializer.Serialize(_trustedSources, AppJsonContext.Default.HashSetString);
-            ProtectedLocalStore.WriteText(FilePath, json);
+            LocalSqliteStore.WriteProtectedText(StoreScope, TrustedSourcesKey, json);
         }
 
         private static string? GetSourceKey(MailItem item)

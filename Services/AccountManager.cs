@@ -10,9 +10,8 @@ namespace Task_Flyout.Services
 {
     public class AccountManager
     {
-        private static readonly string _filePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "TaskFlyout", "connected_accounts.json");
+        private const string StoreScope = "calendar";
+        private const string AccountsKey = "connected_accounts";
 
         public ObservableCollection<ConnectedAccountInfo> Accounts { get; } = new();
 
@@ -20,17 +19,14 @@ namespace Task_Flyout.Services
         {
             Accounts.Clear();
 
-            if (File.Exists(_filePath))
+            var json = LocalSqliteStore.ReadProtectedText(StoreScope, AccountsKey);
+            if (!string.IsNullOrWhiteSpace(json))
             {
                 try
                 {
-                    var json = ProtectedLocalStore.ReadText(_filePath);
-                    if (!string.IsNullOrWhiteSpace(json))
-                    {
-                        var list = JsonSerializer.Deserialize(json, AppJsonContext.Default.ListConnectedAccountInfo);
-                        if (list != null)
-                            foreach (var a in list) Accounts.Add(a);
-                    }
+                    var list = JsonSerializer.Deserialize(json, AppJsonContext.Default.ListConnectedAccountInfo);
+                    if (list != null)
+                        foreach (var a in list) Accounts.Add(a);
                 }
                 catch { }
             }
@@ -72,11 +68,8 @@ namespace Task_Flyout.Services
 
         public void Save()
         {
-            var directory = Path.GetDirectoryName(_filePath);
-            if (!string.IsNullOrEmpty(directory))
-                Directory.CreateDirectory(directory);
             var json = JsonSerializer.Serialize(Accounts.ToList(), AppJsonContext.Default.ListConnectedAccountInfo);
-            ProtectedLocalStore.WriteText(_filePath, json);
+            LocalSqliteStore.WriteProtectedText(StoreScope, AccountsKey, json);
 
             SyncToLegacySettings();
         }

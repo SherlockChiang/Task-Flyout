@@ -171,13 +171,7 @@ namespace Task_Flyout.Services
         {
             try
             {
-                var cachePath = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "TaskFlyout", "local_cache_winui3.json");
-
-                if (!System.IO.File.Exists(cachePath)) return null;
-
-                var json = ProtectedLocalStore.ReadText(cachePath);
+                var json = LocalSqliteStore.ReadProtectedText("calendar", "local_cache_winui3");
                 if (string.IsNullOrWhiteSpace(json)) return null;
                 var cache = System.Text.Json.JsonSerializer.Deserialize(json, AppJsonContext.Default.AppCache);
                 return cache?.DayItems;

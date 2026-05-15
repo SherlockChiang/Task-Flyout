@@ -6,5 +6,6 @@ pixel-icon-provider/
 credentials.json
 Secrets.cs
 *.user
+*.lscache
 *.pfx
 /.claude

@@ -14,9 +14,8 @@ namespace Task_Flyout.Services
         private AppCache _cache = new();
         private bool _cacheLoaded;
         private readonly object _cacheLock = new();
-        private static readonly string CacheFilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "TaskFlyout", "local_cache_winui3.json");
+        private const string StoreScope = "calendar";
+        private const string CacheKey = "local_cache_winui3";
 
         public IReadOnlyList<ISyncProvider> Providers => _providers;
         public AccountManager AccountManager { get; } = new AccountManager();
@@ -176,12 +175,9 @@ namespace Task_Flyout.Services
 
             try
             {
-                if (File.Exists(CacheFilePath))
-                {
-                    string? json = ProtectedLocalStore.ReadText(CacheFilePath);
-                    if (!string.IsNullOrWhiteSpace(json))
-                        _cache = JsonSerializer.Deserialize(json, AppJsonContext.Default.AppCache) ?? new AppCache();
-                }
+                string? json = LocalSqliteStore.ReadProtectedText(StoreScope, CacheKey);
+                if (!string.IsNullOrWhiteSpace(json))
+                    _cache = JsonSerializer.Deserialize(json, AppJsonContext.Default.AppCache) ?? new AppCache();
             }
             catch
             {
@@ -213,15 +209,12 @@ namespace Task_Flyout.Services
         {
             try
             {
-            var directory = Path.GetDirectoryName(CacheFilePath);
-            if (!string.IsNullOrEmpty(directory))
-                Directory.CreateDirectory(directory);
                 string json;
                 lock (_cacheLock)
                 {
                     json = JsonSerializer.Serialize(_cache, AppJsonContext.Default.AppCache);
                 }
-                await ProtectedLocalStore.WriteTextAsync(CacheFilePath, json);
+                await LocalSqliteStore.WriteProtectedTextAsync(StoreScope, CacheKey, json);
             }
             catch { }
         }

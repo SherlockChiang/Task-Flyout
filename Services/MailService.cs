@@ -900,12 +900,9 @@ namespace Task_Flyout.Services
             if (_accountsLoaded) return;
             _accountsLoaded = true;
 
-            string path = GetAccountsPath();
-            if (!File.Exists(path)) return;
-
             try
             {
-                string? json = ProtectedLocalStore.ReadText(path);
+                string? json = LocalSqliteStore.ReadProtectedText("mail", "accounts");
                 if (!string.IsNullOrWhiteSpace(json))
                     _accounts = JsonSerializer.Deserialize(json, AppJsonContext.Default.ListMailAccount) ?? new List<MailAccount>();
             }
@@ -917,19 +914,12 @@ namespace Task_Flyout.Services
 
         private void SaveAccounts()
         {
-            Directory.CreateDirectory(GetAppDataPath());
             string json = JsonSerializer.Serialize(_accounts, AppJsonContext.Default.ListMailAccount);
-            ProtectedLocalStore.WriteText(GetAccountsPath(), json);
+            LocalSqliteStore.WriteProtectedText("mail", "accounts", json);
         }
 
         private static string GetAppDataPath()
             => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TaskFlyout");
-
-        private static string GetAccountsPath()
-            => Path.Combine(GetAppDataPath(), "mail_accounts.json");
-
-        private static string GetMailCachePath()
-            => Path.Combine(GetAppDataPath(), "mail_cache.json");
 
         private static MailItem ToOutlookMailItem(string accountId, string folderId, GraphMessage message)
         {
@@ -1230,13 +1220,9 @@ namespace Task_Flyout.Services
 
             try
             {
-                var path = GetMailCachePath();
-                if (File.Exists(path))
-                {
-                    var json = ProtectedLocalStore.ReadText(path);
-                    if (!string.IsNullOrWhiteSpace(json))
-                        _persistentCache = JsonSerializer.Deserialize(json, AppJsonContext.Default.MailPersistentCache);
-                }
+                var json = LocalSqliteStore.ReadProtectedText("mail", "cache");
+                if (!string.IsNullOrWhiteSpace(json))
+                    _persistentCache = JsonSerializer.Deserialize(json, AppJsonContext.Default.MailPersistentCache);
             }
             catch { }
 
@@ -1253,9 +1239,8 @@ namespace Task_Flyout.Services
             try
             {
                 EnsurePersistentCacheLoaded();
-                Directory.CreateDirectory(GetAppDataPath());
                 var json = JsonSerializer.Serialize(_persistentCache, AppJsonContext.Default.MailPersistentCache);
-                ProtectedLocalStore.WriteText(GetMailCachePath(), json);
+                LocalSqliteStore.WriteProtectedText("mail", "cache", json);
             }
             catch (Exception ex)
             {
