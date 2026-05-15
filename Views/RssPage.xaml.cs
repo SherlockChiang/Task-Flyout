@@ -618,14 +618,6 @@ namespace Task_Flyout.Views
             ResetAndLoadCachedArticles();
         }
 
-        private async void LoadMoreButton_Click(object sender, RoutedEventArgs e)
-        {
-            ShowArticleList();
-            if (!_hasMore)
-                _hasMore = true;
-            await LoadMoreArticlesAsync();
-        }
-
         private void AttachArticleScrollViewer()
         {
             if (_articleScrollViewer != null) return;

@@ -423,6 +423,15 @@ namespace Task_Flyout.Services
             if (enclosure?.Attribute("url")?.Value is { Length: > 0 } enclosureUrl)
                 return enclosureUrl;
 
+            var imgMatch = System.Text.RegularExpressions.Regex.Match(
+                item.ToString(),
+                @"<\s*img\b[^>]+\bsrc\s*=\s*['""]([^'""]+)['""]",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (imgMatch.Success && imgMatch.Groups[1].Value is { Length: > 0 } imgSrc &&
+                (imgSrc.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                 imgSrc.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+                return imgSrc;
+
             var match = System.Text.RegularExpressions.Regex.Match(fallbackText, @"https?://[^\s'""]+\.(png|jpe?g|webp|gif)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             return match.Success ? match.Value : "";
         }
