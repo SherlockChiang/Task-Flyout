@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -34,12 +35,41 @@ namespace Task_Flyout.Services
         public string Title { get; set; } = "";
         public string Link { get; set; } = "";
         public string Summary { get; set; } = "";
+        public string HtmlContent { get; set; } = "";
         public string ImageUrl { get; set; } = "";
         public string LocalImagePath { get; set; } = "";
         public DateTimeOffset PublishedAt { get; set; }
         public string PublishedText => PublishedAt == default ? "" : PublishedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
-        public string ImageSource => File.Exists(LocalImagePath) ? new Uri(LocalImagePath).AbsoluteUri : ImageUrl;
-        public Microsoft.UI.Xaml.Visibility HasImage => string.IsNullOrWhiteSpace(ImageSource) ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
+        public Microsoft.UI.Xaml.Media.ImageSource? ImageSource
+        {
+            get
+            {
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(LocalImagePath) && File.Exists(LocalImagePath))
+                        return new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(LocalImagePath));
+                }
+                catch { }
+
+                return null;
+            }
+        }
+        public Microsoft.UI.Xaml.Visibility HasImage
+        {
+            get
+            {
+                try
+                {
+                    return !string.IsNullOrWhiteSpace(LocalImagePath) && File.Exists(LocalImagePath)
+                        ? Microsoft.UI.Xaml.Visibility.Visible
+                        : Microsoft.UI.Xaml.Visibility.Collapsed;
+                }
+                catch
+                {
+                    return Microsoft.UI.Xaml.Visibility.Collapsed;
+                }
+            }
+        }
         public Microsoft.UI.Xaml.Visibility HasSummary => string.IsNullOrWhiteSpace(Summary) ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
     }
 
@@ -53,6 +83,7 @@ namespace Task_Flyout.Services
     public class RssService
     {
         private const int FeedRefreshMinutes = 30;
+        private const int SchemaVersion = 1;
         private static readonly HttpClient HttpClient = new()
         {
             Timeout = TimeSpan.FromSeconds(20)
@@ -64,6 +95,7 @@ namespace Task_Flyout.Services
 
         private RssCache _cache = new();
         private bool _loaded;
+        private bool _databaseInitialized;
 
         public IReadOnlyList<RssSubscription> GetSubscriptions()
         {
@@ -131,6 +163,26 @@ namespace Task_Flyout.Services
             var subscription = _cache.Subscriptions.FirstOrDefault(item => item.Id == subscriptionId);
             if (subscription == null) return;
             subscription.FolderId = _cache.Folders.Any(folder => folder.Id == folderId) ? folderId : "";
+            Save();
+        }
+
+        public void RenameFolder(string folderId, string name)
+        {
+            EnsureLoaded();
+            var folder = _cache.Folders.FirstOrDefault(item => item.Id == folderId);
+            if (folder == null) return;
+            folder.Name = string.IsNullOrWhiteSpace(name) ? folder.Name : name.Trim();
+            Save();
+        }
+
+        public void RenameSubscription(string subscriptionId, string title)
+        {
+            EnsureLoaded();
+            var subscription = _cache.Subscriptions.FirstOrDefault(item => item.Id == subscriptionId);
+            if (subscription == null) return;
+            subscription.Title = string.IsNullOrWhiteSpace(title) ? subscription.Title : title.Trim();
+            foreach (var article in _cache.Articles.Where(item => item.SubscriptionId == subscriptionId))
+                article.FeedTitle = subscription.Title;
             Save();
         }
 
@@ -221,6 +273,7 @@ namespace Task_Flyout.Services
                     existing.Title = article.Title;
                     existing.Link = article.Link;
                     existing.Summary = article.Summary;
+                    existing.HtmlContent = article.HtmlContent;
                     existing.ImageUrl = article.ImageUrl;
                     existing.LocalImagePath = article.LocalImagePath;
                     existing.PublishedAt = article.PublishedAt;
@@ -270,7 +323,8 @@ namespace Task_Flyout.Services
         {
             var title = GetElementValue(item, "title") ?? "(无标题)";
             string link = GetElementValue(item, "link") ?? "";
-            var summary = StripHtml(GetElementValue(item, "description") ?? GetElementValue(item, "encoded") ?? "");
+            var html = GetElementValue(item, "encoded") ?? GetElementValue(item, "description") ?? "";
+            var summary = StripHtml(html);
             var published = ParseDate(GetElementValue(item, "pubDate") ?? GetElementValue(item, "date"));
             var id = GetElementValue(item, "guid") ?? link ?? $"{subscription.Id}:{title}";
             var imageUrl = FindImageUrl(item, summary);
@@ -283,6 +337,7 @@ namespace Task_Flyout.Services
                 Title = StripHtml(title),
                 Link = link ?? string.Empty,
                 Summary = summary,
+                HtmlContent = html,
                 ImageUrl = imageUrl,
                 PublishedAt = published
             };
@@ -294,7 +349,8 @@ namespace Task_Flyout.Services
             string link = entry.Elements().FirstOrDefault(element =>
                 element.Name.LocalName == "link" &&
                 ((string?)element.Attribute("rel") == null || (string?)element.Attribute("rel") == "alternate"))?.Attribute("href")?.Value ?? "";
-            var summary = StripHtml(GetElementValue(entry, "summary") ?? GetElementValue(entry, "content") ?? "");
+            var html = GetElementValue(entry, "content") ?? GetElementValue(entry, "summary") ?? "";
+            var summary = StripHtml(html);
             var published = ParseDate(GetElementValue(entry, "published") ?? GetElementValue(entry, "updated"));
             var id = GetElementValue(entry, "id") ?? link ?? $"{subscription.Id}:{title}";
             var imageUrl = FindImageUrl(entry, summary);
@@ -307,6 +363,7 @@ namespace Task_Flyout.Services
                 Title = StripHtml(title),
                 Link = link ?? string.Empty,
                 Summary = summary,
+                HtmlContent = html,
                 ImageUrl = imageUrl,
                 PublishedAt = published
             };
@@ -378,12 +435,9 @@ namespace Task_Flyout.Services
 
             try
             {
-                var path = GetCachePath();
-                if (File.Exists(path))
-                {
-                    var json = File.ReadAllText(path);
-                    _cache = JsonSerializer.Deserialize(json, AppJsonContext.Default.RssCache) ?? new RssCache();
-                }
+                InitializeDatabase();
+                _cache = LoadFromDatabase();
+                TryMigrateLegacyJsonCache();
             }
             catch
             {
@@ -394,7 +448,31 @@ namespace Task_Flyout.Services
             _cache.Folders ??= new List<RssFolder>();
             _cache.Articles ??= new List<RssArticle>();
             foreach (var subscription in _cache.Subscriptions)
+            {
+                subscription.Id ??= Guid.NewGuid().ToString("N");
+                subscription.Title ??= "";
+                subscription.Url ??= "";
                 subscription.FolderId ??= "";
+            }
+
+            foreach (var folder in _cache.Folders)
+            {
+                folder.Id ??= Guid.NewGuid().ToString("N");
+                folder.Name ??= "文件夹";
+            }
+
+            foreach (var article in _cache.Articles)
+            {
+                article.Id ??= Guid.NewGuid().ToString("N");
+                article.SubscriptionId ??= "";
+                article.FeedTitle ??= "";
+                article.Title ??= "";
+                article.Link ??= "";
+                article.Summary ??= "";
+                article.HtmlContent ??= "";
+                article.ImageUrl ??= "";
+                article.LocalImagePath ??= "";
+            }
         }
 
         private HashSet<string>? GetSubscriptionIdsForFolder(string? folderId)
@@ -420,8 +498,8 @@ namespace Task_Flyout.Services
         private void Save()
         {
             Directory.CreateDirectory(_appDataPath);
-            var json = JsonSerializer.Serialize(_cache, AppJsonContext.Default.RssCache);
-            File.WriteAllText(GetCachePath(), json);
+            InitializeDatabase();
+            SaveToDatabase();
         }
 
         private void TrimCache()
@@ -434,7 +512,270 @@ namespace Task_Flyout.Services
                 .ToList();
         }
 
-        private string GetCachePath()
+        private void InitializeDatabase()
+        {
+            if (_databaseInitialized) return;
+            _databaseInitialized = true;
+
+            Directory.CreateDirectory(_appDataPath);
+            using var connection = OpenConnection();
+            ExecuteNonQuery(connection, "PRAGMA journal_mode=WAL;");
+            ExecuteNonQuery(connection, "PRAGMA synchronous=NORMAL;");
+            ExecuteNonQuery(connection, """
+CREATE TABLE IF NOT EXISTS metadata (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+""");
+            ExecuteNonQuery(connection, """
+CREATE TABLE IF NOT EXISTS rss_folders (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+""");
+            ExecuteNonQuery(connection, """
+CREATE TABLE IF NOT EXISTS rss_subscriptions (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    folder_id TEXT NOT NULL DEFAULT '',
+    last_fetched_ticks INTEGER NOT NULL DEFAULT 0
+);
+""");
+            ExecuteNonQuery(connection, """
+CREATE TABLE IF NOT EXISTS rss_articles (
+    id TEXT PRIMARY KEY,
+    subscription_id TEXT NOT NULL,
+    feed_title TEXT NOT NULL,
+    title TEXT NOT NULL,
+    link TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    html_content TEXT NOT NULL,
+    image_url TEXT NOT NULL,
+    local_image_path TEXT NOT NULL,
+    published_ticks INTEGER NOT NULL DEFAULT 0
+);
+""");
+
+            using var command = connection.CreateCommand();
+            command.CommandText = "INSERT OR REPLACE INTO metadata(key, value) VALUES ('schema_version', $version);";
+            command.Parameters.AddWithValue("$version", SchemaVersion.ToString());
+            command.ExecuteNonQuery();
+        }
+
+        private RssCache LoadFromDatabase()
+        {
+            var cache = new RssCache();
+            using var connection = OpenConnection();
+
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT id, name, sort_order FROM rss_folders ORDER BY sort_order, name;";
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    cache.Folders.Add(new RssFolder
+                    {
+                        Id = reader.GetString(0),
+                        Name = reader.GetString(1),
+                        SortOrder = reader.GetInt32(2)
+                    });
+                }
+            }
+
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT id, title, url, folder_id, last_fetched_ticks FROM rss_subscriptions ORDER BY title;";
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    cache.Subscriptions.Add(new RssSubscription
+                    {
+                        Id = reader.GetString(0),
+                        Title = reader.GetString(1),
+                        Url = reader.GetString(2),
+                        FolderId = reader.GetString(3),
+                        LastFetchedAt = FromTicks(reader.GetInt64(4))
+                    });
+                }
+            }
+
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = """
+SELECT id, subscription_id, feed_title, title, link, summary, html_content, image_url, local_image_path, published_ticks
+FROM rss_articles
+ORDER BY published_ticks DESC
+LIMIT 1000;
+""";
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    cache.Articles.Add(new RssArticle
+                    {
+                        Id = reader.GetString(0),
+                        SubscriptionId = reader.GetString(1),
+                        FeedTitle = reader.GetString(2),
+                        Title = reader.GetString(3),
+                        Link = reader.GetString(4),
+                        Summary = reader.GetString(5),
+                        HtmlContent = reader.GetString(6),
+                        ImageUrl = reader.GetString(7),
+                        LocalImagePath = reader.GetString(8),
+                        PublishedAt = FromTicks(reader.GetInt64(9))
+                    });
+                }
+            }
+
+            return cache;
+        }
+
+        private void SaveToDatabase()
+        {
+            using var connection = OpenConnection();
+            using var transaction = connection.BeginTransaction();
+
+            ExecuteNonQuery(connection, "DELETE FROM rss_folders;", transaction);
+            ExecuteNonQuery(connection, "DELETE FROM rss_subscriptions;", transaction);
+            ExecuteNonQuery(connection, "DELETE FROM rss_articles;", transaction);
+
+            foreach (var folder in _cache.Folders)
+            {
+                using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = "INSERT INTO rss_folders(id, name, sort_order) VALUES ($id, $name, $sortOrder);";
+                command.Parameters.AddWithValue("$id", folder.Id ?? "");
+                command.Parameters.AddWithValue("$name", folder.Name ?? "");
+                command.Parameters.AddWithValue("$sortOrder", folder.SortOrder);
+                command.ExecuteNonQuery();
+            }
+
+            foreach (var subscription in _cache.Subscriptions)
+            {
+                using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = """
+INSERT INTO rss_subscriptions(id, title, url, folder_id, last_fetched_ticks)
+VALUES ($id, $title, $url, $folderId, $lastFetchedTicks);
+""";
+                command.Parameters.AddWithValue("$id", subscription.Id ?? "");
+                command.Parameters.AddWithValue("$title", subscription.Title ?? "");
+                command.Parameters.AddWithValue("$url", subscription.Url ?? "");
+                command.Parameters.AddWithValue("$folderId", subscription.FolderId ?? "");
+                command.Parameters.AddWithValue("$lastFetchedTicks", ToTicks(subscription.LastFetchedAt));
+                command.ExecuteNonQuery();
+            }
+
+            foreach (var article in _cache.Articles.OrderByDescending(item => item.PublishedAt).Take(1000))
+            {
+                using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = """
+INSERT INTO rss_articles(id, subscription_id, feed_title, title, link, summary, html_content, image_url, local_image_path, published_ticks)
+VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent, $imageUrl, $localImagePath, $publishedTicks);
+""";
+                command.Parameters.AddWithValue("$id", article.Id ?? "");
+                command.Parameters.AddWithValue("$subscriptionId", article.SubscriptionId ?? "");
+                command.Parameters.AddWithValue("$feedTitle", article.FeedTitle ?? "");
+                command.Parameters.AddWithValue("$title", article.Title ?? "");
+                command.Parameters.AddWithValue("$link", article.Link ?? "");
+                command.Parameters.AddWithValue("$summary", article.Summary ?? "");
+                command.Parameters.AddWithValue("$htmlContent", article.HtmlContent ?? "");
+                command.Parameters.AddWithValue("$imageUrl", article.ImageUrl ?? "");
+                command.Parameters.AddWithValue("$localImagePath", article.LocalImagePath ?? "");
+                command.Parameters.AddWithValue("$publishedTicks", ToTicks(article.PublishedAt));
+                command.ExecuteNonQuery();
+            }
+
+            transaction.Commit();
+        }
+
+        private void TryMigrateLegacyJsonCache()
+        {
+            if (_cache.Subscriptions.Count > 0 || _cache.Articles.Count > 0) return;
+
+            var legacyPath = GetLegacyCachePath();
+            if (!File.Exists(legacyPath)) return;
+
+            try
+            {
+                var json = File.ReadAllText(legacyPath);
+                var legacy = JsonSerializer.Deserialize(json, AppJsonContext.Default.RssCache);
+                if (legacy == null) return;
+
+                _cache = legacy;
+                _cache.Subscriptions ??= new List<RssSubscription>();
+                _cache.Folders ??= new List<RssFolder>();
+                _cache.Articles ??= new List<RssArticle>();
+                NormalizeLoadedCache();
+                SaveToDatabase();
+            }
+            catch { }
+        }
+
+        private void NormalizeLoadedCache()
+        {
+            _cache.Subscriptions ??= new List<RssSubscription>();
+            _cache.Folders ??= new List<RssFolder>();
+            _cache.Articles ??= new List<RssArticle>();
+            foreach (var subscription in _cache.Subscriptions)
+            {
+                subscription.Id ??= Guid.NewGuid().ToString("N");
+                subscription.Title ??= "";
+                subscription.Url ??= "";
+                subscription.FolderId ??= "";
+            }
+
+            foreach (var folder in _cache.Folders)
+            {
+                folder.Id ??= Guid.NewGuid().ToString("N");
+                folder.Name ??= "文件夹";
+            }
+
+            foreach (var article in _cache.Articles)
+            {
+                article.Id ??= Guid.NewGuid().ToString("N");
+                article.SubscriptionId ??= "";
+                article.FeedTitle ??= "";
+                article.Title ??= "";
+                article.Link ??= "";
+                article.Summary ??= "";
+                article.HtmlContent ??= "";
+                article.ImageUrl ??= "";
+                article.LocalImagePath ??= "";
+            }
+        }
+
+        private SqliteConnection OpenConnection()
+        {
+            var builder = new SqliteConnectionStringBuilder
+            {
+                DataSource = GetDatabasePath()
+            };
+            var connection = new SqliteConnection(builder.ToString());
+            connection.Open();
+            return connection;
+        }
+
+        private static void ExecuteNonQuery(SqliteConnection connection, string sql, SqliteTransaction? transaction = null)
+        {
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = sql;
+            command.ExecuteNonQuery();
+        }
+
+        private static long ToTicks(DateTimeOffset value)
+            => value == default ? 0 : value.UtcTicks;
+
+        private static DateTimeOffset FromTicks(long ticks)
+            => ticks <= 0 ? default : new DateTimeOffset(ticks, TimeSpan.Zero);
+
+        private string GetDatabasePath()
+            => Path.Combine(_appDataPath, "rss_cache.db");
+
+        private string GetLegacyCachePath()
             => Path.Combine(_appDataPath, "rss_cache.json");
 
         private static string HashText(string value)

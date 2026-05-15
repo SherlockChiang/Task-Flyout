@@ -50,24 +50,19 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <Button x:Name="AllFeedsButton"
-                        HorizontalAlignment="Stretch"
-                        Click="AllFeedsButton_Click"
-                        Content="全部文章"/>
-
                 <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1"
                         CornerRadius="8"
                         Padding="8"
-                        Grid.Row="1">
+                        Grid.RowSpan="3">
                     <Grid RowSpacing="8">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
                         <Grid>
-                            <TextBlock Text="文件夹" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Text="订阅" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
                             <Button HorizontalAlignment="Right"
                                     Width="32"
                                     Height="32"
@@ -79,92 +74,23 @@
                                 <FontIcon Glyph="&#xE710;" FontSize="13"/>
                             </Button>
                         </Grid>
-                        <ListView Grid.Row="1"
-                                  x:Name="FolderList"
-                                  ItemsSource="{x:Bind Folders}"
+                        <TreeView Grid.Row="1"
+                                  x:Name="RssTree"
                                   SelectionMode="Single"
                                   CanDragItems="True"
                                   CanReorderItems="True"
                                   AllowDrop="True"
-                                  DragItemsCompleted="FolderList_DragItemsCompleted"
-                                  SelectionChanged="FolderList_SelectionChanged">
-                            <ListView.ItemTemplate>
-                                <DataTemplate x:DataType="services:RssFolder">
-                                    <Grid ColumnSpacing="8" Padding="4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <FontIcon Glyph="&#xE8B7;" FontSize="14" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="1"
-                                                   Text="{x:Bind Name}"
-                                                   FontSize="14"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   VerticalAlignment="Center"/>
-                                        <Button Grid.Column="2"
-                                                Width="28"
-                                                Height="28"
-                                                Padding="0"
-                                                Background="Transparent"
-                                                BorderThickness="0"
-                                                Click="DeleteFolderButton_Click"
-                                                ToolTipService.ToolTip="删除文件夹">
-                                            <FontIcon Glyph="&#xE74D;" FontSize="12"/>
-                                        </Button>
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
+                                  RightTapped="RssTree_RightTapped"
+                                  ItemInvoked="RssTree_ItemInvoked"
+                                  DragItemsCompleted="RssTree_DragItemsCompleted">
+                            <TreeView.ContextFlyout>
+                                <MenuFlyout Opening="RssTreeMenu_Opening">
+                                    <MenuFlyoutItem x:Name="RenameRssTreeItem" Text="重命名" Click="RenameRssTreeItem_Click"/>
+                                    <MenuFlyoutItem x:Name="DeleteRssTreeItem" Text="删除" Click="DeleteRssTreeItem_Click"/>
+                                </MenuFlyout>
+                            </TreeView.ContextFlyout>
+                        </TreeView>
                     </Grid>
-                </Border>
-
-                <Border Grid.Row="2"
-                        Background="{ThemeResource LayerFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="8">
-                    <ListView x:Name="SubscriptionList"
-                              ItemsSource="{x:Bind Subscriptions}"
-                              SelectionMode="Single"
-                              SelectionChanged="SubscriptionList_SelectionChanged">
-                        <ListView.ItemTemplate>
-                            <DataTemplate x:DataType="services:RssSubscription">
-                                <Grid ColumnSpacing="8" Padding="4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Text="{x:Bind Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock Text="{x:Bind Url}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
-                                    <Button Grid.Column="1"
-                                            Width="32"
-                                            Height="32"
-                                            Padding="0"
-                                            Background="Transparent"
-                                            BorderThickness="0"
-                                            Click="MoveSubscriptionButton_Click"
-                                            ToolTipService.ToolTip="设置文件夹">
-                                        <FontIcon Glyph="&#xE8B7;" FontSize="14"/>
-                                    </Button>
-                                    <Button Grid.Column="2"
-                                            Width="32"
-                                            Height="32"
-                                            Padding="0"
-                                            Background="Transparent"
-                                            BorderThickness="0"
-                                            Click="DeleteSubscriptionButton_Click"
-                                            ToolTipService.ToolTip="删除订阅">
-                                        <FontIcon Glyph="&#xE74D;" FontSize="14"/>
-                                    </Button>
-                                </Grid>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
                 </Border>
 
                 <TextBlock Grid.Row="3"
@@ -173,12 +99,14 @@
                            TextWrapping="Wrap"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
 
-                <Button Grid.Row="4" HorizontalAlignment="Stretch" Click="AddSubscriptionButton_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                        <FontIcon Glyph="&#xE710;" FontSize="14"/>
-                        <TextBlock Text="添加订阅"/>
-                    </StackPanel>
-                </Button>
+                <Grid Grid.Row="4">
+                    <Button HorizontalAlignment="Stretch" Click="AddSubscriptionButton_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                            <FontIcon Glyph="&#xE710;" FontSize="14"/>
+                            <TextBlock Text="添加订阅"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
             </Grid>
 
             <Border Grid.Column="1"
@@ -193,7 +121,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <Grid ColumnSpacing="12">
+                    <Grid x:Name="ArticleListHeader" ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -257,6 +185,44 @@
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
+
+                    <Grid x:Name="ArticleReaderPanel"
+                          Grid.RowSpan="2"
+                          RowSpacing="10"
+                          Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Width="36"
+                                    Height="32"
+                                    Padding="0"
+                                    Click="BackToArticleListButton_Click"
+                                    ToolTipService.ToolTip="返回列表">
+                                <FontIcon Glyph="&#xE72B;" FontSize="14"/>
+                            </Button>
+                            <StackPanel Grid.Column="1" Spacing="2">
+                                <TextBlock x:Name="ReaderTitleText" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="ReaderMetaText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            </StackPanel>
+                            <Button Grid.Column="2" Click="OpenArticleInBrowserButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE774;" FontSize="14"/>
+                                    <TextBlock Text="浏览器"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <WebView2 Grid.Row="1"
+                                  x:Name="RssArticleWebView"/>
+                    </Grid>
                 </Grid>
             </Border>
         </Grid>
