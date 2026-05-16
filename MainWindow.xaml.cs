@@ -14,6 +14,7 @@ namespace Task_Flyout
     public sealed partial class MainWindow : Window
     {
         private ResourceLoader _loader;
+        private bool _pendingMailMessageNavigation;
 
         public MainWindow()
         {
@@ -73,6 +74,10 @@ namespace Task_Flyout
             else if (ContentFrame.SourcePageType == typeof(Views.MailPage))
             {
                 MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Mail");
+                if (_pendingMailMessageNavigation && e.Content is Views.MailPage mailPage)
+                {
+                    mailPage.IsOpeningFromNotification = true;
+                }
             }
             else if (ContentFrame.SourcePageType == typeof(Views.RssPage))
             {
@@ -237,25 +242,46 @@ namespace Task_Flyout
         {
             if (ContentFrame.Content is Views.MailPage existingMailPage)
             {
-                existingMailPage.OpenMessageAsync(accountId, folderId, messageId);
+                _pendingMailMessageNavigation = true;
+                OpenMailMessageOnPage(existingMailPage, accountId, folderId, messageId);
                 return;
             }
+
+            _pendingMailMessageNavigation = true;
 
             void OpenAfterNavigate(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs args)
             {
                 if (args.SourcePageType != typeof(Views.MailPage)) return;
 
                 ContentFrame.Navigated -= OpenAfterNavigate;
-                DispatcherQueue.TryEnqueue(async () =>
+                DispatcherQueue.TryEnqueue(() =>
                 {
                     if (ContentFrame.Content is Views.MailPage mailPage)
-                        await mailPage.OpenMessageAsync(accountId, folderId, messageId);
+                        OpenMailMessageOnPage(mailPage, accountId, folderId, messageId);
                 });
             }
 
             ContentFrame.Navigated += OpenAfterNavigate;
             MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Mail");
             ContentFrame.Navigate(typeof(Views.MailPage));
+        }
+
+        private async void OpenMailMessageOnPage(Views.MailPage mailPage, string accountId, string folderId, string messageId)
+        {
+            mailPage.IsOpeningFromNotification = true;
+            try
+            {
+                await mailPage.OpenMessageAsync(accountId, folderId, messageId);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Open mail notification target failed: {ex.Message}");
+            }
+            finally
+            {
+                mailPage.IsOpeningFromNotification = false;
+                _pendingMailMessageNavigation = false;
+            }
         }
 
         public void NavigateToAddAccount()

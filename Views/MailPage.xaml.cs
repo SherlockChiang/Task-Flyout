@@ -26,6 +26,9 @@ namespace Task_Flyout.Views
         private readonly MailTrustStore _mailTrustStore = new();
         private bool _isInitializing = true;
         private bool _isLoadingMessages;
+        private bool _suppressUnreadToggle;
+        private Task? _refreshAccountsTask;
+        internal bool IsOpeningFromNotification { get; set; }
 
         public MailPage()
         {
@@ -39,7 +42,7 @@ namespace Task_Flyout.Views
             _mailService = (App.Current as App)?.MailService;
             MailListView.ItemsSource = _items;
             _isInitializing = false;
-            await RefreshAccountsAsync();
+            await RefreshAccountsAsync(autoSelect: !IsOpeningFromNotification);
         }
 
         private async void MailPage_ActualThemeChanged(FrameworkElement sender, object args)
@@ -52,12 +55,36 @@ namespace Task_Flyout.Views
         {
             if (_mailService == null) return;
 
+            if (_refreshAccountsTask != null)
+            {
+                await _refreshAccountsTask;
+                return;
+            }
+
+            var tcs = new TaskCompletionSource();
+            _refreshAccountsTask = tcs.Task;
+            try
+            {
+                await RefreshAccountsCoreAsync(autoSelect);
+            }
+            finally
+            {
+                _refreshAccountsTask = null;
+                tcs.SetResult();
+            }
+        }
+
+        private async Task RefreshAccountsCoreAsync(bool autoSelect)
+        {
+            var mailService = _mailService;
+            if (mailService == null) return;
+
             AccountTree.RootNodes.Clear();
             _accountsById.Clear();
             _accountNodes.Clear();
             _folderNodes.Clear();
 
-            var accounts = _mailService.GetAccounts().ToList();
+            var accounts = mailService.GetAccounts().ToList();
             foreach (var account in accounts)
             {
                 _accountsById[account.Id] = account;
@@ -216,9 +243,9 @@ namespace Task_Flyout.Views
             _selectedFolder = selected.Folder;
             _selectedAccountForRemoval = selected.Account;
             RemoveMailButton.IsEnabled = true;
-            UnreadOnlyToggle.IsOn = false;
+            SetUnreadOnlyWithoutReload(false);
 
-            await LoadMessagesAsync(forceRefresh: false);
+            await LoadMessagesAsync(forceRefresh: false, preferredMessageId: messageId, selectFirstWhenNoMatch: false);
 
             var target = _items.FirstOrDefault(item => item.Id == messageId);
             if (target == null)
@@ -231,10 +258,21 @@ namespace Task_Flyout.Views
                 }
             }
 
+            if (target == null)
+            {
+                await LoadMessagesAsync(forceRefresh: true, preferredMessageId: messageId, selectFirstWhenNoMatch: false);
+                target = _items.FirstOrDefault(item => item.Id == messageId);
+            }
+
             if (target != null)
             {
                 MailListView.SelectedItem = target;
                 MailListView.ScrollIntoView(target);
+            }
+            else
+            {
+                MessageListSubtitle.Text = "没有在本地缓存或当前文件夹中找到这封通知邮件。";
+                ClearDetail();
             }
         }
 
@@ -294,7 +332,7 @@ namespace Task_Flyout.Views
             await LoadMessagesAsync();
         }
 
-        private async Task LoadMessagesAsync(bool forceRefresh = false)
+        private async Task LoadMessagesAsync(bool forceRefresh = false, string? preferredMessageId = null, bool selectFirstWhenNoMatch = true)
         {
             if (_mailService == null || _selectedAccount == null || _selectedFolder == null) return;
 
@@ -308,7 +346,7 @@ namespace Task_Flyout.Views
             try
             {
                 var messages = await _mailService.FetchMessagesAsync(_selectedAccount, _selectedFolder, UnreadOnlyToggle.IsOn, forceRefresh: forceRefresh);
-                var previousSelectedId = _selectedItem?.Id;
+                var previousSelectedId = !string.IsNullOrWhiteSpace(preferredMessageId) ? preferredMessageId : _selectedItem?.Id;
                 _items.Clear();
                 foreach (var item in messages.OrderByDescending(item => item.RawReceivedTime))
                     _items.Add(item);
@@ -317,7 +355,13 @@ namespace Task_Flyout.Views
                 var itemToSelect = !string.IsNullOrWhiteSpace(previousSelectedId)
                     ? _items.FirstOrDefault(item => item.Id == previousSelectedId)
                     : null;
-                MailListView.SelectedItem = itemToSelect ?? (_items.Count > 0 ? _items[0] : null);
+                if (itemToSelect != null)
+                    MailListView.SelectedItem = itemToSelect;
+                else if (selectFirstWhenNoMatch)
+                    MailListView.SelectedItem = _items.Count > 0 ? _items[0] : null;
+                else
+                    MailListView.SelectedItem = null;
+
                 if (_items.Count == 0)
                     ClearDetail();
             }
@@ -336,8 +380,23 @@ namespace Task_Flyout.Views
 
         private async void UnreadOnlyToggle_Toggled(object sender, RoutedEventArgs e)
         {
-            if (_isInitializing || _selectedFolder == null) return;
+            if (_isInitializing || _suppressUnreadToggle || _selectedFolder == null) return;
             await LoadMessagesAsync();
+        }
+
+        private void SetUnreadOnlyWithoutReload(bool isOn)
+        {
+            if (UnreadOnlyToggle.IsOn == isOn) return;
+
+            _suppressUnreadToggle = true;
+            try
+            {
+                UnreadOnlyToggle.IsOn = isOn;
+            }
+            finally
+            {
+                _suppressUnreadToggle = false;
+            }
         }
 
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)

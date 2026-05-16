@@ -214,7 +214,13 @@ namespace Task_Flyout.Services
             var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrWhiteSpace(argument)) return result;
 
-            foreach (var pair in argument.Split('&', StringSplitOptions.RemoveEmptyEntries))
+            argument = WebUtility.HtmlDecode(argument).Trim().Trim('"');
+            const string activationPrefix = "----AppNotificationActivated:";
+            var prefixIndex = argument.IndexOf(activationPrefix, StringComparison.OrdinalIgnoreCase);
+            if (prefixIndex >= 0)
+                argument = argument[(prefixIndex + activationPrefix.Length)..].Trim().Trim('"');
+
+            foreach (var pair in argument.Split(new[] { '&', ';' }, StringSplitOptions.RemoveEmptyEntries))
             {
                 var parts = pair.Split('=', 2);
                 if (parts.Length != 2) continue;
