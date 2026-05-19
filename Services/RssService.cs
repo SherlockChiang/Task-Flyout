@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -117,6 +118,7 @@ namespace Task_Flyout.Services
     {
         private const int FeedRefreshMinutes = 30;
         private const int SchemaVersion = 1;
+        private const long MaxImageBytes = 5 * 1024 * 1024;
         private static readonly HttpClient HttpClient = new()
         {
             Timeout = TimeSpan.FromSeconds(20)
@@ -436,11 +438,67 @@ namespace Task_Flyout.Services
             return match.Success ? match.Value : "";
         }
 
+        private static async Task<bool> IsSafeToFetchAsync(Uri uri)
+        {
+            if (uri.HostNameType is not (UriHostNameType.IPv4 or UriHostNameType.IPv6))
+            {
+                try
+                {
+                    var addresses = await Dns.GetHostAddressesAsync(uri.Host);
+                    return addresses.All(addr => IsPublicIpAddress(addr));
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            if (IPAddress.TryParse(uri.Host, out var parsed))
+                return IsPublicIpAddress(parsed);
+
+            return false;
+        }
+
+        private static bool IsPublicIpAddress(IPAddress address)
+        {
+            if (address.Equals(IPAddress.Loopback) || address.Equals(IPAddress.IPv6Loopback))
+                return false;
+
+            if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                var bytes = address.GetAddressBytes();
+                return bytes[0] switch
+                {
+                    10 => false,
+                    127 => false,
+                    169 when bytes[1] == 254 => false,
+                    172 when bytes[1] >= 16 && bytes[1] <= 31 => false,
+                    192 when bytes[1] == 168 => false,
+                    0 => false,
+                    _ => true
+                };
+            }
+
+            if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+            {
+                var bytes = address.GetAddressBytes();
+                // fe80::/10 link-local
+                if (bytes[0] == 0xfe && (bytes[1] & 0xc0) == 0x80) return false;
+                // fc00::/7 unique local
+                if ((bytes[0] & 0xfe) == 0xfc) return false;
+            }
+
+            return true;
+        }
+
         private async Task<string> CacheImageAsync(string imageUrl)
         {
             if (string.IsNullOrWhiteSpace(imageUrl) || !Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri))
                 return "";
             if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+                return "";
+
+            if (!await IsSafeToFetchAsync(uri))
                 return "";
 
             try
@@ -453,8 +511,24 @@ namespace Task_Flyout.Services
                 var path = Path.Combine(imagesPath, HashText(imageUrl) + extension);
                 if (File.Exists(path)) return path;
 
-                var bytes = await HttpClient.GetByteArrayAsync(uri);
-                await File.WriteAllBytesAsync(path, bytes);
+                using var response = await HttpClient.SendAsync(new HttpRequestMessage(HttpMethod.Get, uri), HttpCompletionOption.ResponseHeadersRead);
+                response.EnsureSuccessStatusCode();
+
+                if (response.Content.Headers.ContentLength is > MaxImageBytes)
+                    return "";
+
+                using var stream = await response.Content.ReadAsStreamAsync();
+                using var buffer = new MemoryStream();
+                var chunk = new byte[81920];
+                int bytesRead;
+                while ((bytesRead = await stream.ReadAsync(chunk)) > 0)
+                {
+                    if (buffer.Length + bytesRead > MaxImageBytes)
+                        return "";
+                    buffer.Write(chunk, 0, bytesRead);
+                }
+
+                await File.WriteAllBytesAsync(path, buffer.ToArray());
                 return path;
             }
             catch
