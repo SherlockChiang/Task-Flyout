@@ -1,3 +1,4 @@
+using Microsoft.Windows.ApplicationModel.Resources;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,6 +11,7 @@ namespace Task_Flyout.Services
     public sealed class MailTrustStore
     {
         private readonly HashSet<string> _trustedSources = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ResourceLoader _loader = new();
         private const string StoreScope = "mail";
         private const string TrustedSourcesKey = "trusted_sources";
 
@@ -44,9 +46,9 @@ namespace Task_Flyout.Services
             return true;
         }
 
-        public static string GetDisplaySource(MailItem item)
+        public string GetDisplaySource(MailItem item)
         {
-            return GetSourceKey(item) ?? "未知来源";
+            return GetSourceKey(item) ?? (_loader.GetString("TextUnknownSource") ?? "Unknown source");
         }
 
         private void Load()

@@ -11,6 +11,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
+using Microsoft.Windows.ApplicationModel.Resources;
 using Windows.System;
 
 namespace Task_Flyout.Views
@@ -24,6 +25,7 @@ namespace Task_Flyout.Views
         public ObservableCollection<RssArticle> Articles { get; } = new();
 
         private readonly RssService _rssService = new();
+        private readonly ResourceLoader _loader = new();
         private readonly Dictionary<TreeViewNode, RssFolder> _folderNodes = new();
         private readonly Dictionary<TreeViewNode, RssSubscription> _subscriptionNodes = new();
         private TreeViewNode? _allNode;
@@ -57,7 +59,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 LogRssError(ex);
-                ArticleListSubtitle.Text = $"RSS 初始化失败：{ex.Message}";
+                ArticleListSubtitle.Text = string.Format(_loader.GetString("TextRssInitFailed") ?? "RSS initialization failed: {0}", ex.Message);
             }
         }
 
@@ -88,7 +90,7 @@ namespace Task_Flyout.Views
 
             _allNode = new TreeViewNode
             {
-                Content = "全部文章",
+                Content = _loader.GetString("TextAllArticles") ?? "All Articles",
                 IsExpanded = true
             };
             RssTree.RootNodes.Add(_allNode);
@@ -109,7 +111,7 @@ namespace Task_Flyout.Views
 
             var uncategorizedNode = new TreeViewNode
             {
-                Content = "未分类",
+                Content = _loader.GetString("TextUncategorized") ?? "Uncategorized",
                 IsExpanded = true
             };
             RssTree.RootNodes.Add(uncategorizedNode);
@@ -117,8 +119,8 @@ namespace Task_Flyout.Views
                 AddSubscriptionNode(uncategorizedNode, subscription);
         }
 
-        private static string CreateFolderNodeContent(RssFolder folder)
-            => string.IsNullOrWhiteSpace(folder.Name) ? "文件夹" : folder.Name;
+        private string CreateFolderNodeContent(RssFolder folder)
+            => string.IsNullOrWhiteSpace(folder.Name) ? (_loader.GetString("TextFolder") ?? "Folder") : folder.Name;
 
         private void AddSubscriptionNode(TreeViewNode parent, RssSubscription subscription)
         {
@@ -144,8 +146,8 @@ namespace Task_Flyout.Views
         {
             if (SubscriptionStatusText == null) return;
             SubscriptionStatusText.Text = Subscriptions.Count == 0
-                ? "还没有订阅。添加 RSS 地址后开始阅读。"
-                : $"{Subscriptions.Count} 个订阅，{Folders.Count} 个文件夹";
+                ? (_loader.GetString("TextNoSubscriptionsHint") ?? "No subscriptions yet. Add an RSS URL to start reading.")
+                : string.Format(_loader.GetString("TextNSubscriptions") ?? "{0} subscriptions, {1} folders", Subscriptions.Count, Folders.Count);
         }
 
         private async Task ResetAndLoadArticlesAsync()
@@ -173,13 +175,13 @@ namespace Task_Flyout.Views
                 _loadedCount = items.Count;
                 _hasMore = items.Count == PageSize;
                 ArticleListSubtitle.Text = Articles.Count == 0
-                    ? "暂无缓存文章，点击刷新获取"
-                    : _hasMore ? $"{Articles.Count} 篇文章，向下滚动加载更多" : $"{Articles.Count} 篇文章";
+                    ? (_loader.GetString("TextNoCachedArticles") ?? "No cached articles, click refresh to fetch")
+                    : _hasMore ? string.Format(_loader.GetString("TextNArticlesScroll") ?? "{0} articles, scroll down to load more", Articles.Count) : string.Format(_loader.GetString("TextNArticles") ?? "{0} articles", Articles.Count);
             }
             catch (Exception ex)
             {
                 LogRssError(ex);
-                ArticleListSubtitle.Text = $"缓存读取失败：{ex.Message}";
+                ArticleListSubtitle.Text = string.Format(_loader.GetString("TextCacheLoadFailed") ?? "Cache load failed: {0}", ex.Message);
             }
         }
 
@@ -198,13 +200,13 @@ namespace Task_Flyout.Views
                 _loadedCount += items.Count;
                 _hasMore = items.Count == PageSize;
                 ArticleListSubtitle.Text = Articles.Count == 0
-                    ? "暂无文章"
-                    : _hasMore ? $"{Articles.Count} 篇文章，点击加载更多" : $"{Articles.Count} 篇文章";
+                    ? (_loader.GetString("TextNoArticles") ?? "No articles")
+                    : _hasMore ? string.Format(_loader.GetString("TextNArticlesClickLoad") ?? "{0} articles, click to load more", Articles.Count) : string.Format(_loader.GetString("TextNArticles") ?? "{0} articles", Articles.Count);
             }
             catch (Exception ex)
             {
                 LogRssError(ex);
-                ArticleListSubtitle.Text = $"加载失败：{ex.Message}";
+                ArticleListSubtitle.Text = string.Format(_loader.GetString("TextLoadFailed") ?? "Load failed: {0}", ex.Message);
             }
             finally
             {
@@ -228,8 +230,8 @@ namespace Task_Flyout.Views
                 ShowArticleList();
                 _selectedSubscriptionId = null;
                 _selectedFolderId = null;
-                ArticleListTitle.Text = "全部文章";
-                SubtitleText.Text = "全部订阅文章";
+                ArticleListTitle.Text = _loader.GetString("TextAllArticles") ?? "All Articles";
+                SubtitleText.Text = _loader.GetString("TextAllSubscriptions") ?? "All subscriptions";
             }
             else if (_folderNodes.TryGetValue(node, out var folder))
             {
@@ -237,7 +239,7 @@ namespace Task_Flyout.Views
                 _selectedSubscriptionId = null;
                 _selectedFolderId = folder.Id;
                 ArticleListTitle.Text = folder.Name;
-                SubtitleText.Text = "当前文件夹下的 RSS 文章";
+                SubtitleText.Text = _loader.GetString("TextCurrentFolderArticles") ?? "RSS articles in current folder";
             }
             else if (_subscriptionNodes.TryGetValue(node, out var subscription))
             {
@@ -247,13 +249,13 @@ namespace Task_Flyout.Views
                 ArticleListTitle.Text = subscription.Title;
                 SubtitleText.Text = subscription.Url;
             }
-            else if (node.Content?.ToString() == "未分类")
+            else if (node.Content?.ToString() == (_loader.GetString("TextUncategorized") ?? "Uncategorized"))
             {
                 ShowArticleList();
                 _selectedSubscriptionId = null;
                 _selectedFolderId = "";
-                ArticleListTitle.Text = "未分类";
-                SubtitleText.Text = "未分类订阅文章";
+                ArticleListTitle.Text = _loader.GetString("TextUncategorized") ?? "Uncategorized";
+                SubtitleText.Text = _loader.GetString("TextUncategorizedArticles") ?? "Uncategorized subscription articles";
             }
             else
             {
@@ -267,7 +269,7 @@ namespace Task_Flyout.Views
         {
             var urlBox = new TextBox
             {
-                Header = "RSS 地址",
+                Header = _loader.GetString("TextRssAddress") ?? "RSS URL",
                 PlaceholderText = "https://example.com/feed.xml"
             };
             var folderBox = CreateFolderComboBox(_selectedFolderId);
@@ -277,10 +279,10 @@ namespace Task_Flyout.Views
 
             var dialog = new ContentDialog
             {
-                Title = "添加 RSS 订阅",
+                Title = _loader.GetString("TextAddRssSubscription") ?? "Add RSS Subscription",
                 Content = panel,
-                PrimaryButtonText = "添加",
-                CloseButtonText = "取消",
+                PrimaryButtonText = _loader.GetString("TextAdd") ?? "Add",
+                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = XamlRoot
             };
@@ -306,14 +308,14 @@ namespace Task_Flyout.Views
                     BuildSubscriptionTree();
                     _selectedSubscriptionId = null;
                     _selectedFolderId = null;
-                    ArticleListTitle.Text = "全部文章";
-                    SubtitleText.Text = "全部订阅文章";
+                    ArticleListTitle.Text = _loader.GetString("TextAllArticles") ?? "All Articles";
+                    SubtitleText.Text = _loader.GetString("TextAllSubscriptions") ?? "All subscriptions";
                     ResetAndLoadCachedArticles();
                 }
                 catch (Exception ex)
                 {
                     args.Cancel = true;
-                    SubscriptionStatusText.Text = $"添加失败：{ex.Message}";
+                    SubscriptionStatusText.Text = string.Format(_loader.GetString("TextAddFailed2") ?? "Add failed: {0}", ex.Message);
                 }
                 finally
                 {
@@ -335,10 +337,10 @@ namespace Task_Flyout.Views
         {
             var dialog = new ContentDialog
             {
-                Title = "删除订阅",
-                Content = $"确定要删除“{subscription.Title}”吗？本地缓存文章也会一起删除。",
-                PrimaryButtonText = "删除",
-                CloseButtonText = "取消",
+                Title = _loader.GetString("TextDeleteSubscription") ?? "Delete Subscription",
+                Content = string.Format(_loader.GetString("TextDeleteSubscriptionContent") ?? "Delete \"{0}\"? Cached articles will also be removed.", subscription.Title),
+                PrimaryButtonText = _loader.GetString("CalendarDialog.SecondaryButtonText") ?? "Delete",
+                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = XamlRoot
             };
@@ -350,8 +352,8 @@ namespace Task_Flyout.Views
             if (_selectedSubscriptionId == subscription.Id)
             {
                 _selectedSubscriptionId = null;
-                ArticleListTitle.Text = "全部文章";
-                SubtitleText.Text = "全部订阅文章";
+                ArticleListTitle.Text = _loader.GetString("TextAllArticles") ?? "All Articles";
+                SubtitleText.Text = _loader.GetString("TextAllSubscriptions") ?? "All subscriptions";
             }
             LoadSubscriptions();
             BuildSubscriptionTree();
@@ -390,13 +392,13 @@ namespace Task_Flyout.Views
 
         private async Task RenameFolderAsync(RssFolder folder)
         {
-            var box = new TextBox { Header = "文件夹名称", Text = folder.Name };
+            var box = new TextBox { Header = _loader.GetString("TextFolderName") ?? "Folder name", Text = folder.Name };
             var dialog = new ContentDialog
             {
-                Title = "重命名文件夹",
+                Title = _loader.GetString("TextRenameFolder") ?? "Rename Folder",
                 Content = box,
-                PrimaryButtonText = "保存",
-                CloseButtonText = "取消",
+                PrimaryButtonText = _loader.GetString("CalendarDialog.PrimaryButtonText") ?? "Save",
+                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = XamlRoot
             };
@@ -412,13 +414,13 @@ namespace Task_Flyout.Views
 
         private async Task RenameSubscriptionAsync(RssSubscription subscription)
         {
-            var box = new TextBox { Header = "订阅名称", Text = subscription.Title };
+            var box = new TextBox { Header = _loader.GetString("TextSubscriptionName") ?? "Subscription name", Text = subscription.Title };
             var dialog = new ContentDialog
             {
-                Title = "重命名订阅",
+                Title = _loader.GetString("TextRenameSubscription") ?? "Rename Subscription",
                 Content = box,
-                PrimaryButtonText = "保存",
-                CloseButtonText = "取消",
+                PrimaryButtonText = _loader.GetString("CalendarDialog.PrimaryButtonText") ?? "Save",
+                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = XamlRoot
             };
@@ -435,15 +437,15 @@ namespace Task_Flyout.Views
         {
             var nameBox = new TextBox
             {
-                Header = "文件夹名称",
-                PlaceholderText = "例如：科技、新闻、博客"
+                Header = _loader.GetString("TextFolderName") ?? "Folder name",
+                PlaceholderText = _loader.GetString("TextFolderNamePlaceholder") ?? "e.g. Tech, News, Blog"
             };
             var dialog = new ContentDialog
             {
-                Title = "添加 RSS 文件夹",
+                Title = _loader.GetString("TextAddRssFolder") ?? "Add RSS Folder",
                 Content = nameBox,
-                PrimaryButtonText = "添加",
-                CloseButtonText = "取消",
+                PrimaryButtonText = _loader.GetString("TextAdd") ?? "Add",
+                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = XamlRoot
             };
@@ -476,10 +478,10 @@ namespace Task_Flyout.Views
         {
             var dialog = new ContentDialog
             {
-                Title = "删除文件夹",
-                Content = $"确定要删除“{folder.Name}”吗？订阅不会删除，会移动到未分类。",
-                PrimaryButtonText = "删除",
-                CloseButtonText = "取消",
+                Title = _loader.GetString("TextDeleteFolder") ?? "Delete Folder",
+                Content = string.Format(_loader.GetString("TextDeleteFolderContent") ?? "Delete \"{0}\"? Subscriptions will be moved to Uncategorized.", folder.Name),
+                PrimaryButtonText = _loader.GetString("CalendarDialog.SecondaryButtonText") ?? "Delete",
+                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = XamlRoot
             };
@@ -491,8 +493,8 @@ namespace Task_Flyout.Views
             if (_selectedFolderId == folder.Id)
             {
                 _selectedFolderId = null;
-                ArticleListTitle.Text = "全部文章";
-                SubtitleText.Text = "全部订阅文章";
+                ArticleListTitle.Text = _loader.GetString("TextAllArticles") ?? "All Articles";
+                SubtitleText.Text = _loader.GetString("TextAllSubscriptions") ?? "All subscriptions";
             }
             LoadFolders();
             LoadSubscriptions();
@@ -507,10 +509,10 @@ namespace Task_Flyout.Views
             var folderBox = CreateFolderComboBox(subscription.FolderId);
             var dialog = new ContentDialog
             {
-                Title = $"设置“{subscription.Title}”的文件夹",
+                Title = string.Format(_loader.GetString("TextSetFolder") ?? "Set folder for \"{0}\"", subscription.Title),
                 Content = folderBox,
-                PrimaryButtonText = "保存",
-                CloseButtonText = "取消",
+                PrimaryButtonText = _loader.GetString("CalendarDialog.PrimaryButtonText") ?? "Save",
+                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = XamlRoot
             };
@@ -572,7 +574,7 @@ namespace Task_Flyout.Views
                     _rssService.MoveSubscriptionToFolder(_subscriptionNodes[child].Id, folder.Id);
             }
 
-            foreach (var root in RssTree.RootNodes.Where(node => node.Content?.ToString() == "未分类"))
+            foreach (var root in RssTree.RootNodes.Where(node => node.Content?.ToString() == (_loader.GetString("TextUncategorized") ?? "Uncategorized")))
             {
                 foreach (var child in root.Children.Where(node => _subscriptionNodes.ContainsKey(node)))
                     _rssService.MoveSubscriptionToFolder(_subscriptionNodes[child].Id, "");
@@ -584,10 +586,10 @@ namespace Task_Flyout.Views
         {
             var folderBox = new ComboBox
             {
-                Header = "文件夹",
+                Header = _loader.GetString("TextFolder") ?? "Folder",
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
-            folderBox.Items.Add(new ComboBoxItem { Content = "未分类", Tag = "" });
+            folderBox.Items.Add(new ComboBoxItem { Content = _loader.GetString("TextUncategorized") ?? "Uncategorized", Tag = "" });
             foreach (var folder in _rssService.GetFolders())
                 folderBox.Items.Add(new ComboBoxItem { Content = folder.Name, Tag = folder.Id });
 
@@ -704,7 +706,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 LogRssError(ex);
-                ArticleListSubtitle.Text = $"文章渲染失败：{ex.Message}";
+                ArticleListSubtitle.Text = string.Format(_loader.GetString("TextArticleRenderFailed") ?? "Article render failed: {0}", ex.Message);
             }
         }
 

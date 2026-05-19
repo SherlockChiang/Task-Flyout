@@ -128,19 +128,19 @@ namespace Task_Flyout.Services
             {
                 var lists = await _graphClient.Me.Todo.Lists.GetAsync();
                 _defaultTodoListId = lists?.Value?.FirstOrDefault()?.Id ?? "";
-                System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] 成功获取默认列表 ID: {_defaultTodoListId}");
+                System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] Got default list ID: {_defaultTodoListId}");
                 return _defaultTodoListId;
             }
             catch (Microsoft.Graph.Models.ODataErrors.ODataError odataEx)
             {
-                System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] 获取列表 OData 错误!");
-                System.Diagnostics.Debug.WriteLine($"错误代码: {odataEx.Error?.Code}");
-                System.Diagnostics.Debug.WriteLine($"详细信息: {odataEx.Error?.Message}");
+                System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] OData error fetching lists!");
+                System.Diagnostics.Debug.WriteLine($"Error code: {odataEx.Error?.Code}");
+                System.Diagnostics.Debug.WriteLine($"Details: {odataEx.Error?.Message}");
                 return null;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] 获取列表其他错误: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] Other error fetching lists: {ex.Message}");
                 return null;
             }
         }
@@ -178,7 +178,7 @@ namespace Task_Flyout.Services
 
                 if (events?.Value != null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] 获取到 {events.Value.Count} 个日程");
+                    System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] Fetched {events.Value.Count} events");
                     var recurrenceKinds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                     foreach (var ev in events.Value)
                     {
@@ -231,11 +231,11 @@ namespace Task_Flyout.Services
             }
             catch (Microsoft.Graph.Models.ODataErrors.ODataError odataEx)
             {
-                System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] 拉取日历 OData 错误! 代码: {odataEx.Error?.Code}, 信息: {odataEx.Error?.Message}");
+                System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] OData error: Code={odataEx.Error?.Code}, Message={odataEx.Error?.Message}");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] 拉取日历其他错误: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] Other error: {ex.Message}");
             }
 
             try
@@ -250,7 +250,7 @@ namespace Task_Flyout.Services
 
                     if (tasks?.Value != null)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] 获取到 {tasks.Value.Count} 个待办任务。开始解析：");
+                        System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] Fetched {tasks.Value.Count} tasks. Parsing...");
 
                         foreach (var task in tasks.Value)
                         {
@@ -292,13 +292,13 @@ namespace Task_Flyout.Services
             }
             catch (Microsoft.Graph.Models.ODataErrors.ODataError odataEx)
             {
-                System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] 拉取任务 OData 错误!");
-                System.Diagnostics.Debug.WriteLine($"代码: {odataEx.Error?.Code}");
-                System.Diagnostics.Debug.WriteLine($"信息: {odataEx.Error?.Message}");
+                System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] OData error fetching tasks!");
+                System.Diagnostics.Debug.WriteLine($"Code: {odataEx.Error?.Code}");
+                System.Diagnostics.Debug.WriteLine($"Message: {odataEx.Error?.Message}");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] 拉取任务其他错误: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] Other error fetching tasks: {ex.Message}");
             }
 
             return results;

@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.Windows.ApplicationModel.Resources;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -116,6 +117,7 @@ namespace Task_Flyout.Services
 
     public class RssService
     {
+        private readonly ResourceLoader _loader = new();
         private const int FeedRefreshMinutes = 30;
         private const int SchemaVersion = 1;
         private const long MaxImageBytes = 5 * 1024 * 1024;
@@ -162,7 +164,7 @@ namespace Task_Flyout.Services
             name = name.Trim();
             var folder = new RssFolder
             {
-                Name = string.IsNullOrWhiteSpace(name) ? "新文件夹" : name,
+                Name = string.IsNullOrWhiteSpace(name) ? (_loader.GetString("TextNewFolder") ?? "New folder") : name,
                 SortOrder = _cache.Folders.Count == 0 ? 0 : _cache.Folders.Max(item => item.SortOrder) + 1
             };
             _cache.Folders.Add(folder);
@@ -349,7 +351,7 @@ namespace Task_Flyout.Services
 
         private static RssArticle ParseRssItem(RssSubscription subscription, string feedTitle, XElement item)
         {
-            var title = GetElementValue(item, "title") ?? "(无标题)";
+            var title = GetElementValue(item, "title") ?? "(Untitled)";
             string link = GetElementValue(item, "link") ?? "";
             var html = GetElementValue(item, "encoded") ?? GetElementValue(item, "description") ?? "";
             var summary = StripHtml(html);
@@ -373,7 +375,7 @@ namespace Task_Flyout.Services
 
         private static RssArticle ParseAtomEntry(RssSubscription subscription, string feedTitle, XElement entry)
         {
-            var title = GetElementValue(entry, "title") ?? "(无标题)";
+            var title = GetElementValue(entry, "title") ?? "(Untitled)";
             string link = entry.Elements().FirstOrDefault(element =>
                 element.Name.LocalName == "link" &&
                 ((string?)element.Attribute("rel") == null || (string?)element.Attribute("rel") == "alternate"))?.Attribute("href")?.Value ?? "";
@@ -569,7 +571,7 @@ namespace Task_Flyout.Services
             foreach (var folder in _cache.Folders)
             {
                 folder.Id ??= Guid.NewGuid().ToString("N");
-                folder.Name ??= "文件夹";
+                folder.Name ??= (_loader.GetString("TextFolder") ?? "Folder");
             }
 
             foreach (var article in _cache.Articles)
@@ -851,7 +853,7 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
             foreach (var folder in _cache.Folders)
             {
                 folder.Id ??= Guid.NewGuid().ToString("N");
-                folder.Name ??= "文件夹";
+                folder.Name ??= (_loader.GetString("TextFolder") ?? "Folder");
             }
 
             foreach (var article in _cache.Articles)

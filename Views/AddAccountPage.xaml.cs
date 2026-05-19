@@ -28,10 +28,10 @@ namespace Task_Flyout.Views
 
             if (!BtnGoogle.IsEnabled)
                 BtnGoogle.Content = CreateDisabledContent("Google", "#EA4335",
-                    _loader.GetString("AddAccount_AlreadyConnected") ?? "已连接");
+                    _loader.GetString("AddAccount_AlreadyConnected") ?? "Already connected");
             if (!BtnMicrosoft.IsEnabled)
                 BtnMicrosoft.Content = CreateDisabledContent("Microsoft", "#0078D4",
-                    _loader.GetString("AddAccount_AlreadyConnected") ?? "已连接");
+                    _loader.GetString("AddAccount_AlreadyConnected") ?? "Already connected");
         }
 
         private StackPanel CreateDisabledContent(string name, string color, string status)
@@ -73,7 +73,7 @@ namespace Task_Flyout.Views
             if (mgr == null || syncManager == null) return;
 
             AuthProgress.IsActive = true;
-            StatusText.Text = _loader.GetString("TextAuthorizing") ?? "授权中...";
+            StatusText.Text = _loader.GetString("TextAuthorizing") ?? "Authorizing...";
             BtnGoogle.IsEnabled = false;
             BtnMicrosoft.IsEnabled = false;
 
@@ -128,7 +128,7 @@ namespace Task_Flyout.Views
             }
             catch (Exception ex)
             {
-                StatusText.Text = _loader.GetString("TextAuthFailed") ?? "授权失败";
+                StatusText.Text = _loader.GetString("TextAuthFailed") ?? "Auth Failed";
                 System.Diagnostics.Debug.WriteLine($"Auth failed for {providerName}: {ex}");
             }
             finally

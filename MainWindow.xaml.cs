@@ -145,10 +145,10 @@ namespace Task_Flyout
             {
                 var dialog = new ContentDialog
                 {
-                    Title = GetSafeString("TextRemoveAccountTitle", "移除账户"),
-                    Content = string.Format(GetSafeString("TextRemoveAccountContent", "确定要移除 {0} 账户吗？"), providerName),
-                    PrimaryButtonText = GetSafeString("TextConfirm", "确定"),
-                    CloseButtonText = GetSafeString("CalendarDialog/CloseButtonText", "取消"),
+                    Title = GetSafeString("TextRemoveAccountTitle", "Remove Account"),
+                    Content = string.Format(GetSafeString("TextRemoveAccountContent", "Are you sure you want to remove the {0} account?"), providerName),
+                    PrimaryButtonText = GetSafeString("TextConfirm", "Confirm"),
+                    CloseButtonText = GetSafeString("CalendarDialog/CloseButtonText", "Cancel"),
                     XamlRoot = this.Content.XamlRoot,
                     DefaultButton = ContentDialogButton.Close
                 };

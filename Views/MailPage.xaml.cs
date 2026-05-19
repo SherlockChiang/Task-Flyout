@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
+using Microsoft.Windows.ApplicationModel.Resources;
 using Windows.System;
 
 namespace Task_Flyout.Views
@@ -24,6 +25,7 @@ namespace Task_Flyout.Views
         private MailItem? _selectedItem;
         private MailAccount? _selectedAccountForRemoval;
         private readonly MailTrustStore _mailTrustStore = new();
+        private readonly ResourceLoader _loader = new();
         private bool _isInitializing = true;
         private bool _isLoadingMessages;
         private bool _suppressSelectionClear;
@@ -102,7 +104,7 @@ namespace Task_Flyout.Views
             bool hasAccounts = accounts.Count > 0;
             AddAccountPanel.Visibility = hasAccounts ? Visibility.Collapsed : Visibility.Visible;
             EmptyDetailPanel.Visibility = hasAccounts ? EmptyDetailPanel.Visibility : Visibility.Collapsed;
-            MessageListSubtitle.Text = hasAccounts ? "请选择左侧文件夹" : "先添加一个邮箱账户";
+            MessageListSubtitle.Text = hasAccounts ? (_loader.GetString("TextSelectFolder") ?? "Select a folder on the left") : (_loader.GetString("TextAddMailAccountFirst") ?? "Add an email account first");
             if (!hasAccounts)
             {
                 _items.Clear();
@@ -192,7 +194,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Load folders failed: {ex.Message}");
-                AddStatusText.Text = "加载文件夹失败，请稍后重试。";
+                AddStatusText.Text = _loader.GetString("TextLoadFoldersFailed") ?? "Failed to load folders, please try again later.";
             }
         }
 
@@ -255,7 +257,7 @@ namespace Task_Flyout.Views
                 if (target != null)
                 {
                     _items.Insert(0, target);
-                    MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {_items.Count} 封邮件";
+                    MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetString("TextNMailItems") ?? "{0} messages", _items.Count)}";
                 }
             }
 
@@ -272,7 +274,7 @@ namespace Task_Flyout.Views
             }
             else
             {
-                MessageListSubtitle.Text = "没有在本地缓存或当前文件夹中找到这封通知邮件。";
+                MessageListSubtitle.Text = _loader.GetString("TextMailNotFound") ?? "This message was not found in the local cache or current folder.";
                 ClearDetail();
             }
         }
@@ -342,7 +344,7 @@ namespace Task_Flyout.Views
             LoadingRing.IsActive = true;
             RefreshButton.IsEnabled = false;
             MessageListTitle.Text = _selectedFolder.DisplayName;
-            MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · 正在加载";
+            MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {(_loader.GetString("TextLoading") ?? "Loading")}";
 
             try
             {
@@ -352,7 +354,7 @@ namespace Task_Flyout.Views
                 foreach (var item in messages.OrderByDescending(item => item.RawReceivedTime))
                     _items.Add(item);
 
-                MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {_items.Count} 封邮件";
+                MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetString("TextNMailItems") ?? "{0} messages", _items.Count)}";
                 var itemToSelect = !string.IsNullOrWhiteSpace(previousSelectedId)
                     ? _items.FirstOrDefault(item => item.Id == previousSelectedId)
                     : null;
@@ -369,7 +371,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Load messages failed: {ex.Message}");
-                MessageListSubtitle.Text = "加载邮件失败，请稍后重试。";
+                MessageListSubtitle.Text = _loader.GetString("TextLoadMailFailed") ?? "Failed to load messages, please try again later.";
             }
             finally
             {
@@ -424,10 +426,10 @@ namespace Task_Flyout.Views
             var dialog = new ContentDialog
             {
                 XamlRoot = XamlRoot,
-                Title = "删除邮箱账户",
-                Content = $"要从 Task Flyout 删除 {account.ProviderName} - {account.Subtitle} 吗？这不会删除邮箱服务器上的邮件。",
-                PrimaryButtonText = "删除",
-                CloseButtonText = "取消",
+                Title = _loader.GetString("TextDeleteMailAccount") ?? "Delete Email Account",
+                Content = string.Format(_loader.GetString("TextDeleteMailAccountContent") ?? "Remove {0} - {1} from Task Flyout? This will not delete emails on the server.", account.ProviderName, account.Subtitle),
+                PrimaryButtonText = _loader.GetString("CalendarDialog.SecondaryButtonText") ?? "Delete",
+                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Close
             };
 
@@ -464,7 +466,7 @@ namespace Task_Flyout.Views
         {
             if (_mailService == null) return;
 
-            ComposeTitleText.Text = replyTo == null ? "写邮件" : "回复邮件";
+            ComposeTitleText.Text = replyTo == null ? (_loader.GetString("TextCompose") ?? "Compose") : (_loader.GetString("TextReply") ?? "Reply");
             ComposeFromBox.Items.Clear();
             var accounts = _mailService.GetAccounts().Where(account => account.IsSetupComplete).ToList();
             foreach (var account in accounts)
@@ -489,7 +491,7 @@ namespace Task_Flyout.Views
             ComposeToBox.Text = replyTo == null ? "" : GetReplyRecipient(replyTo);
             ComposeSubjectBox.Text = replyTo == null ? "" : CreateReplySubject(replyTo.Subject);
             ComposeBodyBox.Text = replyTo == null ? "" : CreateReplyBody(replyTo);
-            ComposeStatusText.Text = accounts.Count == 0 ? "请先添加邮箱账户。" : "";
+            ComposeStatusText.Text = accounts.Count == 0 ? (_loader.GetString("TextAddMailAccountFirst") ?? "Please add an email account first.") : "";
 
             ComposePanel.Visibility = Visibility.Visible;
             AddAccountPanel.Visibility = Visibility.Collapsed;
@@ -502,18 +504,18 @@ namespace Task_Flyout.Views
             if (_mailService == null) return;
 
             SetAddButtonsEnabled(false);
-            AddStatusText.Text = "正在打开 Microsoft 授权...";
+            AddStatusText.Text = _loader.GetString("TextOpeningMSAuth") ?? "Opening Microsoft authorization...";
 
             try
             {
                 var account = await _mailService.AddOutlookAccountAsync();
-                AddStatusText.Text = $"已添加 {account.DisplayTitle}";
+                AddStatusText.Text = string.Format(_loader.GetString("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
                 await RefreshAccountsAsync();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Add Outlook account failed: {ex.Message}");
-                AddStatusText.Text = "添加 Outlook 账户失败，请检查授权或网络连接。";
+                AddStatusText.Text = _loader.GetString("TextAddOutlookFailed") ?? "Failed to add Outlook account. Please check authorization or network.";
             }
             finally
             {
@@ -536,18 +538,18 @@ namespace Task_Flyout.Views
             if (_mailService == null) return;
 
             SetAddButtonsEnabled(false);
-            AddStatusText.Text = "正在打开 Google 授权...";
+            AddStatusText.Text = _loader.GetString("TextOpeningGoogleAuth") ?? "Opening Google authorization...";
 
             try
             {
                 var account = await _mailService.AddGoogleAccountAsync();
-                AddStatusText.Text = $"已添加 {account.DisplayTitle}";
+                AddStatusText.Text = string.Format(_loader.GetString("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
                 await RefreshAccountsAsync();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Add Google account failed: {ex.Message}");
-                AddStatusText.Text = "添加 Gmail 账户失败，请检查授权或网络连接。";
+                AddStatusText.Text = _loader.GetString("TextAddGmailFailed") ?? "Failed to add Gmail account. Please check authorization or network.";
             }
             finally
             {
@@ -569,7 +571,7 @@ namespace Task_Flyout.Views
             SmtpPortBox.Value = 587;
             SmtpUserNameBox.Text = "";
             SmtpSslToggle.IsOn = false;
-            AddStatusText.Text = "请输入 IMAP 服务器信息。Gmail/Outlook 建议优先使用 OAuth。";
+            AddStatusText.Text = _loader.GetString("TextImapSetupHint") ?? "Please enter IMAP server info. Gmail/Outlook OAuth is recommended.";
         }
 
         private void CancelImapButton_Click(object sender, RoutedEventArgs e)
@@ -592,27 +594,27 @@ namespace Task_Flyout.Views
             string smtpUserName = SmtpUserNameBox.Text.Trim();
             if (string.IsNullOrWhiteSpace(address))
             {
-                AddStatusText.Text = "请输入邮箱地址。";
+                AddStatusText.Text = _loader.GetString("TextEnterEmail") ?? "Please enter email address.";
                 return;
             }
             if (string.IsNullOrWhiteSpace(host))
             {
-                AddStatusText.Text = "请输入 IMAP 服务器。";
+                AddStatusText.Text = _loader.GetString("TextEnterImapServer") ?? "Please enter IMAP server.";
                 return;
             }
             if (string.IsNullOrWhiteSpace(password))
             {
-                AddStatusText.Text = "请输入密码或应用专用密码。";
+                AddStatusText.Text = _loader.GetString("TextEnterPassword") ?? "Please enter password or app-specific password.";
                 return;
             }
             if (string.IsNullOrWhiteSpace(smtpHost))
             {
-                AddStatusText.Text = "请输入 SMTP 服务器，IMAP 账户需要它来发送邮件。";
+                AddStatusText.Text = _loader.GetString("TextEnterSmtpServer") ?? "Please enter SMTP server. IMAP accounts need it to send mail.";
                 return;
             }
 
             SetAddButtonsEnabled(false);
-            AddStatusText.Text = "正在连接 IMAP 服务器...";
+            AddStatusText.Text = _loader.GetString("TextConnectingImap") ?? "Connecting to IMAP server...";
 
             try
             {
@@ -629,13 +631,13 @@ namespace Task_Flyout.Views
                     SmtpSslToggle.IsOn,
                     smtpUserName);
 
-                AddStatusText.Text = $"已添加 {account.DisplayTitle}";
+                AddStatusText.Text = string.Format(_loader.GetString("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
                 await RefreshAccountsAsync();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Add IMAP account failed: {ex.Message}");
-                AddStatusText.Text = "连接 IMAP 服务器失败，请检查服务器设置和凭据。";
+                AddStatusText.Text = _loader.GetString("TextImapConnectFailed") ?? "Failed to connect to IMAP server. Please check settings and credentials.";
             }
             finally
             {
@@ -698,7 +700,7 @@ namespace Task_Flyout.Views
                     _suppressSelectionClear = false;
                 }
 
-                MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {_items.Count} 封邮件";
+                MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetString("TextNMailItems") ?? "{0} messages", _items.Count)}";
             }
 
             return remoteSyncTask;
@@ -713,7 +715,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Mark as read failed: {ex.Message}");
-                MessageListSubtitle.Text = "已读状态同步失败。";
+                MessageListSubtitle.Text = _loader.GetString("TextReadSyncFailed") ?? "Failed to sync read status.";
             }
         }
 
@@ -827,17 +829,17 @@ namespace Task_Flyout.Views
                 fallbackText = BuildPlainTextFallback(item.HtmlBody);
 
             DetailPreview.Text = string.IsNullOrWhiteSpace(fallbackText)
-                ? string.IsNullOrWhiteSpace(item.Preview) ? "没有可用正文。" : item.Preview
+                ? string.IsNullOrWhiteSpace(item.Preview) ? (_loader.GetString("TextNoBody") ?? "No body available.") : item.Preview
                 : fallbackText;
         }
 
         private void UpdateTrustButton(MailItem item)
         {
-            var source = MailTrustStore.GetDisplaySource(item);
+            var source = _mailTrustStore.GetDisplaySource(item);
             var trusted = _mailTrustStore.IsTrusted(item);
-            TrustSenderButton.IsEnabled = source != "未知来源";
-            TrustSenderButtonText.Text = trusted ? "取消信任来源" : "信任此来源";
-            ToolTipService.SetToolTip(TrustSenderButton, trusted ? $"已信任：{source}" : $"信任后将允许加载此来源的远程邮件内容：{source}");
+            TrustSenderButton.IsEnabled = source != (_loader.GetString("TextUnknownSource") ?? "Unknown source");
+            TrustSenderButtonText.Text = trusted ? (_loader.GetString("TextUntrustSource") ?? "Untrust source") : (_loader.GetString("TextTrustSource") ?? "Trust this source");
+            ToolTipService.SetToolTip(TrustSenderButton, trusted ? string.Format(_loader.GetString("TextTrusted") ?? "Trusted: {0}", source) : string.Format(_loader.GetString("TextTrustTooltip") ?? "Trusting will allow loading remote content from: {0}", source));
         }
 
         private bool IsDarkThemeActive()
@@ -1083,37 +1085,37 @@ body { background-color: {{background}} !important; }
 
             if (ComposeFromBox.SelectedItem is not ComboBoxItem selectedFrom)
             {
-                ComposeStatusText.Text = "请选择发件人。";
+                ComposeStatusText.Text = _loader.GetString("TextSelectSender") ?? "Please select a sender.";
                 return;
             }
 
             var account = _mailService.GetAccounts().FirstOrDefault(a => a.Id == selectedFrom.Tag?.ToString());
             if (account == null)
             {
-                ComposeStatusText.Text = "找不到发件人账户。";
+                ComposeStatusText.Text = _loader.GetString("TextSenderNotFound") ?? "Sender account not found.";
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(ComposeToBox.Text))
             {
-                ComposeStatusText.Text = "请输入收件人。";
+                ComposeStatusText.Text = _loader.GetString("TextEnterRecipient") ?? "Please enter a recipient.";
                 return;
             }
 
             SendComposeButton.IsEnabled = false;
-            ComposeStatusText.Text = "正在发送...";
+            ComposeStatusText.Text = _loader.GetString("TextSending") ?? "Sending...";
 
             try
             {
                 await _mailService.SendMailAsync(account, ComposeToBox.Text, ComposeSubjectBox.Text, ComposeBodyBox.Text);
-                ComposeStatusText.Text = "邮件已发送。";
+                ComposeStatusText.Text = _loader.GetString("TextMailSent") ?? "Email sent.";
                 ComposePanel.Visibility = Visibility.Collapsed;
                 ClearDetail();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Send mail failed: {ex.Message}");
-                ComposeStatusText.Text = "发送邮件失败，请检查网络连接和账户设置。";
+                ComposeStatusText.Text = _loader.GetString("TextSendFailed") ?? "Failed to send email. Please check network and account settings.";
             }
             finally
             {
@@ -1151,11 +1153,15 @@ body { background-color: {{background}} !important; }
             return subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? subject : $"Re: {subject}";
         }
 
-        private static string CreateReplyBody(MailItem item)
+        private string CreateReplyBody(MailItem item)
         {
             var received = item.RawReceivedTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? item.ReceivedTime;
             var original = string.IsNullOrWhiteSpace(item.BodyText) ? item.Preview : item.BodyText;
-            return $"\r\n\r\n---- 原始邮件 ----\r\n发件人: {item.Sender}\r\n时间: {received}\r\n主题: {item.Subject}\r\n\r\n{original}";
+            var originalMail = _loader.GetString("TextOriginalMail") ?? "---- Original Message ----";
+            var fromLabel = _loader.GetString("TextOriginalSender") ?? "From";
+            var dateLabel = _loader.GetString("TextOriginalTime") ?? "Date";
+            var subjectLabel = _loader.GetString("TextOriginalSubject") ?? "Subject";
+            return $"\r\n\r\n{originalMail}\r\n{fromLabel}: {item.Sender}\r\n{dateLabel}: {received}\r\n{subjectLabel}: {item.Subject}\r\n\r\n{original}";
         }
     }
 }

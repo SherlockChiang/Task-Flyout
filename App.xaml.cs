@@ -1,5 +1,6 @@
 ﻿using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.Windows.ApplicationModel.Resources;
 using System.Linq;
 using System;
 using Task_Flyout.Services;
@@ -29,6 +30,7 @@ namespace Task_Flyout
 
         private H.NotifyIcon.TaskbarIcon? _trayIcon;
         private UISettings _uiSettings = null!;
+        private ResourceLoader _loader = new();
         private string _trayToolTipText = "Task Flyout";
         public static FlyoutWindow? MyFlyoutWindow { get; private set; }
         public static MainWindow? MyMainWindow { get; private set; }
@@ -184,10 +186,10 @@ namespace Task_Flyout
 
             var subject = string.IsNullOrWhiteSpace(e.Item.Subject) ? "(No subject)" : e.Item.Subject;
             var sender = string.IsNullOrWhiteSpace(e.Item.Sender) ? e.Account.DisplayTitle : e.Item.Sender;
-            var title = $"新邮件 · {e.Account.DisplayTitle}";
+            var title = $"{(_loader.GetString("TextNewMail") ?? "New Mail")} · {e.Account.DisplayTitle}";
             var message = $"{subject}\n{sender}";
 
-            _trayToolTipText = $"Task Flyout · 新邮件：{TruncateForTray(subject, 48)}";
+            _trayToolTipText = $"Task Flyout · {(_loader.GetString("TextNewMail") ?? "New Mail")}: {TruncateForTray(subject, 48)}";
             _trayIcon.ToolTipText = _trayToolTipText;
 
             try

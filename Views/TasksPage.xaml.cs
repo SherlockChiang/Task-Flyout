@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.Windows.ApplicationModel.Resources;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -17,6 +18,7 @@ namespace Task_Flyout.Views
 
         private SyncManager? _syncManager;
         private AppCache _localCache = new();
+        private ResourceLoader _loader = new();
         private bool _isAccountPaneCollapsed;
 
         public TasksPage()
@@ -115,11 +117,11 @@ namespace Task_Flyout.Views
                     ? GetTaskSortDate(b).CompareTo(GetTaskSortDate(a))
                     : string.Compare(a.Title, b.Title, StringComparison.CurrentCultureIgnoreCase));
 
-            PendingHeaderText.Text = $"待完成 ({PendingTasks.Count})";
-            CompletedHeaderText.Text = $"已完成 ({CompletedTasks.Count})";
+            PendingHeaderText.Text = string.Format(_loader.GetString("TextPendingTasks") ?? "Pending ({0})", PendingTasks.Count);
+            CompletedHeaderText.Text = string.Format(_loader.GetString("TextCompletedTasks") ?? "Completed ({0})", CompletedTasks.Count);
             TaskSummaryText.Text = PendingTasks.Count == 0
-                ? $"已经没有未完成任务，{CompletedTasks.Count} 个已完成"
-                : $"{PendingTasks.Count} 个待完成，{CompletedTasks.Count} 个已完成";
+                ? string.Format(_loader.GetString("TextAllDone") ?? "All done, {0} completed", CompletedTasks.Count)
+                : string.Format(_loader.GetString("TextTaskSummary") ?? "{0} pending, {1} completed", PendingTasks.Count, CompletedTasks.Count);
             PendingTasksList.Visibility = PendingTasks.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
             PendingEmptyText.Visibility = PendingTasks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -194,9 +196,9 @@ namespace Task_Flyout.Views
             {
                 await new ContentDialog
                 {
-                    Title = "没有可用账户",
-                    Content = "请先添加并登录一个支持任务的账户。",
-                    CloseButtonText = "确定",
+                    Title = _loader.GetString("TextNoAccountAvailable") ?? "No Account Available",
+                    Content = _loader.GetString("TextAddAccountForTasks") ?? "Please add and sign in to a task-supporting account first.",
+                    CloseButtonText = _loader.GetString("TextConfirm") ?? "Confirm",
                     XamlRoot = XamlRoot
                 }.ShowAsync();
                 return;
@@ -204,24 +206,24 @@ namespace Task_Flyout.Views
 
             var titleBox = new TextBox
             {
-                Header = "标题",
-                PlaceholderText = "任务名称"
+                Header = _loader.GetString("TextTitle") ?? "Title",
+                PlaceholderText = _loader.GetString("TextTaskName") ?? "Task name"
             };
             var providerBox = new ComboBox
             {
-                Header = "账户",
+                Header = _loader.GetString("TextAccount") ?? "Account",
                 ItemsSource = providerNames,
                 SelectedIndex = 0,
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
             var datePicker = new DatePicker
             {
-                Header = "日期",
+                Header = _loader.GetString("TextDate") ?? "Date",
                 Date = DateTimeOffset.Now
             };
             var timePicker = new TimePicker
             {
-                Header = "时间",
+                Header = _loader.GetString("TextTime") ?? "Time",
                 Time = new TimeSpan(9, 0, 0)
             };
             var panel = new StackPanel { Spacing = 12 };
@@ -232,10 +234,10 @@ namespace Task_Flyout.Views
 
             var dialog = new ContentDialog
             {
-                Title = "添加任务",
+                Title = _loader.GetString("TextAddTask") ?? "Add Task",
                 Content = panel,
-                PrimaryButtonText = "保存",
-                CloseButtonText = "取消",
+                PrimaryButtonText = _loader.GetString("CalendarDialog.PrimaryButtonText") ?? "Save",
+                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = XamlRoot
             };
@@ -246,7 +248,7 @@ namespace Task_Flyout.Views
                 if (string.IsNullOrWhiteSpace(title))
                 {
                     args.Cancel = true;
-                    titleBox.PlaceholderText = "请输入任务名称";
+                    titleBox.PlaceholderText = _loader.GetString("TextEnterTaskName") ?? "Please enter task name";
                     titleBox.Focus(FocusState.Programmatic);
                     return;
                 }
@@ -276,10 +278,10 @@ namespace Task_Flyout.Views
 
             var dialog = new ContentDialog
             {
-                Title = "删除任务",
-                Content = $"确定要删除“{item.Title}”吗？",
-                PrimaryButtonText = "删除",
-                CloseButtonText = "取消",
+                Title = _loader.GetString("TextDeleteTask") ?? "Delete Task",
+                Content = string.Format(_loader.GetString("TextDeleteTaskContent") ?? "Delete \"{0}\"?", item.Title),
+                PrimaryButtonText = _loader.GetString("CalendarDialog.SecondaryButtonText") ?? "Delete",
+                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = XamlRoot
             };
@@ -354,10 +356,10 @@ namespace Task_Flyout.Views
 
             var dialog = new ContentDialog
             {
-                Title = "移除账户",
-                Content = $"确定要移除 {providerName} 账户吗？",
-                PrimaryButtonText = "确定",
-                CloseButtonText = "取消",
+                Title = _loader.GetString("TextRemoveAccount") ?? "Remove Account",
+                Content = string.Format(_loader.GetString("TextRemoveAccountConfirm") ?? "Remove {0} account?", providerName),
+                PrimaryButtonText = _loader.GetString("TextConfirm") ?? "Confirm",
+                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
                 XamlRoot = XamlRoot,
                 DefaultButton = ContentDialogButton.Close
             };

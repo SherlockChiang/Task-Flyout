@@ -1,5 +1,6 @@
 using Microsoft.Windows.AppNotifications;
 using Microsoft.Windows.AppNotifications.Builder;
+using Microsoft.Windows.ApplicationModel.Resources;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,6 +15,7 @@ namespace Task_Flyout.Services
     {
         private readonly SyncManager _syncManager;
         private readonly HashSet<string> _notifiedIds = new();
+        private readonly ResourceLoader _loader = new();
         private DispatcherTimer? _timer;
         private int _reminderMinutes;
 
@@ -132,7 +134,8 @@ namespace Task_Flyout.Services
             if (!DateTime.TryParse(dateKey, out var date)) return null;
 
             var subtitle = item.Subtitle?.Trim();
-            if (string.IsNullOrEmpty(subtitle) || subtitle == "全天" || subtitle == "All day")
+            var allDayText = _loader.GetString("TextAllDay") ?? "All Day";
+            if (string.IsNullOrEmpty(subtitle) || subtitle == "全天" || subtitle == "All day" || subtitle == allDayText)
                 return null;
 
             var timePart = subtitle.Split('-')[0].Trim();
@@ -147,11 +150,13 @@ namespace Task_Flyout.Services
             try
             {
                 var minutesLeft = (int)Math.Ceiling((startTime - DateTime.Now).TotalMinutes);
-                var timeText = minutesLeft <= 1 ? "1 分钟后" : $"{minutesLeft} 分钟后";
+                var timeText = minutesLeft <= 1
+                    ? (_loader.GetString("TextOneMinuteLater") ?? "Starts in 1 minute")
+                    : string.Format(_loader.GetString("TextMinutesLater") ?? "Starts in {0} minutes", minutesLeft);
 
                 var builder = new AppNotificationBuilder()
-                    .AddText(item.Title ?? "日程提醒")
-                    .AddText($"{timeText}开始 · {startTime:HH:mm}");
+                    .AddText(item.Title ?? (_loader.GetString("TextEventReminder") ?? "Event Reminder"))
+                    .AddText($"{timeText} · {startTime:HH:mm}");
 
                 if (!string.IsNullOrEmpty(item.Location))
                     builder.AddText($"\ud83d\udccd {item.Location}");

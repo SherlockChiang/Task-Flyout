@@ -7,6 +7,7 @@ using MailKit.Security;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppNotifications;
 using Microsoft.Windows.AppNotifications.Builder;
+using Microsoft.Windows.ApplicationModel.Resources;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using MimeKit;
@@ -39,6 +40,7 @@ namespace Task_Flyout.Services
 
     public class MailAccount
     {
+        private static readonly ResourceLoader _accountLoader = new();
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
         public MailAccountKind Kind { get; set; } = MailAccountKind.Outlook;
         public string DisplayName { get; set; } = "";
@@ -71,7 +73,7 @@ namespace Task_Flyout.Services
 
         public string DisplayTitle => string.IsNullOrWhiteSpace(DisplayName) ? ProviderName : DisplayName;
         public string Subtitle => string.IsNullOrWhiteSpace(Address) ? ProviderName : Address;
-        public string SetupText => IsSetupComplete ? "" : "待配置";
+        public string SetupText => IsSetupComplete ? "" : (_accountLoader.GetString("TextSetupIncomplete") ?? "Setup required");
     }
 
     public class MailFolder
@@ -139,6 +141,7 @@ namespace Task_Flyout.Services
 
     public class MailService
     {
+        private readonly ResourceLoader _loader = new();
         private GraphServiceClient? _outlookClient;
         private List<MailAccount> _accounts = new();
         private bool _accountsLoaded;
@@ -421,7 +424,7 @@ namespace Task_Flyout.Services
                     {
                         AccountId = account.Id,
                         Id = "setup",
-                        DisplayName = "完成配置后显示文件夹",
+                        DisplayName = _loader.GetString("TextFolderPlaceholder") ?? "Complete setup to view folders",
                         IsPlaceholder = true
                     }
                 };
@@ -793,10 +796,10 @@ namespace Task_Flyout.Services
                         AccountId = account.Id,
                         FolderId = folder.Id,
                         Id = id.Id.ToString(),
-                        Subject = "无法读取此邮件",
+                        Subject = _loader.GetString("TextMailReadError") ?? "Unable to read this email",
                         Sender = account.DisplayTitle,
-                        Preview = "IMAP 服务器返回了无效的 FETCH 响应。",
-                        BodyText = "无法加载此邮件的正文内容。",
+                        Preview = _loader.GetString("TextMailFetchError") ?? "IMAP server returned an invalid FETCH response.",
+                        BodyText = _loader.GetString("TextMailBodyError") ?? "Unable to load the body of this email.",
                         IsRead = isRead
                     });
                 }
@@ -1434,7 +1437,7 @@ namespace Task_Flyout.Services
             try
             {
                 var notification = new AppNotificationBuilder()
-                    .AddText($"新邮件 · {account.DisplayTitle}")
+                    .AddText($"{(_loader.GetString("TextNewMail") ?? "New Mail")} · {account.DisplayTitle}")
                     .AddText(subject)
                     .AddText(sender)
                     .AddArgument("action", "openMail")
@@ -1580,7 +1583,7 @@ namespace Task_Flyout.Services
             if (local.Date == now.Date)
                 return local.ToString("HH:mm");
             if (local.Date == now.Date.AddDays(-1))
-                return "昨天";
+                return "Yesterday";
             return local.ToString("MM/dd");
         }
 

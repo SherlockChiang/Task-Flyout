@@ -564,4 +564,346 @@
   <data name="WeatherPage_FlyoutFieldsDesc" xml:space="preserve">
     <value>Select weather details to show in the system flyout</value>
   </data>
+  <data name="TextNewMail" xml:space="preserve">
+    <value>New Mail</value>
+  </data>
+  <data name="TextSetupIncomplete" xml:space="preserve">
+    <value>Setup required</value>
+  </data>
+  <data name="TextFolderPlaceholder" xml:space="preserve">
+    <value>Complete setup to view folders</value>
+  </data>
+  <data name="TextMailReadError" xml:space="preserve">
+    <value>Unable to read this email</value>
+  </data>
+  <data name="TextMailFetchError" xml:space="preserve">
+    <value>IMAP server returned an invalid FETCH response.</value>
+  </data>
+  <data name="TextMailBodyError" xml:space="preserve">
+    <value>Unable to load the body of this email.</value>
+  </data>
+  <data name="TextYesterday" xml:space="preserve">
+    <value>Yesterday</value>
+  </data>
+  <data name="TextInbox" xml:space="preserve">
+    <value>Inbox</value>
+  </data>
+  <data name="TextSyncIssue" xml:space="preserve">
+    <value>sync issue</value>
+  </data>
+  <data name="TextUnknownSource" xml:space="preserve">
+    <value>Unknown source</value>
+  </data>
+  <data name="TextEventReminder" xml:space="preserve">
+    <value>Event Reminder</value>
+  </data>
+  <data name="TextMinutesBefore" xml:space="preserve">
+    <value>in {0} minutes</value>
+  </data>
+  <data name="TextOneMinuteBefore" xml:space="preserve">
+    <value>in 1 minute</value>
+  </data>
+  <data name="TextStartsAt" xml:space="preserve">
+    <value>starts at {0}</value>
+  </data>
+  <data name="TextNewFolder" xml:space="preserve">
+    <value>New folder</value>
+  </data>
+  <data name="TextUntitled" xml:space="preserve">
+    <value>(Untitled)</value>
+  </data>
+  <data name="TextFolder" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="TextDeleteRecurringTitle" xml:space="preserve">
+    <value>Delete Recurring Event</value>
+  </data>
+  <data name="TextDeleteRecurringPrompt" xml:space="preserve">
+    <value>Select the scope of deletion.</value>
+  </data>
+  <data name="TextDeleteThisEvent" xml:space="preserve">
+    <value>Delete this event only</value>
+  </data>
+  <data name="TextDeleteThisAndFollowing" xml:space="preserve">
+    <value>Delete this and following events</value>
+  </data>
+  <data name="TextDeleteAllRecurring" xml:space="preserve">
+    <value>Delete all recurring events</value>
+  </data>
+  <data name="TextSelectFolder" xml:space="preserve">
+    <value>Select a folder on the left</value>
+  </data>
+  <data name="TextAddMailAccountFirst" xml:space="preserve">
+    <value>Add an email account first</value>
+  </data>
+  <data name="TextNMailItems" xml:space="preserve">
+    <value>{0} messages</value>
+  </data>
+  <data name="TextMailNotFound" xml:space="preserve">
+    <value>This message was not found in the local cache or current folder.</value>
+  </data>
+  <data name="TextLoading" xml:space="preserve">
+    <value>Loading</value>
+  </data>
+  <data name="TextLoadFoldersFailed" xml:space="preserve">
+    <value>Failed to load folders, please try again later.</value>
+  </data>
+  <data name="TextLoadMailFailed" xml:space="preserve">
+    <value>Failed to load messages, please try again later.</value>
+  </data>
+  <data name="TextDeleteMailAccount" xml:space="preserve">
+    <value>Delete Email Account</value>
+  </data>
+  <data name="TextDeleteMailAccountContent" xml:space="preserve">
+    <value>Remove {0} - {1} from Task Flyout? This will not delete emails on the server.</value>
+  </data>
+  <data name="TextCompose" xml:space="preserve">
+    <value>Compose</value>
+  </data>
+  <data name="TextReply" xml:space="preserve">
+    <value>Reply</value>
+  </data>
+  <data name="TextOpeningMSAuth" xml:space="preserve">
+    <value>Opening Microsoft authorization...</value>
+  </data>
+  <data name="TextAccountAdded" xml:space="preserve">
+    <value>Added {0}</value>
+  </data>
+  <data name="TextAddOutlookFailed" xml:space="preserve">
+    <value>Failed to add Outlook account. Please check authorization or network.</value>
+  </data>
+  <data name="TextOpeningGoogleAuth" xml:space="preserve">
+    <value>Opening Google authorization...</value>
+  </data>
+  <data name="TextAddGmailFailed" xml:space="preserve">
+    <value>Failed to add Gmail account. Please check authorization or network.</value>
+  </data>
+  <data name="TextImapSetupHint" xml:space="preserve">
+    <value>Please enter IMAP server info. Gmail/Outlook OAuth is recommended.</value>
+  </data>
+  <data name="TextEnterEmail" xml:space="preserve">
+    <value>Please enter email address.</value>
+  </data>
+  <data name="TextEnterImapServer" xml:space="preserve">
+    <value>Please enter IMAP server.</value>
+  </data>
+  <data name="TextEnterPassword" xml:space="preserve">
+    <value>Please enter password or app-specific password.</value>
+  </data>
+  <data name="TextEnterSmtpServer" xml:space="preserve">
+    <value>Please enter SMTP server. IMAP accounts need it to send mail.</value>
+  </data>
+  <data name="TextConnectingImap" xml:space="preserve">
+    <value>Connecting to IMAP server...</value>
+  </data>
+  <data name="TextImapConnectFailed" xml:space="preserve">
+    <value>Failed to connect to IMAP server. Please check settings and credentials.</value>
+  </data>
+  <data name="TextReadSyncFailed" xml:space="preserve">
+    <value>Failed to sync read status.</value>
+  </data>
+  <data name="TextNoBody" xml:space="preserve">
+    <value>No body available.</value>
+  </data>
+  <data name="TextTrustSource" xml:space="preserve">
+    <value>Trust this source</value>
+  </data>
+  <data name="TextUntrustSource" xml:space="preserve">
+    <value>Untrust source</value>
+  </data>
+  <data name="TextTrusted" xml:space="preserve">
+    <value>Trusted: {0}</value>
+  </data>
+  <data name="TextTrustTooltip" xml:space="preserve">
+    <value>Trusting will allow loading remote content from: {0}</value>
+  </data>
+  <data name="TextSelectSender" xml:space="preserve">
+    <value>Please select a sender.</value>
+  </data>
+  <data name="TextSenderNotFound" xml:space="preserve">
+    <value>Sender account not found.</value>
+  </data>
+  <data name="TextEnterRecipient" xml:space="preserve">
+    <value>Please enter a recipient.</value>
+  </data>
+  <data name="TextSending" xml:space="preserve">
+    <value>Sending...</value>
+  </data>
+  <data name="TextMailSent" xml:space="preserve">
+    <value>Email sent.</value>
+  </data>
+  <data name="TextSendFailed" xml:space="preserve">
+    <value>Failed to send email. Please check network and account settings.</value>
+  </data>
+  <data name="TextOriginalMail" xml:space="preserve">
+    <value>---- Original Message ----</value>
+  </data>
+  <data name="TextOriginalSender" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="TextOriginalTime" xml:space="preserve">
+    <value>Date</value>
+  </data>
+  <data name="TextOriginalSubject" xml:space="preserve">
+    <value>Subject</value>
+  </data>
+  <data name="TextRssInitFailed" xml:space="preserve">
+    <value>RSS initialization failed: {0}</value>
+  </data>
+  <data name="TextAllArticles" xml:space="preserve">
+    <value>All Articles</value>
+  </data>
+  <data name="TextUncategorized" xml:space="preserve">
+    <value>Uncategorized</value>
+  </data>
+  <data name="TextNSubscriptions" xml:space="preserve">
+    <value>{0} subscriptions, {1} folders</value>
+  </data>
+  <data name="TextNoCachedArticles" xml:space="preserve">
+    <value>No cached articles, click refresh to fetch</value>
+  </data>
+  <data name="TextNArticlesScroll" xml:space="preserve">
+    <value>{0} articles, scroll down to load more</value>
+  </data>
+  <data name="TextNArticles" xml:space="preserve">
+    <value>{0} articles</value>
+  </data>
+  <data name="TextCacheLoadFailed" xml:space="preserve">
+    <value>Cache load failed: {0}</value>
+  </data>
+  <data name="TextNoArticles" xml:space="preserve">
+    <value>No articles</value>
+  </data>
+  <data name="TextNArticlesClickLoad" xml:space="preserve">
+    <value>{0} articles, click to load more</value>
+  </data>
+  <data name="TextLoadFailed" xml:space="preserve">
+    <value>Load failed: {0}</value>
+  </data>
+  <data name="TextAllSubscriptions" xml:space="preserve">
+    <value>All subscriptions</value>
+  </data>
+  <data name="TextCurrentFolderArticles" xml:space="preserve">
+    <value>RSS articles in current folder</value>
+  </data>
+  <data name="TextUncategorizedArticles" xml:space="preserve">
+    <value>Uncategorized subscription articles</value>
+  </data>
+  <data name="TextRssAddress" xml:space="preserve">
+    <value>RSS URL</value>
+  </data>
+  <data name="TextAddRssSubscription" xml:space="preserve">
+    <value>Add RSS Subscription</value>
+  </data>
+  <data name="TextAddFailed2" xml:space="preserve">
+    <value>Add failed: {0}</value>
+  </data>
+  <data name="TextDeleteSubscription" xml:space="preserve">
+    <value>Delete Subscription</value>
+  </data>
+  <data name="TextDeleteSubscriptionContent" xml:space="preserve">
+    <value>Delete "{0}"? Cached articles will also be removed.</value>
+  </data>
+  <data name="TextFolderName" xml:space="preserve">
+    <value>Folder name</value>
+  </data>
+  <data name="TextRenameFolder" xml:space="preserve">
+    <value>Rename Folder</value>
+  </data>
+  <data name="TextSubscriptionName" xml:space="preserve">
+    <value>Subscription name</value>
+  </data>
+  <data name="TextRenameSubscription" xml:space="preserve">
+    <value>Rename Subscription</value>
+  </data>
+  <data name="TextFolderNamePlaceholder" xml:space="preserve">
+    <value>e.g. Tech, News, Blog</value>
+  </data>
+  <data name="TextAddRssFolder" xml:space="preserve">
+    <value>Add RSS Folder</value>
+  </data>
+  <data name="TextDeleteFolder" xml:space="preserve">
+    <value>Delete Folder</value>
+  </data>
+  <data name="TextDeleteFolderContent" xml:space="preserve">
+    <value>Delete "{0}"? Subscriptions will be moved to Uncategorized.</value>
+  </data>
+  <data name="TextSetFolder" xml:space="preserve">
+    <value>Set folder for "{0}"</value>
+  </data>
+  <data name="TextArticleRenderFailed" xml:space="preserve">
+    <value>Article render failed: {0}</value>
+  </data>
+  <data name="TextPendingTasks" xml:space="preserve">
+    <value>Pending ({0})</value>
+  </data>
+  <data name="TextCompletedTasks" xml:space="preserve">
+    <value>Completed ({0})</value>
+  </data>
+  <data name="TextAllDone" xml:space="preserve">
+    <value>All done, {0} completed</value>
+  </data>
+  <data name="TextTaskSummary" xml:space="preserve">
+    <value>{0} pending, {1} completed</value>
+  </data>
+  <data name="TextNoAccountAvailable" xml:space="preserve">
+    <value>No Account Available</value>
+  </data>
+  <data name="TextAddAccountForTasks" xml:space="preserve">
+    <value>Please add and sign in to a task-supporting account first.</value>
+  </data>
+  <data name="TextTitle" xml:space="preserve">
+    <value>Title</value>
+  </data>
+  <data name="TextTaskName" xml:space="preserve">
+    <value>Task name</value>
+  </data>
+  <data name="TextAccount" xml:space="preserve">
+    <value>Account</value>
+  </data>
+  <data name="TextDate" xml:space="preserve">
+    <value>Date</value>
+  </data>
+  <data name="TextTime" xml:space="preserve">
+    <value>Time</value>
+  </data>
+  <data name="TextAddTask" xml:space="preserve">
+    <value>Add Task</value>
+  </data>
+  <data name="TextEnterTaskName" xml:space="preserve">
+    <value>Please enter task name</value>
+  </data>
+  <data name="TextDeleteTask" xml:space="preserve">
+    <value>Delete Task</value>
+  </data>
+  <data name="TextDeleteTaskContent" xml:space="preserve">
+    <value>Delete "{0}"?</value>
+  </data>
+  <data name="TextRemoveAccount" xml:space="preserve">
+    <value>Remove Account</value>
+  </data>
+  <data name="TextRemoveAccountConfirm" xml:space="preserve">
+    <value>Remove {0} account?</value>
+  </data>
+  <data name="TextTodoTasks" xml:space="preserve">
+    <value>To Do</value>
+  </data>
+  <data name="TextCustomColorRGB" xml:space="preserve">
+    <value>Custom Color (RGB/HEX)</value>
+  </data>
+  <data name="TextRestartContent" xml:space="preserve">
+    <value>Please restart the app to apply language changes.</value>
+  </data>
+  <data name="TextLater" xml:space="preserve">
+    <value>Later</value>
+  </data>
+  <data name="TextNoSubscriptionsHint" xml:space="preserve">
+    <value>No subscriptions yet. Add an RSS URL to start reading.</value>
+  </data>
+  <data name="TextAdd" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="TextYearFormat" xml:space="preserve">
+    <value>{0}</value>
+  </data>
 </root>

@@ -208,7 +208,7 @@ namespace Task_Flyout.Views
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"数据同步异常: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Sync error: {ex.Message}");
             }
             finally
             {
@@ -248,8 +248,8 @@ namespace Task_Flyout.Views
             FlyoutMonthGrid.ItemsSource = CultureInfo.CurrentUICulture.DateTimeFormat.MonthNames
                 .Where(m => !string.IsNullOrEmpty(m)).ToArray();
         }
-        private void FlyoutPrevYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = $"{--_flyoutYear}年";
-        private void FlyoutNextYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = $"{++_flyoutYear}年";
+        private void FlyoutPrevYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = string.Format(_loader.GetString("TextYearFormat") ?? "{0}", --_flyoutYear);
+        private void FlyoutNextYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = string.Format(_loader.GetString("TextYearFormat") ?? "{0}", ++_flyoutYear);
         private void FlyoutMonthGrid_ItemClick(object sender, ItemClickEventArgs e)
         {
             if (e.ClickedItem is string monthStr)
@@ -306,10 +306,10 @@ namespace Task_Flyout.Views
 
             var dialog = new ContentDialog
             {
-                Title = _loader.GetString("TextRemoveAccountTitle") ?? "移除账户",
-                Content = string.Format(_loader.GetString("TextRemoveAccountContent") ?? "确定要移除 {0} 账户吗？", providerName),
-                PrimaryButtonText = _loader.GetString("TextConfirm") ?? "确定",
-                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "取消",
+                Title = _loader.GetString("TextRemoveAccountTitle") ?? "Remove Account",
+                Content = string.Format(_loader.GetString("TextRemoveAccountContent") ?? "Are you sure you want to remove the {0} account?", providerName),
+                PrimaryButtonText = _loader.GetString("TextConfirm") ?? "Confirm",
+                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
                 XamlRoot = XamlRoot,
                 DefaultButton = ContentDialogButton.Close
             };
@@ -364,7 +364,7 @@ namespace Task_Flyout.Views
             {
                 var sortedItems = _localCache.DayItems[dateKey]
                     .Where(IsItemVisible)
-                    .OrderBy(i => i.Subtitle == "全天" ? 0 : 1)
+                    .OrderBy(i => (i.Subtitle == "全天" || i.Subtitle == (_loader.GetString("TextAllDay") ?? "All Day")) ? 0 : 1)
                     .ThenBy(i => i.Subtitle);
                 foreach (var item in sortedItems)
                 {
@@ -372,7 +372,7 @@ namespace Task_Flyout.Views
                     {
                         Id = item.Id,
                         Title = item.Title,
-                        Subtitle = $"{DateTime.Parse(dateKey).ToString("M", CultureInfo.CurrentUICulture)}\n{(item.Subtitle == "全天" ? _loader.GetString("TextAllDay") : item.Subtitle)}",
+                        Subtitle = $"{DateTime.Parse(dateKey).ToString("M", CultureInfo.CurrentUICulture)}\n{(item.Subtitle == "全天" || item.Subtitle == "All Day" ? (_loader.GetString("TextAllDay") ?? "All Day") : item.Subtitle)}",
                         Location = item.Location,
                         Description = item.Description,
                         IsEvent = item.IsEvent,
@@ -399,7 +399,7 @@ namespace Task_Flyout.Views
             {
                 SelectedDayItems.Add(new AgendaItem
                 {
-                    Title = _loader.GetString("TextNoAgendaTitle") ?? "近期没有安排",
+                    Title = _loader.GetString("TextNoAgendaTitle") ?? "No upcoming events",
                     Subtitle = "-",
                     IsEvent = true
                 });
@@ -518,7 +518,7 @@ namespace Task_Flyout.Views
         private void BtnAddNew_Click(object sender, RoutedEventArgs e)
         {
             _itemBeingEdited = null;
-            EditDialog.Title = _loader.GetString("TextNewItem") ?? "新建";
+            EditDialog.Title = _loader.GetString("TextNewItem") ?? "New Event / Task";
             EditDialog.SecondaryButtonText = "";
             SetupEditProviderComboBox();
             EditCmbProvider.IsEnabled = true;
@@ -543,8 +543,8 @@ namespace Task_Flyout.Views
         private void PrepareDialogForEdit(AgendaItem item)
         {
             _itemBeingEdited = item;
-            EditDialog.Title = _loader.GetString("CalendarDialog/Title") ?? "编辑";
-            EditDialog.SecondaryButtonText = _loader.GetString("CalendarDialog/SecondaryButtonText") ?? "删除";
+            EditDialog.Title = _loader.GetString("CalendarDialog/Title") ?? "Edit Event / Task";
+            EditDialog.SecondaryButtonText = _loader.GetString("CalendarDialog/SecondaryButtonText") ?? "Delete";
 
             EditTxtTitle.Text = item.Title;
             EditTxtLocation.Text = item.Location;
@@ -586,7 +586,7 @@ namespace Task_Flyout.Views
             if (e.OriginalSource is FrameworkElement src && (src is CheckBox || src.Parent is CheckBox)) return;
             if ((sender as FrameworkElement)?.DataContext is AgendaItem item)
             {
-                if (item.Title != null && item.Title.Contains(_loader.GetString("TextNoAgendaTitle") ?? "无安排")) return;
+                if (item.Title != null && item.Title.Contains(_loader.GetString("TextNoAgendaTitle") ?? "No upcoming events")) return;
                 PrepareDialogForEdit(item);
                 EditDialog.XamlRoot = this.XamlRoot;
                 await EditDialog.ShowAsync();
@@ -612,7 +612,7 @@ namespace Task_Flyout.Views
             TimeSpan? newStartTime = EditChkAllDay.IsChecked == true ? null : EditStartTimePicker.SelectedTime;
             TimeSpan? newEndTime = EditChkAllDay.IsChecked == true ? null : EditEndTimePicker.SelectedTime;
 
-            string newSubtitleText = _loader.GetString("TextAllDay") ?? "全天";
+            string newSubtitleText = _loader.GetString("TextAllDay") ?? "All Day";
             if (newStartTime.HasValue && newEndTime.HasValue) newSubtitleText = $"{newStartTime.Value:hh\\:mm} - {newEndTime.Value:hh\\:mm}";
             else if (newStartTime.HasValue) newSubtitleText = $"{newStartTime.Value:hh\\:mm}";
 
@@ -633,7 +633,7 @@ namespace Task_Flyout.Views
                         _ = SyncMonthDataAsync(forceRefresh: true);
                     }
                 }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"新建失败: {ex.Message}"); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Create failed: {ex.Message}"); }
             }
             else
             {
@@ -749,33 +749,33 @@ namespace Task_Flyout.Views
             var dialog = new ContentDialog
             {
                 XamlRoot = XamlRoot,
-                Title = "删除重复日程",
-                CloseButtonText = "取消",
+                Title = _loader.GetString("TextDeleteRecurringTitle") ?? "Delete Recurring Event",
+                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Close
             };
 
             var panel = new StackPanel { Spacing = 8 };
             panel.Children.Add(new TextBlock
             {
-                Text = "请选择要删除的范围。",
+                Text = _loader.GetString("TextDeleteRecurringPrompt") ?? "Select the scope of deletion.",
                 TextWrapping = TextWrapping.Wrap
             });
 
-            var singleButton = CreateDeleteModeButton("仅删除此事件");
+            var singleButton = CreateDeleteModeButton(_loader.GetString("TextDeleteThisEvent") ?? "Delete this event only");
             singleButton.Click += (_, _) =>
             {
                 selectedMode = RecurringDeleteMode.Single;
                 dialog.Hide();
             };
 
-            var followingButton = CreateDeleteModeButton("删除此事件和之后事件");
+            var followingButton = CreateDeleteModeButton(_loader.GetString("TextDeleteThisAndFollowing") ?? "Delete this and following events");
             followingButton.Click += (_, _) =>
             {
                 selectedMode = RecurringDeleteMode.ThisAndFollowing;
                 dialog.Hide();
             };
 
-            var allButton = CreateDeleteModeButton("删除所有重复事件");
+            var allButton = CreateDeleteModeButton(_loader.GetString("TextDeleteAllRecurring") ?? "Delete all recurring events");
             allButton.Click += (_, _) =>
             {
                 selectedMode = RecurringDeleteMode.All;

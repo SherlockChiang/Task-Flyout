@@ -56,7 +56,7 @@ namespace Task_Flyout.Views
             ShowSecondsToggle.IsOn = settings.Values["ShowSeconds"] as bool? ?? false;
 
             // 👉 这里已经支持多语言了！只需在英文 resw 中添加键名 TextMinutes，值为 Minutes 即可。
-            string minuteStr = GetSafeString("TextMinutes", "分钟");
+            string minuteStr = GetSafeString("TextMinutes", "minutes");
 
             NotifyTimeComboBox.Items.Clear();
             foreach (int m in new[] { 5, 10, 15, 30, 60 })
@@ -106,7 +106,7 @@ namespace Task_Flyout.Views
             {
                 ColorPalettePanel.Children.Add(new TextBlock
                 {
-                    Text = GetSafeString("TextNoAccount", "尚未连接任何账户"),
+                    Text = GetSafeString("TextNoAccount", "No accounts connected yet"),
                     FontSize = 13,
                     Opacity = 0.5
                 });
@@ -152,7 +152,7 @@ namespace Task_Flyout.Views
                 }
 
                 var taskRow = CreateColorRow(
-                    GetSafeString("MainWindow_ToggleTasks/Text", "待办任务"),
+                    GetSafeString("MainWindow_ToggleTasks/Text", "Tasks"),
                     account.TaskColorHex,
                     selectedColor =>
                     {
@@ -204,7 +204,7 @@ namespace Task_Flyout.Views
             return grid;
         }
 
-        // 👉 核心：融合了“预设莫奈色”与“自定义RGB拾色器”的高级面板
+        // 👉 核心：融合了"预设莫奈色"与"自定义RGB拾色器"的高级面板
         private void ShowColorPickerFlyout(FrameworkElement anchor, string currentColor, Action<string> onColorSelected)
         {
             var flyout = new Flyout();
@@ -213,7 +213,7 @@ namespace Task_Flyout.Views
             // 1. 预设颜色标题
             var presetHeader = new TextBlock
             {
-                Text = GetSafeString("TextPresetColors", "预设颜色"),
+                Text = GetSafeString("TextPresetColors", "Preset Colors"),
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 FontSize = 14
             };
@@ -272,7 +272,7 @@ namespace Task_Flyout.Views
             // 3. 自定义颜色标题
             var customHeader = new TextBlock
             {
-                Text = GetSafeString("TextCustomColor", "自定义颜色 (RGB/HEX)"),
+                Text = GetSafeString("TextCustomColor", "Custom Color (RGB/HEX)"),
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 FontSize = 14,
                 Margin = new Thickness(0, 8, 0, 0)
@@ -285,12 +285,12 @@ namespace Task_Flyout.Views
             // 5. 底部按钮
             var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Margin = new Thickness(0, 8, 0, 0) };
 
-            var cancelBtn = new Button { Content = GetSafeString("CalendarDialog/CloseButtonText", "取消") };
+            var cancelBtn = new Button { Content = GetSafeString("CalendarDialog/CloseButtonText", "Cancel") };
             cancelBtn.Click += (s, e) => flyout.Hide();
 
             var applyBtn = new Button
             {
-                Content = GetSafeString("TextConfirm", "确定"),
+                Content = GetSafeString("TextConfirm", "Confirm"),
                 Style = (Style)Application.Current.Resources["AccentButtonStyle"]
             };
             applyBtn.Click += (s, e) =>
@@ -354,10 +354,10 @@ namespace Task_Flyout.Views
 
             ContentDialog restartDialog = new ContentDialog
             {
-                Title = GetSafeString("RestartRequired_Title", "需要重启"),
-                Content = GetSafeString("RestartRequired_Content", "更改语言需要重启应用才能生效。"),
-                PrimaryButtonText = GetSafeString("RestartRequired_Primary", "立即重启"),
-                CloseButtonText = GetSafeString("RestartRequired_Close", "稍后"),
+                Title = GetSafeString("RestartRequired_Title", "Restart Required"),
+                Content = GetSafeString("RestartRequired_Content", "Please restart the app to fully apply the language changes."),
+                PrimaryButtonText = GetSafeString("RestartRequired_Primary", "Restart Now"),
+                CloseButtonText = GetSafeString("RestartRequired_Close", "Later"),
                 XamlRoot = this.XamlRoot
             };
 
@@ -449,7 +449,7 @@ namespace Task_Flyout.Views
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"设置开机自启失败: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Startup task failed: {ex.Message}");
             }
         }
 

@@ -564,4 +564,346 @@
   <data name="WeatherPage_FlyoutFieldsDesc" xml:space="preserve">
     <value>勾选希望在系统浮窗中显示的天气信息</value>
   </data>
+  <data name="TextNewMail" xml:space="preserve">
+    <value>新邮件</value>
+  </data>
+  <data name="TextSetupIncomplete" xml:space="preserve">
+    <value>待配置</value>
+  </data>
+  <data name="TextFolderPlaceholder" xml:space="preserve">
+    <value>完成配置后显示文件夹</value>
+  </data>
+  <data name="TextMailReadError" xml:space="preserve">
+    <value>无法读取此邮件</value>
+  </data>
+  <data name="TextMailFetchError" xml:space="preserve">
+    <value>IMAP 服务器返回了无效的 FETCH 响应。</value>
+  </data>
+  <data name="TextMailBodyError" xml:space="preserve">
+    <value>无法加载此邮件的正文内容。</value>
+  </data>
+  <data name="TextYesterday" xml:space="preserve">
+    <value>昨天</value>
+  </data>
+  <data name="TextInbox" xml:space="preserve">
+    <value>收件箱</value>
+  </data>
+  <data name="TextSyncIssue" xml:space="preserve">
+    <value>同步问题</value>
+  </data>
+  <data name="TextUnknownSource" xml:space="preserve">
+    <value>未知来源</value>
+  </data>
+  <data name="TextEventReminder" xml:space="preserve">
+    <value>日程提醒</value>
+  </data>
+  <data name="TextMinutesBefore" xml:space="preserve">
+    <value>{0} 分钟后</value>
+  </data>
+  <data name="TextOneMinuteBefore" xml:space="preserve">
+    <value>1 分钟后</value>
+  </data>
+  <data name="TextStartsAt" xml:space="preserve">
+    <value>开始 · {0}</value>
+  </data>
+  <data name="TextNewFolder" xml:space="preserve">
+    <value>新文件夹</value>
+  </data>
+  <data name="TextUntitled" xml:space="preserve">
+    <value>(无标题)</value>
+  </data>
+  <data name="TextFolder" xml:space="preserve">
+    <value>文件夹</value>
+  </data>
+  <data name="TextDeleteRecurringTitle" xml:space="preserve">
+    <value>删除重复日程</value>
+  </data>
+  <data name="TextDeleteRecurringPrompt" xml:space="preserve">
+    <value>请选择要删除的范围。</value>
+  </data>
+  <data name="TextDeleteThisEvent" xml:space="preserve">
+    <value>仅删除此事件</value>
+  </data>
+  <data name="TextDeleteThisAndFollowing" xml:space="preserve">
+    <value>删除此事件和之后事件</value>
+  </data>
+  <data name="TextDeleteAllRecurring" xml:space="preserve">
+    <value>删除所有重复事件</value>
+  </data>
+  <data name="TextSelectFolder" xml:space="preserve">
+    <value>请选择左侧文件夹</value>
+  </data>
+  <data name="TextAddMailAccountFirst" xml:space="preserve">
+    <value>先添加一个邮箱账户</value>
+  </data>
+  <data name="TextNMailItems" xml:space="preserve">
+    <value>{0} 封邮件</value>
+  </data>
+  <data name="TextMailNotFound" xml:space="preserve">
+    <value>没有在本地缓存或当前文件夹中找到这封通知邮件。</value>
+  </data>
+  <data name="TextLoading" xml:space="preserve">
+    <value>正在加载</value>
+  </data>
+  <data name="TextLoadFoldersFailed" xml:space="preserve">
+    <value>加载文件夹失败，请稍后重试。</value>
+  </data>
+  <data name="TextLoadMailFailed" xml:space="preserve">
+    <value>加载邮件失败，请稍后重试。</value>
+  </data>
+  <data name="TextDeleteMailAccount" xml:space="preserve">
+    <value>删除邮箱账户</value>
+  </data>
+  <data name="TextDeleteMailAccountContent" xml:space="preserve">
+    <value>要从 Task Flyout 删除 {0} - {1} 吗？这不会删除邮箱服务器上的邮件。</value>
+  </data>
+  <data name="TextCompose" xml:space="preserve">
+    <value>写邮件</value>
+  </data>
+  <data name="TextReply" xml:space="preserve">
+    <value>回复邮件</value>
+  </data>
+  <data name="TextOpeningMSAuth" xml:space="preserve">
+    <value>正在打开 Microsoft 授权...</value>
+  </data>
+  <data name="TextAccountAdded" xml:space="preserve">
+    <value>已添加 {0}</value>
+  </data>
+  <data name="TextAddOutlookFailed" xml:space="preserve">
+    <value>添加 Outlook 账户失败，请检查授权或网络连接。</value>
+  </data>
+  <data name="TextOpeningGoogleAuth" xml:space="preserve">
+    <value>正在打开 Google 授权...</value>
+  </data>
+  <data name="TextAddGmailFailed" xml:space="preserve">
+    <value>添加 Gmail 账户失败，请检查授权或网络连接。</value>
+  </data>
+  <data name="TextImapSetupHint" xml:space="preserve">
+    <value>请输入 IMAP 服务器信息。Gmail/Outlook 建议优先使用 OAuth。</value>
+  </data>
+  <data name="TextEnterEmail" xml:space="preserve">
+    <value>请输入邮箱地址。</value>
+  </data>
+  <data name="TextEnterImapServer" xml:space="preserve">
+    <value>请输入 IMAP 服务器。</value>
+  </data>
+  <data name="TextEnterPassword" xml:space="preserve">
+    <value>请输入密码或应用专用密码。</value>
+  </data>
+  <data name="TextEnterSmtpServer" xml:space="preserve">
+    <value>请输入 SMTP 服务器，IMAP 账户需要它来发送邮件。</value>
+  </data>
+  <data name="TextConnectingImap" xml:space="preserve">
+    <value>正在连接 IMAP 服务器...</value>
+  </data>
+  <data name="TextImapConnectFailed" xml:space="preserve">
+    <value>连接 IMAP 服务器失败，请检查服务器设置和凭据。</value>
+  </data>
+  <data name="TextReadSyncFailed" xml:space="preserve">
+    <value>已读状态同步失败。</value>
+  </data>
+  <data name="TextNoBody" xml:space="preserve">
+    <value>没有可用正文。</value>
+  </data>
+  <data name="TextTrustSource" xml:space="preserve">
+    <value>信任此来源</value>
+  </data>
+  <data name="TextUntrustSource" xml:space="preserve">
+    <value>取消信任来源</value>
+  </data>
+  <data name="TextTrusted" xml:space="preserve">
+    <value>已信任：{0}</value>
+  </data>
+  <data name="TextTrustTooltip" xml:space="preserve">
+    <value>信任后将允许加载此来源的远程邮件内容：{0}</value>
+  </data>
+  <data name="TextSelectSender" xml:space="preserve">
+    <value>请选择发件人。</value>
+  </data>
+  <data name="TextSenderNotFound" xml:space="preserve">
+    <value>找不到发件人账户。</value>
+  </data>
+  <data name="TextEnterRecipient" xml:space="preserve">
+    <value>请输入收件人。</value>
+  </data>
+  <data name="TextSending" xml:space="preserve">
+    <value>正在发送...</value>
+  </data>
+  <data name="TextMailSent" xml:space="preserve">
+    <value>邮件已发送。</value>
+  </data>
+  <data name="TextSendFailed" xml:space="preserve">
+    <value>发送邮件失败，请检查网络连接和账户设置。</value>
+  </data>
+  <data name="TextOriginalMail" xml:space="preserve">
+    <value>---- 原始邮件 ----</value>
+  </data>
+  <data name="TextOriginalSender" xml:space="preserve">
+    <value>发件人</value>
+  </data>
+  <data name="TextOriginalTime" xml:space="preserve">
+    <value>时间</value>
+  </data>
+  <data name="TextOriginalSubject" xml:space="preserve">
+    <value>主题</value>
+  </data>
+  <data name="TextRssInitFailed" xml:space="preserve">
+    <value>RSS 初始化失败：{0}</value>
+  </data>
+  <data name="TextAllArticles" xml:space="preserve">
+    <value>全部文章</value>
+  </data>
+  <data name="TextUncategorized" xml:space="preserve">
+    <value>未分类</value>
+  </data>
+  <data name="TextNSubscriptions" xml:space="preserve">
+    <value>{0} 个订阅，{1} 个文件夹</value>
+  </data>
+  <data name="TextNoCachedArticles" xml:space="preserve">
+    <value>暂无缓存文章，点击刷新获取</value>
+  </data>
+  <data name="TextNArticlesScroll" xml:space="preserve">
+    <value>{0} 篇文章，向下滚动加载更多</value>
+  </data>
+  <data name="TextNArticles" xml:space="preserve">
+    <value>{0} 篇文章</value>
+  </data>
+  <data name="TextCacheLoadFailed" xml:space="preserve">
+    <value>缓存读取失败：{0}</value>
+  </data>
+  <data name="TextNoArticles" xml:space="preserve">
+    <value>暂无文章</value>
+  </data>
+  <data name="TextNArticlesClickLoad" xml:space="preserve">
+    <value>{0} 篇文章，点击加载更多</value>
+  </data>
+  <data name="TextLoadFailed" xml:space="preserve">
+    <value>加载失败：{0}</value>
+  </data>
+  <data name="TextAllSubscriptions" xml:space="preserve">
+    <value>全部订阅文章</value>
+  </data>
+  <data name="TextCurrentFolderArticles" xml:space="preserve">
+    <value>当前文件夹下的 RSS 文章</value>
+  </data>
+  <data name="TextUncategorizedArticles" xml:space="preserve">
+    <value>未分类订阅文章</value>
+  </data>
+  <data name="TextRssAddress" xml:space="preserve">
+    <value>RSS 地址</value>
+  </data>
+  <data name="TextAddRssSubscription" xml:space="preserve">
+    <value>添加 RSS 订阅</value>
+  </data>
+  <data name="TextAddFailed2" xml:space="preserve">
+    <value>添加失败：{0}</value>
+  </data>
+  <data name="TextDeleteSubscription" xml:space="preserve">
+    <value>删除订阅</value>
+  </data>
+  <data name="TextDeleteSubscriptionContent" xml:space="preserve">
+    <value>确定要删除"{0}"吗？本地缓存文章也会一起删除。</value>
+  </data>
+  <data name="TextFolderName" xml:space="preserve">
+    <value>文件夹名称</value>
+  </data>
+  <data name="TextRenameFolder" xml:space="preserve">
+    <value>重命名文件夹</value>
+  </data>
+  <data name="TextSubscriptionName" xml:space="preserve">
+    <value>订阅名称</value>
+  </data>
+  <data name="TextRenameSubscription" xml:space="preserve">
+    <value>重命名订阅</value>
+  </data>
+  <data name="TextFolderNamePlaceholder" xml:space="preserve">
+    <value>例如：科技、新闻、博客</value>
+  </data>
+  <data name="TextAddRssFolder" xml:space="preserve">
+    <value>添加 RSS 文件夹</value>
+  </data>
+  <data name="TextDeleteFolder" xml:space="preserve">
+    <value>删除文件夹</value>
+  </data>
+  <data name="TextDeleteFolderContent" xml:space="preserve">
+    <value>确定要删除"{0}"吗？订阅不会删除，会移动到未分类。</value>
+  </data>
+  <data name="TextSetFolder" xml:space="preserve">
+    <value>设置"{0}"的文件夹</value>
+  </data>
+  <data name="TextArticleRenderFailed" xml:space="preserve">
+    <value>文章渲染失败：{0}</value>
+  </data>
+  <data name="TextPendingTasks" xml:space="preserve">
+    <value>待完成 ({0})</value>
+  </data>
+  <data name="TextCompletedTasks" xml:space="preserve">
+    <value>已完成 ({0})</value>
+  </data>
+  <data name="TextAllDone" xml:space="preserve">
+    <value>已经没有未完成任务，{0} 个已完成</value>
+  </data>
+  <data name="TextTaskSummary" xml:space="preserve">
+    <value>{0} 个待完成，{1} 个已完成</value>
+  </data>
+  <data name="TextNoAccountAvailable" xml:space="preserve">
+    <value>没有可用账户</value>
+  </data>
+  <data name="TextAddAccountForTasks" xml:space="preserve">
+    <value>请先添加并登录一个支持任务的账户。</value>
+  </data>
+  <data name="TextTitle" xml:space="preserve">
+    <value>标题</value>
+  </data>
+  <data name="TextTaskName" xml:space="preserve">
+    <value>任务名称</value>
+  </data>
+  <data name="TextAccount" xml:space="preserve">
+    <value>账户</value>
+  </data>
+  <data name="TextDate" xml:space="preserve">
+    <value>日期</value>
+  </data>
+  <data name="TextTime" xml:space="preserve">
+    <value>时间</value>
+  </data>
+  <data name="TextAddTask" xml:space="preserve">
+    <value>添加任务</value>
+  </data>
+  <data name="TextEnterTaskName" xml:space="preserve">
+    <value>请输入任务名称</value>
+  </data>
+  <data name="TextDeleteTask" xml:space="preserve">
+    <value>删除任务</value>
+  </data>
+  <data name="TextDeleteTaskContent" xml:space="preserve">
+    <value>确定要删除"{0}"吗？</value>
+  </data>
+  <data name="TextRemoveAccount" xml:space="preserve">
+    <value>移除账户</value>
+  </data>
+  <data name="TextRemoveAccountConfirm" xml:space="preserve">
+    <value>确定要移除 {0} 账户吗？</value>
+  </data>
+  <data name="TextTodoTasks" xml:space="preserve">
+    <value>待办任务</value>
+  </data>
+  <data name="TextCustomColorRGB" xml:space="preserve">
+    <value>自定义颜色 (RGB/HEX)</value>
+  </data>
+  <data name="TextRestartContent" xml:space="preserve">
+    <value>更改语言需要重启应用才能生效。</value>
+  </data>
+  <data name="TextLater" xml:space="preserve">
+    <value>稍后</value>
+  </data>
+  <data name="TextNoSubscriptionsHint" xml:space="preserve">
+    <value>还没有订阅。添加 RSS 地址后开始阅读。</value>
+  </data>
+  <data name="TextAdd" xml:space="preserve">
+    <value>添加</value>
+  </data>
+  <data name="TextYearFormat" xml:space="preserve">
+    <value>{0}年</value>
+  </data>
 </root>
