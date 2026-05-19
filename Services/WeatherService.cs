@@ -248,12 +248,30 @@ namespace Task_Flyout.Services
 
             string lang = GetCurrentLanguage();
             var now = DateTime.Now;
-            var upcoming = info.HourlyForecast
-                .Where(h => (h.RawTime - now).TotalHours >= 0 && (h.RawTime - now).TotalHours <= lookAhead)
+            var forecast = info.HourlyForecast
+                .OrderBy(h => h.RawTime)
+                .ToList();
+            var currentHour = forecast.LastOrDefault(h => h.RawTime <= now) ?? forecast.FirstOrDefault();
+            if (currentHour == null) return null;
+
+            var upcoming = forecast
+                .Where(h => h.RawTime >= currentHour.RawTime && (h.RawTime - now).TotalHours <= lookAhead)
                 .OrderBy(h => h.RawTime)
                 .ToList();
 
             if (upcoming.Count == 0) return null;
+
+            if (IsRainCondition(currentHour) && TryGetEnabledRainType(currentHour, enabled, out var currentRainType))
+            {
+                var stopHour = forecast.FirstOrDefault(h => h.RawTime > currentHour.RawTime && !IsRainCondition(h));
+                return new WeatherAlert
+                {
+                    Type = currentRainType,
+                    HoursAhead = 0,
+                    Icon = GetAlertIcon(currentRainType),
+                    Message = BuildRainEndingMessage(stopHour, now, forecast.LastOrDefault()?.RawTime, lang)
+                };
+            }
 
             // Priority order: most severe first
             var priority = new[]
@@ -287,6 +305,65 @@ namespace Task_Flyout.Services
                 }
             }
             return null;
+        }
+
+        private static bool TryGetEnabledRainType(HourlyWeather h, HashSet<WeatherAlertType> enabled, out WeatherAlertType type)
+        {
+            type = ClassifyRainType(h);
+            if (enabled.Contains(type)) return true;
+
+            if (enabled.Contains(WeatherAlertType.Rain))
+            {
+                type = WeatherAlertType.Rain;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static WeatherAlertType ClassifyRainType(HourlyWeather h)
+        {
+            int code = h.WeatherCode;
+            if (code is 95 or 96 or 99) return WeatherAlertType.Thunderstorm;
+            if (code is 56 or 57 or 66 or 67) return WeatherAlertType.FreezingRain;
+            if (code is 65 or 82) return WeatherAlertType.HeavyRain;
+            return WeatherAlertType.Rain;
+        }
+
+        private static bool IsRainCondition(HourlyWeather h)
+        {
+            int code = h.WeatherCode;
+            if (code is 51 or 53 or 55 or 56 or 57 or 61 or 63 or 65 or 66 or 67 or 80 or 81 or 82 or 95 or 96 or 99)
+                return true;
+
+            return h.PrecipValue > 0.05 && h.PrecipProbValue >= 40;
+        }
+
+        private static string BuildRainEndingMessage(HourlyWeather? stopHour, DateTime now, DateTime? lastForecastTime, string lang)
+        {
+            bool zh = lang == "zh";
+            if (stopHour != null)
+            {
+                var minutes = Math.Max(0, (int)Math.Round((stopHour.RawTime - now).TotalMinutes));
+                if (minutes <= 5)
+                    return zh ? "正在下雨，很快会停" : "Rain now, should stop soon";
+
+                var when = FormatRainTimeSpan(minutes, zh);
+                return zh ? $"正在下雨，约{when}后停" : $"Rain now, should stop in about {when}";
+            }
+
+            var hours = lastForecastTime.HasValue
+                ? Math.Max(1, (int)Math.Ceiling((lastForecastTime.Value - now).TotalHours))
+                : 24;
+            return zh ? $"未来{hours}h雨还会持续" : $"Rain continues for the next {hours}h";
+        }
+
+        private static string FormatRainTimeSpan(int minutes, bool zh)
+        {
+            if (minutes < 60) return zh ? $"{minutes}分钟" : $"{minutes} min";
+
+            var hours = (int)Math.Round(minutes / 60.0);
+            return zh ? $"{Math.Max(1, hours)}h" : $"{Math.Max(1, hours)}h";
         }
 
         private static bool MatchAlert(HourlyWeather h, WeatherAlertType type)

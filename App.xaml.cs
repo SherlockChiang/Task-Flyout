@@ -29,6 +29,7 @@ namespace Task_Flyout
 
         private H.NotifyIcon.TaskbarIcon? _trayIcon;
         private UISettings _uiSettings = null!;
+        private string _trayToolTipText = "Task Flyout";
         public static FlyoutWindow? MyFlyoutWindow { get; private set; }
         public static MainWindow? MyMainWindow { get; private set; }
         public static WeatherBarWindow? MyWeatherBar { get; private set; }
@@ -73,13 +74,14 @@ namespace Task_Flyout
             NotificationService.Initialize();
             if (NotificationService.IsEnabled)
                 NotificationService.StartPeriodicCheck();
-            MailService.StartMailPolling();
+            MailService.NewMailArrived += MailService_NewMailArrived;
 
             _trayIcon = (H.NotifyIcon.TaskbarIcon)Resources["MyTrayIcon"];
             _uiSettings = new UISettings();
             _uiSettings.ColorValuesChanged += UiSettings_ColorValuesChanged;
             UpdateTrayIconTheme();
-            _trayIcon.ForceCreate();
+            _trayIcon.ForceCreate(enablesEfficiencyMode: false);
+            MailService.StartMailPolling();
 
             _trayIcon.LeftClickCommand = new RelayCommand(() => MyFlyoutWindow.ToggleFlyout());
 
@@ -168,6 +170,50 @@ namespace Task_Flyout
             string iconName = isDarkTheme ? "TrayIcon_Dark.ico" : "TrayIcon_Light.ico";
 
             _trayIcon.IconSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri($"ms-appx:///Assets/{iconName}"));
+            _trayIcon.ToolTipText = _trayToolTipText;
+        }
+
+        private void MailService_NewMailArrived(object? sender, NewMailNotificationEventArgs e)
+        {
+            MainDispatcherQueue.TryEnqueue(() => ShowTrayNewMailNotification(e));
+        }
+
+        private void ShowTrayNewMailNotification(NewMailNotificationEventArgs e)
+        {
+            if (_trayIcon == null) return;
+
+            var subject = string.IsNullOrWhiteSpace(e.Item.Subject) ? "(No subject)" : e.Item.Subject;
+            var sender = string.IsNullOrWhiteSpace(e.Item.Sender) ? e.Account.DisplayTitle : e.Item.Sender;
+            var title = $"新邮件 · {e.Account.DisplayTitle}";
+            var message = $"{subject}\n{sender}";
+
+            _trayToolTipText = $"Task Flyout · 新邮件：{TruncateForTray(subject, 48)}";
+            _trayIcon.ToolTipText = _trayToolTipText;
+
+            try
+            {
+                _trayIcon.ShowNotification(
+                    title,
+                    TruncateForTray(message, 220),
+                    H.NotifyIcon.Core.NotificationIcon.Info,
+                    customIconHandle: null,
+                    largeIcon: true,
+                    sound: true,
+                    respectQuietTime: false,
+                    realtime: true,
+                    timeout: TimeSpan.FromSeconds(15));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Tray mail notification failed: {ex.Message}");
+            }
+        }
+
+        private static string TruncateForTray(string value, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "";
+            value = value.Replace("\r", " ").Replace("\n", " ").Trim();
+            return value.Length <= maxLength ? value : value[..Math.Max(0, maxLength - 3)] + "...";
         }
 
         public static ElementTheme GetConfiguredTheme()
@@ -247,9 +293,23 @@ namespace Task_Flyout
                 MyMainWindow.Activate();
                 MyMainWindow.AppWindow.Show();
                 BringMainWindowToFront();
+                ClearTrayMailHint();
 
                 onOpened?.Invoke(MyMainWindow);
             });
+        }
+
+        private static void ClearTrayMailHint()
+        {
+            if (Current is not App app || app._trayIcon == null) return;
+
+            app._trayToolTipText = "Task Flyout";
+            app._trayIcon.ToolTipText = app._trayToolTipText;
+            try
+            {
+                app._trayIcon.ClearNotifications();
+            }
+            catch { }
         }
 
         private static void BringMainWindowToFront()
@@ -274,7 +334,8 @@ namespace Task_Flyout
         private void ExitAppInternal()
         {
             NotificationService?.Stop();
-            MailService?.StopMailPolling();
+            MailService.StopMailPolling();
+            MailService.NewMailArrived -= MailService_NewMailArrived;
             _trayIcon?.Dispose();
             MyWeatherBar?.Close();
             MyFlyoutWindow?.Close();

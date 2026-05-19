@@ -112,6 +112,12 @@ namespace Task_Flyout.Services
         public Dictionary<string, List<string>> FolderOrder { get; set; } = new();
     }
 
+    public sealed class NewMailNotificationEventArgs : EventArgs
+    {
+        public required MailAccount Account { get; init; }
+        public required MailItem Item { get; init; }
+    }
+
     public class MailService
     {
         private GraphServiceClient? _outlookClient;
@@ -126,6 +132,7 @@ namespace Task_Flyout.Services
         private bool _knownUnreadLoaded;
         private MailPersistentCache? _persistentCache;
         private bool _persistentCacheLoaded;
+        public event EventHandler<NewMailNotificationEventArgs>? NewMailArrived;
 
         private sealed class CacheEntry<T>
         {
@@ -1394,13 +1401,13 @@ namespace Task_Flyout.Services
         private static string GetMailNotificationKey(MailItem item)
             => $"{item.AccountId}|{item.FolderId}|{item.Id}";
 
-        private static void SendNewMailNotification(MailAccount account, MailItem item)
+        private void SendNewMailNotification(MailAccount account, MailItem item)
         {
+            var sender = string.IsNullOrWhiteSpace(item.Sender) ? account.DisplayTitle : item.Sender;
+            var subject = string.IsNullOrWhiteSpace(item.Subject) ? "(No subject)" : item.Subject;
+
             try
             {
-                var sender = string.IsNullOrWhiteSpace(item.Sender) ? account.DisplayTitle : item.Sender;
-                var subject = string.IsNullOrWhiteSpace(item.Subject) ? "(No subject)" : item.Subject;
-
                 var notification = new AppNotificationBuilder()
                     .AddText($"新邮件 · {account.DisplayTitle}")
                     .AddText(subject)
@@ -1417,6 +1424,12 @@ namespace Task_Flyout.Services
             {
                 System.Diagnostics.Debug.WriteLine($"New mail notification failed: {ex.Message}");
             }
+
+            NewMailArrived?.Invoke(this, new NewMailNotificationEventArgs
+            {
+                Account = account,
+                Item = item
+            });
         }
 
         private static bool IsVisibleGoogleLabel(Label label)

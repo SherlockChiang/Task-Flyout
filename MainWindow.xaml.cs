@@ -104,6 +104,8 @@ namespace Task_Flyout
             if (runInBackground)
             {
                 args.Cancel = true;
+                if (App.Current is App app)
+                    app.MailService.UpdateMailPollingSettings();
                 sender.Hide();
             }
         }
