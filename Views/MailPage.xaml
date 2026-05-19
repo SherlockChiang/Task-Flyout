@@ -128,7 +128,7 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="{x:Bind ReadMarker}" FontSize="12"
+                                    <TextBlock Grid.Column="0" Text="{x:Bind ReadMarker, Mode=OneWay}" FontSize="12"
                                                Foreground="{ThemeResource SystemAccentColor}"
                                                VerticalAlignment="Top" Margin="0,3,0,0"/>
                                     <StackPanel Grid.Column="1" Spacing="4">

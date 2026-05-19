@@ -26,6 +26,7 @@ namespace Task_Flyout.Views
         private readonly MailTrustStore _mailTrustStore = new();
         private bool _isInitializing = true;
         private bool _isLoadingMessages;
+        private bool _suppressSelectionClear;
         private bool _suppressUnreadToggle;
         private Task? _refreshAccountsTask;
         internal bool IsOpeningFromNotification { get; set; }
@@ -654,7 +655,7 @@ namespace Task_Flyout.Views
         {
             if (MailListView.SelectedItem is not MailItem item)
             {
-                if (!_isLoadingMessages)
+                if (!_isLoadingMessages && !_suppressSelectionClear)
                     ClearDetail();
                 return;
             }
@@ -667,31 +668,52 @@ namespace Task_Flyout.Views
             DetailSubject.Text = item.Subject;
             DetailSender.Text = item.Sender;
             DetailTime.Text = item.RawReceivedTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? item.ReceivedTime;
+            var markAsReadTask = MarkSelectedMailReadOptimistically(item);
             UpdateTrustButton(item);
             await RenderMailBodyAsync(item);
             ReplyButton.IsEnabled = _selectedAccount != null;
             OpenInBrowserButton.IsEnabled = !string.IsNullOrWhiteSpace(item.WebLink);
 
-            if (_mailService != null && _selectedAccount != null && !item.IsRead)
+            if (markAsReadTask != null)
+                _ = CompleteMarkAsReadAsync(markAsReadTask);
+        }
+
+        private Task? MarkSelectedMailReadOptimistically(MailItem item)
+        {
+            if (_mailService == null || _selectedAccount == null || item.IsRead)
+                return null;
+
+            _mailService.MarkCachedRead(item);
+            var remoteSyncTask = _mailService.MarkAsReadAsync(_selectedAccount, item, forceRemoteSync: true);
+
+            if (UnreadOnlyToggle.IsOn)
             {
+                _suppressSelectionClear = true;
                 try
                 {
-                    await _mailService.MarkAsReadAsync(_selectedAccount, item);
-                    if (UnreadOnlyToggle.IsOn)
-                    {
-                        _items.Remove(item);
-                        MessageListSubtitle.Text = _selectedAccount != null ? $"{_selectedAccount.DisplayTitle} · {_items.Count} 封邮件" : MessageListSubtitle.Text;
-                    }
-                    else
-                    {
-                        MailListView.SelectedItem = item;
-                    }
+                    _items.Remove(item);
                 }
-                catch (Exception ex)
+                finally
                 {
-                    System.Diagnostics.Debug.WriteLine($"Mark as read failed: {ex.Message}");
-                    MessageListSubtitle.Text = "标记已读失败。";
+                    _suppressSelectionClear = false;
                 }
+
+                MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {_items.Count} 封邮件";
+            }
+
+            return remoteSyncTask;
+        }
+
+        private async Task CompleteMarkAsReadAsync(Task remoteSyncTask)
+        {
+            try
+            {
+                await remoteSyncTask;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Mark as read failed: {ex.Message}");
+                MessageListSubtitle.Text = "已读状态同步失败。";
             }
         }
 

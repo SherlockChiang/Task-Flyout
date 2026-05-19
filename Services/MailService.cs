@@ -12,9 +12,11 @@ using Microsoft.Graph.Models;
 using MimeKit;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Text.Json;
@@ -82,8 +84,10 @@ namespace Task_Flyout.Services
         public string CountText => UnreadCount.HasValue && UnreadCount.Value > 0 ? UnreadCount.Value.ToString() : "";
     }
 
-    public class MailItem
+    public class MailItem : INotifyPropertyChanged
     {
+        private bool _isRead;
+
         public string AccountId { get; set; } = "";
         public string FolderId { get; set; } = "";
         public string Id { get; set; } = "";
@@ -95,12 +99,27 @@ namespace Task_Flyout.Services
         public string HtmlBody { get; set; } = "";
         public string ReceivedTime { get; set; } = "";
         public DateTimeOffset? RawReceivedTime { get; set; }
-        public bool IsRead { get; set; }
+        public bool IsRead
+        {
+            get => _isRead;
+            set
+            {
+                if (_isRead == value) return;
+                _isRead = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ReadMarker));
+            }
+        }
         public bool HasAttachments { get; set; }
         public string Importance { get; set; } = "";
         public string WebLink { get; set; } = "";
         public string ReadMarker => IsRead ? "" : "●";
         public string AttachmentMarker => HasAttachments ? "📎" : "";
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
     public class MailPersistentCache
@@ -510,9 +529,15 @@ namespace Task_Flyout.Services
             throw new InvalidOperationException("Unsupported mail account.");
         }
 
-        public async Task MarkAsReadAsync(MailAccount account, MailItem item)
+        public void MarkCachedRead(MailItem item)
         {
-            if (item.IsRead) return;
+            item.IsRead = true;
+            UpdateCachedReadState(item);
+        }
+
+        public async Task MarkAsReadAsync(MailAccount account, MailItem item, bool forceRemoteSync = false)
+        {
+            if (item.IsRead && !forceRemoteSync) return;
 
             if (account.Kind == MailAccountKind.Outlook)
             {
