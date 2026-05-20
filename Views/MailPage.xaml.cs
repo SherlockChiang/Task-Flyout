@@ -672,6 +672,14 @@ namespace Task_Flyout.Views
             DetailTime.Text = item.RawReceivedTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? item.ReceivedTime;
             var markAsReadTask = MarkSelectedMailReadOptimistically(item);
             UpdateTrustButton(item);
+
+            if (string.IsNullOrWhiteSpace(item.BodyText) && string.IsNullOrWhiteSpace(item.HtmlBody)
+                && _mailService != null && _selectedAccount != null)
+            {
+                try { await _mailService.FetchMessageBodyAsync(_selectedAccount, item); }
+                catch { }
+            }
+
             await RenderMailBodyAsync(item);
             ReplyButton.IsEnabled = _selectedAccount != null;
             OpenInBrowserButton.IsEnabled = !string.IsNullOrWhiteSpace(item.WebLink);

@@ -491,7 +491,7 @@ namespace Task_Flyout.Services
                     request.QueryParameters.Select = new[]
                     {
                         "id", "subject", "from", "receivedDateTime", "isRead",
-                        "bodyPreview", "body", "webLink", "hasAttachments", "importance"
+                        "bodyPreview", "webLink", "hasAttachments", "importance"
                     };
                     request.QueryParameters.Orderby = new[] { "receivedDateTime desc" };
                     if (unreadOnly)
@@ -569,6 +569,74 @@ namespace Task_Flyout.Services
 
             item.IsRead = true;
             UpdateCachedReadState(item);
+        }
+
+        public async Task FetchMessageBodyAsync(MailAccount account, MailItem item)
+        {
+            if (!string.IsNullOrWhiteSpace(item.BodyText) || !string.IsNullOrWhiteSpace(item.HtmlBody))
+                return;
+
+            if (account.Kind == MailAccountKind.Outlook)
+            {
+                await EnsureOutlookAuthorizedAsync();
+                if (_outlookClient == null) return;
+
+                var message = await _outlookClient.Me.Messages[item.Id].GetAsync(request =>
+                {
+                    request.QueryParameters.Select = new[] { "body" };
+                });
+                if (message?.Body?.Content != null)
+                {
+                    var content = message.Body.Content;
+                    var isHtml = message.Body.ContentType == BodyType.Html || HasHtmlContentTags(content);
+                    item.HtmlBody = isHtml ? content : "";
+                    item.BodyText = CleanMailBody(isHtml ? StripHtml(content) : content);
+                }
+            }
+            else if (account.Kind == MailAccountKind.Google)
+            {
+                var gmail = await EnsureGoogleMailAuthorizedAsync();
+                var get = gmail.Users.Messages.Get("me", item.Id);
+                get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Full;
+                var full = await get.ExecuteAsync();
+                if (full?.Payload != null)
+                {
+                    string body = ExtractGoogleBody(full.Payload);
+                    string htmlBody = ExtractGoogleHtmlBody(full.Payload);
+                    if (string.IsNullOrWhiteSpace(htmlBody) && HasHtmlContentTags(body))
+                    {
+                        htmlBody = body;
+                        body = CleanMailBody(StripHtml(htmlBody));
+                    }
+                    item.BodyText = body;
+                    item.HtmlBody = htmlBody;
+                    if (string.IsNullOrWhiteSpace(item.Preview))
+                        item.Preview = string.IsNullOrWhiteSpace(body) ? full.Snippet ?? "" : Truncate(body, 240);
+                }
+            }
+            else if (account.Kind == MailAccountKind.Imap)
+            {
+                using var client = new ImapClient();
+                await ConnectImapAsync(client, account, GetImapPassword(account.Id));
+                var folder = await client.GetFolderAsync(item.FolderId);
+                await folder.OpenAsync(FolderAccess.ReadOnly);
+                if (uint.TryParse(item.Id, out var uidValue))
+                {
+                    var message = await folder.GetMessageAsync(new UniqueId(uidValue));
+                    string rawText = message.TextBody ?? "";
+                    string htmlBody = !string.IsNullOrWhiteSpace(message.HtmlBody)
+                        ? message.HtmlBody
+                        : HasHtmlContentTags(rawText) ? rawText : "";
+                    string body = CleanMailBody(!string.IsNullOrWhiteSpace(htmlBody) ? StripHtml(htmlBody) : rawText);
+                    item.BodyText = body;
+                    item.HtmlBody = htmlBody;
+                    if (string.IsNullOrWhiteSpace(item.Preview))
+                        item.Preview = Truncate(body, 240);
+                }
+                await client.DisconnectAsync(true);
+            }
+
+            UpdatePersistentMessageBody(item);
         }
 
         private async Task SendOutlookMailAsync(MailAccount account, string to, string subject, string body)
@@ -766,28 +834,52 @@ namespace Task_Flyout.Services
             var ids = await mailFolder.SearchAsync(query);
             int top = Math.Clamp(pageSize ?? PageSize, 10, 50);
             var selectedIds = ids.Reverse().Take(top).ToList();
-            var flagsById = new Dictionary<uint, MessageFlags?>();
+
+            var summaryItems = MessageSummaryItems.Envelope | MessageSummaryItems.Flags | MessageSummaryItems.BodyStructure;
+            IList<IMessageSummary>? summaries = null;
             try
             {
-                var summaries = await mailFolder.FetchAsync(selectedIds, MessageSummaryItems.Flags);
-                flagsById = summaries
-                    .Where(summary => summary.UniqueId.IsValid)
-                    .ToDictionary(summary => summary.UniqueId.Id, summary => summary.Flags);
+                summaries = await mailFolder.FetchAsync(selectedIds, summaryItems);
             }
             catch
             {
-                // Some IMAP servers return malformed FETCH responses for flags.
-                // Keep loading messages and fall back to per-message flag fetches.
+                // Some IMAP servers return malformed FETCH responses for summaries.
             }
 
             var items = new List<MailItem>();
             foreach (var id in selectedIds)
             {
-                bool isRead = unreadOnly ? false : await GetImapReadStateAsync(mailFolder, id, flagsById);
+                var summary = summaries?.FirstOrDefault(s => s.UniqueId == id);
+                bool isRead = summary?.Flags?.HasFlag(MessageFlags.Seen) == true
+                    || (unreadOnly ? false : await GetImapReadStateAsync(mailFolder, id, new Dictionary<uint, MessageFlags?>()));
                 try
                 {
-                    var message = await mailFolder.GetMessageAsync(id);
-                    items.Add(ToImapMailItem(account.Id, folder.Id, id.Id.ToString(), message, isRead));
+                    string preview = "";
+                    if (summary?.TextBody is BodyPartText textPart)
+                    {
+                        try
+                        {
+                            var entity = await mailFolder.GetBodyPartAsync(id, textPart);
+                            if (entity is TextPart textContent)
+                                preview = Truncate(CleanMailBody(textContent.Text ?? ""), 240).Trim();
+                        }
+                        catch { }
+                    }
+
+                    items.Add(new MailItem
+                    {
+                        AccountId = account.Id,
+                        FolderId = folder.Id,
+                        Id = id.Id.ToString(),
+                        Subject = string.IsNullOrWhiteSpace(summary?.Envelope?.Subject) ? "(No subject)" : summary.Envelope.Subject,
+                        Sender = summary?.Envelope?.From?.ToString() ?? "",
+                        SenderAddress = summary?.Envelope?.From?.Mailboxes?.FirstOrDefault()?.Address ?? "",
+                        Preview = preview,
+                        RawReceivedTime = summary?.Envelope?.Date,
+                        ReceivedTime = FormatReceivedTime(summary?.Envelope?.Date),
+                        IsRead = isRead,
+                        HasAttachments = summary?.Attachments?.Any() == true
+                    });
                 }
                 catch
                 {
@@ -799,7 +891,6 @@ namespace Task_Flyout.Services
                         Subject = _loader.GetString("TextMailReadError") ?? "Unable to read this email",
                         Sender = account.DisplayTitle,
                         Preview = _loader.GetString("TextMailFetchError") ?? "IMAP server returned an invalid FETCH response.",
-                        BodyText = _loader.GetString("TextMailBodyError") ?? "Unable to load the body of this email.",
                         IsRead = isRead
                     });
                 }
@@ -884,7 +975,7 @@ namespace Task_Flyout.Services
                 .Select(async message =>
                 {
                     var get = gmail.Users.Messages.Get("me", message.Id);
-                    get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Full;
+                    get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
                     get.MetadataHeaders = new[] { "From", "Subject", "Date" };
                     return ToGoogleMailItem(account.Id, folder.Id, await get.ExecuteAsync());
                 });
@@ -1035,7 +1126,9 @@ namespace Task_Flyout.Services
                 htmlBody = body;
                 body = CleanMailBody(StripHtml(htmlBody));
             }
-            string preview = string.IsNullOrWhiteSpace(body) ? message.Snippet ?? "" : Truncate(body, 240);
+            string preview = !string.IsNullOrWhiteSpace(body)
+                ? Truncate(body, 240)
+                : message.Snippet ?? "";
             DateTimeOffset? received = null;
             if (message.InternalDate.HasValue)
                 received = DateTimeOffset.FromUnixTimeMilliseconds(message.InternalDate.Value);
@@ -1341,6 +1434,24 @@ namespace Task_Flyout.Services
             if (_persistentCache == null) return;
 
             _persistentCache.Messages[key] = messages;
+            SavePersistentCache();
+        }
+
+        private void UpdatePersistentMessageBody(MailItem item)
+        {
+            EnsurePersistentCacheLoaded();
+            if (_persistentCache == null) return;
+
+            foreach (var messages in _persistentCache.Messages.Values)
+            {
+                var existing = messages.FirstOrDefault(m => m.Id == item.Id && m.AccountId == item.AccountId);
+                if (existing != null)
+                {
+                    existing.BodyText = item.BodyText;
+                    existing.HtmlBody = item.HtmlBody;
+                    break;
+                }
+            }
             SavePersistentCache();
         }
 
