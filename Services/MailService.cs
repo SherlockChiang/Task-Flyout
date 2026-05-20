@@ -818,7 +818,7 @@ namespace Task_Flyout.Services
             if (string.IsNullOrWhiteSpace(password))
                 throw new InvalidOperationException("IMAP password is required.");
 
-            var socketOptions = account.ImapUseSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable;
+            var socketOptions = account.ImapUseSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
             await client.ConnectAsync(account.ImapHost, account.ImapPort, socketOptions);
             await client.AuthenticateAsync(account.ImapUserName, password);
         }
@@ -1003,9 +1003,7 @@ namespace Task_Flyout.Services
             if (account.SmtpPort == 587)
                 return SecureSocketOptions.StartTls;
 
-            return account.SmtpUseSsl
-                ? SecureSocketOptions.StartTls
-                : SecureSocketOptions.StartTlsWhenAvailable;
+            return SecureSocketOptions.StartTls;
         }
 
         private static List<string> ParseRecipients(string value)
