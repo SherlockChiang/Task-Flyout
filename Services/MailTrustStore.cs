@@ -22,33 +22,74 @@ namespace Task_Flyout.Services
 
         public bool IsTrusted(MailItem item)
         {
-            var key = GetSourceKey(item);
-            return key != null && _trustedSources.Contains(key);
+            var address = GetSourceKey(item);
+            if (address == null) return false;
+
+            if (_trustedSources.Contains(address))
+                return true;
+
+            var domain = GetDomainKey(address);
+            return domain != null && _trustedSources.Contains(domain);
         }
 
         public bool Trust(MailItem item)
         {
-            var key = GetSourceKey(item);
-            if (key == null) return false;
+            var address = GetSourceKey(item);
+            if (address == null) return false;
 
-            var changed = _trustedSources.Add(key);
+            var changed = _trustedSources.Add(address);
             if (changed) Save();
             return true;
         }
 
         public bool Untrust(MailItem item)
         {
-            var key = GetSourceKey(item);
-            if (key == null) return false;
+            var address = GetSourceKey(item);
+            if (address == null) return false;
 
-            var changed = _trustedSources.Remove(key);
+            var changed = _trustedSources.Remove(address);
             if (changed) Save();
             return true;
+        }
+
+        public bool TrustDomain(MailItem item)
+        {
+            var address = GetSourceKey(item);
+            var domain = address != null ? GetDomainKey(address) : null;
+            if (domain == null) return false;
+
+            var changed = _trustedSources.Add(domain);
+            if (changed) Save();
+            return true;
+        }
+
+        public bool UntrustDomain(MailItem item)
+        {
+            var address = GetSourceKey(item);
+            var domain = address != null ? GetDomainKey(address) : null;
+            if (domain == null) return false;
+
+            var changed = _trustedSources.Remove(domain);
+            if (changed) Save();
+            return true;
+        }
+
+        public bool IsDomainTrusted(MailItem item)
+        {
+            var address = GetSourceKey(item);
+            var domain = address != null ? GetDomainKey(address) : null;
+            return domain != null && _trustedSources.Contains(domain);
         }
 
         public string GetDisplaySource(MailItem item)
         {
             return GetSourceKey(item) ?? (_loader.GetString("TextUnknownSource") ?? "Unknown source");
+        }
+
+        public string? GetDomain(MailItem item)
+        {
+            var address = GetSourceKey(item);
+            return address != null ? GetDomainKey(address) : null;
         }
 
         private void Load()
@@ -83,11 +124,13 @@ namespace Task_Flyout.Services
             if (address == null)
                 address = ExtractAddress(item.Sender);
 
-            if (address == null) return null;
+            return address?.ToLowerInvariant();
+        }
 
+        private static string? GetDomainKey(string address)
+        {
             var atIndex = address.LastIndexOf('@');
-            if (atIndex < 0 || atIndex == address.Length - 1) return address.ToLowerInvariant();
-
+            if (atIndex < 0 || atIndex == address.Length - 1) return null;
             return address[(atIndex + 1)..].Trim().Trim('>', '.', ',').ToLowerInvariant();
         }
 

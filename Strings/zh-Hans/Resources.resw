@@ -717,6 +717,21 @@
   <data name="TextTrustTooltip" xml:space="preserve">
     <value>信任后将允许加载此来源的远程邮件内容：{0}</value>
   </data>
+  <data name="TextTrustSender" xml:space="preserve">
+    <value>信任此发件人</value>
+  </data>
+  <data name="TextTrustDomain" xml:space="preserve">
+    <value>信任所有 @{0}</value>
+  </data>
+  <data name="TextUntrustDomain" xml:space="preserve">
+    <value>取消信任 @{0}</value>
+  </data>
+  <data name="TextDomainTrusted" xml:space="preserve">
+    <value>域名已信任：@{0}</value>
+  </data>
+  <data name="TextLoadRemoteImages" xml:space="preserve">
+    <value>加载远程图片</value>
+  </data>
   <data name="TextSelectSender" xml:space="preserve">
     <value>请选择发件人。</value>
   </data>

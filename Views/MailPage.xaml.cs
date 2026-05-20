@@ -836,10 +836,27 @@ namespace Task_Flyout.Views
         private void UpdateTrustButton(MailItem item)
         {
             var source = _mailTrustStore.GetDisplaySource(item);
-            var trusted = _mailTrustStore.IsTrusted(item);
+            var senderTrusted = _mailTrustStore.IsTrusted(item);
+            var domainTrusted = _mailTrustStore.IsDomainTrusted(item);
+            var domain = _mailTrustStore.GetDomain(item);
+
             TrustSenderButton.IsEnabled = source != (_loader.GetString("TextUnknownSource") ?? "Unknown source");
-            TrustSenderButtonText.Text = trusted ? (_loader.GetString("TextUntrustSource") ?? "Untrust source") : (_loader.GetString("TextTrustSource") ?? "Trust this source");
-            ToolTipService.SetToolTip(TrustSenderButton, trusted ? string.Format(_loader.GetString("TextTrusted") ?? "Trusted: {0}", source) : string.Format(_loader.GetString("TextTrustTooltip") ?? "Trusting will allow loading remote content from: {0}", source));
+
+            if (senderTrusted && !domainTrusted)
+            {
+                TrustSenderButtonText.Text = _loader.GetString("TextUntrustSource") ?? "Untrust source";
+                ToolTipService.SetToolTip(TrustSenderButton, string.Format(_loader.GetString("TextTrusted") ?? "Trusted: {0}", source));
+            }
+            else if (domainTrusted)
+            {
+                TrustSenderButtonText.Text = string.Format(_loader.GetString("TextUntrustDomain") ?? "Untrust @{0}", domain);
+                ToolTipService.SetToolTip(TrustSenderButton, string.Format(_loader.GetString("TextDomainTrusted") ?? "Domain trusted: @{0}", domain));
+            }
+            else
+            {
+                TrustSenderButtonText.Text = _loader.GetString("TextTrustSender") ?? "Trust this sender";
+                ToolTipService.SetToolTip(TrustSenderButton, string.Format(_loader.GetString("TextTrustTooltip") ?? "Trusting will allow loading remote content from: {0}", source));
+            }
         }
 
         private bool IsDarkThemeActive()
@@ -1135,13 +1152,66 @@ body { background-color: {{background}} !important; }
         {
             if (_selectedItem == null) return;
 
-            if (_mailTrustStore.IsTrusted(_selectedItem))
-                _mailTrustStore.Untrust(_selectedItem);
-            else
-                _mailTrustStore.Trust(_selectedItem);
+            var flyout = new MenuFlyout();
+            var senderTrusted = _mailTrustStore.IsTrusted(_selectedItem);
+            var domainTrusted = _mailTrustStore.IsDomainTrusted(_selectedItem);
+            var domain = _mailTrustStore.GetDomain(_selectedItem);
 
-            UpdateTrustButton(_selectedItem);
-            await RenderMailBodyAsync(_selectedItem);
+            if (!senderTrusted)
+            {
+                flyout.Items.Add(new MenuFlyoutItem
+                {
+                    Text = _loader.GetString("TextTrustSender") ?? "Trust this sender",
+                });
+                ((MenuFlyoutItem)flyout.Items[^1]).Click += async (_, _) =>
+                {
+                    _mailTrustStore.Trust(_selectedItem);
+                    UpdateTrustButton(_selectedItem);
+                    await RenderMailBodyAsync(_selectedItem);
+                };
+            }
+            else
+            {
+                flyout.Items.Add(new MenuFlyoutItem
+                {
+                    Text = _loader.GetString("TextUntrustSource") ?? "Untrust source",
+                });
+                ((MenuFlyoutItem)flyout.Items[^1]).Click += async (_, _) =>
+                {
+                    _mailTrustStore.Untrust(_selectedItem);
+                    UpdateTrustButton(_selectedItem);
+                    await RenderMailBodyAsync(_selectedItem);
+                };
+            }
+
+            if (domain != null && !domainTrusted)
+            {
+                flyout.Items.Add(new MenuFlyoutItem
+                {
+                    Text = string.Format(_loader.GetString("TextTrustDomain") ?? "Trust all @{0}", domain),
+                });
+                ((MenuFlyoutItem)flyout.Items[^1]).Click += async (_, _) =>
+                {
+                    _mailTrustStore.TrustDomain(_selectedItem);
+                    UpdateTrustButton(_selectedItem);
+                    await RenderMailBodyAsync(_selectedItem);
+                };
+            }
+            else if (domain != null && domainTrusted)
+            {
+                flyout.Items.Add(new MenuFlyoutItem
+                {
+                    Text = string.Format(_loader.GetString("TextUntrustDomain") ?? "Untrust @{0}", domain),
+                });
+                ((MenuFlyoutItem)flyout.Items[^1]).Click += async (_, _) =>
+                {
+                    _mailTrustStore.UntrustDomain(_selectedItem);
+                    UpdateTrustButton(_selectedItem);
+                    await RenderMailBodyAsync(_selectedItem);
+                };
+            }
+
+            flyout.ShowAt(sender as FrameworkElement);
         }
 
         private static string GetReplyRecipient(MailItem item)

@@ -717,6 +717,21 @@
   <data name="TextTrustTooltip" xml:space="preserve">
     <value>Trusting will allow loading remote content from: {0}</value>
   </data>
+  <data name="TextTrustSender" xml:space="preserve">
+    <value>Trust this sender</value>
+  </data>
+  <data name="TextTrustDomain" xml:space="preserve">
+    <value>Trust all @{0}</value>
+  </data>
+  <data name="TextUntrustDomain" xml:space="preserve">
+    <value>Untrust @{0}</value>
+  </data>
+  <data name="TextDomainTrusted" xml:space="preserve">
+    <value>Domain trusted: @{0}</value>
+  </data>
+  <data name="TextLoadRemoteImages" xml:space="preserve">
+    <value>Load remote images</value>
+  </data>
   <data name="TextSelectSender" xml:space="preserve">
     <value>Please select a sender.</value>
   </data>
