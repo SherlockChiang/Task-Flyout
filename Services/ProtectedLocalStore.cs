@@ -26,7 +26,9 @@ namespace Task_Flyout.Services
             {
                 try
                 {
-                    return File.ReadAllText(path);
+                    var plaintext = File.ReadAllText(path);
+                    WriteText(path, plaintext);
+                    return plaintext;
                 }
                 catch
                 {
