@@ -94,6 +94,9 @@ namespace Task_Flyout
 
         private DateTime _selectedDay = DateTime.Today;
 
+        private const int QuickSyncPastDays = 30;
+        private const int QuickSyncFutureDays = 365;
+
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern uint GetDpiForWindow(IntPtr hwnd);
 
@@ -553,7 +556,7 @@ namespace Task_Flyout
             AdjustWindowHeight();
         }
 
-        private async Task SyncAllDataAsync(bool silent, bool forceRefresh = false)
+        private async Task SyncAllDataAsync(bool silent, bool forceRefresh = false, bool fullSync = false)
         {
             var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
 
@@ -588,8 +591,8 @@ namespace Task_Flyout
 
             try
             {
-                var min = DateTime.Today.AddYears(-1);
-                var max = DateTime.Today.AddYears(3);
+                var min = fullSync ? DateTime.Today.AddYears(-1) : DateTime.Today.AddDays(-QuickSyncPastDays);
+                var max = fullSync ? DateTime.Today.AddYears(3) : DateTime.Today.AddDays(QuickSyncFutureDays);
 
                 var allItems = await Task.Run(async () => await _syncManager.GetAllDataAsync(min, max, forceRefresh));
 
@@ -886,7 +889,7 @@ namespace Task_Flyout
 
         private void ChkAllDay_Checked(object sender, RoutedEventArgs e) { if (TimePanel != null) TimePanel.Visibility = Visibility.Collapsed; }
         private void ChkAllDay_Unchecked(object sender, RoutedEventArgs e) { if (TimePanel != null) TimePanel.Visibility = Visibility.Visible; }
-        private async void BtnRefresh_Click(object sender, RoutedEventArgs e) => await SyncAllDataAsync(silent: false);
+        private async void BtnRefresh_Click(object sender, RoutedEventArgs e) => await SyncAllDataAsync(silent: false, fullSync: true);
 
         public void ReloadFilters()
         {
