@@ -11,6 +11,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
 using Task_Flyout.Services;
@@ -96,6 +97,7 @@ namespace Task_Flyout
 
         private const int QuickSyncPastDays = 30;
         private const int QuickSyncFutureDays = 365;
+        private static readonly SemaphoreSlim _syncLock = new(1, 1);
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern uint GetDpiForWindow(IntPtr hwnd);
@@ -577,24 +579,26 @@ namespace Task_Flyout
                 return;
             }
 
-            if (!silent)
-            {
-                AgendaItems.Clear();
-                AgendaItems.Add(new AgendaItem
-                {
-                    Title = _loader.GetString("TextFullSyncTitle") ?? "Full Syncing...",
-                    Subtitle = _loader.GetString("TextFullSyncSub") ?? "Fetching all your events and tasks",
-                    IsEvent = false,
-                    IsTask = false
-                });
-            }
+            if (!await _syncLock.WaitAsync(0)) return;
 
             try
             {
+                if (!silent)
+                {
+                    AgendaItems.Clear();
+                    AgendaItems.Add(new AgendaItem
+                    {
+                        Title = _loader.GetString("TextFullSyncTitle") ?? "Full Syncing...",
+                        Subtitle = _loader.GetString("TextFullSyncSub") ?? "Fetching all your events and tasks",
+                        IsEvent = false,
+                        IsTask = false
+                    });
+                }
+
                 var min = fullSync ? DateTime.Today.AddYears(-1) : DateTime.Today.AddDays(-QuickSyncPastDays);
                 var max = fullSync ? DateTime.Today.AddYears(3) : DateTime.Today.AddDays(QuickSyncFutureDays);
 
-                var allItems = await Task.Run(async () => await _syncManager.GetAllDataAsync(min, max, forceRefresh));
+                var allItems = await _syncManager.GetAllDataAsync(min, max, forceRefresh);
 
                 var tempDayItems = new Dictionary<string, List<AgendaItem>>();
                 var tempMarkedDates = new HashSet<string>();
@@ -658,6 +662,10 @@ namespace Task_Flyout
                         IsTask = false
                     });
                 }
+            }
+            finally
+            {
+                _syncLock.Release();
             }
         }
 
