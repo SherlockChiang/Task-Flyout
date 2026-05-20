@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Windows.Storage;
@@ -125,11 +126,20 @@ namespace Task_Flyout.Services
 
     public class WeatherService
     {
-        private static readonly HttpClient _httpClient = new HttpClient();
+        private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
         private WeatherInfo? _cachedWeather;
         private DateTime _lastFetchTime = DateTime.MinValue;
         private readonly TimeSpan _cacheExpiry = TimeSpan.FromMinutes(30);
         private Dictionary<string, (double Lat, double Lon)> _lastSearchCoords = new();
+
+        private static async Task<string> GetStringWithAgentAsync(string url, string userAgent, CancellationToken ct = default)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.UserAgent.ParseAdd(userAgent);
+            using var response = await _httpClient.SendAsync(request, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadAsStringAsync(ct);
+        }
 
         #region Settings Properties
 
@@ -485,10 +495,8 @@ namespace Task_Flyout.Services
             try
             {
                 string url = $"https://geocoding-api.open-meteo.com/v1/search?name={Uri.EscapeDataString(query)}&count=5&language=zh";
-                _httpClient.DefaultRequestHeaders.UserAgent.Clear();
-                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("TaskFlyout/1.0");
 
-                var response = await _httpClient.GetStringAsync(url);
+                var response = await GetStringWithAgentAsync(url, "TaskFlyout/1.0");
                 using var doc = JsonDocument.Parse(response);
                 if (doc.RootElement.TryGetProperty("results", out var results))
                 {
@@ -561,12 +569,9 @@ namespace Task_Flyout.Services
                 $"&hourly=us_aqi,pm2_5,pm10,grass_pollen,birch_pollen,ragweed_pollen" +
                 $"&forecast_days=2";
 
-            _httpClient.DefaultRequestHeaders.UserAgent.Clear();
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("TaskFlyout/1.0");
-
-            var forecastTask = _httpClient.GetStringAsync(forecastUrl);
+            var forecastTask = GetStringWithAgentAsync(forecastUrl, "TaskFlyout/1.0");
             Task<string> aqTask;
-            try { aqTask = _httpClient.GetStringAsync(aqUrl); }
+            try { aqTask = GetStringWithAgentAsync(aqUrl, "TaskFlyout/1.0"); }
             catch { aqTask = Task.FromResult(""); }
 
             string forecastJson = await forecastTask;
@@ -963,10 +968,7 @@ namespace Task_Flyout.Services
             string searchCity = City.Split(',')[0].Trim();
             string url = $"https://wttr.in/{Uri.EscapeDataString(searchCity)}?format=j1&lang={wttrLang}";
 
-            _httpClient.DefaultRequestHeaders.UserAgent.Clear();
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("curl/7.68.0");
-
-            var response = await _httpClient.GetStringAsync(url);
+            var response = await GetStringWithAgentAsync(url, "curl/7.68.0");
             using var doc = JsonDocument.Parse(response);
             var root = doc.RootElement;
 
