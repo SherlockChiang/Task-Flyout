@@ -96,6 +96,7 @@ namespace Task_Flyout.Services
                 return GetCachedItems(min, max);
 
             var allItems = new List<AgendaItem>();
+            var successfulProviders = new List<string>();
             var activeProviders = _providers.Where(p => AccountManager.IsConnected(p.ProviderName)).ToList();
 
             var fetchTasks = activeProviders.Select(async provider =>
@@ -103,18 +104,23 @@ namespace Task_Flyout.Services
                 try
                 {
                     await provider.EnsureAuthorizedAsync();
-                    return await provider.FetchDataAsync(min, max);
+                    var items = await provider.FetchDataAsync(min, max);
+                    return (Provider: provider.ProviderName, Items: items ?? new List<AgendaItem>(), Success: true);
                 }
-                catch { return new List<AgendaItem>(); }
+                catch { return (Provider: provider.ProviderName, Items: new List<AgendaItem>(), Success: false); }
             });
 
             var results = await Task.WhenAll(fetchTasks);
             foreach (var result in results)
             {
-                if (result != null) allItems.AddRange(result);
+                if (result.Success)
+                {
+                    successfulProviders.Add(result.Provider);
+                    allItems.AddRange(result.Items);
+                }
             }
 
-            MergeIntoCache(min, max, allItems);
+            MergeIntoCache(min, max, allItems, successfulProviders);
             await SaveCacheAsync();
 
             return allItems;
@@ -242,7 +248,7 @@ namespace Task_Flyout.Services
                 .ToList();
         }
 
-        private void MergeIntoCache(DateTime min, DateTime max, List<AgendaItem> items)
+        private void MergeIntoCache(DateTime min, DateTime max, List<AgendaItem> items, List<string> successfulProviders)
         {
             string start = min.ToString("yyyy-MM-dd");
             string end = max.AddDays(-1).ToString("yyyy-MM-dd");
@@ -250,7 +256,16 @@ namespace Task_Flyout.Services
             lock (_cacheLock)
             {
                 for (var d = min; d < max; d = d.AddDays(1))
-                    _cache.DayItems.Remove(d.ToString("yyyy-MM-dd"));
+                {
+                    var key = d.ToString("yyyy-MM-dd");
+                    if (!_cache.DayItems.ContainsKey(key)) continue;
+
+                    _cache.DayItems[key].RemoveAll(item =>
+                        successfulProviders.Contains(item.Provider, StringComparer.OrdinalIgnoreCase));
+
+                    if (_cache.DayItems[key].Count == 0)
+                        _cache.DayItems.Remove(key);
+                }
 
                 foreach (var item in items.Where(item => !string.IsNullOrWhiteSpace(item.DateKey)))
                 {
