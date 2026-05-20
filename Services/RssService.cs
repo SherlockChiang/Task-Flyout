@@ -9,6 +9,7 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace Task_Flyout.Services
@@ -121,7 +122,9 @@ namespace Task_Flyout.Services
         private const int FeedRefreshMinutes = 30;
         private const int SchemaVersion = 1;
         private const long MaxImageBytes = 5 * 1024 * 1024;
-        private static readonly HttpClient HttpClient = new()
+        private const long MaxFeedBytes = 5 * 1024 * 1024;
+        private const int MaxRedirects = 5;
+        private static readonly HttpClient HttpClient = new(new HttpClientHandler { AllowAutoRedirect = false })
         {
             Timeout = TimeSpan.FromSeconds(20)
         };
@@ -272,9 +275,7 @@ namespace Task_Flyout.Services
             EnsureLoaded();
             if (!force && !ShouldRefresh(subscription)) return;
 
-            using var response = await HttpClient.GetAsync(subscription.Url);
-            response.EnsureSuccessStatusCode();
-            var xml = await response.Content.ReadAsStringAsync();
+            var xml = await FetchFeedAsync(subscription.Url);
             var parsed = ParseFeed(subscription, xml);
 
             if (!string.IsNullOrWhiteSpace(parsed.FeedTitle))
@@ -327,7 +328,8 @@ namespace Task_Flyout.Services
 
         private (string FeedTitle, string FeedImageUrl, List<RssArticle> Articles) ParseFeed(RssSubscription subscription, string xml)
         {
-            var doc = XDocument.Parse(xml);
+            using var reader = XmlReader.Create(new StringReader(xml), new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit });
+            var doc = XDocument.Load(reader);
             var root = doc.Root;
             if (root == null) return ("", "", new List<RssArticle>());
 
@@ -493,6 +495,78 @@ namespace Task_Flyout.Services
             return true;
         }
 
+        private static bool IsRedirect(HttpStatusCode code)
+            => code is HttpStatusCode.Moved or HttpStatusCode.Found or HttpStatusCode.SeeOther
+                or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect
+                or (HttpStatusCode)308;
+
+        private static async Task<HttpResponseMessage> SendWithRedirectsAsync(HttpRequestMessage request)
+        {
+            var currentUri = request.RequestUri!;
+            if (!await IsSafeToFetchAsync(currentUri))
+                throw new InvalidOperationException("URL resolved to a non-public IP address.");
+
+            HttpResponseMessage response;
+            for (var hop = 0; ; hop++)
+            {
+                response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+                if (!IsRedirect(response.StatusCode) || hop >= MaxRedirects)
+                    return response;
+
+                var location = response.Headers.Location;
+                if (location == null)
+                    return response;
+
+                if (!location.IsAbsoluteUri)
+                    location = new Uri(currentUri, location);
+
+                if (location.Scheme != "http" && location.Scheme != "https")
+                {
+                    response.Dispose();
+                    throw new InvalidOperationException("Redirect to non-HTTP(S) scheme.");
+                }
+
+                if (!await IsSafeToFetchAsync(location))
+                {
+                    response.Dispose();
+                    throw new InvalidOperationException("Redirect URL resolved to a non-public IP address.");
+                }
+
+                currentUri = location;
+                response.Dispose();
+                request = new HttpRequestMessage(HttpMethod.Get, currentUri);
+            }
+        }
+
+        private async Task<string> FetchFeedAsync(string url)
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                throw new InvalidOperationException("Invalid feed URL.");
+            if (uri.Scheme != "http" && uri.Scheme != "https")
+                throw new InvalidOperationException("Feed URL must use HTTP or HTTPS.");
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            using var response = await SendWithRedirectsAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            if (response.Content.Headers.ContentLength is > MaxFeedBytes)
+                throw new InvalidOperationException("Feed response exceeds maximum size.");
+
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var buffer = new MemoryStream();
+            var chunk = new byte[81920];
+            int bytesRead;
+            while ((bytesRead = await stream.ReadAsync(chunk)) > 0)
+            {
+                if (buffer.Length + bytesRead > MaxFeedBytes)
+                    throw new InvalidOperationException("Feed response exceeds maximum size.");
+                buffer.Write(chunk, 0, bytesRead);
+            }
+
+            return System.Text.Encoding.UTF8.GetString(buffer.ToArray());
+        }
+
         private async Task<string> CacheImageAsync(string imageUrl)
         {
             if (string.IsNullOrWhiteSpace(imageUrl) || !Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri))
@@ -513,7 +587,8 @@ namespace Task_Flyout.Services
                 var path = Path.Combine(imagesPath, HashText(imageUrl) + extension);
                 if (File.Exists(path)) return path;
 
-                using var response = await HttpClient.SendAsync(new HttpRequestMessage(HttpMethod.Get, uri), HttpCompletionOption.ResponseHeadersRead);
+                using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+                using var response = await SendWithRedirectsAsync(request);
                 response.EnsureSuccessStatusCode();
 
                 if (response.Content.Headers.ContentLength is > MaxImageBytes)
