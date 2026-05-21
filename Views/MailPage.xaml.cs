@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Microsoft.Windows.ApplicationModel.Resources;
@@ -26,6 +27,34 @@ namespace Task_Flyout.Views
         private MailAccount? _selectedAccountForRemoval;
         private readonly MailTrustStore _mailTrustStore = new();
         private readonly ResourceLoader _loader = new();
+
+        // Pre-compiled regex patterns for mail HTML sanitization
+        private static readonly Regex RxPairedDangerousTags = new(@"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*>.*?<\s*/\s*\1\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxSelfClosingDangerousTags = new(@"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*/?\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxEventHandlerQuoted = new(@"\s+on\w+\s*=\s*(['""]).*?\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxEventHandlerUnquoted = new(@"\s+on\w+\s*=\s*[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxScriptUriQuoted = new(@"(href|src|action|formaction|data)\s*=\s*(['""])\s*(javascript|vbscript|data):.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxScriptUriUnquoted = new(@"(href|src|action|formaction|data)\s*=\s*(javascript|vbscript|data):[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxRemoteResourceQuoted = new(@"\s(src|srcset|background)\s*=\s*(['""])\s*https?://.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxRemoteResourceUnquoted = new(@"\s(src|srcset|background)\s*=\s*https?://[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxDangerousCssStyle = new(@"style\s*=\s*(['""])[^'""]*\b(expression|url\s*\(|-moz-binding|behavior)\b[^'""]*\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxCssUrl = new(@"url\s*\(\s*(['""]?)https?://.*?\1\s*\)", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxHtmlContentTags = new(@"<\s*(html|head|body|style|table|div|p|span|br|img|a|meta)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxHtmlTag = new(@"<\s*html\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxHeadClose = new(@"<\s*/\s*head\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxHtmlOpenTag = new(@"<\s*html\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxTrustedScriptUriQuoted = new(@"(href|action|formaction)\s*=\s*(['""])\s*(javascript|vbscript):.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxTrustedScriptUriUnquoted = new(@"(href|action|formaction)\s*=\s*(javascript|vbscript):[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxTrustedDangerousCss = new(@"style\s*=\s*(['""])[^'""]*\b(expression|-moz-binding|behavior)\b[^'""]*\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxNonContentTags = new(@"<\s*(head|style|script|meta|link)\b[^>]*>.*?<\s*/\s*\1\s*>|<\s*(meta|link)\b[^>]*/?\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxHtmlTagsOnly = new("<.*?>", RegexOptions.Compiled);
+        private static readonly Regex RxLocalImgSrc = new(@"<\s*img\b[^>]+\bsrc\s*=\s*(['""])(?!https?://|cid:|data:)[^'""]+\1", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxPlainTextHeadStyle = new(@"<\s*(head|style|script)\b[^>]*>.*?<\s*/\s*\1\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxPlainTextMetaLink = new(@"<\s*(meta|link)\b[^>]*/?\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxMultiSpace = new(@"[ \t]{2,}", RegexOptions.Compiled);
+        private static readonly Regex RxCssSelector = new(@"^[.#][\w\-#.:\s,>+~\[\]=""']+\{?$", RegexOptions.Compiled);
+        private static readonly Regex RxCssProperty = new(@"^[a-zA-Z\-]+\s*:\s*[^。！？；，、]*;?$", RegexOptions.Compiled);
+        private static readonly Regex RxCssRuleStart = new(@"^[a-zA-Z][\w\-#.\s,>+~\[\]=""']+\s*\{", RegexOptions.Compiled);
         private bool _isInitializing = true;
         private bool _isLoadingMessages;
         private bool _suppressSelectionClear;
@@ -939,17 +968,12 @@ body { background-color: {{background}} !important; }
 </style>
 """;
 
-            if (System.Text.RegularExpressions.Regex.IsMatch(safeHtml, @"<\s*html\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            if (RxHtmlTag.IsMatch(safeHtml))
             {
-                if (System.Text.RegularExpressions.Regex.IsMatch(safeHtml, @"<\s*/\s*head\s*>", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-                    return System.Text.RegularExpressions.Regex.Replace(safeHtml, @"<\s*/\s*head\s*>", baseStyle + "</head>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (RxHeadClose.IsMatch(safeHtml))
+                    return RxHeadClose.Replace(safeHtml, baseStyle + "</head>");
 
-                return System.Text.RegularExpressions.Regex.Replace(
-                    safeHtml,
-                    @"<\s*html\b[^>]*>",
-                    match => match.Value + baseStyle,
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase,
-                    TimeSpan.FromMilliseconds(100));
+                return RxHtmlOpenTag.Replace(safeHtml, match => match.Value + baseStyle);
             }
 
             return """
@@ -981,24 +1005,18 @@ body { background-color: {{background}} !important; }
             if (string.IsNullOrWhiteSpace(html)) return "";
 
             var value = html;
-            // Remove block-level dangerous elements (paired tags)
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*>.*?<\s*/\s*\1\s*>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            // Remove self-closing / standalone dangerous elements
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*/?\s*>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            // Remove event handler attributes (on*)
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+on\w+\s*=\s*(['""]).*?\1", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+on\w+\s*=\s*[^\s>]+", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            // Remove javascript: and vbscript: URIs
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"(href|src|action|formaction|data)\s*=\s*(['""])\s*(javascript|vbscript|data):.*?\2", "$1=\"#\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"(href|src|action|formaction|data)\s*=\s*(javascript|vbscript|data):[^\s>]+", "$1=\"#\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            // Block remote resources such as tracking pixels. Links remain clickable through the WebView navigation handler.
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"\s(src|srcset|background)\s*=\s*(['""])\s*https?://.*?\2", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"\s(src|srcset|background)\s*=\s*https?://[^\s>]+", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            // Remove dangerous CSS in style attributes (expression, url(), -moz-binding, behavior)
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"style\s*=\s*(['""])[^'""]*\b(expression|url\s*\(|-moz-binding|behavior)\b[^'""]*\1", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"url\s*\(\s*(['""]?)https?://.*?\1\s*\)", "none", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            value = RxPairedDangerousTags.Replace(value, "");
+            value = RxSelfClosingDangerousTags.Replace(value, "");
+            value = RxEventHandlerQuoted.Replace(value, "");
+            value = RxEventHandlerUnquoted.Replace(value, "");
+            value = RxScriptUriQuoted.Replace(value, "$1=\"#\"");
+            value = RxScriptUriUnquoted.Replace(value, "$1=\"#\"");
+            value = RxRemoteResourceQuoted.Replace(value, "");
+            value = RxRemoteResourceUnquoted.Replace(value, "");
+            value = RxDangerousCssStyle.Replace(value, "");
+            value = RxCssUrl.Replace(value, "none");
 
-            if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"<\s*(html|head|body|style|table|div|p|span|br|img|a|meta)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            if (!RxHtmlContentTags.IsMatch(value))
                 value = $"<pre>{WebUtility.HtmlEncode(RemoveCssNoise(value))}</pre>";
 
             return value;
@@ -1009,15 +1027,15 @@ body { background-color: {{background}} !important; }
             if (string.IsNullOrWhiteSpace(html)) return "";
 
             var value = html;
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*>.*?<\s*/\s*\1\s*>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*/?\s*>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+on\w+\s*=\s*(['""]).*?\1", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+on\w+\s*=\s*[^\s>]+", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"(href|action|formaction)\s*=\s*(['""])\s*(javascript|vbscript):.*?\2", "$1=\"#\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"(href|action|formaction)\s*=\s*(javascript|vbscript):[^\s>]+", "$1=\"#\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"style\s*=\s*(['""])[^'""]*\b(expression|-moz-binding|behavior)\b[^'""]*\1", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            value = RxPairedDangerousTags.Replace(value, "");
+            value = RxSelfClosingDangerousTags.Replace(value, "");
+            value = RxEventHandlerQuoted.Replace(value, "");
+            value = RxEventHandlerUnquoted.Replace(value, "");
+            value = RxTrustedScriptUriQuoted.Replace(value, "$1=\"#\"");
+            value = RxTrustedScriptUriUnquoted.Replace(value, "$1=\"#\"");
+            value = RxTrustedDangerousCss.Replace(value, "");
 
-            if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"<\s*(html|head|body|style|table|div|p|span|br|img|a|meta)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            if (!RxHtmlContentTags.IsMatch(value))
                 value = $"<pre>{WebUtility.HtmlEncode(RemoveCssNoise(value))}</pre>";
 
             return value;
@@ -1027,21 +1045,14 @@ body { background-color: {{background}} !important; }
         {
             if (string.IsNullOrWhiteSpace(html)) return false;
 
-            var withoutNonContent = System.Text.RegularExpressions.Regex.Replace(
-                html,
-                @"<\s*(head|style|script|meta|link)\b[^>]*>.*?<\s*/\s*\1\s*>|<\s*(meta|link)\b[^>]*/?\s*>",
-                " ",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            var withoutNonContent = RxNonContentTags.Replace(html, " ");
 
-            var text = System.Text.RegularExpressions.Regex.Replace(withoutNonContent, "<.*?>", " ");
+            var text = RxHtmlTagsOnly.Replace(withoutNonContent, " ");
             text = WebUtility.HtmlDecode(text).Trim();
             if (text.Length > 0)
                 return true;
 
-            if (System.Text.RegularExpressions.Regex.IsMatch(
-                    withoutNonContent,
-                    @"<\s*img\b[^>]+\bsrc\s*=\s*(['""])(?!https?://|cid:|data:)[^'""]+\1",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            if (RxLocalImgSrc.IsMatch(withoutNonContent))
                 return true;
 
             return false;
@@ -1070,12 +1081,12 @@ body { background-color: {{background}} !important; }
 
         private static string BuildPlainTextFallback(string value)
         {
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(head|style|script)\b[^>]*>.*?<\s*/\s*\1\s*>", " ", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            value = System.Text.RegularExpressions.Regex.Replace(value, @"<\s*(meta|link)\b[^>]*/?\s*>", " ", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            value = System.Text.RegularExpressions.Regex.Replace(value, "<.*?>", " ");
+            value = RxPlainTextHeadStyle.Replace(value, " ");
+            value = RxPlainTextMetaLink.Replace(value, " ");
+            value = RxHtmlTagsOnly.Replace(value, " ");
             value = RemoveCssNoise(value);
             value = WebUtility.HtmlDecode(value);
-            return System.Text.RegularExpressions.Regex.Replace(value, @"[ \t]{2,}", " ").Trim();
+            return RxMultiSpace.Replace(value, " ").Trim();
         }
 
         private static bool IsCssNoiseLine(string line)
@@ -1086,9 +1097,9 @@ body { background-color: {{background}} !important; }
                 line.StartsWith("@-moz", StringComparison.OrdinalIgnoreCase) ||
                 line.StartsWith("@supports", StringComparison.OrdinalIgnoreCase))
                 return true;
-            if (System.Text.RegularExpressions.Regex.IsMatch(line, @"^[.#][\w\-#.:\s,>+~\[\]=""']+\{?$")) return true;
-            if (System.Text.RegularExpressions.Regex.IsMatch(line, @"^[a-zA-Z\-]+\s*:\s*[^。！？；，、]*;?$")) return true;
-            if (System.Text.RegularExpressions.Regex.IsMatch(line, @"^[a-zA-Z][\w\-#.\s,>+~\[\]=""']+\s*\{")) return true;
+            if (RxCssSelector.IsMatch(line)) return true;
+            if (RxCssProperty.IsMatch(line)) return true;
+            if (RxCssRuleStart.IsMatch(line)) return true;
             return false;
         }
 
