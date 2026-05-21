@@ -338,6 +338,7 @@ namespace Task_Flyout
             NotificationService?.Stop();
             MailService.StopMailPolling();
             MailService.NewMailArrived -= MailService_NewMailArrived;
+            if (_uiSettings != null) _uiSettings.ColorValuesChanged -= UiSettings_ColorValuesChanged;
             _trayIcon?.Dispose();
             MyWeatherBar?.Close();
             MyFlyoutWindow?.Close();

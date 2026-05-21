@@ -136,6 +136,7 @@ namespace Task_Flyout.Services
         private RssCache _cache = new();
         private bool _loaded;
         private bool _databaseInitialized;
+        private string? _connectionString;
 
         public IReadOnlyList<RssSubscription> GetSubscriptions()
         {
@@ -947,11 +948,11 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
 
         private SqliteConnection OpenConnection()
         {
-            var builder = new SqliteConnectionStringBuilder
+            _connectionString ??= new SqliteConnectionStringBuilder
             {
                 DataSource = GetDatabasePath()
-            };
-            var connection = new SqliteConnection(builder.ToString());
+            }.ToString();
+            var connection = new SqliteConnection(_connectionString);
             connection.Open();
             return connection;
         }

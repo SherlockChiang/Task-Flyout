@@ -29,6 +29,7 @@ namespace Task_Flyout
         private bool _userHidden;
         private double _preferredLogicalWidth = 180;
         private IntPtr _fluentFlyoutHwnd = IntPtr.Zero;
+        private IntPtr _currentRgn = IntPtr.Zero;
 
         #region P/Invoke
 
@@ -362,7 +363,8 @@ namespace Task_Flyout
                 int cornerRadius = (int)(8 * scaleFactor);
                 IntPtr rgn = CreateRoundRectRgn(0, 0, pillWidth + 1, pillHeight + 1, cornerRadius, cornerRadius);
                 SetWindowRgn(hWnd, rgn, true);
-                // SetWindowRgn 接管 region 所有权，不需要 DeleteObject
+                if (_currentRgn != IntPtr.Zero) DeleteObject(_currentRgn);
+                _currentRgn = rgn;
             }
             catch
             {
@@ -905,6 +907,7 @@ namespace Task_Flyout
                 ShowWindow(hWnd, 0); // SW_HIDE
                 // 清除 region 并缩为 0，彻底消除残影
                 SetWindowRgn(hWnd, IntPtr.Zero, true);
+                if (_currentRgn != IntPtr.Zero) { DeleteObject(_currentRgn); _currentRgn = IntPtr.Zero; }
                 SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0,
                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
             }

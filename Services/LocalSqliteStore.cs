@@ -12,6 +12,7 @@ namespace Task_Flyout.Services
         private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("TaskFlyout.LocalCache.v1");
         private static readonly object InitLock = new();
         private static bool _initialized;
+        private static string? _connectionString;
 
         public static string? ReadProtectedText(string scope, string key)
         {
@@ -87,11 +88,11 @@ CREATE TABLE IF NOT EXISTS protected_store (
 
         private static SqliteConnection OpenConnection()
         {
-            var builder = new SqliteConnectionStringBuilder
+            _connectionString ??= new SqliteConnectionStringBuilder
             {
                 DataSource = Path.Combine(GetAppDataPath(), "taskflyout_store.db")
-            };
-            var connection = new SqliteConnection(builder.ToString());
+            }.ToString();
+            var connection = new SqliteConnection(_connectionString);
             connection.Open();
             return connection;
         }
