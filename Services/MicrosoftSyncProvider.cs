@@ -43,9 +43,11 @@ namespace Task_Flyout.Services
 
             try
             {
-                if (File.Exists(authRecordPath))
+                var encrypted = ProtectedLocalStore.ReadText(authRecordPath);
+                if (!string.IsNullOrEmpty(encrypted))
                 {
-                    using var stream = File.OpenRead(authRecordPath);
+                    var bytes = Convert.FromBase64String(encrypted);
+                    using var stream = new MemoryStream(bytes);
                     authRecord = await AuthenticationRecord.DeserializeAsync(stream);
                 }
             }
@@ -70,8 +72,7 @@ namespace Task_Flyout.Services
                 if (authRecord == null)
                 {
                     authRecord = await credential.AuthenticateAsync(tokenContext);
-                    using var stream = File.Create(authRecordPath);
-                    await authRecord.SerializeAsync(stream);
+                    await SaveAuthRecordAsync(authRecordPath, authRecord);
                 }
                 else
                 {
@@ -84,8 +85,7 @@ namespace Task_Flyout.Services
                 options.AuthenticationRecord = null;
 
                 authRecord = await credential.AuthenticateAsync(new TokenRequestContext(_scopes));
-                using var stream = File.Create(authRecordPath);
-                await authRecord.SerializeAsync(stream);
+                await SaveAuthRecordAsync(authRecordPath, authRecord);
             }
 
             _graphClient = new GraphServiceClient(credential, _scopes);
@@ -498,6 +498,14 @@ namespace Task_Flyout.Services
                 RecurrencePatternType.AbsoluteYearly or RecurrencePatternType.RelativeYearly => "Yearly",
                 _ => "None"
             };
+        }
+
+        private static async Task SaveAuthRecordAsync(string path, AuthenticationRecord record)
+        {
+            using var stream = new MemoryStream();
+            await record.SerializeAsync(stream);
+            var base64 = Convert.ToBase64String(stream.ToArray());
+            ProtectedLocalStore.WriteText(path, base64);
         }
     }
 }

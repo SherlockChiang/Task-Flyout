@@ -12,7 +12,9 @@ using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using MimeKit;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -148,10 +150,10 @@ namespace Task_Flyout.Services
         private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(10);
         private readonly Dictionary<string, CacheEntry<List<MailFolder>>> _folderCache = new();
         private readonly Dictionary<string, CacheEntry<List<MailItem>>> _messageCache = new();
-        private readonly HashSet<string> _knownUnreadIds = new(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, byte> _knownUnreadIds = new(StringComparer.Ordinal);
         private DispatcherTimer? _pollTimer;
-        private bool _isPollingMail;
-        private bool _knownUnreadLoaded;
+        private int _isPollingMail;
+        private int _knownUnreadLoaded;
         private MailPersistentCache? _persistentCache;
         private bool _persistentCacheLoaded;
         public event EventHandler<NewMailNotificationEventArgs>? NewMailArrived;
@@ -691,9 +693,8 @@ namespace Task_Flyout.Services
 
         private async Task CheckNewMailAsync()
         {
-            if (_isPollingMail || !MailPollingEnabled) return;
+            if (Interlocked.CompareExchange(ref _isPollingMail, 1, 0) != 0 || !MailPollingEnabled) return;
 
-            _isPollingMail = true;
             try
             {
                 EnsureAccountsLoaded();
@@ -730,7 +731,7 @@ namespace Task_Flyout.Services
 
                             if (hasBaseline &&
                                 itemTicks > previousSeenTicks &&
-                                !_knownUnreadIds.Contains(key))
+                                !_knownUnreadIds.ContainsKey(key))
                             {
                                 newItems.Add((account, item));
                             }
@@ -750,13 +751,13 @@ namespace Task_Flyout.Services
 
                 _knownUnreadIds.Clear();
                 foreach (var id in currentUnreadIds.Take(500))
-                    _knownUnreadIds.Add(id);
+                    _knownUnreadIds[id] = 0;
                 SaveKnownUnreadIds();
                 SavePersistentCache();
             }
             finally
             {
-                _isPollingMail = false;
+                Volatile.Write(ref _isPollingMail, 0);
             }
         }
 
@@ -1506,17 +1507,16 @@ namespace Task_Flyout.Services
 
         private void LoadKnownUnreadIds()
         {
-            if (_knownUnreadLoaded) return;
-            _knownUnreadLoaded = true;
+            if (Interlocked.CompareExchange(ref _knownUnreadLoaded, 1, 0) != 0) return;
 
             var raw = ApplicationData.Current.LocalSettings.Values["MailKnownUnreadIds"] as string ?? "";
             foreach (var id in raw.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-                _knownUnreadIds.Add(id);
+                _knownUnreadIds[id] = 0;
         }
 
         private void SaveKnownUnreadIds()
         {
-            ApplicationData.Current.LocalSettings.Values["MailKnownUnreadIds"] = string.Join('\n', _knownUnreadIds);
+            ApplicationData.Current.LocalSettings.Values["MailKnownUnreadIds"] = string.Join('\n', _knownUnreadIds.Keys);
         }
 
         private long GetLastSeenInboxTicks(string inboxKey)

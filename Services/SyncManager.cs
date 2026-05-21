@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
 
@@ -12,8 +13,8 @@ namespace Task_Flyout.Services
     {
         private readonly List<ISyncProvider> _providers = new();
         private AppCache _cache = new();
-        private bool _cacheLoaded;
-        private readonly object _cacheLock = new();
+        private int _cacheLoaded;
+        private readonly SemaphoreSlim _cacheLock = new(1, 1);
         private const string StoreScope = "calendar";
         private const string CacheKey = "local_cache_winui3";
 
@@ -120,7 +121,7 @@ namespace Task_Flyout.Services
                 }
             }
 
-            MergeIntoCache(min, max, allItems, successfulProviders);
+            await MergeIntoCacheAsync(min, max, allItems, successfulProviders);
             await SaveCacheAsync();
 
             return allItems;
@@ -176,8 +177,7 @@ namespace Task_Flyout.Services
 
         private void EnsureCacheLoaded()
         {
-            if (_cacheLoaded) return;
-            _cacheLoaded = true;
+            if (Interlocked.CompareExchange(ref _cacheLoaded, 1, 0) != 0) return;
 
             try
             {
@@ -198,7 +198,8 @@ namespace Task_Flyout.Services
         private void RemoveProviderFromCache(string providerName)
         {
             EnsureCacheLoaded();
-            lock (_cacheLock)
+            _cacheLock.Wait();
+            try
             {
                 foreach (var key in _cache.DayItems.Keys.ToList())
                 {
@@ -209,6 +210,10 @@ namespace Task_Flyout.Services
 
                 RebuildMarkedDates();
             }
+            finally
+            {
+                _cacheLock.Release();
+            }
         }
 
         private async Task SaveCacheAsync()
@@ -216,9 +221,14 @@ namespace Task_Flyout.Services
             try
             {
                 string json;
-                lock (_cacheLock)
+                await _cacheLock.WaitAsync();
+                try
                 {
                     json = JsonSerializer.Serialize(_cache, AppJsonContext.Default.AppCache);
+                }
+                finally
+                {
+                    _cacheLock.Release();
                 }
                 await LocalSqliteStore.WriteProtectedTextAsync(StoreScope, CacheKey, json);
             }
@@ -248,12 +258,13 @@ namespace Task_Flyout.Services
                 .ToList();
         }
 
-        private void MergeIntoCache(DateTime min, DateTime max, List<AgendaItem> items, List<string> successfulProviders)
+        private async Task MergeIntoCacheAsync(DateTime min, DateTime max, List<AgendaItem> items, List<string> successfulProviders)
         {
             string start = min.ToString("yyyy-MM-dd");
             string end = max.AddDays(-1).ToString("yyyy-MM-dd");
 
-            lock (_cacheLock)
+            await _cacheLock.WaitAsync();
+            try
             {
                 for (var d = min; d < max; d = d.AddDays(1))
                 {
@@ -282,6 +293,10 @@ namespace Task_Flyout.Services
                 _cache.CachedRanges.Add(new AgendaCacheRange { StartDateKey = start, EndDateKey = end });
                 MergeCacheRanges();
                 RebuildMarkedDates();
+            }
+            finally
+            {
+                _cacheLock.Release();
             }
         }
 
