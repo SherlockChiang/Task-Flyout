@@ -199,7 +199,6 @@ namespace Task_Flyout
             UpdateClock();
             _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _clockTimer.Tick += (s, e) => UpdateClock();
-            _clockTimer.Start();
         }
 
         private bool _showSeconds;
@@ -316,7 +315,7 @@ namespace Task_Flyout
         {
             if (_dotRefreshTimer == null)
             {
-                _dotRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+                _dotRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
                 _dotRefreshTimer.Tick += (s, args) =>
                 {
                     _dotRefreshTimer.Stop();
@@ -386,8 +385,9 @@ namespace Task_Flyout
                     var dotColors = new List<Color>();
                     if (_localCache.DayItems.TryGetValue(dateStr, out var agendaItems))
                     {
-                        foreach (var ai in agendaItems.Where(IsItemVisible))
+                        foreach (var ai in agendaItems)
                         {
+                            if (accountMgr != null && !accountMgr.IsItemVisible(ai)) continue;
                             accountMgr?.PopulateItemColor(ai);
                             var c = !string.IsNullOrEmpty(ai.ColorHex)
                                 ? Services.ColorHelper.ParseHex(ai.ColorHex)
@@ -686,6 +686,7 @@ namespace Task_Flyout
                 AdjustWindowHeight();
                 Activate();
                 _appWindow.Show();
+                _clockTimer?.Start();
 
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 SetForegroundWindow(hWnd);
@@ -836,6 +837,7 @@ namespace Task_Flyout
             }
 
             _focusTimer?.Stop();
+            _clockTimer?.Stop();
             _appWindow.Hide();
             _lastHideTime = DateTime.Now;
         }
