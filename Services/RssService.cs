@@ -831,27 +831,29 @@ LIMIT 1000;
             using var connection = OpenConnection();
             using var transaction = connection.BeginTransaction();
 
-            ExecuteNonQuery(connection, "DELETE FROM rss_folders;", transaction);
-            ExecuteNonQuery(connection, "DELETE FROM rss_subscriptions;", transaction);
-            ExecuteNonQuery(connection, "DELETE FROM rss_articles;", transaction);
-
             foreach (var folder in _cache.Folders)
             {
                 using var command = connection.CreateCommand();
                 command.Transaction = transaction;
-                command.CommandText = "INSERT INTO rss_folders(id, name, sort_order) VALUES ($id, $name, $sortOrder);";
+                command.CommandText = """
+INSERT OR REPLACE INTO rss_folders(id, name, sort_order)
+VALUES ($id, $name, $sortOrder);
+""";
                 command.Parameters.AddWithValue("$id", folder.Id ?? "");
                 command.Parameters.AddWithValue("$name", folder.Name ?? "");
                 command.Parameters.AddWithValue("$sortOrder", folder.SortOrder);
                 command.ExecuteNonQuery();
             }
 
+            var currentFolderIds = _cache.Folders.Select(f => f.Id ?? "").ToHashSet(StringComparer.Ordinal);
+            ExecuteNonQuery(connection, $"DELETE FROM rss_folders WHERE id NOT IN ('{string.Join("','", currentFolderIds)}');", transaction);
+
             foreach (var subscription in _cache.Subscriptions)
             {
                 using var command = connection.CreateCommand();
                 command.Transaction = transaction;
                 command.CommandText = """
-INSERT INTO rss_subscriptions(id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks)
+INSERT OR REPLACE INTO rss_subscriptions(id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks)
 VALUES ($id, $title, $url, $folderId, $imageUrl, $localImagePath, $lastFetchedTicks);
 """;
                 command.Parameters.AddWithValue("$id", subscription.Id ?? "");
@@ -864,12 +866,17 @@ VALUES ($id, $title, $url, $folderId, $imageUrl, $localImagePath, $lastFetchedTi
                 command.ExecuteNonQuery();
             }
 
+            var currentSubIds = _cache.Subscriptions.Select(s => s.Id ?? "").ToHashSet(StringComparer.Ordinal);
+            ExecuteNonQuery(connection, $"DELETE FROM rss_subscriptions WHERE id NOT IN ('{string.Join("','", currentSubIds)}');", transaction);
+
+            var keptArticleIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (var article in _cache.Articles.OrderByDescending(item => item.PublishedAt).Take(1000))
             {
+                keptArticleIds.Add(article.Id ?? "");
                 using var command = connection.CreateCommand();
                 command.Transaction = transaction;
                 command.CommandText = """
-INSERT INTO rss_articles(id, subscription_id, feed_title, title, link, summary, html_content, image_url, local_image_path, published_ticks)
+INSERT OR REPLACE INTO rss_articles(id, subscription_id, feed_title, title, link, summary, html_content, image_url, local_image_path, published_ticks)
 VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent, $imageUrl, $localImagePath, $publishedTicks);
 """;
                 command.Parameters.AddWithValue("$id", article.Id ?? "");
@@ -884,6 +891,11 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
                 command.Parameters.AddWithValue("$publishedTicks", ToTicks(article.PublishedAt));
                 command.ExecuteNonQuery();
             }
+
+            if (keptArticleIds.Count > 0)
+                ExecuteNonQuery(connection, $"DELETE FROM rss_articles WHERE id NOT IN ('{string.Join("','", keptArticleIds)}');", transaction);
+            else
+                ExecuteNonQuery(connection, "DELETE FROM rss_articles;", transaction);
 
             transaction.Commit();
         }
