@@ -135,6 +135,7 @@ namespace Task_Flyout
         private const uint WM_DISPLAYCHANGE = 0x007E;
         private const uint WM_SETTINGCHANGE = 0x001A;
         private const uint WM_DPICHANGED = 0x02E0;
+        private const uint WM_PARENTNOTIFY = 0x0210;
 
         private SUBCLASSPROC _subclassProc = null!;
 
@@ -226,10 +227,11 @@ namespace Task_Flyout
 
                 PositionOnTaskbar();
 
-                // 只在 reparent 后或窗口被意外隐藏时才 ShowWindow
-                // 避免每 2 秒调 ShowWindow 改变 z-order，覆盖 FluentFlyout
                 if ((needsReparent || !IsWindowVisible(hWnd)) && IsWindow(hWnd))
                     ShowWindow(hWnd, SW_SHOWNOACTIVATE);
+
+                if (_isParented)
+                    _reparentTimer?.Stop();
             }
             catch
             {
@@ -272,6 +274,19 @@ namespace Task_Flyout
                 {
                     ApplyWindowsTheme();
                     PositionOnTaskbar();
+                });
+            }
+
+            if (uMsg == WM_PARENTNOTIFY)
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    IntPtr parent = GetParent(hWnd);
+                    if (parent == IntPtr.Zero || parent != _taskbarHwnd)
+                    {
+                        _isParented = false;
+                        _reparentTimer?.Start();
+                    }
                 });
             }
 
