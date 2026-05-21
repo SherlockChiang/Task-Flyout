@@ -18,6 +18,9 @@ namespace Task_Flyout.Services
         private readonly ResourceLoader _loader = new();
         private DispatcherTimer? _timer;
         private int _reminderMinutes;
+        private Dictionary<string, List<AgendaItem>>? _cachedItems;
+        private DateTime _cacheReadTime = DateTime.MinValue;
+        private static readonly TimeSpan CacheRefreshInterval = TimeSpan.FromMinutes(5);
 
         public NotificationService(SyncManager syncManager)
         {
@@ -174,14 +177,19 @@ namespace Task_Flyout.Services
 
         private Dictionary<string, List<AgendaItem>>? LoadCacheItems()
         {
+            if (_cachedItems != null && DateTime.Now - _cacheReadTime < CacheRefreshInterval)
+                return _cachedItems;
+
             try
             {
                 var json = LocalSqliteStore.ReadProtectedText("calendar", "local_cache_winui3");
-                if (string.IsNullOrWhiteSpace(json)) return null;
+                if (string.IsNullOrWhiteSpace(json)) return _cachedItems;
                 var cache = System.Text.Json.JsonSerializer.Deserialize(json, AppJsonContext.Default.AppCache);
-                return cache?.DayItems;
+                _cachedItems = cache?.DayItems;
+                _cacheReadTime = DateTime.Now;
+                return _cachedItems;
             }
-            catch { return null; }
+            catch { return _cachedItems; }
         }
 
         private bool IsItemVisible(AgendaItem item)
