@@ -148,7 +148,6 @@ namespace Task_Flyout.Services
         public async Task<List<AgendaItem>> FetchDataAsync(DateTime startDate, DateTime endDate)
         {
             await EnsureAuthorizedAsync();
-            var results = new List<AgendaItem>();
 
             // Fetch calendars to get names for CalendarId/CalendarName
             var calendarMap = new Dictionary<string, string>();
@@ -166,6 +165,21 @@ namespace Task_Flyout.Services
             }
             catch { }
 
+            // Fetch events and tasks in parallel
+            var eventsTask = FetchCalendarEventsAsync(startDate, endDate, calendarMap);
+            var tasksTask = FetchMicrosoftTasksAsync();
+
+            await Task.WhenAll(eventsTask, tasksTask);
+
+            var results = new List<AgendaItem>();
+            results.AddRange(eventsTask.Result);
+            results.AddRange(tasksTask.Result);
+            return results;
+        }
+
+        private async Task<List<AgendaItem>> FetchCalendarEventsAsync(DateTime startDate, DateTime endDate, Dictionary<string, string> calendarMap)
+        {
+            var results = new List<AgendaItem>();
             try
             {
                 var events = await _graphClient.Me.CalendarView.GetAsync(req =>
@@ -186,12 +200,10 @@ namespace Task_Flyout.Services
 
                         string? calId = null;
                         string? calName = null;
-                        // Try to extract calendar info from the event
                         if (ev.AdditionalData != null && ev.AdditionalData.TryGetValue("calendar@odata.associationLink", out var calLink))
                         {
                             calId = calLink?.ToString();
                         }
-                        // Use the first calendar as default if we can't determine
                         if (calId == null && calendarMap.Count > 0)
                         {
                             var first = calendarMap.First();
@@ -237,7 +249,12 @@ namespace Task_Flyout.Services
             {
                 System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] Other error: {ex.Message}");
             }
+            return results;
+        }
 
+        private async Task<List<AgendaItem>> FetchMicrosoftTasksAsync()
+        {
+            var results = new List<AgendaItem>();
             try
             {
                 var listId = await GetDefaultTodoListIdAsync();
@@ -300,7 +317,6 @@ namespace Task_Flyout.Services
             {
                 System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] Other error fetching tasks: {ex.Message}");
             }
-
             return results;
         }
 

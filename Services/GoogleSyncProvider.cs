@@ -126,75 +126,90 @@ namespace Task_Flyout.Services
             await EnsureAuthorizedAsync();
             var calendarSvc = CalendarSvc!;
             var tasksSvc = TasksSvc!;
-            var items = new List<AgendaItem>();
 
             // Fetch events from all calendars
             var calendars = await FetchCalendarListAsync();
             if (calendars.Count == 0)
             {
-                // Fallback to primary if calendar list fails
                 calendars.Add(new SubscribedCalendarInfo { Id = "primary", Name = "Primary" });
             }
 
-            foreach (var cal in calendars)
+            var calendarTasks = calendars.Select(cal => FetchCalendarEventsAsync(calendarSvc, cal, min, max));
+            var tasksTask = FetchGoogleTasksAsync(tasksSvc);
+
+            await Task.WhenAll(calendarTasks.Append(tasksTask));
+
+            var items = new List<AgendaItem>();
+            foreach (var task in calendarTasks)
+                items.AddRange(task.Result);
+            items.AddRange(tasksTask.Result);
+
+            return items;
+        }
+
+        private async Task<List<AgendaItem>> FetchCalendarEventsAsync(CalendarService calendarSvc, SubscribedCalendarInfo cal, DateTime min, DateTime max)
+        {
+            var items = new List<AgendaItem>();
+            var recurrenceKinds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            string? pageToken = null;
+            do
             {
-                var recurrenceKinds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                string? pageToken = null;
-                do
+                try
                 {
-                    try
+                    var req = calendarSvc.Events.List(cal.Id);
+                    req.TimeMinDateTimeOffset = min;
+                    req.TimeMaxDateTimeOffset = max;
+                    req.SingleEvents = true;
+                    req.MaxResults = 2500;
+                    req.PageToken = pageToken;
+                    var events = await req.ExecuteAsync().ConfigureAwait(false);
+                    if (events?.Items != null)
                     {
-                        var req = calendarSvc.Events.List(cal.Id);
-                        req.TimeMinDateTimeOffset = min;
-                        req.TimeMaxDateTimeOffset = max;
-                        req.SingleEvents = true;
-                        req.MaxResults = 2500;
-                        req.PageToken = pageToken;
-                        var events = await req.ExecuteAsync().ConfigureAwait(false);
-                        if (events?.Items != null)
+                        foreach (var ev in events.Items)
                         {
-                            foreach (var ev in events.Items)
+                            DateTime? date = ev.Start?.DateTimeDateTimeOffset?.DateTime ?? (DateTime.TryParse(ev.Start?.Date, out var d) ? d : null);
+                            if (date == null) continue;
+
+                            var endDate2 = ev.End?.DateTimeDateTimeOffset?.DateTime ?? (DateTime.TryParse(ev.End?.Date, out var ed) ? ed : (DateTime?)null);
+                            string recurringEventId = ev.RecurringEventId ?? "";
+                            string recurrenceKind = GetGoogleRecurrenceKind(ev.Recurrence);
+                            if (recurrenceKind == "None" && !string.IsNullOrWhiteSpace(recurringEventId))
+                                recurrenceKind = await GetGoogleMasterRecurrenceKindAsync(cal.Id, recurringEventId, recurrenceKinds);
+
+                            items.Add(new AgendaItem
                             {
-                                DateTime? date = ev.Start?.DateTimeDateTimeOffset?.DateTime ?? (DateTime.TryParse(ev.Start?.Date, out var d) ? d : null);
-                                if (date == null) continue;
-
-                                var endDate2 = ev.End?.DateTimeDateTimeOffset?.DateTime ?? (DateTime.TryParse(ev.End?.Date, out var ed) ? ed : (DateTime?)null);
-                                string recurringEventId = ev.RecurringEventId ?? "";
-                                string recurrenceKind = GetGoogleRecurrenceKind(ev.Recurrence);
-                                if (recurrenceKind == "None" && !string.IsNullOrWhiteSpace(recurringEventId))
-                                    recurrenceKind = await GetGoogleMasterRecurrenceKindAsync(cal.Id, recurringEventId, recurrenceKinds);
-
-                                items.Add(new AgendaItem
-                                {
-                                    Id = ev.Id ?? "",
-                                    Title = ev.Summary ?? "",
-                                    Subtitle = ev.Start?.DateTimeDateTimeOffset == null ? _loader.GetString("TextAllDay") : ev.Start.DateTimeDateTimeOffset.Value.ToString("HH:mm"),
-                                    Location = ev.Location ?? "",
-                                    Description = ev.Description ?? "",
-                                    IsEvent = true,
-                                    Provider = ProviderName,
-                                    CalendarId = cal.Id,
-                                    CalendarName = cal.Name,
-                                    DateKey = date.Value.ToString("yyyy-MM-dd"),
-                                    StartDateTime = ev.Start?.DateTimeDateTimeOffset?.DateTime,
-                                    EndDateTime = endDate2,
-                                    IsRecurring = !string.IsNullOrWhiteSpace(recurringEventId) || ev.Recurrence?.Count > 0,
-                                    RecurringEventId = recurringEventId,
-                                    RecurrenceKind = recurrenceKind
-                                });
-                            }
+                                Id = ev.Id ?? "",
+                                Title = ev.Summary ?? "",
+                                Subtitle = ev.Start?.DateTimeDateTimeOffset == null ? _loader.GetString("TextAllDay") : ev.Start.DateTimeDateTimeOffset.Value.ToString("HH:mm"),
+                                Location = ev.Location ?? "",
+                                Description = ev.Description ?? "",
+                                IsEvent = true,
+                                Provider = ProviderName,
+                                CalendarId = cal.Id,
+                                CalendarName = cal.Name,
+                                DateKey = date.Value.ToString("yyyy-MM-dd"),
+                                StartDateTime = ev.Start?.DateTimeDateTimeOffset?.DateTime,
+                                EndDateTime = endDate2,
+                                IsRecurring = !string.IsNullOrWhiteSpace(recurringEventId) || ev.Recurrence?.Count > 0,
+                                RecurringEventId = recurringEventId,
+                                RecurrenceKind = recurrenceKind
+                            });
                         }
-                        pageToken = events?.NextPageToken;
                     }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[Google] Failed to fetch events from calendar {cal.Id}: {ex.Message}");
-                        pageToken = null;
-                    }
-                } while (pageToken != null);
-            }
+                    pageToken = events?.NextPageToken;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[Google] Failed to fetch events from calendar {cal.Id}: {ex.Message}");
+                    pageToken = null;
+                }
+            } while (pageToken != null);
+            return items;
+        }
 
-            // Fetch tasks from @default list
+        private async Task<List<AgendaItem>> FetchGoogleTasksAsync(TasksService tasksSvc)
+        {
+            var items = new List<AgendaItem>();
             string? taskPageToken = null;
             do
             {
@@ -227,7 +242,6 @@ namespace Task_Flyout.Services
                 }
                 taskPageToken = tasks?.NextPageToken;
             } while (taskPageToken != null);
-
             return items;
         }
 
