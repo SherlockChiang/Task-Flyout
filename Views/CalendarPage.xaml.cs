@@ -192,14 +192,21 @@ namespace Task_Flyout.Views
 
                 _localCache = _syncManager.GetLocalCache();
 
+                var itemsByDate = allItems
+                    .Where(IsItemVisible)
+                    .GroupBy(it => it.DateKey)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+
                 foreach (var cell in DayCells)
                 {
                     cell.Items.Clear();
-                    var dayItems = allItems.Where(it => it.DateKey == cell.Date.ToString("yyyy-MM-dd") && IsItemVisible(it));
-                    foreach (var item in dayItems)
+                    if (itemsByDate.TryGetValue(cell.Date.ToString("yyyy-MM-dd"), out var dayItems))
                     {
-                        PopulateItemColor(item);
-                        cell.Items.Add(item);
+                        foreach (var item in dayItems)
+                        {
+                            PopulateItemColor(item);
+                            cell.Items.Add(item);
+                        }
                     }
                 }
 

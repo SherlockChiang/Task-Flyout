@@ -13,8 +13,8 @@ namespace Task_Flyout.Views
 {
     public sealed partial class TasksPage : Page
     {
-        public ObservableCollection<AgendaItem> PendingTasks { get; } = new();
-        public ObservableCollection<AgendaItem> CompletedTasks { get; } = new();
+        public SuppressableObservableCollection<AgendaItem> PendingTasks { get; } = new();
+        public SuppressableObservableCollection<AgendaItem> CompletedTasks { get; } = new();
 
         private SyncManager? _syncManager;
         private AppCache _localCache = new();
@@ -392,11 +392,46 @@ namespace Task_Flyout.Views
     {
         public static void SortInPlace<T>(this ObservableCollection<T> collection, Comparison<T> comparison)
         {
-            var ordered = collection.ToList();
-            ordered.Sort(comparison);
-            collection.Clear();
-            foreach (var item in ordered)
-                collection.Add(item);
+            if (collection is SuppressableObservableCollection<T> sc)
+            {
+                sc.SuppressRange(() =>
+                {
+                    var ordered = collection.ToList();
+                    ordered.Sort(comparison);
+                    collection.Clear();
+                    foreach (var item in ordered)
+                        collection.Add(item);
+                });
+            }
+            else
+            {
+                var ordered = collection.ToList();
+                ordered.Sort(comparison);
+                collection.Clear();
+                foreach (var item in ordered)
+                    collection.Add(item);
+            }
+        }
+    }
+
+    public class SuppressableObservableCollection<T> : ObservableCollection<T>
+    {
+        private bool _suppressNotification;
+
+        public void SuppressRange(Action action)
+        {
+            _suppressNotification = true;
+            try { action(); }
+            finally
+            {
+                _suppressNotification = false;
+                OnCollectionChanged(new System.Collections.Specialized.NotifyCollectionChangedEventArgs(System.Collections.Specialized.NotifyCollectionChangedAction.Reset));
+            }
+        }
+
+        protected override void OnCollectionChanged(System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            if (!_suppressNotification) base.OnCollectionChanged(e);
         }
     }
 }
