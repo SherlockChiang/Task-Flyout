@@ -57,10 +57,25 @@ ON CONFLICT(scope, key) DO UPDATE SET value = excluded.value, updated_ticks = ex
             command.ExecuteNonQuery();
         }
 
-        public static Task WriteProtectedTextAsync(string scope, string key, string text)
+        public static async Task WriteProtectedTextAsync(string scope, string key, string text)
         {
-            WriteProtectedText(scope, key, text);
-            return Task.CompletedTask;
+            EnsureInitialized();
+            var bytes = Encoding.UTF8.GetBytes(text ?? "");
+            var encrypted = ProtectedData.Protect(bytes, Entropy, DataProtectionScope.CurrentUser);
+
+            await using var connection = CreateConnection();
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+INSERT INTO protected_store(scope, key, value, updated_ticks)
+VALUES ($scope, $key, $value, $updatedTicks)
+ON CONFLICT(scope, key) DO UPDATE SET value = excluded.value, updated_ticks = excluded.updated_ticks;
+""";
+            command.Parameters.AddWithValue("$scope", scope);
+            command.Parameters.AddWithValue("$key", key);
+            command.Parameters.Add("$value", SqliteType.Blob).Value = encrypted;
+            command.Parameters.AddWithValue("$updatedTicks", DateTimeOffset.UtcNow.UtcTicks);
+            await command.ExecuteNonQueryAsync();
         }
 
         private static void EnsureInitialized()
@@ -88,13 +103,18 @@ CREATE TABLE IF NOT EXISTS protected_store (
 
         private static SqliteConnection OpenConnection()
         {
+            var connection = CreateConnection();
+            connection.Open();
+            return connection;
+        }
+
+        private static SqliteConnection CreateConnection()
+        {
             _connectionString ??= new SqliteConnectionStringBuilder
             {
                 DataSource = Path.Combine(GetAppDataPath(), "taskflyout_store.db")
             }.ToString();
-            var connection = new SqliteConnection(_connectionString);
-            connection.Open();
-            return connection;
+            return new SqliteConnection(_connectionString);
         }
 
         private static void ExecuteNonQuery(SqliteConnection connection, string sql)
