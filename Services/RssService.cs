@@ -6,7 +6,9 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Xml;
@@ -124,7 +126,11 @@ namespace Task_Flyout.Services
         private const long MaxImageBytes = 5 * 1024 * 1024;
         private const long MaxFeedBytes = 5 * 1024 * 1024;
         private const int MaxRedirects = 5;
-        private static readonly HttpClient HttpClient = new(new HttpClientHandler { AllowAutoRedirect = false })
+        private static readonly HttpClient HttpClient = new(new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            ConnectCallback = ConnectToPublicAddressAsync
+        })
         {
             Timeout = TimeSpan.FromSeconds(20)
         };
@@ -443,6 +449,34 @@ namespace Task_Flyout.Services
             return match.Success ? match.Value : "";
         }
 
+        private static async ValueTask<Stream> ConnectToPublicAddressAsync(SocketsHttpConnectionContext context, System.Threading.CancellationToken cancellationToken)
+        {
+            var host = context.DnsEndPoint.Host;
+            var port = context.DnsEndPoint.Port;
+
+            var addresses = await ResolvePublicAddressesAsync(host, cancellationToken);
+            if (addresses.Count == 0)
+                throw new InvalidOperationException("URL resolved to a non-public IP address.");
+
+            Exception? lastError = null;
+            foreach (var address in addresses)
+            {
+                var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+                try
+                {
+                    await socket.ConnectAsync(new IPEndPoint(address, port), cancellationToken);
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex;
+                    socket.Dispose();
+                }
+            }
+
+            throw lastError ?? new InvalidOperationException("Unable to connect to feed host.");
+        }
+
         private static async Task<bool> IsSafeToFetchAsync(Uri uri)
         {
             if (uri.HostNameType is not (UriHostNameType.IPv4 or UriHostNameType.IPv6))
@@ -464,9 +498,37 @@ namespace Task_Flyout.Services
             return false;
         }
 
+        private static async Task<List<IPAddress>> ResolvePublicAddressesAsync(string host, System.Threading.CancellationToken cancellationToken)
+        {
+            IPAddress[] addresses;
+            if (IPAddress.TryParse(host, out var parsed))
+            {
+                addresses = new[] { parsed };
+            }
+            else
+            {
+                addresses = await Dns.GetHostAddressesAsync(host, cancellationToken);
+                if (addresses.Any(address => !IsPublicIpAddress(address)))
+                    return new List<IPAddress>();
+            }
+
+            return addresses
+                .Select(NormalizeIpAddress)
+                .Where(IsPublicIpAddress)
+                .Distinct()
+                .ToList();
+        }
+
         private static bool IsPublicIpAddress(IPAddress address)
         {
-            if (address.Equals(IPAddress.Loopback) || address.Equals(IPAddress.IPv6Loopback))
+            address = NormalizeIpAddress(address);
+
+            if (IPAddress.IsLoopback(address) ||
+                address.Equals(IPAddress.Any) ||
+                address.Equals(IPAddress.Broadcast) ||
+                address.Equals(IPAddress.None) ||
+                address.Equals(IPAddress.IPv6Any) ||
+                address.Equals(IPAddress.IPv6None))
                 return false;
 
             if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
@@ -474,12 +536,20 @@ namespace Task_Flyout.Services
                 var bytes = address.GetAddressBytes();
                 return bytes[0] switch
                 {
+                    0 => false,
                     10 => false,
                     127 => false,
+                    100 when bytes[1] >= 64 && bytes[1] <= 127 => false,
                     169 when bytes[1] == 254 => false,
                     172 when bytes[1] >= 16 && bytes[1] <= 31 => false,
+                    192 when bytes[1] == 0 => false,
+                    192 when bytes[1] == 0 && bytes[2] == 2 => false,
+                    192 when bytes[1] == 88 && bytes[2] == 99 => false,
                     192 when bytes[1] == 168 => false,
-                    0 => false,
+                    198 when bytes[1] == 18 || bytes[1] == 19 => false,
+                    198 when bytes[1] == 51 && bytes[2] == 100 => false,
+                    203 when bytes[1] == 0 && bytes[2] == 113 => false,
+                    >= 224 => false,
                     _ => true
                 };
             }
@@ -487,14 +557,19 @@ namespace Task_Flyout.Services
             if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
             {
                 var bytes = address.GetAddressBytes();
-                // fe80::/10 link-local
-                if (bytes[0] == 0xfe && (bytes[1] & 0xc0) == 0x80) return false;
-                // fc00::/7 unique local
-                if ((bytes[0] & 0xfe) == 0xfc) return false;
+                if (address.IsIPv6LinkLocal || address.IsIPv6Multicast || address.IsIPv6SiteLocal)
+                    return false;
+                if ((bytes[0] & 0xfe) == 0xfc)
+                    return false;
+                if (bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0x0d && bytes[3] == 0xb8)
+                    return false;
             }
 
             return true;
         }
+
+        private static IPAddress NormalizeIpAddress(IPAddress address)
+            => address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address;
 
         private static bool IsRedirect(HttpStatusCode code)
             => code is HttpStatusCode.Moved or HttpStatusCode.Found or HttpStatusCode.SeeOther
@@ -565,7 +640,26 @@ namespace Task_Flyout.Services
                 buffer.Write(chunk, 0, bytesRead);
             }
 
-            return System.Text.Encoding.UTF8.GetString(buffer.ToArray());
+            return DecodeFeedBytes(buffer.ToArray(), response.Content.Headers.ContentType?.CharSet);
+        }
+
+        private static string DecodeFeedBytes(byte[] bytes, string? charset)
+        {
+            if (!string.IsNullOrWhiteSpace(charset))
+            {
+                try
+                {
+                    var normalizedCharset = charset.Trim().Trim('"', '\'');
+                    return Encoding.GetEncoding(normalizedCharset).GetString(bytes);
+                }
+                catch
+                {
+                }
+            }
+
+            using var stream = new MemoryStream(bytes);
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            return reader.ReadToEnd();
         }
 
         private async Task<string> CacheImageAsync(string imageUrl)
