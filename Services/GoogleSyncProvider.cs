@@ -134,15 +134,17 @@ namespace Task_Flyout.Services
                 calendars.Add(new SubscribedCalendarInfo { Id = "primary", Name = "Primary" });
             }
 
-            var calendarTasks = calendars.Select(cal => FetchCalendarEventsAsync(calendarSvc, cal, min, max));
+            var calendarTasks = calendars
+                .Select(cal => FetchCalendarEventsAsync(calendarSvc, cal, min, max))
+                .ToList();
             var tasksTask = FetchGoogleTasksAsync(tasksSvc);
 
             await Task.WhenAll(calendarTasks.Append(tasksTask));
 
             var items = new List<AgendaItem>();
-            foreach (var task in calendarTasks)
-                items.AddRange(task.Result);
-            items.AddRange(tasksTask.Result);
+            foreach (var calendarTask in calendarTasks)
+                items.AddRange(await calendarTask);
+            items.AddRange(await tasksTask);
 
             return items;
         }
