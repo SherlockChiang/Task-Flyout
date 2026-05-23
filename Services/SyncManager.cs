@@ -77,13 +77,32 @@ namespace Task_Flyout.Services
         public AppCache GetLocalCache()
         {
             EnsureCacheLoaded();
-            return _cache;
+            _cacheLock.Wait();
+            try
+            {
+                return CloneCache(_cache);
+            }
+            finally
+            {
+                _cacheLock.Release();
+            }
         }
 
-        public async Task SaveLocalCacheAsync()
+        public async Task SaveLocalCacheAsync(AppCache? localCache = null)
         {
             EnsureCacheLoaded();
-            RebuildMarkedDates();
+            await _cacheLock.WaitAsync();
+            try
+            {
+                if (localCache != null)
+                    _cache = CloneCache(localCache);
+                RebuildMarkedDates();
+            }
+            finally
+            {
+                _cacheLock.Release();
+            }
+
             await SaveCacheAsync();
         }
 
@@ -361,5 +380,49 @@ namespace Task_Flyout.Services
                 .Select(kvp => kvp.Key)
                 .ToHashSet();
         }
+
+        private static AppCache CloneCache(AppCache cache)
+            => new()
+            {
+                MarkedDates = cache.MarkedDates?.ToHashSet(StringComparer.Ordinal) ?? new HashSet<string>(),
+                DayItems = cache.DayItems?
+                    .ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => kvp.Value.Select(CloneAgendaItem).ToList(),
+                        StringComparer.Ordinal)
+                    ?? new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal),
+                CachedRanges = cache.CachedRanges?
+                    .Select(range => new AgendaCacheRange
+                    {
+                        ProviderName = range.ProviderName,
+                        StartDateKey = range.StartDateKey,
+                        EndDateKey = range.EndDateKey
+                    })
+                    .ToList()
+                    ?? new List<AgendaCacheRange>()
+            };
+
+        private static AgendaItem CloneAgendaItem(AgendaItem item)
+            => new()
+            {
+                Id = item.Id,
+                Title = item.Title,
+                Subtitle = item.Subtitle,
+                IsTask = item.IsTask,
+                IsEvent = item.IsEvent,
+                IsCompleted = item.IsCompleted,
+                Location = item.Location,
+                Description = item.Description,
+                Provider = item.Provider,
+                CalendarId = item.CalendarId,
+                CalendarName = item.CalendarName,
+                DateKey = item.DateKey,
+                ColorHex = item.ColorHex,
+                IsRecurring = item.IsRecurring,
+                RecurringEventId = item.RecurringEventId,
+                RecurrenceKind = item.RecurrenceKind,
+                StartDateTime = item.StartDateTime,
+                EndDateTime = item.EndDateTime
+            };
     }
 }

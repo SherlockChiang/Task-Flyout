@@ -159,7 +159,7 @@ namespace Task_Flyout.Views
             {
                 cb.IsEnabled = false;
                 SetTaskCompletionInCache(item, newValue);
-                await _syncManager.SaveLocalCacheAsync();
+                await _syncManager.SaveLocalCacheAsync(_localCache);
                 ReloadTasks();
 
                 if (!string.IsNullOrWhiteSpace(item.Provider) && !string.IsNullOrWhiteSpace(item.Id))
@@ -174,7 +174,7 @@ namespace Task_Flyout.Views
             catch
             {
                 SetTaskCompletionInCache(item, oldValue);
-                await _syncManager.SaveLocalCacheAsync();
+                await _syncManager.SaveLocalCacheAsync(_localCache);
                 ReloadTasks();
             }
             finally
@@ -297,7 +297,7 @@ namespace Task_Flyout.Views
                     await _syncManager.DeleteItemAsync(item.Provider, item.Id, isEvent: false);
 
                 RemoveTaskFromCache(item);
-                await _syncManager.SaveLocalCacheAsync();
+                await _syncManager.SaveLocalCacheAsync(_localCache);
                 ReloadTasks();
                 App.MyFlyoutWindow?.ReloadFilters();
             }

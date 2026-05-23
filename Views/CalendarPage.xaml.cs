@@ -658,7 +658,7 @@ namespace Task_Flyout.Views
                         if (!_localCache.DayItems.ContainsKey(newDateKey)) _localCache.DayItems[newDateKey] = new List<AgendaItem>();
                         _localCache.DayItems[newDateKey].Add(orig);
                         if (_syncManager != null)
-                            _ = _syncManager.SaveLocalCacheAsync();
+                            _ = _syncManager.SaveLocalCacheAsync(_localCache);
                     }
                 }
                 LoadCalendar(_viewDate);
@@ -705,7 +705,7 @@ namespace Task_Flyout.Views
                 {
                 list.RemoveAll(x => x.Id == itemToDelete.Id);
                     if (_syncManager != null)
-                        _ = _syncManager.SaveLocalCacheAsync();
+                        _ = _syncManager.SaveLocalCacheAsync(_localCache);
                 }
                 LoadCalendar(_viewDate);
 
