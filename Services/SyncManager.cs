@@ -93,12 +93,16 @@ namespace Task_Flyout.Services
             min = min.Date;
             max = max.Date;
 
-            if (!forceRefresh && IsRangeCached(min, max))
+            var activeProviders = _providers.Where(p => AccountManager.IsConnected(p.ProviderName)).ToList();
+            if (activeProviders.Count == 0)
+                return GetCachedItems(min, max);
+
+            if (!forceRefresh && IsRangeCached(min, max, activeProviders.Select(provider => provider.ProviderName)))
                 return GetCachedItems(min, max);
 
             var allItems = new List<AgendaItem>();
             var successfulProviders = new List<string>();
-            var activeProviders = _providers.Where(p => AccountManager.IsConnected(p.ProviderName)).ToList();
+            var attemptedProviders = activeProviders.Select(provider => provider.ProviderName).ToList();
 
             var fetchTasks = activeProviders.Select(async provider =>
             {
@@ -121,10 +125,10 @@ namespace Task_Flyout.Services
                 }
             }
 
-            await MergeIntoCacheAsync(min, max, allItems, successfulProviders);
+            await MergeIntoCacheAsync(min, max, allItems, successfulProviders, attemptedProviders);
             await SaveCacheAsync();
 
-            return allItems;
+            return GetCachedItems(min, max);
         }
 
         public async Task UpdateTaskStatusAsync(string providerName, string taskId, bool isCompleted)
@@ -193,6 +197,11 @@ namespace Task_Flyout.Services
             _cache.MarkedDates ??= new HashSet<string>();
             _cache.DayItems ??= new Dictionary<string, List<AgendaItem>>();
             _cache.CachedRanges ??= new List<AgendaCacheRange>();
+            _cache.CachedRanges = _cache.CachedRanges
+                .Where(range => !string.IsNullOrWhiteSpace(range.ProviderName)
+                                && !string.IsNullOrWhiteSpace(range.StartDateKey)
+                                && !string.IsNullOrWhiteSpace(range.EndDateKey))
+                .ToList();
         }
 
         private void RemoveProviderFromCache(string providerName)
@@ -235,14 +244,19 @@ namespace Task_Flyout.Services
             catch { }
         }
 
-        private bool IsRangeCached(DateTime min, DateTime max)
+        private bool IsRangeCached(DateTime min, DateTime max, IEnumerable<string> providerNames)
         {
             string start = min.ToString("yyyy-MM-dd");
             string end = max.AddDays(-1).ToString("yyyy-MM-dd");
+            var providers = providerNames
+                .Where(provider => !string.IsNullOrWhiteSpace(provider))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-            return _cache.CachedRanges.Any(range =>
+            return providers.Count > 0 && providers.All(provider => _cache.CachedRanges.Any(range =>
+                string.Equals(range.ProviderName, provider, StringComparison.OrdinalIgnoreCase) &&
                 string.Compare(range.StartDateKey, start, StringComparison.Ordinal) <= 0 &&
-                string.Compare(range.EndDateKey, end, StringComparison.Ordinal) >= 0);
+                string.Compare(range.EndDateKey, end, StringComparison.Ordinal) >= 0));
         }
 
         private List<AgendaItem> GetCachedItems(DateTime min, DateTime max)
@@ -258,10 +272,12 @@ namespace Task_Flyout.Services
                 .ToList();
         }
 
-        private async Task MergeIntoCacheAsync(DateTime min, DateTime max, List<AgendaItem> items, List<string> successfulProviders)
+        private async Task MergeIntoCacheAsync(DateTime min, DateTime max, List<AgendaItem> items, List<string> successfulProviders, List<string> attemptedProviders)
         {
             string start = min.ToString("yyyy-MM-dd");
             string end = max.AddDays(-1).ToString("yyyy-MM-dd");
+            var successfulProviderSet = successfulProviders.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var attemptedProviderSet = attemptedProviders.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             await _cacheLock.WaitAsync();
             try
@@ -272,7 +288,7 @@ namespace Task_Flyout.Services
                     if (!_cache.DayItems.ContainsKey(key)) continue;
 
                     _cache.DayItems[key].RemoveAll(item =>
-                        successfulProviders.Contains(item.Provider, StringComparer.OrdinalIgnoreCase));
+                        successfulProviderSet.Contains(item.Provider));
 
                     if (_cache.DayItems[key].Count == 0)
                         _cache.DayItems.Remove(key);
@@ -287,10 +303,13 @@ namespace Task_Flyout.Services
                 }
 
                 _cache.CachedRanges.RemoveAll(range =>
+                    attemptedProviderSet.Contains(range.ProviderName) &&
                     string.Compare(range.EndDateKey, start, StringComparison.Ordinal) >= 0 &&
                     string.Compare(range.StartDateKey, end, StringComparison.Ordinal) <= 0);
 
-                _cache.CachedRanges.Add(new AgendaCacheRange { StartDateKey = start, EndDateKey = end });
+                foreach (var providerName in successfulProviderSet)
+                    _cache.CachedRanges.Add(new AgendaCacheRange { ProviderName = providerName, StartDateKey = start, EndDateKey = end });
+
                 MergeCacheRanges();
                 RebuildMarkedDates();
             }
@@ -303,8 +322,11 @@ namespace Task_Flyout.Services
         private void MergeCacheRanges()
         {
             var ranges = _cache.CachedRanges
-                .Where(range => !string.IsNullOrWhiteSpace(range.StartDateKey) && !string.IsNullOrWhiteSpace(range.EndDateKey))
-                .OrderBy(range => range.StartDateKey)
+                .Where(range => !string.IsNullOrWhiteSpace(range.ProviderName) &&
+                                !string.IsNullOrWhiteSpace(range.StartDateKey) &&
+                                !string.IsNullOrWhiteSpace(range.EndDateKey))
+                .OrderBy(range => range.ProviderName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(range => range.StartDateKey)
                 .ToList();
 
             var merged = new List<AgendaCacheRange>();
@@ -317,7 +339,8 @@ namespace Task_Flyout.Services
                 }
 
                 var last = merged[^1];
-                if (string.Compare(range.StartDateKey, last.EndDateKey, StringComparison.Ordinal) <= 0)
+                if (string.Equals(range.ProviderName, last.ProviderName, StringComparison.OrdinalIgnoreCase) &&
+                    string.Compare(range.StartDateKey, last.EndDateKey, StringComparison.Ordinal) <= 0)
                 {
                     if (string.Compare(range.EndDateKey, last.EndDateKey, StringComparison.Ordinal) > 0)
                         last.EndDateKey = range.EndDateKey;

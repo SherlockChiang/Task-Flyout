@@ -31,6 +31,7 @@ namespace Task_Flyout
 
     public class AgendaCacheRange
     {
+        public string ProviderName { get; set; } = "";
         public string StartDateKey { get; set; } = "";
         public string EndDateKey { get; set; } = "";
     }
