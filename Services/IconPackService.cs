@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Xml;
 using System.Xml.Linq;
 using Windows.Storage;
 
@@ -32,6 +33,11 @@ namespace Task_Flyout.Services
         private Dictionary<string, string>? _activeFilter;
         private string? _activeDrawableDir;
         private string? _loadedPackId;
+        private const int MaxZipEntries = 5000;
+        private const int MaxImportedIcons = 1000;
+        private const long MaxFilterBytes = 2 * 1024 * 1024;
+        private const long MaxIconBytes = 2 * 1024 * 1024;
+        private const long MaxTotalZipBytes = 100 * 1024 * 1024;
 
         private IconPackService()
         {
@@ -44,7 +50,8 @@ namespace Task_Flyout.Services
             get => ApplicationData.Current.LocalSettings.Values["WeatherIconPack"] as string ?? BuiltInEmojiId;
             set
             {
-                ApplicationData.Current.LocalSettings.Values["WeatherIconPack"] = value;
+                ApplicationData.Current.LocalSettings.Values["WeatherIconPack"] =
+                    value == BuiltInEmojiId ? BuiltInEmojiId : SanitizeId(value);
                 _loadedPackId = null;
                 _activeFilter = null;
             }
@@ -89,7 +96,7 @@ namespace Task_Flyout.Services
         public void DeletePack(string id)
         {
             if (string.IsNullOrEmpty(id) || id == BuiltInEmojiId) return;
-            var dir = Path.Combine(_rootDir, id);
+            if (!TryResolvePackDir(id, out var dir)) return;
             if (Directory.Exists(dir))
             {
                 try { Directory.Delete(dir, recursive: true); } catch { }
@@ -112,22 +119,26 @@ namespace Task_Flyout.Services
                 using (var stream = await zipFile.OpenStreamForReadAsync())
                 using (var archive = new ZipArchive(stream, ZipArchiveMode.Read))
                 {
+                    if (!IsReasonableArchive(archive)) return null;
+
                     // Locate drawable_filter.xml anywhere in the archive.
                     var filterEntry = archive.Entries.FirstOrDefault(e =>
                         string.Equals(Path.GetFileName(e.FullName), "drawable_filter.xml", StringComparison.OrdinalIgnoreCase));
                     if (filterEntry == null) return null;
+                    if (filterEntry.Length <= 0 || filterEntry.Length > MaxFilterBytes) return null;
 
                     // Parse <item name=".." value=".." /> pairs.
                     var filter = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                     using (var fs = filterEntry.Open())
                     {
-                        var doc = XDocument.Load(fs);
+                        using var reader = XmlReader.Create(fs, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit });
+                        var doc = XDocument.Load(reader);
                         foreach (var item in doc.Descendants("item"))
                         {
                             var name = item.Attribute("name")?.Value;
-                            var value = item.Attribute("value")?.Value;
+                            var value = NormalizeResourceName(item.Attribute("value")?.Value ?? "");
                             if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(value))
-                                filter[name!] = value!;
+                                filter[name!] = value;
                         }
                     }
                     if (filter.Count == 0) return null;
@@ -137,11 +148,13 @@ namespace Task_Flyout.Services
                     var drawableOut = Path.Combine(tempDir, "drawable");
                     Directory.CreateDirectory(drawableOut);
 
+                    var importedIcons = 0;
                     foreach (var entry in archive.Entries)
                     {
                         if (entry.FullName.EndsWith("/", StringComparison.Ordinal)) continue;
                         var fileName = Path.GetFileName(entry.FullName);
                         if (!fileName.EndsWith(".png", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (entry.Length <= 0 || entry.Length > MaxIconBytes) return null;
 
                         // Only care about files that sit inside a "drawable" folder (res/drawable, drawable-xxhdpi, etc.)
                         var parent = Path.GetFileName(Path.GetDirectoryName(entry.FullName.Replace('\\', '/')) ?? "");
@@ -150,11 +163,10 @@ namespace Task_Flyout.Services
                         var baseName = Path.GetFileNameWithoutExtension(fileName);
                         if (!needed.Contains(baseName)) continue;
 
-                        var outPath = Path.Combine(drawableOut, baseName + ".png");
+                        if (++importedIcons > MaxImportedIcons) return null;
+                        if (!TryResolveUnderRoot(drawableOut, baseName + ".png", out var outPath)) return null;
                         if (File.Exists(outPath)) continue; // first win; avoid density duplicates
-                        using var outStream = File.Create(outPath);
-                        using var inStream = entry.Open();
-                        await inStream.CopyToAsync(outStream);
+                        if (!await CopyEntryToFileAsync(entry, outPath, MaxIconBytes)) return null;
                     }
 
                     // Write filters.json (simple key=value lines keep it dependency-free).
@@ -165,7 +177,7 @@ namespace Task_Flyout.Services
                     var id = SanitizeId(displayName ?? Path.GetFileNameWithoutExtension(zipFile.Name));
                     if (string.IsNullOrWhiteSpace(id)) id = "pack-" + DateTime.Now.Ticks;
 
-                    var finalDir = Path.Combine(_rootDir, id);
+                    if (!TryResolvePackDir(id, out var finalDir)) return null;
                     if (Directory.Exists(finalDir)) Directory.Delete(finalDir, recursive: true);
                     Directory.Move(tempDir, finalDir);
                     tempDir = ""; // consumed
@@ -206,6 +218,96 @@ namespace Task_Flyout.Services
             return new string(chars).Trim('-').ToLowerInvariant();
         }
 
+        private static string NormalizeResourceName(string raw)
+        {
+            var value = raw.Trim();
+            const string drawablePrefix = "@drawable/";
+            if (value.StartsWith(drawablePrefix, StringComparison.OrdinalIgnoreCase))
+                value = value[drawablePrefix.Length..];
+
+            value = value.Replace('\\', '/').Split('/').LastOrDefault() ?? "";
+            return Path.GetFileNameWithoutExtension(value);
+        }
+
+        private static bool IsReasonableArchive(ZipArchive archive)
+        {
+            if (archive.Entries.Count > MaxZipEntries) return false;
+
+            long total = 0;
+            foreach (var entry in archive.Entries)
+            {
+                if (entry.Length < 0) return false;
+                total += entry.Length;
+                if (total > MaxTotalZipBytes) return false;
+            }
+
+            return true;
+        }
+
+        private static async Task<bool> CopyEntryToFileAsync(ZipArchiveEntry entry, string path, long maxBytes)
+        {
+            var tempPath = path + ".tmp";
+            var copied = false;
+            try
+            {
+                await using var outStream = File.Create(tempPath);
+                await using var inStream = entry.Open();
+                var buffer = new byte[81920];
+                long total = 0;
+                int bytesRead;
+                while ((bytesRead = await inStream.ReadAsync(buffer)) > 0)
+                {
+                    total += bytesRead;
+                    if (total > maxBytes) return false;
+                    await outStream.WriteAsync(buffer.AsMemory(0, bytesRead));
+                }
+
+                copied = true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (!copied && File.Exists(tempPath))
+                {
+                    try { File.Delete(tempPath); } catch { }
+                }
+            }
+
+            if (File.Exists(path)) File.Delete(path);
+            File.Move(tempPath, path);
+            return true;
+        }
+
+        private bool TryResolvePackDir(string id, out string path)
+        {
+            path = "";
+            var sanitizedId = SanitizeId(id);
+            if (string.IsNullOrWhiteSpace(sanitizedId) ||
+                !string.Equals(id, sanitizedId, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return TryResolveUnderRoot(_rootDir, sanitizedId, out path);
+        }
+
+        private static bool TryResolveUnderRoot(string root, string relativePath, out string path)
+        {
+            path = "";
+            if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathRooted(relativePath))
+                return false;
+
+            var rootFullPath = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                               + Path.DirectorySeparatorChar;
+            var candidate = Path.GetFullPath(Path.Combine(rootFullPath, relativePath));
+            if (!candidate.StartsWith(rootFullPath, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            path = candidate;
+            return true;
+        }
+
         private void EnsureLoaded()
         {
             var id = ActivePackId;
@@ -215,7 +317,7 @@ namespace Task_Flyout.Services
             _activeDrawableDir = null;
 
             if (id == BuiltInEmojiId) return;
-            var packDir = Path.Combine(_rootDir, id);
+            if (!TryResolvePackDir(id, out var packDir)) return;
             var filtersPath = Path.Combine(packDir, "filters.json");
             var drawableDir = Path.Combine(packDir, "drawable");
             if (!File.Exists(filtersPath) || !Directory.Exists(drawableDir)) return;
@@ -260,9 +362,7 @@ namespace Task_Flyout.Services
                 if (!_activeFilter.TryGetValue(alt, out resName)) return null;
             }
 
-            var path = Path.Combine(_activeDrawableDir, resName + ".png");
-            if (!File.Exists(path)) return null;
-            return new Uri(path).AbsoluteUri;
+            return TryResolveDrawableUri(resName);
         }
 
         public string? TryResolveBitmapUri(string wttrCode, bool isDay)
@@ -298,8 +398,7 @@ namespace Task_Flyout.Services
                     var alt = key.Replace("_" + dayNight, dayNight == "day" ? "_night" : "_day");
                     if (!_activeFilter.TryGetValue(alt, out resName)) return null;
                 }
-                var path = Path.Combine(_activeDrawableDir!, resName + ".png");
-                return File.Exists(path) ? new Uri(path).AbsoluteUri : null;
+                return TryResolveDrawableUri(resName);
             }
 
             var cloudOnly = TryLayer(1);
@@ -328,6 +427,15 @@ namespace Task_Flyout.Services
             };
             if (code == null) return Array.Empty<string>();
             return TryResolveBitmapLayers(code.Value, isDay, isOpenMeteo: true);
+        }
+
+        private string? TryResolveDrawableUri(string resName)
+        {
+            if (_activeDrawableDir == null) return null;
+            if (!TryResolveUnderRoot(_activeDrawableDir, NormalizeResourceName(resName) + ".png", out var path))
+                return null;
+            if (!File.Exists(path)) return null;
+            return new Uri(path).AbsoluteUri;
         }
 
         /// <summary>
