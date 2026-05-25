@@ -43,6 +43,9 @@ This app is currently undergoing Google's official verification process. You mig
 **Your data belongs to you.**
 This software runs locally on your device as a "Public Client". All OAuth credentials and calendar data are saved on your local machine and are **NEVER** collected, stored, or uploaded to any third-party servers. Read our full [Privacy Policy](https://sherlockchiang.github.io/Task-Flyout/#privacy).
 
+**Why the app declares `runFullTrust`:**
+Task Flyout uses the restricted `runFullTrust` capability for desktop integration that packaged WinUI apps cannot provide through UWP-only APIs: the system tray icon, startup task registration, taskbar weather bar placement, and toast activation routing. It is not used to run background installers, elevate privileges, or execute arbitrary downloaded code.
+
 ---
 
 ## 简体中文
@@ -70,6 +73,9 @@ This software runs locally on your device as a "Public Client". All OAuth creden
 ### 🔒 隐私与安全
 **您的数据，只属于您。**
 本软件作为“公共客户端 (Public Client)”运行在您的本地设备上。所有的 OAuth 凭证与日程数据均保存在您的本地计算机中，**绝不会**收集、存储或上传任何敏感信息至任何第三方服务器。阅读完整的 [隐私政策 (Privacy Policy)](https://sherlockchiang.github.io/Task-Flyout/#privacy)。
+
+**为什么声明 `runFullTrust`：**
+Task Flyout 使用受限的 `runFullTrust` 能力，是为了实现纯 UWP API 无法覆盖的桌面集成：系统托盘图标、开机启动任务、任务栏天气栏定位，以及通知激活路由。它不会用于后台安装程序、提权或执行任意下载代码。
 
 ---
 <div align="center">
