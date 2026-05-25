@@ -141,6 +141,7 @@ namespace Task_Flyout
             ConfigureFlyoutStyle();
             StartClock();
             SetupPeriodicSync();
+            _syncTimer?.Stop();
             SetupFocusTimer();
 
             Activated += FlyoutWindow_Activated;
@@ -708,6 +709,7 @@ namespace Task_Flyout
                 Activate();
                 _appWindow.Show();
                 _clockTimer?.Start();
+                _syncTimer?.Start();
 
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 SetForegroundWindow(hWnd);
@@ -882,6 +884,7 @@ namespace Task_Flyout
 
             _focusTimer?.Stop();
             _clockTimer?.Stop();
+            _syncTimer?.Stop();
             _appWindow.Hide();
             _lastHideTime = DateTime.Now;
         }
