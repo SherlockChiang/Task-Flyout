@@ -874,12 +874,8 @@ pre, code { white-space: pre-wrap; overflow-wrap: anywhere; }
         {
             try
             {
-                var logDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "TaskFlyout",
-                    "Logs");
-                Directory.CreateDirectory(logDir);
-                var logPath = Path.Combine(logDir, "TaskFlyout_RssLog.txt");
+                var logDir = AppDataPathHelper.EnsureDirectory(AppDataPathHelper.ResolveRoaming("Logs"));
+                var logPath = AppDataPathHelper.ResolveRoaming("Logs", "TaskFlyout_RssLog.txt");
                 File.AppendAllText(logPath, $"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n{ex}\n\n");
             }
             catch { }

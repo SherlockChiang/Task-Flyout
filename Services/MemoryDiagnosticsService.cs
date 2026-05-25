@@ -50,13 +50,8 @@ namespace Task_Flyout.Services
 
         private void EnsureLogFile()
         {
-            var logDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "TaskFlyout",
-                "Logs");
-            Directory.CreateDirectory(logDir);
-
-            _logPath = Path.Combine(logDir, "memory-diagnostics.csv");
+            var logDir = AppDataPathHelper.EnsureDirectory(AppDataPathHelper.ResolveRoaming("Logs"));
+            _logPath = AppDataPathHelper.ResolveRoaming("Logs", "memory-diagnostics.csv");
             if (File.Exists(_logPath)) return;
 
             File.WriteAllText(

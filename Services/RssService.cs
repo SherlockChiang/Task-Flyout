@@ -143,9 +143,7 @@ namespace Task_Flyout.Services
             Timeout = TimeSpan.FromSeconds(20)
         };
 
-        private readonly string _appDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "TaskFlyout");
+        private readonly string _appDataPath = AppDataPathHelper.LocalRoot;
 
         private RssCache _cache = new();
         private bool _loaded;
@@ -682,12 +680,11 @@ namespace Task_Flyout.Services
 
             try
             {
-                var imagesPath = Path.Combine(_appDataPath, "RssImages");
-                Directory.CreateDirectory(imagesPath);
+                var imagesPath = AppDataPathHelper.EnsureDirectory(AppDataPathHelper.ResolveLocal("RssImages"));
                 var extension = Path.GetExtension(uri.AbsolutePath);
                 if (string.IsNullOrWhiteSpace(extension) || extension.Length > 8)
                     extension = ".img";
-                var path = Path.Combine(imagesPath, HashText(imageUrl) + extension);
+                var path = AppDataPathHelper.ResolveUnderRoot(imagesPath, HashText(imageUrl) + extension);
                 if (File.Exists(path)) return path;
 
                 using var request = new HttpRequestMessage(HttpMethod.Get, uri);
@@ -1097,10 +1094,10 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
             => ticks <= 0 ? default : new DateTimeOffset(ticks, TimeSpan.Zero);
 
         private string GetDatabasePath()
-            => Path.Combine(_appDataPath, "rss_cache.db");
+            => AppDataPathHelper.ResolveLocal("rss_cache.db");
 
         private string GetLegacyCachePath()
-            => Path.Combine(_appDataPath, "rss_cache.json");
+            => AppDataPathHelper.ResolveLocal("rss_cache.json");
 
         private static string HashText(string value)
         {

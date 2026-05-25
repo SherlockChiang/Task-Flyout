@@ -909,11 +909,7 @@ namespace Task_Flyout.Views
         {
             if (_mailWebViewCachePathConfigured) return;
 
-            var cachePath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "TaskFlyout",
-                "MailWebView2Cache");
-            Directory.CreateDirectory(cachePath);
+            var cachePath = AppDataPathHelper.EnsureDirectory(AppDataPathHelper.ResolveLocal("MailWebView2Cache"));
             Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", cachePath, EnvironmentVariableTarget.Process);
             _mailWebViewCachePathConfigured = true;
         }
