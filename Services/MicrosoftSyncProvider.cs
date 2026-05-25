@@ -288,9 +288,9 @@ namespace Task_Flyout.Services
                                 DateTime.TryParse(task.CompletedDateTime.DateTime, out targetDate);
                                 targetDate = targetDate.ToLocalTime();
                             }
-                            else if (task.CreatedDateTime.HasValue)
+                            else if (task.Status == Microsoft.Graph.Models.TaskStatus.Completed)
                             {
-                                targetDate = task.CreatedDateTime.Value.UtcDateTime.ToLocalTime();
+                                continue;
                             }
 
                             if (!IsInDateRange(targetDate, startDate, endDate))
