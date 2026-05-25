@@ -302,6 +302,9 @@ namespace Task_Flyout
                     MyMainWindow.Closed += (s, args) => { MyMainWindow = null; };
                 }
 
+                if (onOpened == null)
+                    MyMainWindow.EnsureContentLoaded();
+
                 MyMainWindow.Activate();
                 MyMainWindow.AppWindow.Show();
                 BringMainWindowToFront();

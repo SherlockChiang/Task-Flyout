@@ -15,6 +15,7 @@ namespace Task_Flyout
     {
         private ResourceLoader _loader;
         private bool _pendingMailMessageNavigation;
+        private Type _lastContentPageType = typeof(Views.CalendarPage);
 
         public MainWindow()
         {
@@ -54,6 +55,8 @@ namespace Task_Flyout
         private void ContentFrame_Navigated(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
         {
             MainNav.IsBackEnabled = ContentFrame.CanGoBack;
+            if (e.SourcePageType != null)
+                _lastContentPageType = e.SourcePageType;
 
             if (ContentFrame.SourcePageType == typeof(Views.SettingsPage))
             {
@@ -106,8 +109,33 @@ namespace Task_Flyout
                 args.Cancel = true;
                 if (App.Current is App app)
                     app.MailService.UpdateMailPollingSettings();
+                ReleaseContentForBackground();
                 sender.Hide();
             }
+        }
+
+        public void EnsureContentLoaded()
+        {
+            if (ContentFrame.Content != null) return;
+
+            var pageType = _lastContentPageType;
+            if (pageType == typeof(Views.AddAccountPage))
+                pageType = typeof(Views.CalendarPage);
+
+            ContentFrame.Navigate(pageType);
+        }
+
+        private void ReleaseContentForBackground()
+        {
+            if (ContentFrame.Content == null) return;
+
+            if (ContentFrame.SourcePageType != null)
+                _lastContentPageType = ContentFrame.SourcePageType;
+
+            ContentFrame.BackStack.Clear();
+            ContentFrame.Content = null;
+            MainNav.SelectedItem = null;
+            MainNav.IsBackEnabled = false;
         }
 
         private Services.AccountManager? GetAccountManager()
