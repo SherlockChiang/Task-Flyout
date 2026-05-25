@@ -109,6 +109,25 @@ namespace Task_Flyout
             }
 
             HandleLaunchActivation(args);
+            QueueFlyoutPrewarmIfEnabled();
+        }
+
+        private void QueueFlyoutPrewarmIfEnabled()
+        {
+            bool enabled = ApplicationData.Current.LocalSettings.Values["FlyoutPrewarmEnabled"] as bool? ?? false;
+            if (!enabled) return;
+
+            MainDispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, async () =>
+            {
+                try
+                {
+                    await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(8));
+                    if (MyFlyoutWindow != null) return;
+
+                    EnsureFlyoutWindow();
+                }
+                catch { }
+            });
         }
 
         private static void HandleLaunchActivation(LaunchActivatedEventArgs args)
