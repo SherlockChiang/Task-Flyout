@@ -43,6 +43,7 @@ namespace Task_Flyout.Views
         {
             InitializeComponent();
             Loaded += RssPage_Loaded;
+            Unloaded += (_, _) => RssArticleWebView.Close();
             ActualThemeChanged += RssPage_ActualThemeChanged;
         }
 

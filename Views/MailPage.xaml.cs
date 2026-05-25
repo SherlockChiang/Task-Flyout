@@ -66,6 +66,7 @@ namespace Task_Flyout.Views
         {
             InitializeComponent();
             Loaded += MailPage_Loaded;
+            Unloaded += (_, _) => DetailHtmlView.Close();
             ActualThemeChanged += MailPage_ActualThemeChanged;
         }
 
