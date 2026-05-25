@@ -156,6 +156,8 @@ namespace Task_Flyout.Services
         private int _knownUnreadLoaded;
         private MailPersistentCache? _persistentCache;
         private bool _persistentCacheLoaded;
+        private const int MaxBodyTextChars = 80_000;
+        private const int MaxHtmlBodyChars = 160_000;
         public event EventHandler<NewMailNotificationEventArgs>? NewMailArrived;
 
         private sealed class CacheEntry<T>
@@ -638,7 +640,14 @@ namespace Task_Flyout.Services
                 await client.DisconnectAsync(true);
             }
 
+            LimitMailBody(item);
             UpdatePersistentMessageBody(item);
+        }
+
+        public void ClearVolatileMessageBodies()
+        {
+            foreach (var entry in _messageCache.Values)
+                StripBodies(entry.Value);
         }
 
         private async Task SendOutlookMailAsync(MailAccount account, string to, string subject, string body)
@@ -1051,8 +1060,6 @@ namespace Task_Flyout.Services
         private static MailItem ToOutlookMailItem(string accountId, string folderId, GraphMessage message)
         {
             var received = message.ReceivedDateTime;
-            var content = message.Body?.Content ?? "";
-            var isHtml = message.Body?.ContentType == BodyType.Html || HasHtmlContentTags(content);
             return new MailItem
             {
                 AccountId = accountId,
@@ -1064,8 +1071,8 @@ namespace Task_Flyout.Services
                     ?? "",
                 SenderAddress = message.From?.EmailAddress?.Address ?? "",
                 Preview = message.BodyPreview ?? "",
-                BodyText = CleanMailBody(isHtml ? StripHtml(content) : content),
-                HtmlBody = isHtml ? content : "",
+                BodyText = "",
+                HtmlBody = "",
                 RawReceivedTime = received,
                 ReceivedTime = FormatReceivedTime(received),
                 IsRead = message.IsRead == true,
@@ -1120,16 +1127,7 @@ namespace Task_Flyout.Services
             string subject = GetGoogleHeader(message, "Subject");
             string sender = GetGoogleHeader(message, "From");
             string senderAddress = ExtractEmailAddress(sender);
-            string body = ExtractGoogleBody(message.Payload);
-            string htmlBody = ExtractGoogleHtmlBody(message.Payload);
-            if (string.IsNullOrWhiteSpace(htmlBody) && HasHtmlContentTags(body))
-            {
-                htmlBody = body;
-                body = CleanMailBody(StripHtml(htmlBody));
-            }
-            string preview = !string.IsNullOrWhiteSpace(body)
-                ? Truncate(body, 240)
-                : message.Snippet ?? "";
+            string preview = message.Snippet ?? "";
             DateTimeOffset? received = null;
             if (message.InternalDate.HasValue)
                 received = DateTimeOffset.FromUnixTimeMilliseconds(message.InternalDate.Value);
@@ -1143,8 +1141,8 @@ namespace Task_Flyout.Services
                 Sender = sender,
                 SenderAddress = senderAddress,
                 Preview = preview,
-                BodyText = body,
-                HtmlBody = htmlBody,
+                BodyText = "",
+                HtmlBody = "",
                 RawReceivedTime = received,
                 ReceivedTime = FormatReceivedTime(received),
                 IsRead = message.LabelIds?.Contains("UNREAD") != true,
@@ -1171,8 +1169,8 @@ namespace Task_Flyout.Services
                 Sender = message.From?.ToString() ?? "",
                 SenderAddress = message.From?.Mailboxes?.FirstOrDefault()?.Address ?? "",
                 Preview = preview.Trim(),
-                BodyText = body,
-                HtmlBody = htmlBody,
+                BodyText = "",
+                HtmlBody = "",
                 RawReceivedTime = message.Date,
                 ReceivedTime = FormatReceivedTime(message.Date),
                 IsRead = isRead,
@@ -1479,12 +1477,18 @@ namespace Task_Flyout.Services
                 var existing = messages.FirstOrDefault(m => m.Id == item.Id && m.AccountId == item.AccountId);
                 if (existing != null)
                 {
-                    existing.BodyText = item.BodyText;
-                    existing.HtmlBody = item.HtmlBody;
+                    existing.BodyText = "";
+                    existing.HtmlBody = "";
                     break;
                 }
             }
             SavePersistentCache();
+        }
+
+        private static void LimitMailBody(MailItem item)
+        {
+            item.BodyText = Truncate(item.BodyText ?? "", MaxBodyTextChars);
+            item.HtmlBody = Truncate(item.HtmlBody ?? "", MaxHtmlBodyChars);
         }
 
         private void MergeMessagesIntoPersistentCache(string accountId, string folderId, List<MailItem> newMessages)

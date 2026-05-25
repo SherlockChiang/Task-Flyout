@@ -66,8 +66,20 @@ namespace Task_Flyout.Views
         {
             InitializeComponent();
             Loaded += MailPage_Loaded;
-            Unloaded += (_, _) => DetailHtmlView.Close();
+            Unloaded += MailPage_Unloaded;
             ActualThemeChanged += MailPage_ActualThemeChanged;
+        }
+
+        private void MailPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            ReleaseMessageBodies();
+            try
+            {
+                if (DetailHtmlView.CoreWebView2 != null)
+                    DetailHtmlView.NavigateToString("<html></html>");
+                DetailHtmlView.Close();
+            }
+            catch { }
         }
 
         private async void MailPage_Loaded(object sender, RoutedEventArgs e)
@@ -767,6 +779,23 @@ namespace Task_Flyout.Views
             TrustSenderButton.IsEnabled = false;
             if (AddAccountPanel.Visibility != Visibility.Visible && ComposePanel.Visibility != Visibility.Visible)
                 EmptyDetailPanel.Visibility = Visibility.Visible;
+        }
+
+        private void ReleaseMessageBodies()
+        {
+            foreach (var item in _items)
+            {
+                item.BodyText = "";
+                item.HtmlBody = "";
+            }
+
+            if (_selectedItem != null)
+            {
+                _selectedItem.BodyText = "";
+                _selectedItem.HtmlBody = "";
+            }
+
+            _mailService?.ClearVolatileMessageBodies();
         }
 
         private bool _webView2Configured;
