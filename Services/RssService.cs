@@ -18,34 +18,25 @@ namespace Task_Flyout.Services
 {
     public class RssSubscription
     {
-        private string _localImagePath = "";
-        private Microsoft.UI.Xaml.Media.Imaging.BitmapImage? _cachedImage;
-
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
         public string Title { get; set; } = "";
         public string Url { get; set; } = "";
         public string FolderId { get; set; } = "";
         public string ImageUrl { get; set; } = "";
-        public string LocalImagePath
-        {
-            get => _localImagePath;
-            set { if (_localImagePath != value) { _localImagePath = value; _cachedImage = null; } }
-        }
+        public string LocalImagePath { get; set; } = "";
         public DateTimeOffset LastFetchedAt { get; set; }
         public Microsoft.UI.Xaml.Media.ImageSource? ImageSource
         {
             get
             {
-                if (_cachedImage != null) return _cachedImage;
                 try
                 {
                     if (!string.IsNullOrWhiteSpace(LocalImagePath) && File.Exists(LocalImagePath))
                     {
-                        _cachedImage = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(LocalImagePath))
+                        return new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(LocalImagePath))
                         {
                             DecodePixelWidth = 32
                         };
-                        return _cachedImage;
                     }
                 }
                 catch { }
@@ -80,9 +71,6 @@ namespace Task_Flyout.Services
 
     public class RssArticle
     {
-        private string _localImagePath = "";
-        private Microsoft.UI.Xaml.Media.Imaging.BitmapImage? _cachedImage;
-
         public string Id { get; set; } = "";
         public string SubscriptionId { get; set; } = "";
         public string FeedTitle { get; set; } = "";
@@ -91,27 +79,21 @@ namespace Task_Flyout.Services
         public string Summary { get; set; } = "";
         public string HtmlContent { get; set; } = "";
         public string ImageUrl { get; set; } = "";
-        public string LocalImagePath
-        {
-            get => _localImagePath;
-            set { if (_localImagePath != value) { _localImagePath = value; _cachedImage = null; } }
-        }
+        public string LocalImagePath { get; set; } = "";
         public DateTimeOffset PublishedAt { get; set; }
         public string PublishedText => PublishedAt == default ? "" : PublishedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
         public Microsoft.UI.Xaml.Media.ImageSource? ImageSource
         {
             get
             {
-                if (_cachedImage != null) return _cachedImage;
                 try
                 {
                     if (!string.IsNullOrWhiteSpace(LocalImagePath) && File.Exists(LocalImagePath))
                     {
-                        _cachedImage = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(LocalImagePath))
+                        return new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(LocalImagePath))
                         {
                             DecodePixelWidth = 120
                         };
-                        return _cachedImage;
                     }
                 }
                 catch { }
