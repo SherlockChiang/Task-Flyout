@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Windows.Media.Control;
@@ -30,6 +31,7 @@ namespace Task_Flyout
         private double _preferredLogicalWidth = 180;
         private IntPtr _fluentFlyoutHwnd = IntPtr.Zero;
         private IntPtr _currentRgn = IntPtr.Zero;
+        private int _refreshing;
 
         #region P/Invoke
 
@@ -137,7 +139,7 @@ namespace Task_Flyout
         private const uint WM_DPICHANGED = 0x02E0;
         private const uint WM_PARENTNOTIFY = 0x0210;
 
-        private SUBCLASSPROC _subclassProc = null!;
+        private SUBCLASSPROC? _subclassProc;
 
         #endregion
 
@@ -195,6 +197,12 @@ namespace Task_Flyout
                 if (_contentPanel != null)
                     _contentPanel.SizeChanged += (s2, e2) => RecomputeBarWidth();
                 await RefreshWeatherAsync();
+            };
+
+            Closed += (_, _) =>
+            {
+                _refreshTimer.Stop();
+                _reparentTimer.Stop();
             };
         }
 
@@ -314,17 +322,7 @@ namespace Task_Flyout
             int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
             exStyle |= WS_EX_TOOLWINDOW;
             exStyle |= WS_EX_NOACTIVATE;
-            exStyle |= WS_EX_LAYERED;
             SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
-
-            ApplyLayeredOpacity(hWnd);
-        }
-
-        private void ApplyLayeredOpacity(IntPtr hWnd)
-        {
-            var weatherService = (App.Current as App)?.WeatherService;
-            byte alpha = weatherService?.WeatherBarTransparentBackground == true ? (byte)255 : (byte)230;
-            SetLayeredWindowAttributes(hWnd, 0, alpha, LWA_ALPHA);
         }
 
         public void PositionOnTaskbar()
@@ -377,9 +375,12 @@ namespace Task_Flyout
                 // 圆角裁剪窗口外形（Win32 region）
                 int cornerRadius = (int)(8 * scaleFactor);
                 IntPtr rgn = CreateRoundRectRgn(0, 0, pillWidth + 1, pillHeight + 1, cornerRadius, cornerRadius);
-                SetWindowRgn(hWnd, rgn, true);
-                if (_currentRgn != IntPtr.Zero) DeleteObject(_currentRgn);
-                _currentRgn = rgn;
+                if (rgn != IntPtr.Zero)
+                {
+                    SetWindowRgn(hWnd, rgn, true);
+                    // SetWindowRgn takes ownership — do NOT DeleteObject(rgn).
+                    _currentRgn = rgn;
+                }
             }
             catch
             {
@@ -627,13 +628,16 @@ namespace Task_Flyout
                 var topBorder = root.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
                 var weatherService = (App.Current as App)?.WeatherService;
                 bool transparent = weatherService?.WeatherBarTransparentBackground == true;
-                ApplyLayeredOpacity(WinRT.Interop.WindowNative.GetWindowHandle(this));
-                SystemBackdrop = transparent
-                    ? new DesktopAcrylicBackdrop()
-                    : null;
+
+                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
 
                 if (transparent)
                 {
+                    exStyle &= ~WS_EX_LAYERED;
+                    SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
+                    SystemBackdrop = new DesktopAcrylicBackdrop();
+
                     if (mainBorder != null)
                         mainBorder.Background = CreateTaskbarMaterialBrush(_isLightTheme);
                     if (topBorder != null)
@@ -642,6 +646,11 @@ namespace Task_Flyout
                             : Color.FromArgb(45, 255, 255, 255));
                     return;
                 }
+
+                exStyle |= WS_EX_LAYERED;
+                SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
+                SystemBackdrop = null;
+                SetLayeredWindowAttributes(hWnd, 0, 255, LWA_ALPHA);
 
                 if (_isLightTheme)
                 {
@@ -714,6 +723,19 @@ namespace Task_Flyout
         }
 
         public async Task RefreshWeatherAsync()
+        {
+            if (Interlocked.CompareExchange(ref _refreshing, 1, 0) != 0) return;
+            try
+            {
+                await RefreshWeatherCoreAsync();
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _refreshing, 0);
+            }
+        }
+
+        private async Task RefreshWeatherCoreAsync()
         {
             var weatherService = (App.Current as App)?.WeatherService;
             if (weatherService == null || !weatherService.IsEnabled)
@@ -920,9 +942,9 @@ namespace Task_Flyout
                 if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
 
                 ShowWindow(hWnd, 0); // SW_HIDE
-                // 清除 region 并缩为 0，彻底消除残影
+                // Clear region — system releases the previous one.
                 SetWindowRgn(hWnd, IntPtr.Zero, true);
-                if (_currentRgn != IntPtr.Zero) { DeleteObject(_currentRgn); _currentRgn = IntPtr.Zero; }
+                _currentRgn = IntPtr.Zero;
                 SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0,
                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
             }
