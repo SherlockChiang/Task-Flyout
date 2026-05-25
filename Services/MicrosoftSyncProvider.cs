@@ -294,10 +294,7 @@ namespace Task_Flyout.Services
                                 targetDate = targetDate.ToLocalTime();
                             }
 
-                            if (isCompleted && !IsInDateRange(targetDate, startDate, endDate))
-                                targetDate = DateTime.Today;
-
-                            if (!IsInDateRange(targetDate, startDate, endDate))
+                            if (!isCompleted && !IsInDateRange(targetDate, startDate, endDate))
                                 continue;
 
                             results.Add(new AgendaItem

@@ -152,6 +152,37 @@ namespace Task_Flyout.Services
             }
         }
 
+        public AppCache GetTaskCacheSnapshot()
+        {
+            EnsureCacheLoaded();
+
+            _cacheLock.Wait();
+            try
+            {
+                var dayItems = _cache.DayItems
+                    .Select(kvp => new
+                    {
+                        kvp.Key,
+                        Items = kvp.Value
+                            .Where(item => item.IsTask)
+                            .Select(CloneAgendaItem)
+                            .ToList()
+                    })
+                    .Where(kvp => kvp.Items.Count > 0)
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Items, StringComparer.Ordinal);
+
+                return new AppCache
+                {
+                    DayItems = dayItems,
+                    MarkedDates = dayItems.Keys.ToHashSet(StringComparer.Ordinal)
+                };
+            }
+            finally
+            {
+                _cacheLock.Release();
+            }
+        }
+
         public async Task UpsertCachedItemAsync(AgendaItem item, string? oldDateKey = null)
         {
             EnsureCacheLoaded();
@@ -448,7 +479,7 @@ namespace Task_Flyout.Services
 
                 foreach (var item in items.Where(item => !string.IsNullOrWhiteSpace(item.DateKey)))
                 {
-                    if (!IsDateKeyInRange(item.DateKey, min, max))
+                    if (!ShouldKeepSyncedItem(item, min, max))
                         continue;
 
                     if (!_cache.DayItems.ContainsKey(item.DateKey))
@@ -539,7 +570,7 @@ namespace Task_Flyout.Services
 
                     if (item.IsTask)
                     {
-                        if (itemDate < minTaskDate || itemDate >= maxTaskDate)
+                        if (!item.IsCompleted && (itemDate < minTaskDate || itemDate >= maxTaskDate))
                             continue;
 
                         var taskKey = GetTaskCacheKey(item);
@@ -631,6 +662,13 @@ namespace Task_Flyout.Services
 
         private static bool IsDateKeyInRange(string dateKey, DateTime min, DateTime max)
             => TryParseDateKey(dateKey, out var date) && date >= min.Date && date < max.Date;
+
+        private static bool ShouldKeepSyncedItem(AgendaItem item, DateTime min, DateTime max)
+        {
+            if (!TryParseDateKey(item.DateKey, out var date)) return false;
+            if (date >= min.Date && date < max.Date) return true;
+            return item.IsTask && item.IsCompleted;
+        }
 
         private static bool TryParseDateKey(string? dateKey, out DateTime date)
             => DateTime.TryParseExact(

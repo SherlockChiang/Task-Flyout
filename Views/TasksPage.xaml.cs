@@ -39,15 +39,12 @@ namespace Task_Flyout.Views
             ReloadTasks();
 
             if (PendingTasks.Count == 0 && CompletedTasks.Count == 0)
-                await SyncTasksAsync(forceRefresh: false, fullRange: false);
+                await SyncTasksAsync(forceRefresh: true, fullRange: false);
         }
 
         private void LoadCache()
         {
-            _localCache = _syncManager?.GetRangeCacheSnapshot(
-                DateTime.Today.AddDays(-TaskWindowPastDays),
-                DateTime.Today.AddDays(TaskWindowFutureDays),
-                tasksOnly: true) ?? new AppCache();
+            _localCache = _syncManager?.GetTaskCacheSnapshot() ?? new AppCache();
         }
 
         public void RefreshAccountList()
@@ -78,8 +75,8 @@ namespace Task_Flyout.Views
                 SetSyncProgress(true);
                 var min = fullRange ? DateTime.Today.AddYears(-1) : DateTime.Today.AddDays(-30);
                 var max = fullRange ? DateTime.Today.AddYears(3) : DateTime.Today.AddDays(365);
-                var items = await _syncManager.GetAllDataAsync(min, max, forceRefresh);
-                _localCache = BuildTaskCache(items);
+                await _syncManager.GetAllDataAsync(min, max, forceRefresh);
+                LoadCache();
                 ReloadTasks();
             }
             finally

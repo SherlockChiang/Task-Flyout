@@ -229,10 +229,7 @@ namespace Task_Flyout.Services
                         if (!string.IsNullOrEmpty(t.Due) && DateTime.TryParse(t.Due, out var dueTime)) taskDate = dueTime.Date;
                         else if (isDone && !string.IsNullOrEmpty(t.Completed) && DateTime.TryParse(t.Completed, out var compTime)) taskDate = compTime.Date;
 
-                        if (isDone && !IsInDateRange(taskDate, min, max))
-                            taskDate = DateTime.Today;
-
-                        if (!IsInDateRange(taskDate, min, max))
+                        if (!isDone && !IsInDateRange(taskDate, min, max))
                             continue;
 
                         items.Add(new AgendaItem
