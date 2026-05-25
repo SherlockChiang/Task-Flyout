@@ -1055,11 +1055,7 @@ body { background-color: {{background}} !important; }
         }
 
         private static void OpenSafeExternalUri(string uriText)
-        {
-            if (!Uri.TryCreate(uriText, UriKind.Absolute, out var uri)) return;
-            if (uri.Scheme != "http" && uri.Scheme != "https") return;
-            _ = Launcher.LaunchUriAsync(uri);
-        }
+            => _ = SafeUriLauncher.TryLaunchExternalHttpUriAsync(uriText);
 
         private static string SanitizeMailHtml(string html)
         {
@@ -1223,9 +1219,7 @@ body { background-color: {{background}} !important; }
         private async void OpenInBrowserButton_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedItem == null || string.IsNullOrWhiteSpace(_selectedItem.WebLink)) return;
-            if (Uri.TryCreate(_selectedItem.WebLink, UriKind.Absolute, out var uri) &&
-                (uri.Scheme == "http" || uri.Scheme == "https"))
-                await Launcher.LaunchUriAsync(uri);
+            await SafeUriLauncher.TryLaunchExternalHttpUriAsync(_selectedItem.WebLink);
         }
 
         private async void TrustSenderButton_Click(object sender, RoutedEventArgs e)

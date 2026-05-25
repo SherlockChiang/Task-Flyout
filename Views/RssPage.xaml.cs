@@ -855,11 +855,7 @@ pre, code { white-space: pre-wrap; overflow-wrap: anywhere; }
         }
 
         private static void OpenSafeExternalUri(string uriText)
-        {
-            if (!Uri.TryCreate(uriText, UriKind.Absolute, out var uri)) return;
-            if (uri.Scheme != "http" && uri.Scheme != "https") return;
-            _ = Launcher.LaunchUriAsync(uri);
-        }
+            => _ = SafeUriLauncher.TryLaunchExternalHttpUriAsync(uriText);
 
         private static T? FindAncestor<T>(DependencyObject source) where T : DependencyObject
         {
