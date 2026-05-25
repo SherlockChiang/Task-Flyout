@@ -114,6 +114,107 @@ namespace Task_Flyout.Services
             }
         }
 
+        public AppCache GetRangeCacheSnapshot(DateTime min, DateTime max, bool tasksOnly = false)
+        {
+            EnsureCacheLoaded();
+            min = min.Date;
+            max = max.Date;
+
+            _cacheLock.Wait();
+            try
+            {
+                var dayItems = new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal);
+                for (var day = min; day < max; day = day.AddDays(1))
+                {
+                    var key = day.ToString("yyyy-MM-dd");
+                    if (!_cache.DayItems.TryGetValue(key, out var items)) continue;
+
+                    var snapshotItems = items
+                        .Where(item => !tasksOnly || item.IsTask)
+                        .Select(CloneAgendaItem)
+                        .ToList();
+                    if (snapshotItems.Count > 0)
+                        dayItems[key] = snapshotItems;
+                }
+
+                return new AppCache
+                {
+                    DayItems = dayItems,
+                    MarkedDates = dayItems.Keys.ToHashSet(StringComparer.Ordinal)
+                };
+            }
+            finally
+            {
+                _cacheLock.Release();
+            }
+        }
+
+        public async Task UpsertCachedItemAsync(AgendaItem item, string? oldDateKey = null)
+        {
+            EnsureCacheLoaded();
+            await _cacheLock.WaitAsync();
+            try
+            {
+                RemoveMatchingCachedItems(item, oldDateKey);
+
+                if (!string.IsNullOrWhiteSpace(item.DateKey))
+                {
+                    if (!_cache.DayItems.TryGetValue(item.DateKey, out var items))
+                    {
+                        items = new List<AgendaItem>();
+                        _cache.DayItems[item.DateKey] = items;
+                    }
+
+                    items.Add(CloneAgendaItem(item));
+                }
+
+                RebuildMarkedDates();
+            }
+            finally
+            {
+                _cacheLock.Release();
+            }
+
+            await SaveCacheAsync();
+        }
+
+        public async Task RemoveCachedItemAsync(AgendaItem item)
+        {
+            EnsureCacheLoaded();
+            await _cacheLock.WaitAsync();
+            try
+            {
+                RemoveMatchingCachedItems(item);
+                RebuildMarkedDates();
+            }
+            finally
+            {
+                _cacheLock.Release();
+            }
+
+            await SaveCacheAsync();
+        }
+
+        public async Task SetCachedTaskCompletionAsync(AgendaItem target, bool isCompleted)
+        {
+            EnsureCacheLoaded();
+            await _cacheLock.WaitAsync();
+            try
+            {
+                foreach (var items in _cache.DayItems.Values)
+                {
+                    foreach (var item in items.Where(item => item.IsTask && IsSameCachedItem(item, target)))
+                        item.IsCompleted = isCompleted;
+                }
+            }
+            finally
+            {
+                _cacheLock.Release();
+            }
+
+            await SaveCacheAsync();
+        }
+
         public async Task SaveLocalCacheAsync(AppCache? localCache = null)
         {
             EnsureCacheLoaded();
@@ -405,6 +506,32 @@ namespace Task_Flyout.Services
                 .Where(kvp => kvp.Value.Any(AccountManager.IsItemVisible))
                 .Select(kvp => kvp.Key)
                 .ToHashSet();
+        }
+
+        private void RemoveMatchingCachedItems(AgendaItem target, string? preferredDateKey = null)
+        {
+            var keys = !string.IsNullOrWhiteSpace(preferredDateKey)
+                ? new[] { preferredDateKey }.Concat(_cache.DayItems.Keys.Where(key => key != preferredDateKey)).ToList()
+                : _cache.DayItems.Keys.ToList();
+
+            foreach (var key in keys)
+            {
+                if (!_cache.DayItems.TryGetValue(key, out var items)) continue;
+                items.RemoveAll(item => IsSameCachedItem(item, target));
+                if (items.Count == 0)
+                    _cache.DayItems.Remove(key);
+            }
+        }
+
+        private static bool IsSameCachedItem(AgendaItem a, AgendaItem b)
+        {
+            if (!string.IsNullOrWhiteSpace(a.Id) && !string.IsNullOrWhiteSpace(b.Id))
+                return string.Equals(a.Provider, b.Provider, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(a.Id, b.Id, StringComparison.Ordinal);
+
+            return string.Equals(a.Provider, b.Provider, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(a.Title, b.Title, StringComparison.Ordinal)
+                && string.Equals(a.DateKey, b.DateKey, StringComparison.Ordinal);
         }
 
         private static AppCache CloneCache(AppCache cache)

@@ -103,7 +103,6 @@ namespace Task_Flyout.Views
             _loader = new ResourceLoader();
             if (Application.Current is App app) _syncManager = app.SyncManager;
             this.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(Global_PointerWheelChanged), handledEventsToo: true);
-            LoadCache();
             this.Loaded += (s, e) =>
             {
                 RefreshAccountList();
@@ -111,15 +110,19 @@ namespace Task_Flyout.Views
             };
         }
 
-        private void LoadCache()
+        private void LoadCache(DateTime date)
         {
-            _localCache = _syncManager?.GetLocalCache() ?? new AppCache();
+            var firstOfMonth = new DateTime(date.Year, date.Month, 1);
+            var start = firstOfMonth.AddDays(-(int)firstOfMonth.DayOfWeek);
+            var end = start.AddDays(42 + 90);
+            _localCache = _syncManager?.GetRangeCacheSnapshot(start, end) ?? new AppCache();
         }
 
         private void LoadCalendar(DateTime date)
         {
             if (BtnMonthYear == null || CalendarGrid == null) return;
 
+            LoadCache(date);
             DayCells.Clear();
             BtnMonthYear.Content = date.ToString("Y", CultureInfo.CurrentUICulture);
 
@@ -190,12 +193,18 @@ namespace Task_Flyout.Views
 
                 if (CalendarGrid == null) return;
 
-                _localCache = _syncManager.GetLocalCache();
-
                 var itemsByDate = allItems
                     .Where(IsItemVisible)
                     .GroupBy(it => it.DateKey)
                     .ToDictionary(g => g.Key, g => g.ToList());
+                _localCache = new AppCache
+                {
+                    DayItems = itemsByDate.ToDictionary(
+                        pair => pair.Key,
+                        pair => pair.Value.ToList(),
+                        StringComparer.Ordinal),
+                    MarkedDates = itemsByDate.Keys.ToHashSet(StringComparer.Ordinal)
+                };
 
                 foreach (var cell in DayCells)
                 {
@@ -327,7 +336,6 @@ namespace Task_Flyout.Views
             if (_syncManager != null)
                 await _syncManager.RemoveAccountAsync(providerName);
             RefreshAccountList();
-            LoadCache();
             LoadCalendar(_viewDate);
             App.MyFlyoutWindow?.ReloadFilters();
         }
@@ -471,7 +479,7 @@ namespace Task_Flyout.Views
                 var min = DateTime.Today.AddYears(-1);
                 var max = DateTime.Today.AddYears(3);
                 await _syncManager.GetAllDataAsync(min, max, forceRefresh: true);
-                _localCache = _syncManager.GetLocalCache();
+                LoadCache(_viewDate);
                 LoadCalendar(_viewDate);
             }
             finally
@@ -649,6 +657,7 @@ namespace Task_Flyout.Views
                     var orig = oldList.FirstOrDefault(x => x.Id == _itemBeingEdited.Id);
                     if (orig != null)
                     {
+                        var oldDateKey = orig.DateKey;
                         oldList.Remove(orig);
                         orig.Title = EditTxtTitle.Text;
                         orig.Location = EditTxtLocation.Text;
@@ -658,7 +667,7 @@ namespace Task_Flyout.Views
                         if (!_localCache.DayItems.ContainsKey(newDateKey)) _localCache.DayItems[newDateKey] = new List<AgendaItem>();
                         _localCache.DayItems[newDateKey].Add(orig);
                         if (_syncManager != null)
-                            _ = _syncManager.SaveLocalCacheAsync(_localCache);
+                            _ = _syncManager.UpsertCachedItemAsync(orig, oldDateKey);
                     }
                 }
                 LoadCalendar(_viewDate);
@@ -705,7 +714,7 @@ namespace Task_Flyout.Views
                 {
                 list.RemoveAll(x => x.Id == itemToDelete.Id);
                     if (_syncManager != null)
-                        _ = _syncManager.SaveLocalCacheAsync(_localCache);
+                        _ = _syncManager.RemoveCachedItemAsync(itemToDelete);
                 }
                 LoadCalendar(_viewDate);
 

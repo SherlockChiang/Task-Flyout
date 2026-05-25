@@ -20,6 +20,8 @@ namespace Task_Flyout.Views
         private AppCache _localCache = new();
         private ResourceLoader _loader = new();
         private bool _isAccountPaneCollapsed;
+        private const int TaskWindowPastDays = 365;
+        private const int TaskWindowFutureDays = 365 * 3;
 
         public TasksPage()
         {
@@ -42,7 +44,10 @@ namespace Task_Flyout.Views
 
         private void LoadCache()
         {
-            _localCache = _syncManager?.GetLocalCache() ?? new AppCache();
+            _localCache = _syncManager?.GetRangeCacheSnapshot(
+                DateTime.Today.AddDays(-TaskWindowPastDays),
+                DateTime.Today.AddDays(TaskWindowFutureDays),
+                tasksOnly: true) ?? new AppCache();
         }
 
         public void RefreshAccountList()
@@ -73,8 +78,8 @@ namespace Task_Flyout.Views
                 SetSyncProgress(true);
                 var min = fullRange ? DateTime.Today.AddYears(-1) : DateTime.Today.AddDays(-30);
                 var max = fullRange ? DateTime.Today.AddYears(3) : DateTime.Today.AddDays(365);
-                await _syncManager.GetAllDataAsync(min, max, forceRefresh);
-                LoadCache();
+                var items = await _syncManager.GetAllDataAsync(min, max, forceRefresh);
+                _localCache = BuildTaskCache(items);
                 ReloadTasks();
             }
             finally
@@ -159,7 +164,7 @@ namespace Task_Flyout.Views
             {
                 cb.IsEnabled = false;
                 SetTaskCompletionInCache(item, newValue);
-                await _syncManager.SaveLocalCacheAsync(_localCache);
+                await _syncManager.SetCachedTaskCompletionAsync(item, newValue);
                 ReloadTasks();
 
                 if (!string.IsNullOrWhiteSpace(item.Provider) && !string.IsNullOrWhiteSpace(item.Id))
@@ -174,7 +179,7 @@ namespace Task_Flyout.Views
             catch
             {
                 SetTaskCompletionInCache(item, oldValue);
-                await _syncManager.SaveLocalCacheAsync(_localCache);
+                await _syncManager.SetCachedTaskCompletionAsync(item, oldValue);
                 ReloadTasks();
             }
             finally
@@ -297,7 +302,7 @@ namespace Task_Flyout.Views
                     await _syncManager.DeleteItemAsync(item.Provider, item.Id, isEvent: false);
 
                 RemoveTaskFromCache(item);
-                await _syncManager.SaveLocalCacheAsync(_localCache);
+                await _syncManager.RemoveCachedItemAsync(item);
                 ReloadTasks();
                 App.MyFlyoutWindow?.ReloadFilters();
             }
@@ -335,6 +340,23 @@ namespace Task_Flyout.Views
             return string.Equals(a.Provider, b.Provider, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(a.Title, b.Title, StringComparison.Ordinal)
                 && string.Equals(a.DateKey, b.DateKey, StringComparison.Ordinal);
+        }
+
+        private static AppCache BuildTaskCache(IEnumerable<AgendaItem> items)
+        {
+            var dayItems = items
+                .Where(item => item.IsTask && !string.IsNullOrWhiteSpace(item.DateKey))
+                .GroupBy(item => item.DateKey)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.ToList(),
+                    StringComparer.Ordinal);
+
+            return new AppCache
+            {
+                DayItems = dayItems,
+                MarkedDates = dayItems.Keys.ToHashSet(StringComparer.Ordinal)
+            };
         }
 
         private void AccountToggle_Toggled(object sender, RoutedEventArgs e)
