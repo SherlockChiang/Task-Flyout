@@ -631,13 +631,17 @@ namespace Task_Flyout
 
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+                exStyle |= WS_EX_LAYERED;
+                SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
+
+                // Use WS_EX_LAYERED alpha for semi-transparency (no DesktopAcrylicBackdrop —
+                // it leaks composition visuals when reassigned on a taskbar-parented window).
+                byte alpha = transparent ? (byte)180 : (byte)255;
+                SetLayeredWindowAttributes(hWnd, 0, alpha, LWA_ALPHA);
+                SystemBackdrop = null;
 
                 if (transparent)
                 {
-                    exStyle &= ~WS_EX_LAYERED;
-                    SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
-                    SystemBackdrop = new DesktopAcrylicBackdrop();
-
                     if (mainBorder != null)
                         mainBorder.Background = CreateTaskbarMaterialBrush(_isLightTheme);
                     if (topBorder != null)
@@ -646,11 +650,6 @@ namespace Task_Flyout
                             : Color.FromArgb(45, 255, 255, 255));
                     return;
                 }
-
-                exStyle |= WS_EX_LAYERED;
-                SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
-                SystemBackdrop = null;
-                SetLayeredWindowAttributes(hWnd, 0, 255, LWA_ALPHA);
 
                 if (_isLightTheme)
                 {
