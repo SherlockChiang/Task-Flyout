@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Globalization;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,6 +18,8 @@ namespace Task_Flyout.Services
         private readonly SemaphoreSlim _cacheLock = new(1, 1);
         private const string StoreScope = "calendar";
         private const string CacheKey = "local_cache_winui3";
+        private const int RetainedTaskPastYears = 1;
+        private const int RetainedTaskFutureYears = 3;
 
         public IReadOnlyList<ISyncProvider> Providers => _providers;
         public AccountManager AccountManager { get; } = new AccountManager();
@@ -348,6 +351,9 @@ namespace Task_Flyout.Services
                                 && !string.IsNullOrWhiteSpace(range.StartDateKey)
                                 && !string.IsNullOrWhiteSpace(range.EndDateKey))
                 .ToList();
+
+            if (CompactCache(DateTime.Today))
+                SaveCacheSyncNoLock();
         }
 
         private void RemoveProviderFromCache(string providerName)
@@ -442,6 +448,9 @@ namespace Task_Flyout.Services
 
                 foreach (var item in items.Where(item => !string.IsNullOrWhiteSpace(item.DateKey)))
                 {
+                    if (!IsDateKeyInRange(item.DateKey, min, max))
+                        continue;
+
                     if (!_cache.DayItems.ContainsKey(item.DateKey))
                         _cache.DayItems[item.DateKey] = new List<AgendaItem>();
 
@@ -457,6 +466,7 @@ namespace Task_Flyout.Services
                     _cache.CachedRanges.Add(new AgendaCacheRange { ProviderName = providerName, StartDateKey = start, EndDateKey = end });
 
                 MergeCacheRanges();
+                CompactCache(DateTime.Today);
                 RebuildMarkedDates();
             }
             finally
@@ -498,6 +508,146 @@ namespace Task_Flyout.Services
             }
 
             _cache.CachedRanges = merged;
+        }
+
+        private bool CompactCache(DateTime today)
+        {
+            int originalItemCount = _cache.DayItems.Sum(kvp => kvp.Value.Count);
+            int originalDayCount = _cache.DayItems.Count;
+            int originalRangeCount = _cache.CachedRanges.Count;
+            string originalRangeSignature = GetRangeSignature(_cache.CachedRanges);
+            bool replacedTask = false;
+
+            var minTaskDate = today.Date.AddYears(-RetainedTaskPastYears);
+            var maxTaskDate = today.Date.AddYears(RetainedTaskFutureYears);
+            var minTaskKey = minTaskDate.ToString("yyyy-MM-dd");
+            var maxTaskEndKey = maxTaskDate.AddDays(-1).ToString("yyyy-MM-dd");
+
+            var compactedDayItems = new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal);
+            var taskItems = new Dictionary<string, AgendaItem>(StringComparer.OrdinalIgnoreCase);
+            var eventKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var kvp in _cache.DayItems.OrderBy(kvp => kvp.Key, StringComparer.Ordinal))
+            {
+                foreach (var item in kvp.Value)
+                {
+                    if (string.IsNullOrWhiteSpace(item.DateKey))
+                        item.DateKey = kvp.Key;
+
+                    if (!TryParseDateKey(item.DateKey, out var itemDate))
+                        continue;
+
+                    if (item.IsTask)
+                    {
+                        if (itemDate < minTaskDate || itemDate >= maxTaskDate)
+                            continue;
+
+                        var taskKey = GetTaskCacheKey(item);
+                        if (!taskItems.TryGetValue(taskKey, out var existing) || ShouldReplaceTask(existing, item))
+                        {
+                            replacedTask |= existing != null;
+                            taskItems[taskKey] = item;
+                        }
+
+                        continue;
+                    }
+
+                    var eventKey = GetEventCacheKey(item);
+                    if (eventKeys.Add(eventKey))
+                        AddCachedItem(compactedDayItems, item);
+                }
+            }
+
+            foreach (var item in taskItems.Values)
+                AddCachedItem(compactedDayItems, item);
+
+            _cache.DayItems = compactedDayItems
+                .OrderBy(kvp => kvp.Key, StringComparer.Ordinal)
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.Ordinal);
+
+            _cache.CachedRanges = _cache.CachedRanges
+                .Select(range => new AgendaCacheRange
+                {
+                    ProviderName = range.ProviderName,
+                    StartDateKey = string.Compare(range.StartDateKey, minTaskKey, StringComparison.Ordinal) < 0 ? minTaskKey : range.StartDateKey,
+                    EndDateKey = string.Compare(range.EndDateKey, maxTaskEndKey, StringComparison.Ordinal) > 0 ? maxTaskEndKey : range.EndDateKey
+                })
+                .Where(range => string.Compare(range.StartDateKey, range.EndDateKey, StringComparison.Ordinal) <= 0)
+                .ToList();
+            MergeCacheRanges();
+            RebuildMarkedDates();
+
+            return originalItemCount != _cache.DayItems.Sum(kvp => kvp.Value.Count)
+                || originalDayCount != _cache.DayItems.Count
+                || originalRangeCount != _cache.CachedRanges.Count
+                || originalRangeSignature != GetRangeSignature(_cache.CachedRanges)
+                || replacedTask;
+        }
+
+        private static string GetRangeSignature(IEnumerable<AgendaCacheRange> ranges)
+            => string.Join(
+                "\n",
+                ranges.Select(range => $"{range.ProviderName}|{range.StartDateKey}|{range.EndDateKey}"));
+
+        private static void AddCachedItem(Dictionary<string, List<AgendaItem>> dayItems, AgendaItem item)
+        {
+            if (!dayItems.TryGetValue(item.DateKey, out var items))
+            {
+                items = new List<AgendaItem>();
+                dayItems[item.DateKey] = items;
+            }
+
+            items.Add(item);
+        }
+
+        private static bool ShouldReplaceTask(AgendaItem existing, AgendaItem candidate)
+        {
+            var existingKey = existing.DateKey ?? "";
+            var candidateKey = candidate.DateKey ?? "";
+            var compare = string.Compare(candidateKey, existingKey, StringComparison.Ordinal);
+            if (compare != 0) return compare > 0;
+
+            if (string.IsNullOrWhiteSpace(existing.Description) && !string.IsNullOrWhiteSpace(candidate.Description))
+                return true;
+
+            return false;
+        }
+
+        private static string GetTaskCacheKey(AgendaItem item)
+        {
+            if (!string.IsNullOrWhiteSpace(item.Id))
+                return $"{item.Provider}|task|{item.Id}";
+
+            return $"{item.Provider}|task|{item.Title}|{item.DateKey}";
+        }
+
+        private static string GetEventCacheKey(AgendaItem item)
+        {
+            if (!string.IsNullOrWhiteSpace(item.Id))
+                return $"{item.Provider}|event|{item.Id}|{item.DateKey}";
+
+            return $"{item.Provider}|event|{item.Title}|{item.Subtitle}|{item.DateKey}";
+        }
+
+        private static bool IsDateKeyInRange(string dateKey, DateTime min, DateTime max)
+            => TryParseDateKey(dateKey, out var date) && date >= min.Date && date < max.Date;
+
+        private static bool TryParseDateKey(string? dateKey, out DateTime date)
+            => DateTime.TryParseExact(
+                dateKey,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out date);
+
+        private void SaveCacheSyncNoLock()
+        {
+            try
+            {
+                string json = JsonSerializer.Serialize(_cache, AppJsonContext.Default.AppCache);
+                LocalSqliteStore.WriteProtectedText(StoreScope, CacheKey, json);
+            }
+            catch { }
         }
 
         private void RebuildMarkedDates()
