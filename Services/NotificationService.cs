@@ -182,8 +182,12 @@ namespace Task_Flyout.Services
 
             try
             {
-                var cache = _syncManager.GetLocalCache();
-                _cachedItems = cache.DayItems;
+                var now = DateTime.Now;
+                _cachedItems = _syncManager.GetDayItemsSnapshot(new[]
+                {
+                    now.ToString("yyyy-MM-dd"),
+                    now.AddDays(1).ToString("yyyy-MM-dd")
+                });
                 _cacheReadTime = DateTime.Now;
                 return _cachedItems;
             }

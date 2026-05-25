@@ -17,7 +17,6 @@ namespace Task_Flyout.Services
         private readonly SemaphoreSlim _cacheLock = new(1, 1);
         private const string StoreScope = "calendar";
         private const string CacheKey = "local_cache_winui3";
-        private AppCache? _cachedClone;
 
         public IReadOnlyList<ISyncProvider> Providers => _providers;
         public AccountManager AccountManager { get; } = new AccountManager();
@@ -81,8 +80,33 @@ namespace Task_Flyout.Services
             _cacheLock.Wait();
             try
             {
-                _cachedClone ??= CloneCache(_cache);
-                return _cachedClone;
+                return CloneCache(_cache);
+            }
+            finally
+            {
+                _cacheLock.Release();
+            }
+        }
+
+        public Dictionary<string, List<AgendaItem>> GetDayItemsSnapshot(IEnumerable<string> dateKeys)
+        {
+            EnsureCacheLoaded();
+            var keys = dateKeys
+                .Where(key => !string.IsNullOrWhiteSpace(key))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            _cacheLock.Wait();
+            try
+            {
+                var result = new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal);
+                foreach (var key in keys)
+                {
+                    if (_cache.DayItems.TryGetValue(key, out var items))
+                        result[key] = items.Select(CloneAgendaItem).ToList();
+                }
+
+                return result;
             }
             finally
             {
@@ -99,7 +123,6 @@ namespace Task_Flyout.Services
                 if (localCache != null)
                     _cache = CloneCache(localCache);
                 RebuildMarkedDates();
-                InvalidateCacheClone();
             }
             finally
             {
@@ -334,7 +357,6 @@ namespace Task_Flyout.Services
 
                 MergeCacheRanges();
                 RebuildMarkedDates();
-                InvalidateCacheClone();
             }
             finally
             {
@@ -383,11 +405,6 @@ namespace Task_Flyout.Services
                 .Where(kvp => kvp.Value.Any(AccountManager.IsItemVisible))
                 .Select(kvp => kvp.Key)
                 .ToHashSet();
-        }
-
-        private void InvalidateCacheClone()
-        {
-            _cachedClone = null;
         }
 
         private static AppCache CloneCache(AppCache cache)

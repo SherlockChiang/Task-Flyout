@@ -32,6 +32,18 @@ namespace Task_Flyout
         private IntPtr _fluentFlyoutHwnd = IntPtr.Zero;
         private IntPtr _currentRgn = IntPtr.Zero;
         private int _refreshing;
+        private int _mediaSessionInitializing;
+        private GlobalSystemMediaTransportControlsSessionManager? _mediaSessionManager;
+        private GlobalSystemMediaTransportControlsSession? _mediaSession;
+        private DesktopAcrylicBackdrop? _acrylicBackdrop;
+        private int _lastBarX = int.MinValue;
+        private int _lastBarY = int.MinValue;
+        private int _lastBarWidth = int.MinValue;
+        private int _lastBarHeight = int.MinValue;
+        private int _lastRegionWidth = int.MinValue;
+        private int _lastRegionHeight = int.MinValue;
+        private int _lastRegionRadius = int.MinValue;
+        private IntPtr _lastInsertAfter = IntPtr.Zero;
 
         #region P/Invoke
 
@@ -191,6 +203,8 @@ namespace Task_Flyout
             _reparentTimer.Tick += ReparentTimer_Tick;
             _reparentTimer.Start();
 
+            _ = InitializeMediaSessionManagerAsync();
+
             RootGrid.Loaded += async (s, e) =>
             {
                 _contentPanel = RootGrid.FindName("ContentPanel") as FrameworkElement;
@@ -203,6 +217,15 @@ namespace Task_Flyout
             {
                 _refreshTimer.Stop();
                 _reparentTimer.Stop();
+                UnsubscribeMediaSession();
+                if (_mediaSessionManager != null)
+                {
+                    _mediaSessionManager.SessionsChanged -= MediaSessionsChanged;
+                    _mediaSessionManager.CurrentSessionChanged -= MediaCurrentSessionChanged;
+                    _mediaSessionManager = null;
+                }
+                SystemBackdrop = null;
+                _acrylicBackdrop = null;
             };
         }
 
@@ -233,13 +256,15 @@ namespace Task_Flyout
                     AttachToTaskbar();
                 }
 
+                if (_mediaSessionManager == null)
+                    _ = InitializeMediaSessionManagerAsync();
                 PositionOnTaskbar();
 
                 if ((needsReparent || !IsWindowVisible(hWnd)) && IsWindow(hWnd))
                     ShowWindow(hWnd, SW_SHOWNOACTIVATE);
 
-                if (_isParented)
-                    _reparentTimer?.Stop();
+                // Keep polling after parenting: taskbar widgets and FluentFlyout media
+                // controls can appear or disappear without changing our parent HWND.
             }
             catch
             {
@@ -263,6 +288,11 @@ namespace Task_Flyout
             SetWindowLong(hWnd, GWL_STYLE, style);
 
             _isParented = SetParent(hWnd, _taskbarHwnd) != IntPtr.Zero || GetParent(hWnd) == _taskbarHwnd;
+            if (_isParented)
+            {
+                ResetCachedWindowPlacement();
+                ApplyWindowsTheme();
+            }
         }
 
         private void InstallSubclass(IntPtr hWnd)
@@ -358,11 +388,11 @@ namespace Task_Flyout
             int x = widgetsOffset + (widgetsOffset > 0 ? gap : 0);
             int y = (taskbarHeight - pillHeight) / 2;
 
-            // 如果检测到 FluentFlyout，把自己排在它后面（z-order 更低），避免遮挡
-            IntPtr insertAfter = _fluentFlyoutHwnd != IntPtr.Zero ? _fluentFlyoutHwnd : IntPtr.Zero;
-            uint flags = SWP_NOACTIVATE | SWP_SHOWWINDOW;
-            if (_fluentFlyoutHwnd == IntPtr.Zero)
-                flags |= SWP_NOZORDER;
+                // 如果检测到 FluentFlyout，把自己排在它后面（z-order 更低），避免遮挡
+                IntPtr insertAfter = _fluentFlyoutHwnd != IntPtr.Zero ? _fluentFlyoutHwnd : IntPtr.Zero;
+                uint flags = SWP_NOACTIVATE | SWP_SHOWWINDOW;
+                if (_fluentFlyoutHwnd == IntPtr.Zero)
+                    flags |= SWP_NOZORDER;
 
                 if (insertAfter != IntPtr.Zero && !IsWindow(insertAfter))
                 {
@@ -370,16 +400,40 @@ namespace Task_Flyout
                     flags |= SWP_NOZORDER;
                 }
 
-                SetWindowPos(hWnd, insertAfter, x, y, pillWidth, pillHeight, flags);
+                bool placementChanged =
+                    x != _lastBarX ||
+                    y != _lastBarY ||
+                    pillWidth != _lastBarWidth ||
+                    pillHeight != _lastBarHeight ||
+                    insertAfter != _lastInsertAfter ||
+                    !IsWindowVisible(hWnd);
+
+                if (placementChanged)
+                {
+                    SetWindowPos(hWnd, insertAfter, x, y, pillWidth, pillHeight, flags);
+                    _lastBarX = x;
+                    _lastBarY = y;
+                    _lastBarWidth = pillWidth;
+                    _lastBarHeight = pillHeight;
+                    _lastInsertAfter = insertAfter;
+                }
 
                 // 圆角裁剪窗口外形（Win32 region）
                 int cornerRadius = (int)(8 * scaleFactor);
-                IntPtr rgn = CreateRoundRectRgn(0, 0, pillWidth + 1, pillHeight + 1, cornerRadius, cornerRadius);
-                if (rgn != IntPtr.Zero)
+                if (pillWidth != _lastRegionWidth ||
+                    pillHeight != _lastRegionHeight ||
+                    cornerRadius != _lastRegionRadius)
                 {
-                    SetWindowRgn(hWnd, rgn, true);
-                    // SetWindowRgn takes ownership — do NOT DeleteObject(rgn).
-                    _currentRgn = rgn;
+                    IntPtr rgn = CreateRoundRectRgn(0, 0, pillWidth + 1, pillHeight + 1, cornerRadius, cornerRadius);
+                    if (rgn != IntPtr.Zero)
+                    {
+                        SetWindowRgn(hWnd, rgn, true);
+                        // SetWindowRgn takes ownership — do NOT DeleteObject(rgn).
+                        _currentRgn = rgn;
+                        _lastRegionWidth = pillWidth;
+                        _lastRegionHeight = pillHeight;
+                        _lastRegionRadius = cornerRadius;
+                    }
                 }
             }
             catch
@@ -387,6 +441,18 @@ namespace Task_Flyout
                 _taskbarHwnd = IntPtr.Zero;
                 _isParented = false;
             }
+        }
+
+        private void ResetCachedWindowPlacement()
+        {
+            _lastBarX = int.MinValue;
+            _lastBarY = int.MinValue;
+            _lastBarWidth = int.MinValue;
+            _lastBarHeight = int.MinValue;
+            _lastRegionWidth = int.MinValue;
+            _lastRegionHeight = int.MinValue;
+            _lastRegionRadius = int.MinValue;
+            _lastInsertAfter = IntPtr.Zero;
         }
 
         [DllImport("gdi32.dll")]
@@ -411,16 +477,62 @@ namespace Task_Flyout
         /// </summary>
         private bool _isMediaActive;
 
-        private async void RefreshMediaPlaybackState()
+        private async Task InitializeMediaSessionManagerAsync()
+        {
+            if (Interlocked.CompareExchange(ref _mediaSessionInitializing, 1, 0) != 0)
+                return;
+
+            try
+            {
+                var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    _mediaSessionManager = manager;
+                    _mediaSessionManager.SessionsChanged += MediaSessionsChanged;
+                    _mediaSessionManager.CurrentSessionChanged += MediaCurrentSessionChanged;
+                    UpdateCurrentMediaSession();
+                });
+            }
+            catch
+            {
+                DispatcherQueue.TryEnqueue(() => _isMediaActive = false);
+                Interlocked.Exchange(ref _mediaSessionInitializing, 0);
+            }
+        }
+
+        private void MediaSessionsChanged(GlobalSystemMediaTransportControlsSessionManager sender, SessionsChangedEventArgs args)
+            => DispatcherQueue.TryEnqueue(UpdateCurrentMediaSession);
+
+        private void MediaCurrentSessionChanged(GlobalSystemMediaTransportControlsSessionManager sender, CurrentSessionChangedEventArgs args)
+            => DispatcherQueue.TryEnqueue(UpdateCurrentMediaSession);
+
+        private void MediaPlaybackInfoChanged(GlobalSystemMediaTransportControlsSession sender, PlaybackInfoChangedEventArgs args)
+            => DispatcherQueue.TryEnqueue(() =>
+            {
+                UpdateMediaPlaybackState(sender);
+                PositionOnTaskbar();
+            });
+
+        private void UpdateCurrentMediaSession()
+        {
+            var current = _mediaSessionManager?.GetCurrentSession();
+            if (!ReferenceEquals(current, _mediaSession))
+            {
+                UnsubscribeMediaSession();
+                _mediaSession = current;
+                if (_mediaSession != null)
+                    _mediaSession.PlaybackInfoChanged += MediaPlaybackInfoChanged;
+            }
+
+            UpdateMediaPlaybackState(_mediaSession);
+            PositionOnTaskbar();
+        }
+
+        private void UpdateMediaPlaybackState(GlobalSystemMediaTransportControlsSession? session)
         {
             try
             {
-                var sessionManager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
-                var current = sessionManager?.GetCurrentSession();
-                if (current == null) { _isMediaActive = false; return; }
-
-                var playback = current.GetPlaybackInfo();
-                var status = playback?.PlaybackStatus;
+                var status = session?.GetPlaybackInfo()?.PlaybackStatus;
                 // Playing/Paused 状态下 FluentFlyout 都会显示媒体控件
                 _isMediaActive = status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
                               || status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused;
@@ -428,6 +540,15 @@ namespace Task_Flyout
             catch
             {
                 _isMediaActive = false;
+            }
+        }
+
+        private void UnsubscribeMediaSession()
+        {
+            if (_mediaSession != null)
+            {
+                _mediaSession.PlaybackInfoChanged -= MediaPlaybackInfoChanged;
+                _mediaSession = null;
             }
         }
 
@@ -445,9 +566,6 @@ namespace Task_Flyout
 
                 int maxRightScreen = taskbarLeft;
                 _fluentFlyoutHwnd = IntPtr.Zero;
-
-                // 先刷新媒体播放状态，用于判断 FluentFlyout 是否应该避让
-                RefreshMediaPlaybackState();
 
                 // 枚举 Shell_TrayWnd 的直接子窗口（FluentFlyout TaskbarWindow 通过 SetParent 挂载在这里，
                 // Win11 原生 Widgets 也是 DesktopWindowContentBridge 子窗口）
@@ -630,18 +748,16 @@ namespace Task_Flyout
                 bool transparent = weatherService?.WeatherBarTransparentBackground == true;
 
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-                int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-                exStyle |= WS_EX_LAYERED;
-                SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
-
-                // Use WS_EX_LAYERED alpha for semi-transparency (no DesktopAcrylicBackdrop —
-                // it leaks composition visuals when reassigned on a taskbar-parented window).
-                byte alpha = transparent ? (byte)180 : (byte)255;
-                SetLayeredWindowAttributes(hWnd, 0, alpha, LWA_ALPHA);
-                SystemBackdrop = null;
-
                 if (transparent)
                 {
+                    int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+                    exStyle &= ~WS_EX_LAYERED;
+                    SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
+
+                    _acrylicBackdrop ??= new DesktopAcrylicBackdrop();
+                    if (!ReferenceEquals(SystemBackdrop, _acrylicBackdrop))
+                        SystemBackdrop = _acrylicBackdrop;
+
                     if (mainBorder != null)
                         mainBorder.Background = CreateTaskbarMaterialBrush(_isLightTheme);
                     if (topBorder != null)
@@ -650,6 +766,12 @@ namespace Task_Flyout
                             : Color.FromArgb(45, 255, 255, 255));
                     return;
                 }
+
+                int opaqueExStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+                opaqueExStyle |= WS_EX_LAYERED;
+                SetWindowLong(hWnd, GWL_EXSTYLE, opaqueExStyle);
+                SystemBackdrop = null;
+                SetLayeredWindowAttributes(hWnd, 0, 255, LWA_ALPHA);
 
                 if (_isLightTheme)
                 {
@@ -944,6 +1066,7 @@ namespace Task_Flyout
                 // Clear region — system releases the previous one.
                 SetWindowRgn(hWnd, IntPtr.Zero, true);
                 _currentRgn = IntPtr.Zero;
+                ResetCachedWindowPlacement();
                 SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0,
                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
             }

@@ -96,9 +96,11 @@ namespace Task_Flyout
 
         private DateTime _selectedDay = DateTime.Today;
 
-        private const int QuickSyncPastDays = 30;
-        private const int QuickSyncFutureDays = 365;
+        private const int QuickSyncPastDays = 14;
+        private const int QuickSyncFutureDays = 90;
+        private const int VisibleCacheFutureDays = 45;
         private static readonly SemaphoreSlim _syncLock = new(1, 1);
+        private bool _backgroundRefreshQueued;
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern uint GetDpiForWindow(IntPtr hwnd);
@@ -137,7 +139,6 @@ namespace Task_Flyout
             }
 
             ConfigureFlyoutStyle();
-            LoadCache();
             StartClock();
             SetupPeriodicSync();
             SetupFocusTimer();
@@ -154,11 +155,11 @@ namespace Task_Flyout
             }
 
             UpdateSelectedDateHeader();
+            LoadCacheForDate(_selectedDay);
             ShowDataForDate(_selectedDay);
 
             MainCalendar.RegisterPropertyChangedCallback(CalendarView.DisplayModeProperty, (s, args) => RequestDotRefresh());
 
-            _ = SyncAllDataAsync(true);
             _ = RefreshWeatherAsync();
         }
 
@@ -250,13 +251,18 @@ namespace Task_Flyout
             SetWindowLong(hWnd, GWL_STYLE, style);
         }
 
-        private void LoadCache()
+        private void LoadCacheForDate(DateTime anchorDate)
         {
             try
             {
                 if (_syncManager != null)
                 {
-                    _localCache = _syncManager.GetLocalCache();
+                    var dayItems = _syncManager.GetDayItemsSnapshot(GetVisibleCacheDateKeys(anchorDate));
+                    _localCache = new AppCache
+                    {
+                        DayItems = dayItems,
+                        MarkedDates = dayItems.Keys.ToHashSet(StringComparer.Ordinal)
+                    };
                     MarkedDates = new HashSet<string>(_localCache.MarkedDates);
                     EventCounts.Clear();
                     foreach (var kvp in _localCache.DayItems)
@@ -267,6 +273,16 @@ namespace Task_Flyout
                 }
             }
             catch { _localCache = new(); }
+        }
+
+        private static IEnumerable<string> GetVisibleCacheDateKeys(DateTime anchorDate)
+        {
+            var firstOfMonth = new DateTime(anchorDate.Year, anchorDate.Month, 1);
+            var visibleStart = firstOfMonth.AddDays(-(int)firstOfMonth.DayOfWeek);
+            var visibleEnd = visibleStart.AddDays(42 + VisibleCacheFutureDays);
+
+            for (var day = visibleStart.Date; day < visibleEnd.Date; day = day.AddDays(1))
+                yield return day.ToString("yyyy-MM-dd");
         }
 
         private async Task SaveCache()
@@ -459,6 +475,7 @@ namespace Task_Flyout
             }
 
             _selectedDay = args.AddedDates[0].Date;
+            LoadCacheForDate(_selectedDay);
             UpdateSelectedDateHeader();
             ShowDataForDate(_selectedDay);
         }
@@ -633,10 +650,13 @@ namespace Task_Flyout
                     }
                 }
 
-                _localCache = _syncManager.GetLocalCache();
+                _localCache = new AppCache
+                {
+                    DayItems = tempDayItems,
+                    MarkedDates = tempMarkedDates
+                };
                 MarkedDates = tempMarkedDates;
                 EventCounts = tempEventCounts;
-                await SaveCache();
 
                 if (dataChanged)
                 {
@@ -680,7 +700,7 @@ namespace Task_Flyout
             }
             else
             {
-                LoadCache();
+                LoadCacheForDate(DateTime.Today);
                 _selectedDay = DateTime.Today;
                 ShowDataForDate(_selectedDay);
 
@@ -708,9 +728,32 @@ namespace Task_Flyout
 
                 UpdateAutoHideTimer();
 
-                _ = SyncAllDataAsync(true);
-                _ = RefreshWeatherAsync();
+                QueueBackgroundRefresh();
             }
+        }
+
+        private void QueueBackgroundRefresh()
+        {
+            if (_backgroundRefreshQueued) return;
+            _backgroundRefreshQueued = true;
+
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1200);
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    try
+                    {
+                        if (!_appWindow.IsVisible) return;
+                        await SyncAllDataAsync(true);
+                        await RefreshWeatherAsync();
+                    }
+                    finally
+                    {
+                        _backgroundRefreshQueued = false;
+                    }
+                });
+            });
         }
 
         private void AdjustWindowHeight()

@@ -1359,6 +1359,7 @@ namespace Task_Flyout.Services
             _persistentCache.LastSeenInboxTicks ??= new Dictionary<string, long>();
             _persistentCache.AccountOrder ??= new List<string>();
             _persistentCache.FolderOrder ??= new Dictionary<string, List<string>>();
+            TrimPersistentCacheForMemory();
         }
 
         private void SavePersistentCache()
@@ -1446,6 +1447,26 @@ namespace Task_Flyout.Services
                 m.HtmlBody = "";
             }
             return messages;
+        }
+
+        private void TrimPersistentCacheForMemory()
+        {
+            if (_persistentCache == null) return;
+
+            foreach (var key in _persistentCache.Messages.Keys.ToList())
+            {
+                var messages = StripBodies(_persistentCache.Messages[key]);
+                _persistentCache.Messages[key] = messages
+                    .OrderByDescending(item => item.RawReceivedTime)
+                    .Take(Math.Clamp(GetPageSizeFromCacheKey(key), 10, 50))
+                    .ToList();
+            }
+        }
+
+        private int GetPageSizeFromCacheKey(string key)
+        {
+            var parts = key.Split('|');
+            return parts.Length > 0 && int.TryParse(parts[^1], out var value) ? value : PageSize;
         }
 
         private void UpdatePersistentMessageBody(MailItem item)

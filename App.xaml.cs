@@ -69,7 +69,6 @@ namespace Task_Flyout
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
             MainDispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
-            MyFlyoutWindow = new FlyoutWindow();
             ApplyConfiguredThemeToOpenWindows();
 
             NotificationService = new NotificationService(SyncManager);
@@ -85,7 +84,7 @@ namespace Task_Flyout
             _trayIcon.ForceCreate(enablesEfficiencyMode: false);
             MailService.StartMailPolling();
 
-            _trayIcon.LeftClickCommand = new RelayCommand(() => MyFlyoutWindow.ToggleFlyout());
+            _trayIcon.LeftClickCommand = new RelayCommand(() => EnsureFlyoutWindow().ToggleFlyout());
 
             // Initialize weather bar if enabled
             InitWeatherBar();
@@ -238,6 +237,17 @@ namespace Task_Flyout
 
             if (MyFlyoutWindow?.Content is FrameworkElement flyoutRoot)
                 flyoutRoot.RequestedTheme = theme;
+        }
+
+        private static FlyoutWindow EnsureFlyoutWindow()
+        {
+            if (MyFlyoutWindow == null)
+            {
+                MyFlyoutWindow = new FlyoutWindow();
+                ApplyConfiguredThemeToOpenWindows();
+            }
+
+            return MyFlyoutWindow;
         }
 
         private void InitWeatherBar()
