@@ -167,13 +167,13 @@ namespace Task_Flyout.Services
 
             // Fetch events and tasks in parallel
             var eventsTask = FetchCalendarEventsAsync(startDate, endDate, calendarMap);
-            var tasksTask = FetchMicrosoftTasksAsync();
+            var tasksTask = FetchMicrosoftTasksAsync(startDate, endDate);
 
             await Task.WhenAll(eventsTask, tasksTask);
 
             var results = new List<AgendaItem>();
-            results.AddRange(eventsTask.Result);
-            results.AddRange(tasksTask.Result);
+            results.AddRange(await eventsTask);
+            results.AddRange(await tasksTask);
             return results;
         }
 
@@ -252,9 +252,11 @@ namespace Task_Flyout.Services
             return results;
         }
 
-        private async Task<List<AgendaItem>> FetchMicrosoftTasksAsync()
+        private async Task<List<AgendaItem>> FetchMicrosoftTasksAsync(DateTime startDate, DateTime endDate)
         {
             var results = new List<AgendaItem>();
+            startDate = startDate.Date;
+            endDate = endDate.Date;
             try
             {
                 var listId = await GetDefaultTodoListIdAsync();
@@ -291,6 +293,9 @@ namespace Task_Flyout.Services
                                 targetDate = task.CreatedDateTime.Value.UtcDateTime.ToLocalTime();
                             }
 
+                            if (!IsInDateRange(targetDate, startDate, endDate))
+                                continue;
+
                             results.Add(new AgendaItem
                             {
                                 Id = task.Id ?? "",
@@ -318,6 +323,12 @@ namespace Task_Flyout.Services
                 System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] Other error fetching tasks: {ex.Message}");
             }
             return results;
+        }
+
+        private static bool IsInDateRange(DateTime date, DateTime startDate, DateTime endDate)
+        {
+            var day = date.Date;
+            return day >= startDate && day < endDate;
         }
 
         public async Task UpdateItemAsync(string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime)

@@ -137,7 +137,7 @@ namespace Task_Flyout.Services
             var calendarTasks = calendars
                 .Select(cal => FetchCalendarEventsAsync(calendarSvc, cal, min, max))
                 .ToList();
-            var tasksTask = FetchGoogleTasksAsync(tasksSvc);
+            var tasksTask = FetchGoogleTasksAsync(tasksSvc, min, max);
 
             await Task.WhenAll(calendarTasks.Append(tasksTask));
 
@@ -209,9 +209,11 @@ namespace Task_Flyout.Services
             return items;
         }
 
-        private async Task<List<AgendaItem>> FetchGoogleTasksAsync(TasksService tasksSvc)
+        private async Task<List<AgendaItem>> FetchGoogleTasksAsync(TasksService tasksSvc, DateTime min, DateTime max)
         {
             var items = new List<AgendaItem>();
+            min = min.Date;
+            max = max.Date;
             string? taskPageToken = null;
             do
             {
@@ -227,6 +229,9 @@ namespace Task_Flyout.Services
                         if (!string.IsNullOrEmpty(t.Due) && DateTime.TryParse(t.Due, out var dueTime)) taskDate = dueTime.Date;
                         else if (isDone && !string.IsNullOrEmpty(t.Completed) && DateTime.TryParse(t.Completed, out var compTime)) taskDate = compTime.Date;
                         else if (isDone) continue;
+
+                        if (!IsInDateRange(taskDate, min, max))
+                            continue;
 
                         items.Add(new AgendaItem
                         {
@@ -245,6 +250,12 @@ namespace Task_Flyout.Services
                 taskPageToken = tasks?.NextPageToken;
             } while (taskPageToken != null);
             return items;
+        }
+
+        private static bool IsInDateRange(DateTime date, DateTime min, DateTime max)
+        {
+            var day = date.Date;
+            return day >= min && day < max;
         }
 
         public async Task UpdateItemAsync(string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime)
