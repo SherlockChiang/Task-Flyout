@@ -190,6 +190,12 @@ namespace Task_Flyout.Services
             return ApplyAccountOrder(_accounts);
         }
 
+        public bool HasSetupCompleteAccounts()
+        {
+            EnsureAccountsLoaded();
+            return _accounts.Any(account => account.IsSetupComplete);
+        }
+
         public void SaveMailAccountOrder(IEnumerable<string> accountIds)
         {
             EnsureAccountsLoaded();
@@ -237,13 +243,14 @@ namespace Task_Flyout.Services
 
             ClearAccountCache(account.Id);
             SaveAccounts();
+            UpdateMailPollingSettings();
             return true;
         }
 
         public void StartMailPolling()
         {
             StopMailPolling();
-            if (!MailPollingEnabled) return;
+            if (!MailPollingEnabled || !HasSetupCompleteAccounts()) return;
 
             _pollTimer = new DispatcherTimer
             {
@@ -265,7 +272,7 @@ namespace Task_Flyout.Services
 
         public void UpdateMailPollingSettings()
         {
-            if (MailPollingEnabled)
+            if (MailPollingEnabled && HasSetupCompleteAccounts())
                 StartMailPolling();
             else
                 StopMailPolling();
@@ -273,6 +280,7 @@ namespace Task_Flyout.Services
 
         public async Task<MailAccount> AddOutlookAccountAsync()
         {
+            EnsureAccountsLoaded();
             await EnsureOutlookAuthorizedAsync();
             if (_outlookClient == null)
                 throw new InvalidOperationException("Outlook authorization failed.");
@@ -299,6 +307,7 @@ namespace Task_Flyout.Services
 
             _accounts.Add(account);
             SaveAccounts();
+            UpdateMailPollingSettings();
             await EnsureMicrosoftAgendaAccountAsync();
             return account;
         }
@@ -371,17 +380,20 @@ namespace Task_Flyout.Services
                 existing.IsSetupComplete = true;
                 SaveImapPassword(existing.Id, password);
                 SaveAccounts();
+                UpdateMailPollingSettings();
                 return existing;
             }
 
             _accounts.Add(account);
             SaveImapPassword(account.Id, password);
             SaveAccounts();
+            UpdateMailPollingSettings();
             return account;
         }
 
         public async Task<MailAccount> AddGoogleAccountAsync()
         {
+            EnsureAccountsLoaded();
             var gmail = await EnsureGoogleMailAuthorizedAsync();
             var profile = await gmail.Users.GetProfile("me").ExecuteAsync();
             var address = profile?.EmailAddress ?? "";
@@ -402,6 +414,7 @@ namespace Task_Flyout.Services
 
             _accounts.Add(account);
             SaveAccounts();
+            UpdateMailPollingSettings();
             return account;
         }
 
