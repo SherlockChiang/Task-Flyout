@@ -218,7 +218,7 @@ namespace Task_Flyout.Services
             do
             {
                 var tasksReq = tasksSvc.Tasks.List("@default");
-                tasksReq.ShowHidden = true; tasksReq.MaxResults = 100; tasksReq.PageToken = taskPageToken;
+                tasksReq.ShowCompleted = true; tasksReq.ShowHidden = true; tasksReq.MaxResults = 100; tasksReq.PageToken = taskPageToken;
                 var tasks = await tasksReq.ExecuteAsync().ConfigureAwait(false);
                 if (tasks?.Items != null)
                 {
@@ -228,6 +228,9 @@ namespace Task_Flyout.Services
                         DateTime taskDate = DateTime.Today;
                         if (!string.IsNullOrEmpty(t.Due) && DateTime.TryParse(t.Due, out var dueTime)) taskDate = dueTime.Date;
                         else if (isDone && !string.IsNullOrEmpty(t.Completed) && DateTime.TryParse(t.Completed, out var compTime)) taskDate = compTime.Date;
+
+                        if (isDone && !IsInDateRange(taskDate, min, max))
+                            taskDate = DateTime.Today;
 
                         if (!IsInDateRange(taskDate, min, max))
                             continue;

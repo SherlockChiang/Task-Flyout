@@ -259,10 +259,14 @@ namespace Task_Flyout.Services
             endDate = endDate.Date;
             try
             {
-                var listId = await GetDefaultTodoListIdAsync();
-                if (!string.IsNullOrEmpty(listId))
+                var lists = await _graphClient.Me.Todo.Lists.GetAsync(req =>
                 {
-                    var tasks = await _graphClient.Me.Todo.Lists[listId].Tasks.GetAsync(req =>
+                    req.QueryParameters.Top = 100;
+                });
+
+                foreach (var list in lists?.Value?.Where(list => !string.IsNullOrWhiteSpace(list.Id)) ?? Enumerable.Empty<TodoTaskList>())
+                {
+                    var tasks = await _graphClient.Me.Todo.Lists[list.Id].Tasks.GetAsync(req =>
                     {
                         req.QueryParameters.Top = 500;
                     });
@@ -273,6 +277,7 @@ namespace Task_Flyout.Services
 
                         foreach (var task in tasks.Value)
                         {
+                            bool isCompleted = task.Status == Microsoft.Graph.Models.TaskStatus.Completed;
                             DateTime targetDate = DateTime.Today;
 
                             if (task.DueDateTime != null)
@@ -283,11 +288,14 @@ namespace Task_Flyout.Services
                                     targetDate = targetDate.ToLocalTime();
                                 }
                             }
-                            else if (task.Status == Microsoft.Graph.Models.TaskStatus.Completed && task.CompletedDateTime != null)
+                            else if (isCompleted && task.CompletedDateTime != null)
                             {
                                 DateTime.TryParse(task.CompletedDateTime.DateTime, out targetDate);
                                 targetDate = targetDate.ToLocalTime();
                             }
+
+                            if (isCompleted && !IsInDateRange(targetDate, startDate, endDate))
+                                targetDate = DateTime.Today;
 
                             if (!IsInDateRange(targetDate, startDate, endDate))
                                 continue;
@@ -300,8 +308,10 @@ namespace Task_Flyout.Services
                                 Description = task.Body?.Content ?? "",
                                 IsEvent = false,
                                 IsTask = true,
-                                IsCompleted = task.Status == Microsoft.Graph.Models.TaskStatus.Completed,
+                                IsCompleted = isCompleted,
                                 Provider = ProviderName,
+                                CalendarId = list.Id ?? "",
+                                CalendarName = list.DisplayName ?? "",
                                 DateKey = targetDate.ToString("yyyy-MM-dd")
                             });
                         }
