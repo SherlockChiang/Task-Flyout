@@ -44,6 +44,10 @@ namespace Task_Flyout
         private int _lastRegionHeight = int.MinValue;
         private int _lastRegionRadius = int.MinValue;
         private IntPtr _lastInsertAfter = IntPtr.Zero;
+        private DateTime _fastReparentPollingUntilUtc = DateTime.MinValue;
+        private static readonly TimeSpan NormalReparentInterval = TimeSpan.FromSeconds(8);
+        private static readonly TimeSpan FastReparentInterval = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan FastReparentDuration = TimeSpan.FromSeconds(20);
 
         #region P/Invoke
 
@@ -199,7 +203,7 @@ namespace Task_Flyout
             _refreshTimer.Tick += async (s, e) => await RefreshWeatherAsync();
             _refreshTimer.Start();
 
-            _reparentTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            _reparentTimer = new DispatcherTimer { Interval = NormalReparentInterval };
             _reparentTimer.Tick += ReparentTimer_Tick;
             _reparentTimer.Start();
 
@@ -235,7 +239,11 @@ namespace Task_Flyout
         {
             try
             {
-                if (_userHidden) return;
+                if (_userHidden)
+                {
+                    _reparentTimer.Stop();
+                    return;
+                }
 
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
@@ -271,6 +279,30 @@ namespace Task_Flyout
                 _taskbarHwnd = IntPtr.Zero;
                 _isParented = false;
             }
+            finally
+            {
+                UpdateReparentPollingInterval();
+            }
+        }
+
+        private void UseFastReparentPolling()
+        {
+            if (_userHidden) return;
+
+            _fastReparentPollingUntilUtc = DateTime.UtcNow.Add(FastReparentDuration);
+            UpdateReparentPollingInterval();
+            if (!_reparentTimer.IsEnabled)
+                _reparentTimer.Start();
+        }
+
+        private void UpdateReparentPollingInterval()
+        {
+            var desired = DateTime.UtcNow < _fastReparentPollingUntilUtc
+                ? FastReparentInterval
+                : NormalReparentInterval;
+
+            if (_reparentTimer.Interval != desired)
+                _reparentTimer.Interval = desired;
         }
 
         private void AttachToTaskbar()
@@ -312,6 +344,7 @@ namespace Task_Flyout
                 {
                     ApplyWindowsTheme();
                     PositionOnTaskbar();
+                    UseFastReparentPolling();
                 });
             }
 
@@ -323,7 +356,7 @@ namespace Task_Flyout
                     if (parent == IntPtr.Zero || parent != _taskbarHwnd)
                     {
                         _isParented = false;
-                        _reparentTimer?.Start();
+                        UseFastReparentPolling();
                     }
                 });
             }
@@ -382,7 +415,10 @@ namespace Task_Flyout
             int pillWidth = (int)(_preferredLogicalWidth * scaleFactor);
             if (pillWidth < (int)(80 * scaleFactor)) pillWidth = (int)(80 * scaleFactor);
 
+            IntPtr previousFluentFlyout = _fluentFlyoutHwnd;
             int widgetsOffset = GetTaskbarWidgetsOffset(hWnd, tbRect);
+            if (previousFluentFlyout != _fluentFlyoutHwnd)
+                UseFastReparentPolling();
 
             int gap = (int)(6 * scaleFactor);
             int x = widgetsOffset + (widgetsOffset > 0 ? gap : 0);
@@ -511,6 +547,7 @@ namespace Task_Flyout
             {
                 UpdateMediaPlaybackState(sender);
                 PositionOnTaskbar();
+                UseFastReparentPolling();
             });
 
         private void UpdateCurrentMediaSession()
@@ -526,6 +563,7 @@ namespace Task_Flyout
 
             UpdateMediaPlaybackState(_mediaSession);
             PositionOnTaskbar();
+            UseFastReparentPolling();
         }
 
         private void UpdateMediaPlaybackState(GlobalSystemMediaTransportControlsSession? session)
@@ -1039,6 +1077,7 @@ namespace Task_Flyout
                 }
 
                 ApplyWindowsTheme();
+                UseFastReparentPolling();
 
                 if (!_isParented)
                     AttachToTaskbar();
@@ -1063,6 +1102,7 @@ namespace Task_Flyout
                 if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
 
                 ShowWindow(hWnd, 0); // SW_HIDE
+                _reparentTimer.Stop();
                 // Clear region — system releases the previous one.
                 SetWindowRgn(hWnd, IntPtr.Zero, true);
                 _currentRgn = IntPtr.Zero;
