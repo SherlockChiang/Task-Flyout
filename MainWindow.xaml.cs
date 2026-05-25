@@ -148,6 +148,11 @@ namespace Task_Flyout
             if (ContentFrame.SourcePageType != null)
                 _lastContentPageType = ContentFrame.SourcePageType;
 
+            if (ContentFrame.Content is Views.MailPage mailPage)
+                mailPage.DisposeLikeCleanup();
+            else if (ContentFrame.Content is Views.RssPage rssPage)
+                rssPage.DisposeLikeCleanup();
+
             ContentFrame.BackStack.Clear();
             ContentFrame.Content = null;
             MainNav.SelectedItem = null;

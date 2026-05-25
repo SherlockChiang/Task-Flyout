@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.Web.WebView2.Core;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -43,8 +44,47 @@ namespace Task_Flyout.Views
         {
             InitializeComponent();
             Loaded += RssPage_Loaded;
-            Unloaded += (_, _) => RssArticleWebView.Close();
+            Unloaded += (_, _) => DisposeLikeCleanup();
             ActualThemeChanged += RssPage_ActualThemeChanged;
+        }
+
+        public void DisposeLikeCleanup()
+        {
+            _selectedArticle = null;
+            _selectedSubscriptionId = null;
+            _selectedFolderId = null;
+            _loadedCount = 0;
+            _hasMore = true;
+            _isLoading = false;
+
+            if (_articleScrollViewer != null)
+            {
+                _articleScrollViewer.ViewChanged -= ArticleScrollViewer_ViewChanged;
+                _articleScrollViewer = null;
+            }
+
+            try
+            {
+                if (RssArticleWebView.CoreWebView2 != null)
+                {
+                    RssArticleWebView.CoreWebView2.NavigationStarting -= RssArticle_NavigationStarting;
+                    RssArticleWebView.CoreWebView2.NavigationCompleted -= RssArticle_NavigationCompleted;
+                    RssArticleWebView.CoreWebView2.NewWindowRequested -= RssArticle_NewWindowRequested;
+                    RssArticleWebView.NavigateToString("<html></html>");
+                }
+                RssArticleWebView.Close();
+            }
+            catch { }
+
+            _rssWebViewConfigured = false;
+            _isInternalArticleNavigation = false;
+            Articles.Clear();
+            Subscriptions.Clear();
+            Folders.Clear();
+            _folderNodes.Clear();
+            _subscriptionNodes.Clear();
+            _allNode = null;
+            RssTree?.RootNodes.Clear();
         }
 
         private async void RssPage_Loaded(object sender, RoutedEventArgs e)
@@ -681,24 +721,9 @@ namespace Task_Flyout.Views
                     settings.AreDevToolsEnabled = false;
                     settings.IsStatusBarEnabled = false;
                     settings.IsPinchZoomEnabled = true;
-                    RssArticleWebView.CoreWebView2.NavigationStarting += (_, args) =>
-                    {
-                        if (_isInternalArticleNavigation)
-                            return;
-
-                        if (args.Uri == "about:blank") return;
-                        args.Cancel = true;
-                        OpenSafeExternalUri(args.Uri);
-                    };
-                    RssArticleWebView.CoreWebView2.NavigationCompleted += (_, _) =>
-                    {
-                        _isInternalArticleNavigation = false;
-                    };
-                    RssArticleWebView.CoreWebView2.NewWindowRequested += (_, args) =>
-                    {
-                        args.Handled = true;
-                        OpenSafeExternalUri(args.Uri);
-                    };
+                    RssArticleWebView.CoreWebView2.NavigationStarting += RssArticle_NavigationStarting;
+                    RssArticleWebView.CoreWebView2.NavigationCompleted += RssArticle_NavigationCompleted;
+                    RssArticleWebView.CoreWebView2.NewWindowRequested += RssArticle_NewWindowRequested;
                 }
 
                 _isInternalArticleNavigation = true;
@@ -709,6 +734,27 @@ namespace Task_Flyout.Views
                 LogRssError(ex);
                 ArticleListSubtitle.Text = string.Format(_loader.GetString("TextArticleRenderFailed") ?? "Article render failed: {0}", ex.Message);
             }
+        }
+
+        private void RssArticle_NavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
+        {
+            if (_isInternalArticleNavigation)
+                return;
+
+            if (args.Uri == "about:blank") return;
+            args.Cancel = true;
+            OpenSafeExternalUri(args.Uri);
+        }
+
+        private void RssArticle_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs args)
+        {
+            _isInternalArticleNavigation = false;
+        }
+
+        private void RssArticle_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs args)
+        {
+            args.Handled = true;
+            OpenSafeExternalUri(args.Uri);
         }
 
         private void BackToArticleListButton_Click(object sender, RoutedEventArgs e)

@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.Web.WebView2.Core;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -72,14 +73,38 @@ namespace Task_Flyout.Views
 
         private void MailPage_Unloaded(object sender, RoutedEventArgs e)
         {
+            DisposeLikeCleanup();
+        }
+
+        public void DisposeLikeCleanup()
+        {
             ReleaseMessageBodies();
+            _selectedItem = null;
+            _selectedAccount = null;
+            _selectedFolder = null;
+            _selectedAccountForRemoval = null;
+            _refreshAccountsTask = null;
+
             try
             {
                 if (DetailHtmlView.CoreWebView2 != null)
+                {
+                    DetailHtmlView.CoreWebView2.NavigationStarting -= MailHtml_NavigationStarting;
+                    DetailHtmlView.CoreWebView2.NavigationCompleted -= MailHtml_NavigationCompleted;
+                    DetailHtmlView.CoreWebView2.NewWindowRequested -= MailHtml_NewWindowRequested;
                     DetailHtmlView.NavigateToString("<html></html>");
+                }
                 DetailHtmlView.Close();
             }
             catch { }
+
+            _webView2Configured = false;
+            _isInternalMailHtmlNavigation = false;
+            MailListView.ItemsSource = null;
+            _items.Clear();
+            _accountsById.Clear();
+            _accountNodes.Clear();
+            _folderNodes.Clear();
         }
 
         private async void MailPage_Loaded(object sender, RoutedEventArgs e)
@@ -837,26 +862,9 @@ namespace Task_Flyout.Views
                             settings.IsStatusBarEnabled = false;
                             settings.IsPinchZoomEnabled = false;
                             settings.IsSwipeNavigationEnabled = false;
-                            coreWebView.NavigationStarting += (_, args) =>
-                            {
-                                if (_isInternalMailHtmlNavigation)
-                                    return;
-
-                                if (!args.IsRedirected && args.Uri != "about:blank")
-                                {
-                                    args.Cancel = true;
-                                    OpenSafeExternalUri(args.Uri);
-                                }
-                            };
-                            coreWebView.NavigationCompleted += (_, _) =>
-                            {
-                                _isInternalMailHtmlNavigation = false;
-                            };
-                            coreWebView.NewWindowRequested += (_, args) =>
-                            {
-                                args.Handled = true;
-                                OpenSafeExternalUri(args.Uri);
-                            };
+                            coreWebView.NavigationStarting += MailHtml_NavigationStarting;
+                            coreWebView.NavigationCompleted += MailHtml_NavigationCompleted;
+                            coreWebView.NewWindowRequested += MailHtml_NewWindowRequested;
                         }
                         if (_selectedItem?.Id != itemId) return;
                         _isInternalMailHtmlNavigation = true;
@@ -872,6 +880,29 @@ namespace Task_Flyout.Views
             }
 
             ShowPlainTextMailBody(item);
+        }
+
+        private void MailHtml_NavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
+        {
+            if (_isInternalMailHtmlNavigation)
+                return;
+
+            if (!args.IsRedirected && args.Uri != "about:blank")
+            {
+                args.Cancel = true;
+                OpenSafeExternalUri(args.Uri);
+            }
+        }
+
+        private void MailHtml_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs args)
+        {
+            _isInternalMailHtmlNavigation = false;
+        }
+
+        private void MailHtml_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs args)
+        {
+            args.Handled = true;
+            OpenSafeExternalUri(args.Uri);
         }
 
         private static void EnsureMailWebViewCachePathConfigured()
