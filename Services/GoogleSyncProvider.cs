@@ -228,7 +228,6 @@ namespace Task_Flyout.Services
                         DateTime taskDate = DateTime.Today;
                         if (!string.IsNullOrEmpty(t.Due) && DateTime.TryParse(t.Due, out var dueTime)) taskDate = dueTime.Date;
                         else if (isDone && !string.IsNullOrEmpty(t.Completed) && DateTime.TryParse(t.Completed, out var compTime)) taskDate = compTime.Date;
-                        else if (isDone) continue;
 
                         if (!IsInDateRange(taskDate, min, max))
                             continue;

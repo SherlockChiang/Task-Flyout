@@ -288,10 +288,6 @@ namespace Task_Flyout.Services
                                 DateTime.TryParse(task.CompletedDateTime.DateTime, out targetDate);
                                 targetDate = targetDate.ToLocalTime();
                             }
-                            else if (task.Status == Microsoft.Graph.Models.TaskStatus.Completed)
-                            {
-                                continue;
-                            }
 
                             if (!IsInDateRange(targetDate, startDate, endDate))
                                 continue;
