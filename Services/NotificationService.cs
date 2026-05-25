@@ -182,10 +182,8 @@ namespace Task_Flyout.Services
 
             try
             {
-                var json = LocalSqliteStore.ReadProtectedText("calendar", "local_cache_winui3");
-                if (string.IsNullOrWhiteSpace(json)) return _cachedItems;
-                var cache = System.Text.Json.JsonSerializer.Deserialize(json, AppJsonContext.Default.AppCache);
-                _cachedItems = cache?.DayItems;
+                var cache = _syncManager.GetLocalCache();
+                _cachedItems = cache.DayItems;
                 _cacheReadTime = DateTime.Now;
                 return _cachedItems;
             }

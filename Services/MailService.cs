@@ -1434,8 +1434,18 @@ namespace Task_Flyout.Services
             EnsurePersistentCacheLoaded();
             if (_persistentCache == null) return;
 
-            _persistentCache.Messages[key] = messages;
+            _persistentCache.Messages[key] = StripBodies(messages);
             SavePersistentCache();
+        }
+
+        private static List<MailItem> StripBodies(List<MailItem> messages)
+        {
+            foreach (var m in messages)
+            {
+                m.BodyText = "";
+                m.HtmlBody = "";
+            }
+            return messages;
         }
 
         private void UpdatePersistentMessageBody(MailItem item)
@@ -1461,6 +1471,7 @@ namespace Task_Flyout.Services
             EnsurePersistentCacheLoaded();
             if (_persistentCache == null || newMessages.Count == 0) return;
 
+            StripBodies(newMessages);
             int pageSize = PageSize;
             foreach (bool unreadOnly in new[] { true, false })
             {
