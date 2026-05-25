@@ -848,9 +848,11 @@ pre, code { white-space: pre-wrap; overflow-wrap: anywhere; }
             value = Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*/?\s*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             value = Regex.Replace(value, @"\s+on\w+\s*=\s*(['""]).*?\1", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             value = Regex.Replace(value, @"\s+on\w+\s*=\s*[^\s>]+", "", RegexOptions.IgnoreCase);
-            value = Regex.Replace(value, @"(href|src|action|formaction)\s*=\s*(['""])\s*(javascript|vbscript):.*?\2", "$1=\"#\"", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            value = Regex.Replace(value, @"(href|src|action|formaction)\s*=\s*(javascript|vbscript):[^\s>]+", "$1=\"#\"", RegexOptions.IgnoreCase);
-            value = Regex.Replace(value, @"style\s*=\s*(['""])[^'""]*\b(expression|-moz-binding|behavior)\b[^'""]*\1", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            value = Regex.Replace(value, @"(href|src|action|formaction|data)\s*=\s*(['""])\s*(javascript|vbscript|data):.*?\2", "$1=\"#\"", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            value = Regex.Replace(value, @"(href|src|action|formaction|data)\s*=\s*(javascript|vbscript|data):[^\s>]+", "$1=\"#\"", RegexOptions.IgnoreCase);
+            value = Regex.Replace(value, @"\s(src|srcset|background)\s*=\s*(['""])\s*https?://.*?\2", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            value = Regex.Replace(value, @"\s(src|srcset|background)\s*=\s*https?://[^\s>]+", "", RegexOptions.IgnoreCase);
+            value = Regex.Replace(value, @"style\s*=\s*(['""])[^'""]*\b(expression|url\s*\(|-moz-binding|behavior)\b[^'""]*\1", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             return value;
         }
 
