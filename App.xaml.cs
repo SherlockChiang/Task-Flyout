@@ -40,6 +40,7 @@ namespace Task_Flyout
         public NotificationService NotificationService { get; private set; } = null!;
         public WeatherService WeatherService { get; } = new WeatherService();
         public MailService MailService { get; } = new MailService();
+        public MemoryDiagnosticsService MemoryDiagnostics { get; } = new MemoryDiagnosticsService();
 
         public App()
         {
@@ -76,6 +77,7 @@ namespace Task_Flyout
             if (NotificationService.IsEnabled)
                 NotificationService.StartPeriodicCheck();
             MailService.NewMailArrived += MailService_NewMailArrived;
+            MemoryDiagnostics.StartIfEnabled();
 
             _trayIcon = (H.NotifyIcon.TaskbarIcon)Resources["MyTrayIcon"];
             _uiSettings = new UISettings();

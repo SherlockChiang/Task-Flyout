@@ -125,6 +125,22 @@ namespace Task_Flyout
             ContentFrame.Navigate(pageType);
         }
 
+        public string GetDiagnosticsCurrentPageName()
+        {
+            if (ContentFrame.Content == null)
+                return _lastContentPageType.Name + " (released)";
+
+            return ContentFrame.Content.GetType().Name;
+        }
+
+        public bool HasDiagnosticsWebView2()
+        {
+            if (ContentFrame.Content is not DependencyObject content)
+                return false;
+
+            return ContainsWebView2(content);
+        }
+
         private void ReleaseContentForBackground()
         {
             if (ContentFrame.Content == null) return;
@@ -136,6 +152,20 @@ namespace Task_Flyout
             ContentFrame.Content = null;
             MainNav.SelectedItem = null;
             MainNav.IsBackEnabled = false;
+        }
+
+        private static bool ContainsWebView2(DependencyObject root)
+        {
+            if (root is WebView2) return true;
+
+            var childCount = VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < childCount; i++)
+            {
+                if (ContainsWebView2(VisualTreeHelper.GetChild(root, i)))
+                    return true;
+            }
+
+            return false;
         }
 
         private Services.AccountManager? GetAccountManager()
