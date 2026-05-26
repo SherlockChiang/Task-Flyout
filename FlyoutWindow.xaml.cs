@@ -1003,7 +1003,17 @@ namespace Task_Flyout
 
         private void ChkAllDay_Checked(object sender, RoutedEventArgs e) { if (TimePanel != null) TimePanel.Visibility = Visibility.Collapsed; }
         private void ChkAllDay_Unchecked(object sender, RoutedEventArgs e) { if (TimePanel != null) TimePanel.Visibility = Visibility.Visible; }
-        private async void BtnRefresh_Click(object sender, RoutedEventArgs e) => await SyncAllDataAsync(silent: false, fullSync: true);
+        private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                await SyncAllDataAsync(silent: false, fullSync: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Manual refresh failed: {ex}");
+            }
+        }
 
         public void ReloadFilters()
         {
