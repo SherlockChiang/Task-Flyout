@@ -23,43 +23,48 @@ namespace Task_Flyout.Services
         public string Url { get; set; } = "";
         public string FolderId { get; set; } = "";
         public string ImageUrl { get; set; } = "";
-        public string LocalImagePath { get; set; } = "";
+        private string _localImagePath = "";
+        public string LocalImagePath
+        {
+            get => _localImagePath;
+            set
+            {
+                if (_localImagePath == value) return;
+                _localImagePath = value ?? "";
+                _imageCache = null;
+                _imageCacheStamped = false;
+            }
+        }
         public DateTimeOffset LastFetchedAt { get; set; }
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        private Microsoft.UI.Xaml.Media.ImageSource? _imageCache;
+        [System.Text.Json.Serialization.JsonIgnore]
+        private bool _imageCacheStamped;
+
         public Microsoft.UI.Xaml.Media.ImageSource? ImageSource
         {
             get
             {
+                if (_imageCacheStamped) return _imageCache;
+                _imageCacheStamped = true;
                 try
                 {
-                    if (!string.IsNullOrWhiteSpace(LocalImagePath) && File.Exists(LocalImagePath))
+                    if (!string.IsNullOrWhiteSpace(_localImagePath) && File.Exists(_localImagePath))
                     {
-                        return new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(LocalImagePath))
+                        _imageCache = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(_localImagePath))
                         {
                             DecodePixelWidth = 32
                         };
                     }
                 }
-                catch { }
-                return null;
+                catch { _imageCache = null; }
+                return _imageCache;
             }
         }
 
-        public Microsoft.UI.Xaml.Visibility HasImage
-        {
-            get
-            {
-                try
-                {
-                    return !string.IsNullOrWhiteSpace(LocalImagePath) && File.Exists(LocalImagePath)
-                        ? Microsoft.UI.Xaml.Visibility.Visible
-                        : Microsoft.UI.Xaml.Visibility.Collapsed;
-                }
-                catch
-                {
-                    return Microsoft.UI.Xaml.Visibility.Collapsed;
-                }
-            }
-        }
+        public Microsoft.UI.Xaml.Visibility HasImage =>
+            ImageSource != null ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
     }
 
     public class RssFolder
@@ -79,43 +84,50 @@ namespace Task_Flyout.Services
         public string Summary { get; set; } = "";
         public string HtmlContent { get; set; } = "";
         public string ImageUrl { get; set; } = "";
-        public string LocalImagePath { get; set; } = "";
+        private string _localImagePath = "";
+        public string LocalImagePath
+        {
+            get => _localImagePath;
+            set
+            {
+                if (_localImagePath == value) return;
+                _localImagePath = value ?? "";
+                _imageCache = null;
+                _imageCacheStamped = false;
+            }
+        }
         public DateTimeOffset PublishedAt { get; set; }
         public string PublishedText => PublishedAt == default ? "" : PublishedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        private Microsoft.UI.Xaml.Media.ImageSource? _imageCache;
+        [System.Text.Json.Serialization.JsonIgnore]
+        private bool _imageCacheStamped;
+
         public Microsoft.UI.Xaml.Media.ImageSource? ImageSource
         {
             get
             {
+                if (_imageCacheStamped) return _imageCache;
+                _imageCacheStamped = true;
                 try
                 {
-                    if (!string.IsNullOrWhiteSpace(LocalImagePath) && File.Exists(LocalImagePath))
+                    if (!string.IsNullOrWhiteSpace(_localImagePath) && File.Exists(_localImagePath))
                     {
-                        return new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(LocalImagePath))
+                        _imageCache = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(_localImagePath))
                         {
                             DecodePixelWidth = 120
                         };
                     }
                 }
-                catch { }
-                return null;
+                catch { _imageCache = null; }
+                return _imageCache;
             }
         }
-        public Microsoft.UI.Xaml.Visibility HasImage
-        {
-            get
-            {
-                try
-                {
-                    return !string.IsNullOrWhiteSpace(LocalImagePath) && File.Exists(LocalImagePath)
-                        ? Microsoft.UI.Xaml.Visibility.Visible
-                        : Microsoft.UI.Xaml.Visibility.Collapsed;
-                }
-                catch
-                {
-                    return Microsoft.UI.Xaml.Visibility.Collapsed;
-                }
-            }
-        }
+
+        public Microsoft.UI.Xaml.Visibility HasImage =>
+            ImageSource != null ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
+
         public Microsoft.UI.Xaml.Visibility HasSummary => string.IsNullOrWhiteSpace(Summary) ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
     }
 
