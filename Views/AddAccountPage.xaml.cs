@@ -104,7 +104,7 @@ namespace Task_Flyout.Views
                 // Refresh the MainWindow pane
                 if (App.MyMainWindow is MainWindow mainWin)
                 {
-                    mainWin.RefreshAccountList();
+                    _ = mainWin.RefreshAccountListAsync();
 
                     // Navigate back to calendar
                     var frame = mainWin.Content is Grid grid

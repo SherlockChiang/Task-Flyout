@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Task_Flyout.Models;
 using Task_Flyout.Views;
 using Windows.Storage;
@@ -30,7 +31,7 @@ namespace Task_Flyout
 
             ContentFrame.Navigated += ContentFrame_Navigated;
 
-            RefreshWeatherNavIconAsync();
+            _ = RefreshWeatherNavIconAsync();
 
             var calendarItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault();
             if (calendarItem != null) MainNav.SelectedItem = calendarItem;
@@ -179,22 +180,29 @@ namespace Task_Flyout
             return null;
         }
 
-        public async void RefreshAccountList()
+        public async Task RefreshAccountListAsync()
         {
-            if (ContentFrame.Content is CalendarPage page)
+            try
             {
-                page.RefreshAccountList();
-                return;
-            }
+                if (ContentFrame.Content is CalendarPage page)
+                {
+                    page.RefreshAccountList();
+                    return;
+                }
 
-            if (ContentFrame.Content is TasksPage tasksPage)
+                if (ContentFrame.Content is TasksPage tasksPage)
+                {
+                    tasksPage.RefreshAccountList();
+                    return;
+                }
+
+                if (App.Current is App app)
+                    await app.SyncManager.SyncAllCalendarsAsync();
+            }
+            catch (Exception ex)
             {
-                tasksPage.RefreshAccountList();
-                return;
+                System.Diagnostics.Debug.WriteLine($"RefreshAccountListAsync failed: {ex.Message}");
             }
-
-            if (App.Current is App app)
-                await app.SyncManager.SyncAllCalendarsAsync();
         }
 
         private void BtnAddAccount_Click(object sender, RoutedEventArgs e)
@@ -221,7 +229,7 @@ namespace Task_Flyout
                 {
                     var mgr = GetAccountManager();
                     mgr?.RemoveAccount(providerName);
-                    RefreshAccountList();
+                    _ = RefreshAccountListAsync();
 
                     if (ContentFrame.Content is CalendarPage page) page.ForceSync();
                 }
@@ -376,19 +384,26 @@ namespace Task_Flyout
 
         private const string FluentIconsFont = "ms-appx:///Assets/FluentSystemIcons-Filled.ttf#FluentSystemIcons-Filled";
 
-        public async void RefreshWeatherNavIconAsync()
+        public async Task RefreshWeatherNavIconAsync()
         {
-            var weatherService = (App.Current as App)?.WeatherService;
-            if (weatherService == null || !weatherService.IsEnabled) return;
-
-            var info = await weatherService.GetWeatherAsync();
-            if (info == null) return;
-
-            DispatcherQueue.TryEnqueue(() =>
+            try
             {
-                WeatherNavIcon.Glyph = WeatherCodeToFluentGlyph(info.RawWeatherCode);
-                WeatherNavIcon.FontFamily = new FontFamily(FluentIconsFont);
-            });
+                var weatherService = (App.Current as App)?.WeatherService;
+                if (weatherService == null || !weatherService.IsEnabled) return;
+
+                var info = await weatherService.GetWeatherAsync();
+                if (info == null) return;
+
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    WeatherNavIcon.Glyph = WeatherCodeToFluentGlyph(info.RawWeatherCode);
+                    WeatherNavIcon.FontFamily = new FontFamily(FluentIconsFont);
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"RefreshWeatherNavIconAsync failed: {ex.Message}");
+            }
         }
 
         private static string WeatherCodeToFluentGlyph(int code)
