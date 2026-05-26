@@ -48,15 +48,15 @@ namespace Task_Flyout
             this.UnhandledException += (sender, e) =>
             {
                 e.Handled = true;
-                string errorMsg = $"Fatal Error! Please contact us! \nTime：{DateTime.Now:yyyy-MM-dd HH:mm:ss}\nError：{e.Exception.Message}\n\nStack:\n{e.Exception.StackTrace}";
-
-                string logDir = AppDataPathHelper.EnsureDirectory(AppDataPathHelper.ResolveRoaming("Logs"));
-                string logPath = AppDataPathHelper.ResolveRoaming("Logs", "TaskFlyout_CrashLog.txt");
+                string errorMsg = $"Fatal Error! Please contact us! \nTime：{DateTime.Now:yyyy-MM-dd HH:mm:ss}\nError：{e.Exception.Message}\n\nStack:\n{e.Exception.StackTrace}\n";
 
                 try
                 {
-                    System.IO.Directory.CreateDirectory(logDir);
+                    string logDir = AppDataPathHelper.EnsureDirectory(AppDataPathHelper.ResolveRoaming("Logs"));
+                    string fileName = $"TaskFlyout_CrashLog_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+                    string logPath = AppDataPathHelper.ResolveRoaming("Logs", fileName);
                     System.IO.File.WriteAllText(logPath, errorMsg);
+                    PruneOldCrashLogs(logDir);
                 }
                 catch { }
             };
@@ -342,6 +342,21 @@ namespace Task_Flyout
             {
                 MyMainWindow.Activate();
             }
+        }
+
+        private static void PruneOldCrashLogs(string logDir)
+        {
+            try
+            {
+                var files = System.IO.Directory.GetFiles(logDir, "TaskFlyout_CrashLog_*.txt");
+                if (files.Length <= 10) return;
+
+                foreach (var path in files.OrderByDescending(p => p).Skip(10))
+                {
+                    try { System.IO.File.Delete(path); } catch { }
+                }
+            }
+            catch { }
         }
 
         private void ExitAppInternal()
