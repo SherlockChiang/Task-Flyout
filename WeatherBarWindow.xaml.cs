@@ -35,7 +35,6 @@ namespace Task_Flyout
         private int _mediaSessionInitializing;
         private GlobalSystemMediaTransportControlsSessionManager? _mediaSessionManager;
         private GlobalSystemMediaTransportControlsSession? _mediaSession;
-        private DesktopAcrylicBackdrop? _acrylicBackdrop;
         private int _lastBarX = int.MinValue;
         private int _lastBarY = int.MinValue;
         private int _lastBarWidth = int.MinValue;
@@ -229,7 +228,6 @@ namespace Task_Flyout
                     _mediaSessionManager = null;
                 }
                 SystemBackdrop = null;
-                _acrylicBackdrop = null;
             };
         }
 
@@ -800,21 +798,21 @@ namespace Task_Flyout
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 if (transparent)
                 {
+                    // Reparented child of Shell_TrayWnd: SystemBackdrop (acrylic/mica)
+                    // does NOT render on child windows. Fall back to a layered window
+                    // color-key, painting the bar background with a magic colour that
+                    // DWM turns into true transparency so the real taskbar shows through.
+                    SystemBackdrop = null;
+
                     int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-                    exStyle &= ~WS_EX_LAYERED;
+                    exStyle |= WS_EX_LAYERED;
                     SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
+                    SetLayeredWindowAttributes(hWnd, TransparencyKeyColorRef, 255, LWA_COLORKEY | LWA_ALPHA);
 
-                    _acrylicBackdrop ??= new DesktopAcrylicBackdrop();
-                    if (!ReferenceEquals(SystemBackdrop, _acrylicBackdrop))
-                        SystemBackdrop = _acrylicBackdrop;
-
-                    // Let the Thin acrylic show through — no opaque overlay at rest.
                     if (mainBorder != null)
-                        mainBorder.Background = new SolidColorBrush(Colors.Transparent);
+                        mainBorder.Background = TransparencyKeyBrush;
                     if (topBorder != null)
-                        topBorder.BorderBrush = new SolidColorBrush(_isLightTheme
-                            ? Color.FromArgb(28, 255, 255, 255)
-                            : Color.FromArgb(32, 255, 255, 255));
+                        topBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
                     return;
                 }
 
@@ -874,16 +872,25 @@ namespace Task_Flyout
             ApplyWindowsTheme(); // restore resting Mica background + border
         }
 
+        // Magic colour used as a layered-window color key. R=1, G=0, B=1 is chosen because
+        // it almost never appears in real anti-aliased text/icons, and any AA fringe will
+        // blend with neighbouring colours rather than match exactly.
+        private static readonly Color TransparencyKeyColor = Color.FromArgb(255, 1, 0, 1);
+        // COLORREF is 0x00BBGGRR
+        private const uint TransparencyKeyColorRef = 0x00010001;
+        private static readonly Brush TransparencyKeyBrush = new SolidColorBrush(TransparencyKeyColor);
+
         private static Brush CreateTaskbarMaterialBrush(bool isLightTheme, bool hovered = false)
         {
-            // Resting state defers to the Thin acrylic backdrop (no overlay). Only
-            // hover paints a subtle tint to give pointer feedback.
+            // In layered-color-key mode the resting bar is fully see-through (painted with
+            // the magic color and keyed out by DWM). Hover paints a fully opaque tint so
+            // we don't blend with the key color (which would leave a pinkish fringe).
             if (!hovered)
-                return new SolidColorBrush(Colors.Transparent);
+                return TransparencyKeyBrush;
 
             return new SolidColorBrush(isLightTheme
-                ? Color.FromArgb(48, 255, 255, 255)
-                : Color.FromArgb(56, 255, 255, 255));
+                ? Color.FromArgb(255, 232, 232, 234)
+                : Color.FromArgb(255, 50, 50, 55));
         }
 
         private static string FormatBarLocation(string city)
