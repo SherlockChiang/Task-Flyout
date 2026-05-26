@@ -35,7 +35,9 @@ namespace Task_Flyout
         private int _mediaSessionInitializing;
         private GlobalSystemMediaTransportControlsSessionManager? _mediaSessionManager;
         private GlobalSystemMediaTransportControlsSession? _mediaSession;
-        private DesktopAcrylicBackdrop? _acrylicBackdrop;
+        private DesktopAcrylicController? _acrylicController;
+        private SystemBackdropConfiguration? _backdropConfig;
+        private object? _dispatcherQueueController;
         private bool _inTransparentTopLevelMode;
         private int _lastBarX = int.MinValue;
         private int _lastBarY = int.MinValue;
@@ -138,6 +140,19 @@ namespace Task_Flyout
         // 用一个极不可能出现的颜色作为透明 key（Win32 COLORREF 是 BGR）
         private const uint TRANSPARENCY_KEY = 0x00010201; // R=1 G=2 B=1
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct DispatcherQueueOptions
+        {
+            internal int dwSize;
+            internal int threadType;
+            internal int apartmentType;
+        }
+
+        [DllImport("CoreMessaging.dll")]
+        private static extern int CreateDispatcherQueueController(
+            [In] DispatcherQueueOptions options,
+            [In, Out, MarshalAs(UnmanagedType.IUnknown)] ref object? dispatcherQueueController);
+
         [DllImport("gdi32.dll")]
         private static extern IntPtr CreateRoundRectRgn(int x1, int y1, int x2, int y2, int cx, int cy);
 
@@ -232,7 +247,7 @@ namespace Task_Flyout
                     _mediaSessionManager = null;
                 }
                 SystemBackdrop = null;
-                _acrylicBackdrop = null;
+                DisposeManagedAcrylicBackdrop();
             };
         }
 
@@ -857,16 +872,16 @@ namespace Task_Flyout
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 if (transparent)
                 {
-                    // Top-level window (not reparented into Shell_TrayWnd) — SystemBackdrop
-                    // can render here. Drop any layered/color-key styling left over from a
-                    // previous mode and attach DesktopAcrylicBackdrop.
                     int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
                     exStyle &= ~WS_EX_LAYERED;
                     SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
 
-                    _acrylicBackdrop ??= new DesktopAcrylicBackdrop();
-                    if (!ReferenceEquals(SystemBackdrop, _acrylicBackdrop))
-                        SystemBackdrop = _acrylicBackdrop;
+                    // Manually managed DesktopAcrylicController so we can force
+                    // IsInputActive = true (the bar never receives activation, otherwise
+                    // the XAML helper paints the dim "inactive" fallback) and pick the
+                    // thinner acrylic variant for more see-through.
+                    SystemBackdrop = null;
+                    EnsureManagedAcrylicBackdrop();
 
                     if (mainBorder != null)
                         mainBorder.Background = new SolidColorBrush(Colors.Transparent);
@@ -876,6 +891,8 @@ namespace Task_Flyout
                             : Color.FromArgb(32, 255, 255, 255));
                     return;
                 }
+
+                DisposeManagedAcrylicBackdrop();
 
                 int opaqueExStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
                 opaqueExStyle |= WS_EX_LAYERED;
@@ -931,6 +948,73 @@ namespace Task_Flyout
         private void MainBorder_PointerExited(object sender, PointerRoutedEventArgs e)
         {
             ApplyWindowsTheme(); // restore resting Mica background + border
+        }
+
+        private void EnsureDispatcherQueueController()
+        {
+            if (Windows.System.DispatcherQueue.GetForCurrentThread() != null)
+                return;
+
+            if (_dispatcherQueueController != null)
+                return;
+
+            DispatcherQueueOptions options;
+            options.dwSize = Marshal.SizeOf(typeof(DispatcherQueueOptions));
+            options.threadType = 2;     // DQTYPE_THREAD_CURRENT
+            options.apartmentType = 2;  // DQTAT_COM_STA
+
+            object? controller = null;
+            CreateDispatcherQueueController(options, ref controller);
+            _dispatcherQueueController = controller;
+        }
+
+        private void EnsureManagedAcrylicBackdrop()
+        {
+            try
+            {
+                if (!DesktopAcrylicController.IsSupported())
+                    return;
+
+                EnsureDispatcherQueueController();
+
+                if (_backdropConfig == null)
+                    _backdropConfig = new SystemBackdropConfiguration();
+
+                _backdropConfig.IsInputActive = true; // force "active" variant
+                _backdropConfig.Theme = _isLightTheme
+                    ? SystemBackdropTheme.Light
+                    : SystemBackdropTheme.Dark;
+
+                if (_acrylicController == null)
+                {
+                    _acrylicController = new DesktopAcrylicController
+                    {
+                        Kind = DesktopAcrylicKind.Thin,
+                    };
+                    _acrylicController.AddSystemBackdropTarget(
+                        WinRT.CastExtensions.As<Microsoft.UI.Composition.ICompositionSupportsSystemBackdrop>(this));
+                    _acrylicController.SetSystemBackdropConfiguration(_backdropConfig);
+                }
+                else
+                {
+                    _acrylicController.Kind = DesktopAcrylicKind.Thin;
+                }
+            }
+            catch
+            {
+                DisposeManagedAcrylicBackdrop();
+            }
+        }
+
+        private void DisposeManagedAcrylicBackdrop()
+        {
+            try
+            {
+                _acrylicController?.Dispose();
+            }
+            catch { }
+            _acrylicController = null;
+            _backdropConfig = null;
         }
 
         private static Brush CreateTaskbarMaterialBrush(bool isLightTheme, bool hovered = false)
