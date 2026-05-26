@@ -773,10 +773,22 @@ namespace Task_Flyout
         {
             try
             {
-                using var key = Registry.CurrentUser.OpenSubKey(
-                    @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-                var val = key?.GetValue("SystemUsesLightTheme");
-                _isLightTheme = val is int v && v == 1;
+                var configuredTheme = App.GetConfiguredTheme();
+                if (configuredTheme == ElementTheme.Light)
+                {
+                    _isLightTheme = true;
+                }
+                else if (configuredTheme == ElementTheme.Dark)
+                {
+                    _isLightTheme = false;
+                }
+                else
+                {
+                    using var key = Registry.CurrentUser.OpenSubKey(
+                        @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+                    var val = key?.GetValue("SystemUsesLightTheme");
+                    _isLightTheme = val is int v && v == 1;
+                }
 
                 var root = this.Content as FrameworkElement;
                 if (root == null) return;
