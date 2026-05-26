@@ -651,6 +651,7 @@ namespace Task_Flyout
             {
                 if (!silent)
                 {
+                    SetSyncProgressVisible(true);
                     AgendaItems.Clear();
                     AgendaItems.Add(new AgendaItem
                     {
@@ -734,8 +735,17 @@ namespace Task_Flyout
             }
             finally
             {
+                if (!silent)
+                    SetSyncProgressVisible(false);
                 _syncLock.Release();
             }
+        }
+
+        private void SetSyncProgressVisible(bool isVisible)
+        {
+            if (SyncProgress == null) return;
+            SyncProgress.IsActive = isVisible;
+            SyncProgress.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
         }
 
         public void ToggleFlyout()
