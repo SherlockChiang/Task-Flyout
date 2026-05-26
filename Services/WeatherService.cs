@@ -609,9 +609,7 @@ namespace Task_Flyout.Services
                     var aqRoot = aqDoc.RootElement;
                     if (aqRoot.TryGetProperty("hourly", out var aqHourly))
                     {
-                        // Clone to separate document since aqDoc will be disposed
-                        var aqClone = JsonDocument.Parse(aqHourly.GetRawText());
-                        var aqH = aqClone.RootElement;
+                        var aqH = aqHourly.Clone();
                         aqTimes = aqH.GetProperty("time");
                         aqAqi = aqH.GetProperty("us_aqi");
                         aqPm25 = aqH.GetProperty("pm2_5");
