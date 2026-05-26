@@ -171,6 +171,7 @@ namespace Task_Flyout.Views
             var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
             if (accountMgr == null || accountMgr.Accounts.Count == 0)
             {
+                UpdateAccountEmptyState();
                 return;
             }
 
@@ -309,6 +310,7 @@ namespace Task_Flyout.Views
             {
                 if (_syncManager == null || AccountListRepeater == null) return;
                 var mgr = _syncManager.AccountManager;
+                UpdateAccountEmptyState();
 
                 if (!ReferenceEquals(AccountListRepeater.ItemsSource, mgr.Accounts))
                     AccountListRepeater.ItemsSource = mgr.Accounts;
@@ -316,11 +318,23 @@ namespace Task_Flyout.Views
                 await _syncManager.SyncAllCalendarsAsync();
                 if (!ReferenceEquals(AccountListRepeater.ItemsSource, mgr.Accounts))
                     AccountListRepeater.ItemsSource = mgr.Accounts;
+                UpdateAccountEmptyState();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Refresh account list failed: {ex.Message}");
             }
+        }
+
+        private void UpdateAccountEmptyState()
+        {
+            if (NoAccountEmptyState == null || CalendarGrid == null) return;
+
+            var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
+            bool hasAccounts = accountMgr != null && accountMgr.Accounts.Count > 0;
+            NoAccountEmptyState.Visibility = hasAccounts ? Visibility.Collapsed : Visibility.Visible;
+            CalendarGrid.Opacity = hasAccounts ? 1.0 : 0.25;
+            CalendarGrid.IsHitTestVisible = hasAccounts;
         }
 
         private void BtnAddAccount_Click(object sender, RoutedEventArgs e)
