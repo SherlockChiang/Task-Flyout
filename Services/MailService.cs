@@ -521,9 +521,9 @@ namespace Task_Flyout.Services
                     .ToList() ?? new List<MailItem>();
             }
 
-            _messageCache[cacheKey] = new CacheEntry<List<MailItem>> { Value = messages };
+            _messageCache[cacheKey] = new CacheEntry<List<MailItem>> { Value = StripBodies(messages) };
             UpdatePersistentMessages(cacheKey, messages);
-            return messages;
+            return CloneMailItems(messages, includeBodies: false);
         }
 
         public async Task SendMailAsync(MailAccount account, string to, string subject, string body)
@@ -659,8 +659,8 @@ namespace Task_Flyout.Services
 
         public void ClearVolatileMessageBodies()
         {
-            foreach (var entry in _messageCache.Values)
-                StripBodies(entry.Value);
+            foreach (var key in _messageCache.Keys.ToList())
+                _messageCache[key].Value = StripBodies(_messageCache[key].Value);
         }
 
         private async Task SendOutlookMailAsync(MailAccount account, string to, string subject, string body)
@@ -1280,15 +1280,17 @@ namespace Task_Flyout.Services
         {
             if (_messageCache.TryGetValue(key, out var entry) && DateTimeOffset.Now - entry.CreatedAt < CacheLifetime)
             {
-                messages = entry.Value;
+                messages = CloneMailItems(entry.Value, includeBodies: false);
                 return true;
             }
 
             EnsurePersistentCacheLoaded();
             if (_persistentCache?.Messages.TryGetValue(key, out var persistentMessages) == true)
             {
-                messages = persistentMessages;
-                _messageCache[key] = new CacheEntry<List<MailItem>> { Value = messages };
+                var cachedMessages = StripBodies(persistentMessages);
+                _persistentCache.Messages[key] = cachedMessages;
+                _messageCache[key] = new CacheEntry<List<MailItem>> { Value = cachedMessages };
+                messages = CloneMailItems(cachedMessages, includeBodies: false);
                 return true;
             }
 
@@ -1451,14 +1453,7 @@ namespace Task_Flyout.Services
         }
 
         private static List<MailItem> StripBodies(List<MailItem> messages)
-        {
-            foreach (var m in messages)
-            {
-                m.BodyText = "";
-                m.HtmlBody = "";
-            }
-            return messages;
-        }
+            => CloneMailItems(messages, includeBodies: false);
 
         private void TrimPersistentCacheForMemory()
         {
@@ -1485,19 +1480,23 @@ namespace Task_Flyout.Services
             EnsurePersistentCacheLoaded();
             if (_persistentCache == null) return;
 
+            bool changed = false;
             foreach (var messages in _persistentCache.Messages.Values)
             {
                 var existing = messages.FirstOrDefault(m => m.Id == item.Id && m.AccountId == item.AccountId);
                 if (existing != null)
                 {
-                    // Don't clear body here — existing shares the same object reference
-                    // as the in-memory item. Clearing it would wipe the body that
-                    // FetchMessageBodyAsync just populated. Bodies are already stripped
-                    // in UpdatePersistentMessages/MergeMessagesIntoPersistentCache,
-                    // and TrimPersistentCacheForMemory handles periodic cleanup.
-                    break;
+                    if (!string.IsNullOrEmpty(existing.BodyText) || !string.IsNullOrEmpty(existing.HtmlBody))
+                    {
+                        existing.BodyText = "";
+                        existing.HtmlBody = "";
+                        changed = true;
+                    }
                 }
             }
+
+            if (changed)
+                SavePersistentCache();
         }
 
         private static void LimitMailBody(MailItem item)
@@ -1511,20 +1510,20 @@ namespace Task_Flyout.Services
             EnsurePersistentCacheLoaded();
             if (_persistentCache == null || newMessages.Count == 0) return;
 
-            StripBodies(newMessages);
+            var strippedNewMessages = StripBodies(newMessages);
             int pageSize = PageSize;
             foreach (bool unreadOnly in new[] { true, false })
             {
                 var key = GetMessageCacheKey(accountId, folderId, unreadOnly, pageSize);
                 var existing = _persistentCache.Messages.TryGetValue(key, out var cached)
-                    ? cached
+                    ? StripBodies(cached)
                     : new List<MailItem>();
 
-                foreach (var message in newMessages)
+                foreach (var message in strippedNewMessages)
                 {
                     if (unreadOnly && message.IsRead) continue;
                     existing.RemoveAll(item => item.Id == message.Id);
-                    existing.Add(message);
+                    existing.Add(CloneMailItem(message, includeBodies: false));
                 }
 
                 _persistentCache.Messages[key] = existing
@@ -1532,7 +1531,7 @@ namespace Task_Flyout.Services
                     .Take(Math.Clamp(pageSize, 10, 50))
                     .ToList();
 
-                _messageCache[key] = new CacheEntry<List<MailItem>> { Value = _persistentCache.Messages[key] };
+                _messageCache[key] = new CacheEntry<List<MailItem>> { Value = StripBodies(_persistentCache.Messages[key]) };
             }
 
             SavePersistentCache();
@@ -1550,11 +1549,34 @@ namespace Task_Flyout.Services
                     message.AccountId == accountId &&
                     message.FolderId == folderId &&
                     message.Id == messageId);
-                if (item != null) return item;
+                if (item != null) return CloneMailItem(item, includeBodies: false);
             }
 
             return null;
         }
+
+        private static List<MailItem> CloneMailItems(IEnumerable<MailItem> messages, bool includeBodies)
+            => messages.Select(item => CloneMailItem(item, includeBodies)).ToList();
+
+        private static MailItem CloneMailItem(MailItem item, bool includeBodies)
+            => new()
+            {
+                AccountId = item.AccountId,
+                FolderId = item.FolderId,
+                Id = item.Id,
+                Subject = item.Subject,
+                Sender = item.Sender,
+                SenderAddress = item.SenderAddress,
+                Preview = item.Preview,
+                BodyText = includeBodies ? item.BodyText : "",
+                HtmlBody = includeBodies ? item.HtmlBody : "",
+                ReceivedTime = item.ReceivedTime,
+                RawReceivedTime = item.RawReceivedTime,
+                IsRead = item.IsRead,
+                HasAttachments = item.HasAttachments,
+                Importance = item.Importance,
+                WebLink = item.WebLink
+            };
 
         private void LoadKnownUnreadIds()
         {
