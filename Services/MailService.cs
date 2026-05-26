@@ -1490,12 +1490,14 @@ namespace Task_Flyout.Services
                 var existing = messages.FirstOrDefault(m => m.Id == item.Id && m.AccountId == item.AccountId);
                 if (existing != null)
                 {
-                    existing.BodyText = "";
-                    existing.HtmlBody = "";
+                    // Don't clear body here — existing shares the same object reference
+                    // as the in-memory item. Clearing it would wipe the body that
+                    // FetchMessageBodyAsync just populated. Bodies are already stripped
+                    // in UpdatePersistentMessages/MergeMessagesIntoPersistentCache,
+                    // and TrimPersistentCacheForMemory handles periodic cleanup.
                     break;
                 }
             }
-            SavePersistentCache();
         }
 
         private static void LimitMailBody(MailItem item)
