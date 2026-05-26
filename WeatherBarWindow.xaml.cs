@@ -808,12 +808,13 @@ namespace Task_Flyout
                     if (!ReferenceEquals(SystemBackdrop, _acrylicBackdrop))
                         SystemBackdrop = _acrylicBackdrop;
 
+                    // Let the Thin acrylic show through — no opaque overlay at rest.
                     if (mainBorder != null)
-                        mainBorder.Background = CreateTaskbarMaterialBrush(_isLightTheme);
+                        mainBorder.Background = new SolidColorBrush(Colors.Transparent);
                     if (topBorder != null)
                         topBorder.BorderBrush = new SolidColorBrush(_isLightTheme
-                            ? Color.FromArgb(40, 255, 255, 255)
-                            : Color.FromArgb(45, 255, 255, 255));
+                            ? Color.FromArgb(28, 255, 255, 255)
+                            : Color.FromArgb(32, 255, 255, 255));
                     return;
                 }
 
@@ -875,10 +876,14 @@ namespace Task_Flyout
 
         private static Brush CreateTaskbarMaterialBrush(bool isLightTheme, bool hovered = false)
         {
-            var color = isLightTheme
-                ? hovered ? Color.FromArgb(120, 255, 255, 255) : Color.FromArgb(88, 255, 255, 255)
-                : hovered ? Color.FromArgb(128, 34, 34, 38) : Color.FromArgb(94, 34, 34, 38);
-            return new SolidColorBrush(color);
+            // Resting state defers to the Thin acrylic backdrop (no overlay). Only
+            // hover paints a subtle tint to give pointer feedback.
+            if (!hovered)
+                return new SolidColorBrush(Colors.Transparent);
+
+            return new SolidColorBrush(isLightTheme
+                ? Color.FromArgb(48, 255, 255, 255)
+                : Color.FromArgb(56, 255, 255, 255));
         }
 
         private static string FormatBarLocation(string city)
