@@ -65,6 +65,7 @@
                               CanReorderItems="True"
                               AllowDrop="True"
                               Expanding="AccountTree_Expanding"
+                              SelectionChanged="AccountTree_SelectionChanged"
                               ItemInvoked="AccountTree_ItemInvoked"
                               DragItemsCompleted="AccountTree_DragItemsCompleted"/>
                 </Border>

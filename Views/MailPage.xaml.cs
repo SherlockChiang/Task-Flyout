@@ -366,6 +366,46 @@ namespace Task_Flyout.Views
             await LoadMessagesAsync();
         }
 
+        private void AccountTree_SelectionChanged(TreeView sender, TreeViewSelectionChangedEventArgs args)
+        {
+            UpdateSelectedAccountForRemoval(sender.SelectedNode);
+        }
+
+        private MailAccount? ResolveSelectedAccountForRemoval()
+        {
+            if (_selectedAccountForRemoval != null)
+                return _selectedAccountForRemoval;
+
+            if (UpdateSelectedAccountForRemoval(AccountTree.SelectedNode))
+                return _selectedAccountForRemoval;
+
+            return _selectedAccount;
+        }
+
+        private bool UpdateSelectedAccountForRemoval(TreeViewNode? node)
+        {
+            if (node != null)
+            {
+                if (_accountNodes.TryGetValue(node, out var account))
+                {
+                    _selectedAccountForRemoval = account;
+                    RemoveMailButton.IsEnabled = true;
+                    return true;
+                }
+
+                if (_folderNodes.TryGetValue(node, out var selection))
+                {
+                    _selectedAccountForRemoval = selection.Account;
+                    RemoveMailButton.IsEnabled = true;
+                    return true;
+                }
+            }
+
+            _selectedAccountForRemoval = _selectedAccount;
+            RemoveMailButton.IsEnabled = _selectedAccountForRemoval != null;
+            return _selectedAccountForRemoval != null;
+        }
+
         private async Task SelectFirstFolderForAccountNodeAsync(TreeViewNode accountNode)
         {
             await LoadFoldersForNodeAsync(accountNode);
@@ -473,9 +513,10 @@ namespace Task_Flyout.Views
 
         private async void RemoveMailButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_mailService == null || _selectedAccountForRemoval == null) return;
+            if (_mailService == null) return;
 
-            var account = _selectedAccountForRemoval;
+            var account = ResolveSelectedAccountForRemoval();
+            if (account == null) return;
             var dialog = new ContentDialog
             {
                 XamlRoot = XamlRoot,
@@ -489,7 +530,9 @@ namespace Task_Flyout.Views
             var result = await dialog.ShowAsync();
             if (result != ContentDialogResult.Primary) return;
 
-            _mailService.RemoveAccount(account.Id);
+            if (!_mailService.RemoveAccount(account.Id))
+                return;
+
             _items.Clear();
             _selectedAccount = null;
             _selectedFolder = null;
