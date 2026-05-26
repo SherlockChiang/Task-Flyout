@@ -156,9 +156,13 @@ namespace Task_Flyout.Services
         private int _knownUnreadLoaded;
         private MailPersistentCache? _persistentCache;
         private bool _persistentCacheLoaded;
+        private readonly object _persistentCacheSaveLock = new();
+        private CancellationTokenSource? _persistentCacheSaveCts;
+        private string? _pendingPersistentCacheJson;
         private const int MaxBodyTextChars = 80_000;
         private const int MaxHtmlBodyChars = 160_000;
         private const int MaxConcurrentGoogleMessageMetadataRequests = 6;
+        private const int PersistentCacheSaveDebounceMs = 1500;
         public event EventHandler<NewMailNotificationEventArgs>? NewMailArrived;
 
         private sealed class CacheEntry<T>
@@ -1391,11 +1395,67 @@ namespace Task_Flyout.Services
             {
                 EnsurePersistentCacheLoaded();
                 var json = JsonSerializer.Serialize(_persistentCache, AppJsonContext.Default.MailPersistentCache);
-                LocalSqliteStore.WriteProtectedText("mail", "cache", json);
+                QueuePersistentCacheSave(json);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Save mail cache failed: {ex.Message}");
+            }
+        }
+
+        private void QueuePersistentCacheSave(string json)
+        {
+            CancellationTokenSource cts;
+            lock (_persistentCacheSaveLock)
+            {
+                _pendingPersistentCacheJson = json;
+                _persistentCacheSaveCts?.Cancel();
+                _persistentCacheSaveCts = new CancellationTokenSource();
+                cts = _persistentCacheSaveCts;
+            }
+
+            _ = SavePersistentCacheAfterDelayAsync(cts);
+        }
+
+        private async Task SavePersistentCacheAfterDelayAsync(CancellationTokenSource cts)
+        {
+            try
+            {
+                await Task.Delay(PersistentCacheSaveDebounceMs, cts.Token);
+
+                string? json;
+                lock (_persistentCacheSaveLock)
+                {
+                    if (!ReferenceEquals(cts, _persistentCacheSaveCts))
+                        return;
+
+                    json = _pendingPersistentCacheJson;
+                    _pendingPersistentCacheJson = null;
+                    _persistentCacheSaveCts = null;
+                }
+
+                if (!string.IsNullOrWhiteSpace(json))
+                    await LocalSqliteStore.WriteProtectedTextAsync("mail", "cache", json);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Save mail cache failed: {ex.Message}");
+            }
+            finally
+            {
+                if (ReferenceEquals(cts, _persistentCacheSaveCts))
+                {
+                    lock (_persistentCacheSaveLock)
+                    {
+                        if (ReferenceEquals(cts, _persistentCacheSaveCts))
+                            _persistentCacheSaveCts = null;
+                    }
+                }
+
+                cts.Dispose();
             }
         }
 
