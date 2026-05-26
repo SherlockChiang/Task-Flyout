@@ -789,7 +789,7 @@ namespace Task_Flyout.Views
         private void RssArticle_WebResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs args)
         {
             if (sender is CoreWebView2 coreWebView)
-                WebView2RuntimeService.BlockUnsafeEmbeddedResource(coreWebView, args);
+                WebView2RuntimeService.BlockUnsafeRssEmbeddedResource(coreWebView, args);
         }
 
         private void BackToArticleListButton_Click(object sender, RoutedEventArgs e)

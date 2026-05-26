@@ -49,7 +49,8 @@
                 <TextBlock Text="邮件同步" FontWeight="SemiBold" FontSize="16"/>
                 <ToggleSwitch x:Name="MailPollingToggle" Header="定时抓取新邮件并显示 Windows 通知" IsOn="True" Toggled="MailPollingToggle_Toggled"/>
                 <ComboBox x:Name="MailPollingIntervalComboBox" Header="新邮件检查间隔" Width="200" SelectionChanged="MailPollingIntervalComboBox_SelectionChanged" />
-                <ToggleSwitch x:Name="AllowInsecureWebViewResourcesToggle" Header="允许邮件和 RSS 加载 HTTP 图片资源" IsOn="False" Toggled="AllowInsecureWebViewResourcesToggle_Toggled"/>
+                <ToggleSwitch x:Name="AllowInsecureWebViewResourcesToggle" Header="允许邮件加载 HTTP 图片资源" IsOn="False" Toggled="AllowInsecureWebViewResourcesToggle_Toggled"/>
+                <ToggleSwitch x:Name="AllowRssRemoteResourcesToggle" Header="允许 RSS 文章加载远程图片资源" IsOn="False" Toggled="AllowRssRemoteResourcesToggle_Toggled"/>
             </StackPanel>
 
             <StackPanel Spacing="8">

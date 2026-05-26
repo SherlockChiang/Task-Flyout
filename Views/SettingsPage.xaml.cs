@@ -55,6 +55,7 @@ namespace Task_Flyout.Views
             NotifyToggle.IsOn = settings.Values["NotifyEnabled"] as bool? ?? true;
             MailPollingToggle.IsOn = settings.Values["MailPollingEnabled"] as bool? ?? true;
             AllowInsecureWebViewResourcesToggle.IsOn = settings.Values["AllowInsecureWebViewResources"] as bool? ?? false;
+            AllowRssRemoteResourcesToggle.IsOn = settings.Values["AllowRssRemoteResources"] as bool? ?? false;
             ShowSecondsToggle.IsOn = settings.Values["ShowSeconds"] as bool? ?? false;
             AboutVersionText.Text = GetVersionText();
 
@@ -446,6 +447,12 @@ namespace Task_Flyout.Views
         {
             if (_isInitializing) return;
             ApplicationData.Current.LocalSettings.Values["AllowInsecureWebViewResources"] = AllowInsecureWebViewResourcesToggle.IsOn;
+        }
+
+        private void AllowRssRemoteResourcesToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            ApplicationData.Current.LocalSettings.Values["AllowRssRemoteResources"] = AllowRssRemoteResourcesToggle.IsOn;
         }
 
         private async void StartupToggle_Toggled(object sender, RoutedEventArgs e)

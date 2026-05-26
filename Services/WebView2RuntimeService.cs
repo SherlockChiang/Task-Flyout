@@ -30,6 +30,18 @@ namespace Task_Flyout.Services
                 "Content-Type: text/plain");
         }
 
+        public static void BlockUnsafeRssEmbeddedResource(CoreWebView2 coreWebView, CoreWebView2WebResourceRequestedEventArgs args)
+        {
+            if (IsAllowedRssEmbeddedResource(args.Request?.Uri))
+                return;
+
+            args.Response = coreWebView.Environment.CreateWebResourceResponse(
+                new InMemoryRandomAccessStream(),
+                403,
+                "Blocked",
+                "Content-Type: text/plain");
+        }
+
         public static bool IsAllowedEmbeddedResource(string? uriText)
         {
             if (string.IsNullOrWhiteSpace(uriText))
@@ -48,6 +60,23 @@ namespace Task_Flyout.Services
             return uri.Scheme.Equals("data", StringComparison.OrdinalIgnoreCase) &&
                    (uriText.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase) ||
                     uriText.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase));
+        }
+
+        public static bool IsAllowedRssEmbeddedResource(string? uriText)
+        {
+            if (ApplicationData.Current.LocalSettings.Values["AllowRssRemoteResources"] as bool? ?? false)
+                return IsAllowedEmbeddedResource(uriText);
+
+            if (string.IsNullOrWhiteSpace(uriText))
+                return false;
+
+            if (!Uri.TryCreate(uriText, UriKind.Absolute, out var uri))
+                return false;
+
+            return uri.Scheme.Equals("about", StringComparison.OrdinalIgnoreCase) ||
+                   (uri.Scheme.Equals("data", StringComparison.OrdinalIgnoreCase) &&
+                    (uriText.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase) ||
+                     uriText.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)));
         }
     }
 }
