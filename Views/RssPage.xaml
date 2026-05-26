@@ -220,8 +220,8 @@
                             </Button>
                         </Grid>
 
-                        <WebView2 Grid.Row="1"
-                                  x:Name="RssArticleWebView"/>
+                        <Grid Grid.Row="1"
+                              x:Name="RssArticleWebViewHost"/>
                     </Grid>
                 </Grid>
             </Border>

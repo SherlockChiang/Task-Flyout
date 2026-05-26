@@ -188,7 +188,7 @@
                         </Grid>
                         <Border Grid.Row="2" Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
                         <Grid Grid.Row="3" MinHeight="320">
-                            <WebView2 x:Name="DetailHtmlView" Visibility="Collapsed"/>
+                            <Grid x:Name="DetailHtmlViewHost" Visibility="Collapsed"/>
                             <ScrollViewer x:Name="DetailTextScrollViewer" VerticalScrollBarVisibility="Auto">
                                 <TextBlock x:Name="DetailPreview" FontSize="14" TextWrapping="WrapWholeWords"
                                            LineHeight="22"/>

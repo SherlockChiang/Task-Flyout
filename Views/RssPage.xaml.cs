@@ -39,6 +39,7 @@ namespace Task_Flyout.Views
         private RssArticle? _selectedArticle;
         private bool _rssWebViewConfigured;
         private bool _isInternalArticleNavigation;
+        private WebView2? _rssArticleWebView;
 
         public RssPage()
         {
@@ -63,20 +64,7 @@ namespace Task_Flyout.Views
                 _articleScrollViewer = null;
             }
 
-            try
-            {
-                if (RssArticleWebView.CoreWebView2 != null)
-                {
-                    RssArticleWebView.CoreWebView2.NavigationStarting -= RssArticle_NavigationStarting;
-                    RssArticleWebView.CoreWebView2.NavigationCompleted -= RssArticle_NavigationCompleted;
-                    RssArticleWebView.CoreWebView2.NewWindowRequested -= RssArticle_NewWindowRequested;
-                    RssArticleWebView.NavigateToString("<html></html>");
-                }
-                RssArticleWebView.Close();
-            }
-            catch { }
-
-            _rssWebViewConfigured = false;
+            ReleaseRssWebView();
             _isInternalArticleNavigation = false;
             Articles.Clear();
             Subscriptions.Clear();
@@ -710,30 +698,68 @@ namespace Task_Flyout.Views
         {
             try
             {
-                await RssArticleWebView.EnsureCoreWebView2Async();
-                if (!_rssWebViewConfigured && RssArticleWebView.CoreWebView2 != null)
+                var webView = EnsureRssArticleWebView();
+                await webView.EnsureCoreWebView2Async();
+                if (!_rssWebViewConfigured && webView.CoreWebView2 != null)
                 {
                     _rssWebViewConfigured = true;
-                    var settings = RssArticleWebView.CoreWebView2.Settings;
+                    var settings = webView.CoreWebView2.Settings;
                     settings.IsScriptEnabled = false;
                     settings.IsWebMessageEnabled = false;
                     settings.AreDefaultContextMenusEnabled = false;
                     settings.AreDevToolsEnabled = false;
                     settings.IsStatusBarEnabled = false;
                     settings.IsPinchZoomEnabled = true;
-                    RssArticleWebView.CoreWebView2.NavigationStarting += RssArticle_NavigationStarting;
-                    RssArticleWebView.CoreWebView2.NavigationCompleted += RssArticle_NavigationCompleted;
-                    RssArticleWebView.CoreWebView2.NewWindowRequested += RssArticle_NewWindowRequested;
+                    webView.CoreWebView2.NavigationStarting += RssArticle_NavigationStarting;
+                    webView.CoreWebView2.NavigationCompleted += RssArticle_NavigationCompleted;
+                    webView.CoreWebView2.NewWindowRequested += RssArticle_NewWindowRequested;
                 }
 
                 _isInternalArticleNavigation = true;
-                RssArticleWebView.NavigateToString(BuildArticleHtml(article, IsDarkThemeActive()));
+                webView.NavigateToString(BuildArticleHtml(article, IsDarkThemeActive()));
             }
             catch (Exception ex)
             {
                 LogRssError(ex);
                 ArticleListSubtitle.Text = string.Format(_loader.GetString("TextArticleRenderFailed") ?? "Article render failed: {0}", ex.Message);
             }
+        }
+
+        private WebView2 EnsureRssArticleWebView()
+        {
+            if (_rssArticleWebView != null)
+                return _rssArticleWebView;
+
+            WebView2RuntimeService.ConfigureSharedRuntime();
+            _rssArticleWebView = new WebView2();
+            RssArticleWebViewHost.Children.Clear();
+            RssArticleWebViewHost.Children.Add(_rssArticleWebView);
+            _rssWebViewConfigured = false;
+            return _rssArticleWebView;
+        }
+
+        private void ReleaseRssWebView()
+        {
+            var webView = _rssArticleWebView;
+            if (webView == null) return;
+
+            try
+            {
+                if (webView.CoreWebView2 != null)
+                {
+                    webView.CoreWebView2.NavigationStarting -= RssArticle_NavigationStarting;
+                    webView.CoreWebView2.NavigationCompleted -= RssArticle_NavigationCompleted;
+                    webView.CoreWebView2.NewWindowRequested -= RssArticle_NewWindowRequested;
+                    webView.NavigateToString("<html></html>");
+                }
+
+                webView.Close();
+            }
+            catch { }
+
+            RssArticleWebViewHost.Children.Clear();
+            _rssArticleWebView = null;
+            _rssWebViewConfigured = false;
         }
 
         private void RssArticle_NavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)

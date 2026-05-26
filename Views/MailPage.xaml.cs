@@ -85,20 +85,7 @@ namespace Task_Flyout.Views
             _selectedAccountForRemoval = null;
             _refreshAccountsTask = null;
 
-            try
-            {
-                if (DetailHtmlView.CoreWebView2 != null)
-                {
-                    DetailHtmlView.CoreWebView2.NavigationStarting -= MailHtml_NavigationStarting;
-                    DetailHtmlView.CoreWebView2.NavigationCompleted -= MailHtml_NavigationCompleted;
-                    DetailHtmlView.CoreWebView2.NewWindowRequested -= MailHtml_NewWindowRequested;
-                    DetailHtmlView.NavigateToString("<html></html>");
-                }
-                DetailHtmlView.Close();
-            }
-            catch { }
-
-            _webView2Configured = false;
+            ReleaseMailWebView();
             _isInternalMailHtmlNavigation = false;
             MailListView.ItemsSource = null;
             _items.Clear();
@@ -798,7 +785,7 @@ namespace Task_Flyout.Views
         {
             _selectedItem = null;
             DetailPanel.Visibility = Visibility.Collapsed;
-            DetailHtmlView.Visibility = Visibility.Collapsed;
+            DetailHtmlViewHost.Visibility = Visibility.Collapsed;
             DetailTextScrollViewer.Visibility = Visibility.Visible;
             DetailPreview.Text = "";
             TrustSenderButton.IsEnabled = false;
@@ -825,7 +812,7 @@ namespace Task_Flyout.Views
 
         private bool _webView2Configured;
         private bool _isInternalMailHtmlNavigation;
-        private static bool _mailWebViewCachePathConfigured;
+        private WebView2? _detailHtmlView;
 
         private async Task RenderMailBodyAsync(MailItem item)
         {
@@ -844,12 +831,12 @@ namespace Task_Flyout.Views
                         var itemId = item.Id;
                         DetailPreview.Text = "";
                         DetailTextScrollViewer.Visibility = Visibility.Collapsed;
-                        DetailHtmlView.Visibility = Visibility.Visible;
-                        EnsureMailWebViewCachePathConfigured();
-                        await DetailHtmlView.EnsureCoreWebView2Async();
+                        DetailHtmlViewHost.Visibility = Visibility.Visible;
+                        var htmlView = EnsureDetailHtmlView();
+                        await htmlView.EnsureCoreWebView2Async();
                         if (!_webView2Configured)
                         {
-                            var coreWebView = DetailHtmlView.CoreWebView2;
+                            var coreWebView = htmlView.CoreWebView2;
                             if (coreWebView == null)
                                 throw new InvalidOperationException("Mail WebView2 failed to initialize.");
 
@@ -868,7 +855,7 @@ namespace Task_Flyout.Views
                         }
                         if (_selectedItem?.Id != itemId) return;
                         _isInternalMailHtmlNavigation = true;
-                        DetailHtmlView.NavigateToString(htmlDocument);
+                        htmlView.NavigateToString(htmlDocument);
                         return;
                     }
                     catch (Exception ex)
@@ -905,18 +892,46 @@ namespace Task_Flyout.Views
             OpenSafeExternalUri(args.Uri);
         }
 
-        private static void EnsureMailWebViewCachePathConfigured()
+        private WebView2 EnsureDetailHtmlView()
         {
-            if (_mailWebViewCachePathConfigured) return;
+            if (_detailHtmlView != null)
+                return _detailHtmlView;
 
-            var cachePath = AppDataPathHelper.EnsureDirectory(AppDataPathHelper.ResolveLocal("MailWebView2Cache"));
-            Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", cachePath, EnvironmentVariableTarget.Process);
-            _mailWebViewCachePathConfigured = true;
+            WebView2RuntimeService.ConfigureSharedRuntime();
+            _detailHtmlView = new WebView2 { Visibility = Visibility.Visible };
+            DetailHtmlViewHost.Children.Clear();
+            DetailHtmlViewHost.Children.Add(_detailHtmlView);
+            _webView2Configured = false;
+            return _detailHtmlView;
+        }
+
+        private void ReleaseMailWebView()
+        {
+            var webView = _detailHtmlView;
+            if (webView == null) return;
+
+            try
+            {
+                if (webView.CoreWebView2 != null)
+                {
+                    webView.CoreWebView2.NavigationStarting -= MailHtml_NavigationStarting;
+                    webView.CoreWebView2.NavigationCompleted -= MailHtml_NavigationCompleted;
+                    webView.CoreWebView2.NewWindowRequested -= MailHtml_NewWindowRequested;
+                    webView.NavigateToString("<html></html>");
+                }
+
+                webView.Close();
+            }
+            catch { }
+
+            DetailHtmlViewHost.Children.Clear();
+            _detailHtmlView = null;
+            _webView2Configured = false;
         }
 
         private void ShowPlainTextMailBody(MailItem item)
         {
-            DetailHtmlView.Visibility = Visibility.Collapsed;
+            DetailHtmlViewHost.Visibility = Visibility.Collapsed;
             DetailTextScrollViewer.Visibility = Visibility.Visible;
             var fallbackText = item.BodyText;
             if (string.IsNullOrWhiteSpace(fallbackText) && !string.IsNullOrWhiteSpace(item.HtmlBody))
