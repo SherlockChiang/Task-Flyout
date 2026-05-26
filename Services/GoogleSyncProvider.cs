@@ -23,6 +23,10 @@ namespace Task_Flyout.Services
         public TasksService? TasksSvc { get; private set; }
         public GmailService? GmailSvc { get; private set; }
         private ResourceLoader _loader = new ResourceLoader();
+        private static readonly TimeSpan CalendarListCacheDuration = TimeSpan.FromMinutes(30);
+        private readonly SemaphoreSlim _calendarListLock = new(1, 1);
+        private List<SubscribedCalendarInfo>? _cachedCalendarList;
+        private DateTimeOffset _calendarListCacheExpiresAt = DateTimeOffset.MinValue;
         private static readonly string[] RequiredScopes =
         {
             CalendarService.Scope.Calendar,
@@ -93,25 +97,56 @@ namespace Task_Flyout.Services
 
         public async Task<List<SubscribedCalendarInfo>> FetchCalendarListAsync()
         {
+            var now = DateTimeOffset.UtcNow;
+            if (_cachedCalendarList != null && _calendarListCacheExpiresAt > now)
+                return CloneCalendars(_cachedCalendarList);
+
+            await _calendarListLock.WaitAsync();
+            try
+            {
+                now = DateTimeOffset.UtcNow;
+                if (_cachedCalendarList != null && _calendarListCacheExpiresAt > now)
+                    return CloneCalendars(_cachedCalendarList);
+
+                var fetched = await FetchCalendarListFromApiAsync();
+                _cachedCalendarList = fetched;
+                _calendarListCacheExpiresAt = now.Add(CalendarListCacheDuration);
+                return CloneCalendars(fetched);
+            }
+            finally
+            {
+                _calendarListLock.Release();
+            }
+        }
+
+        private async Task<List<SubscribedCalendarInfo>> FetchCalendarListFromApiAsync()
+        {
             var result = new List<SubscribedCalendarInfo>();
             if (CalendarSvc == null) return result;
 
             try
             {
-                var listRequest = CalendarSvc.CalendarList.List();
-                var calendarList = await listRequest.ExecuteAsync();
-                if (calendarList?.Items != null)
+                string? pageToken = null;
+                do
                 {
-                    foreach (var cal in calendarList.Items)
+                    var listRequest = CalendarSvc.CalendarList.List();
+                    listRequest.PageToken = pageToken;
+                    var calendarList = await listRequest.ExecuteAsync();
+                    if (calendarList?.Items != null)
                     {
-                        result.Add(new SubscribedCalendarInfo
+                        foreach (var cal in calendarList.Items)
                         {
-                            Id = cal.Id,
-                            Name = cal.SummaryOverride ?? cal.Summary ?? cal.Id,
-                            IsVisible = true
-                        });
+                            result.Add(new SubscribedCalendarInfo
+                            {
+                                Id = cal.Id,
+                                Name = cal.SummaryOverride ?? cal.Summary ?? cal.Id,
+                                IsVisible = true
+                            });
+                        }
                     }
-                }
+
+                    pageToken = calendarList?.NextPageToken;
+                } while (!string.IsNullOrEmpty(pageToken));
             }
             catch (Exception ex)
             {
@@ -120,6 +155,16 @@ namespace Task_Flyout.Services
 
             return result;
         }
+
+        private static List<SubscribedCalendarInfo> CloneCalendars(IEnumerable<SubscribedCalendarInfo> calendars) =>
+            calendars
+                .Select(cal => new SubscribedCalendarInfo
+                {
+                    Id = cal.Id,
+                    Name = cal.Name,
+                    IsVisible = cal.IsVisible
+                })
+                .ToList();
 
         public async Task<List<AgendaItem>> FetchDataAsync(DateTime min, DateTime max)
         {
