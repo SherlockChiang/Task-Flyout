@@ -158,7 +158,6 @@ namespace Task_Flyout.Services
         private bool _persistentCacheLoaded;
         private readonly object _persistentCacheSaveLock = new();
         private CancellationTokenSource? _persistentCacheSaveCts;
-        private string? _pendingPersistentCacheJson;
         private const int MaxBodyTextChars = 80_000;
         private const int MaxHtmlBodyChars = 160_000;
         private const int MaxConcurrentGoogleMessageMetadataRequests = 6;
@@ -1391,24 +1390,11 @@ namespace Task_Flyout.Services
 
         private void SavePersistentCache()
         {
-            try
-            {
-                EnsurePersistentCacheLoaded();
-                var json = JsonSerializer.Serialize(_persistentCache, AppJsonContext.Default.MailPersistentCache);
-                QueuePersistentCacheSave(json);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Save mail cache failed: {ex.Message}");
-            }
-        }
+            EnsurePersistentCacheLoaded();
 
-        private void QueuePersistentCacheSave(string json)
-        {
             CancellationTokenSource cts;
             lock (_persistentCacheSaveLock)
             {
-                _pendingPersistentCacheJson = json;
                 _persistentCacheSaveCts?.Cancel();
                 _persistentCacheSaveCts = new CancellationTokenSource();
                 cts = _persistentCacheSaveCts;
@@ -1429,8 +1415,17 @@ namespace Task_Flyout.Services
                     if (!ReferenceEquals(cts, _persistentCacheSaveCts))
                         return;
 
-                    json = _pendingPersistentCacheJson;
-                    _pendingPersistentCacheJson = null;
+                    try
+                    {
+                        json = _persistentCache == null
+                            ? null
+                            : JsonSerializer.Serialize(_persistentCache, AppJsonContext.Default.MailPersistentCache);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Serialize mail cache failed: {ex.Message}");
+                        json = null;
+                    }
                     _persistentCacheSaveCts = null;
                 }
 
@@ -1446,13 +1441,10 @@ namespace Task_Flyout.Services
             }
             finally
             {
-                if (ReferenceEquals(cts, _persistentCacheSaveCts))
+                lock (_persistentCacheSaveLock)
                 {
-                    lock (_persistentCacheSaveLock)
-                    {
-                        if (ReferenceEquals(cts, _persistentCacheSaveCts))
-                            _persistentCacheSaveCts = null;
-                    }
+                    if (ReferenceEquals(cts, _persistentCacheSaveCts))
+                        _persistentCacheSaveCts = null;
                 }
 
                 cts.Dispose();
