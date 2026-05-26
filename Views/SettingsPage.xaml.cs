@@ -6,6 +6,7 @@ using Windows.Storage;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System;
 using System.Linq;
+using System.Reflection;
 using Microsoft.Windows.AppLifecycle;
 using Windows.ApplicationModel;
 using Task_Flyout.Services;
@@ -54,6 +55,7 @@ namespace Task_Flyout.Views
             NotifyToggle.IsOn = settings.Values["NotifyEnabled"] as bool? ?? true;
             MailPollingToggle.IsOn = settings.Values["MailPollingEnabled"] as bool? ?? true;
             ShowSecondsToggle.IsOn = settings.Values["ShowSeconds"] as bool? ?? false;
+            AboutVersionText.Text = GetVersionText();
 
             // 👉 这里已经支持多语言了！只需在英文 resw 中添加键名 TextMinutes，值为 Minutes 即可。
             string minuteStr = GetSafeString("TextMinutes", "minutes");
@@ -89,6 +91,22 @@ namespace Task_Flyout.Views
             BuildColorPaletteUI();
 
             _isInitializing = false;
+        }
+
+        private static string GetVersionText()
+        {
+            try
+            {
+                var version = Package.Current.Id.Version;
+                return $"版本 {version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
+            }
+            catch
+            {
+                var version = Assembly.GetExecutingAssembly().GetName().Version;
+                return version == null
+                    ? "版本 unknown"
+                    : $"版本 {version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
+            }
         }
 
         private void SelectComboByTag(ComboBox combo, string tag)
