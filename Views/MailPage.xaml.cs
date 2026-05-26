@@ -823,7 +823,7 @@ namespace Task_Flyout.Views
                     ? SanitizeTrustedMailHtml(item.HtmlBody)
                     : SanitizeMailHtml(item.HtmlBody);
 
-                if (trusted || HasVisibleHtmlContent(html))
+                if (trusted || HasRenderableHtml(html))
                 {
                     var htmlDocument = BuildMailHtmlDocument(html, IsDarkThemeActive(), alreadySanitized: true);
                     try
@@ -906,7 +906,12 @@ namespace Task_Flyout.Views
                 return _detailHtmlView;
 
             WebView2RuntimeService.ConfigureSharedRuntime();
-            _detailHtmlView = new WebView2 { Visibility = Visibility.Visible };
+            _detailHtmlView = new WebView2
+            {
+                Visibility = Visibility.Visible,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
             DetailHtmlViewHost.Children.Clear();
             DetailHtmlViewHost.Children.Add(_detailHtmlView);
             _webView2Configured = false;
@@ -1136,6 +1141,13 @@ body { background-color: {{background}} !important; }
                 return true;
 
             return false;
+        }
+
+        private static bool HasRenderableHtml(string html)
+        {
+            if (string.IsNullOrWhiteSpace(html)) return false;
+            if (HasVisibleHtmlContent(html)) return true;
+            return RxHtmlContentTags.IsMatch(html);
         }
 
         private static string RemoveCssNoise(string value)
