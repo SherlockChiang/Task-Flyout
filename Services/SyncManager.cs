@@ -361,30 +361,46 @@ namespace Task_Flyout.Services
 
         private void EnsureCacheLoaded()
         {
-            if (Interlocked.CompareExchange(ref _cacheLoaded, 1, 0) != 0) return;
+            if (Volatile.Read(ref _cacheLoaded) != 0) return;
 
+            _cacheLock.Wait();
             try
             {
-                string? json = LocalSqliteStore.ReadProtectedText(StoreScope, CacheKey);
-                if (!string.IsNullOrWhiteSpace(json))
-                    _cache = JsonSerializer.Deserialize(json, AppJsonContext.Default.AppCache) ?? new AppCache();
+                if (Volatile.Read(ref _cacheLoaded) != 0) return;
+
+                AppCache loaded;
+                try
+                {
+                    string? json = LocalSqliteStore.ReadProtectedText(StoreScope, CacheKey);
+                    loaded = !string.IsNullOrWhiteSpace(json)
+                        ? JsonSerializer.Deserialize(json, AppJsonContext.Default.AppCache) ?? new AppCache()
+                        : new AppCache();
+                }
+                catch
+                {
+                    loaded = new AppCache();
+                }
+
+                loaded.MarkedDates ??= new HashSet<string>();
+                loaded.DayItems ??= new Dictionary<string, List<AgendaItem>>();
+                loaded.CachedRanges ??= new List<AgendaCacheRange>();
+                loaded.CachedRanges = loaded.CachedRanges
+                    .Where(range => !string.IsNullOrWhiteSpace(range.ProviderName)
+                                    && !string.IsNullOrWhiteSpace(range.StartDateKey)
+                                    && !string.IsNullOrWhiteSpace(range.EndDateKey))
+                    .ToList();
+
+                _cache = loaded;
+
+                if (CompactCache(DateTime.Today))
+                    SaveCacheSyncNoLock();
+
+                Volatile.Write(ref _cacheLoaded, 1);
             }
-            catch
+            finally
             {
-                _cache = new AppCache();
+                _cacheLock.Release();
             }
-
-            _cache.MarkedDates ??= new HashSet<string>();
-            _cache.DayItems ??= new Dictionary<string, List<AgendaItem>>();
-            _cache.CachedRanges ??= new List<AgendaCacheRange>();
-            _cache.CachedRanges = _cache.CachedRanges
-                .Where(range => !string.IsNullOrWhiteSpace(range.ProviderName)
-                                && !string.IsNullOrWhiteSpace(range.StartDateKey)
-                                && !string.IsNullOrWhiteSpace(range.EndDateKey))
-                .ToList();
-
-            if (CompactCache(DateTime.Today))
-                SaveCacheSyncNoLock();
         }
 
         private void RemoveProviderFromCache(string providerName)

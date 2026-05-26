@@ -146,7 +146,8 @@ namespace Task_Flyout.Services
         private readonly string _appDataPath = AppDataPathHelper.LocalRoot;
 
         private RssCache _cache = new();
-        private bool _loaded;
+        private volatile bool _loaded;
+        private readonly object _loadLock = new();
         private bool _databaseInitialized;
         private string? _connectionString;
 
@@ -717,49 +718,65 @@ namespace Task_Flyout.Services
         private void EnsureLoaded()
         {
             if (_loaded) return;
-            _loaded = true;
 
-            try
+            lock (_loadLock)
             {
-                InitializeDatabase();
-                _cache = LoadFromDatabase();
-                TryMigrateLegacyJsonCache();
-            }
-            catch
-            {
-                _cache = new RssCache();
-            }
+                if (_loaded) return;
 
-            _cache.Subscriptions ??= new List<RssSubscription>();
-            _cache.Folders ??= new List<RssFolder>();
-            _cache.Articles ??= new List<RssArticle>();
-            foreach (var subscription in _cache.Subscriptions)
-            {
-                subscription.Id ??= Guid.NewGuid().ToString("N");
-                subscription.Title ??= "";
-                subscription.Url ??= "";
-                subscription.FolderId ??= "";
-                subscription.ImageUrl ??= "";
-                subscription.LocalImagePath ??= "";
-            }
+                RssCache loaded;
+                try
+                {
+                    InitializeDatabase();
+                    loaded = LoadFromDatabase();
+                }
+                catch
+                {
+                    loaded = new RssCache();
+                }
 
-            foreach (var folder in _cache.Folders)
-            {
-                folder.Id ??= Guid.NewGuid().ToString("N");
-                folder.Name ??= (_loader.GetString("TextFolder") ?? "Folder");
-            }
+                loaded.Subscriptions ??= new List<RssSubscription>();
+                loaded.Folders ??= new List<RssFolder>();
+                loaded.Articles ??= new List<RssArticle>();
+                foreach (var subscription in loaded.Subscriptions)
+                {
+                    subscription.Id ??= Guid.NewGuid().ToString("N");
+                    subscription.Title ??= "";
+                    subscription.Url ??= "";
+                    subscription.FolderId ??= "";
+                    subscription.ImageUrl ??= "";
+                    subscription.LocalImagePath ??= "";
+                }
 
-            foreach (var article in _cache.Articles)
-            {
-                article.Id ??= Guid.NewGuid().ToString("N");
-                article.SubscriptionId ??= "";
-                article.FeedTitle ??= "";
-                article.Title ??= "";
-                article.Link ??= "";
-                article.Summary ??= "";
-                article.HtmlContent ??= "";
-                article.ImageUrl ??= "";
-                article.LocalImagePath ??= "";
+                foreach (var folder in loaded.Folders)
+                {
+                    folder.Id ??= Guid.NewGuid().ToString("N");
+                    folder.Name ??= (_loader.GetString("TextFolder") ?? "Folder");
+                }
+
+                foreach (var article in loaded.Articles)
+                {
+                    article.Id ??= Guid.NewGuid().ToString("N");
+                    article.SubscriptionId ??= "";
+                    article.FeedTitle ??= "";
+                    article.Title ??= "";
+                    article.Link ??= "";
+                    article.Summary ??= "";
+                    article.HtmlContent ??= "";
+                    article.ImageUrl ??= "";
+                    article.LocalImagePath ??= "";
+                }
+
+                _cache = loaded;
+
+                try
+                {
+                    TryMigrateLegacyJsonCache();
+                }
+                catch
+                {
+                }
+
+                _loaded = true;
             }
         }
 
