@@ -190,11 +190,25 @@ namespace Task_Flyout.Services
                     req.QueryParameters.Select = new[] { "id", "subject", "start", "end", "isAllDay", "location", "bodyPreview", "calendar", "recurrence", "seriesMasterId", "type" };
                 });
 
-                if (events?.Value != null)
+                var allEvents = new List<Event>();
+                if (events != null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] Fetched {events.Value.Count} events");
+                    var pageIterator = PageIterator<Event, EventCollectionResponse>.CreatePageIterator(
+                        _graphClient,
+                        events,
+                        ev =>
+                        {
+                            allEvents.Add(ev);
+                            return true;
+                        });
+                    await pageIterator.IterateAsync();
+                }
+
+                if (allEvents.Count > 0)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] Fetched {allEvents.Count} events");
                     var recurrenceKinds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    foreach (var ev in events.Value)
+                    foreach (var ev in allEvents)
                     {
                         DateTime.TryParse(ev.Start?.DateTime, out var start);
 
@@ -271,11 +285,25 @@ namespace Task_Flyout.Services
                         req.QueryParameters.Top = 500;
                     });
 
-                    if (tasks?.Value != null)
+                    var allTasks = new List<TodoTask>();
+                    if (tasks != null)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] Fetched {tasks.Value.Count} tasks. Parsing...");
+                        var pageIterator = PageIterator<TodoTask, TodoTaskCollectionResponse>.CreatePageIterator(
+                            _graphClient,
+                            tasks,
+                            task =>
+                            {
+                                allTasks.Add(task);
+                                return true;
+                            });
+                        await pageIterator.IterateAsync();
+                    }
 
-                        foreach (var task in tasks.Value)
+                    if (allTasks.Count > 0)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] Fetched {allTasks.Count} tasks. Parsing...");
+
+                        foreach (var task in allTasks)
                         {
                             bool isCompleted = task.Status == Microsoft.Graph.Models.TaskStatus.Completed;
                             DateTime targetDate = DateTime.Today;
