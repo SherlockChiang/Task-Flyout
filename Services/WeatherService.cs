@@ -193,7 +193,7 @@ namespace Task_Flyout.Services
 
         public bool WeatherBarTransparentBackground
         {
-            get => ApplicationData.Current.LocalSettings.Values["WeatherBarTransparentBackground"] as bool? ?? false;
+            get => ApplicationData.Current.LocalSettings.Values["WeatherBarTransparentBackground"] as bool? ?? true;
             set => ApplicationData.Current.LocalSettings.Values["WeatherBarTransparentBackground"] = value;
         }
 
