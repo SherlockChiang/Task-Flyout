@@ -298,17 +298,29 @@ namespace Task_Flyout.Views
             ToggleTimelinePaneIcon.Glyph = _isTimelinePaneCollapsed ? "\uE76B" : "\uE76C";
         }
 
-        public async void RefreshAccountList()
+        public void RefreshAccountList()
         {
-            if (_syncManager == null || AccountListRepeater == null) return;
-            var mgr = _syncManager.AccountManager;
+            _ = RefreshAccountListAsync();
+        }
 
-            if (!ReferenceEquals(AccountListRepeater.ItemsSource, mgr.Accounts))
-                AccountListRepeater.ItemsSource = mgr.Accounts;
+        private async Task RefreshAccountListAsync()
+        {
+            try
+            {
+                if (_syncManager == null || AccountListRepeater == null) return;
+                var mgr = _syncManager.AccountManager;
 
-            await _syncManager.SyncAllCalendarsAsync();
-            if (!ReferenceEquals(AccountListRepeater.ItemsSource, mgr.Accounts))
-                AccountListRepeater.ItemsSource = mgr.Accounts;
+                if (!ReferenceEquals(AccountListRepeater.ItemsSource, mgr.Accounts))
+                    AccountListRepeater.ItemsSource = mgr.Accounts;
+
+                await _syncManager.SyncAllCalendarsAsync();
+                if (!ReferenceEquals(AccountListRepeater.ItemsSource, mgr.Accounts))
+                    AccountListRepeater.ItemsSource = mgr.Accounts;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Refresh account list failed: {ex.Message}");
+            }
         }
 
         private void BtnAddAccount_Click(object sender, RoutedEventArgs e)
