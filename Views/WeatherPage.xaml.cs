@@ -464,7 +464,10 @@ namespace Task_Flyout.Views
                 {
                     try
                     {
-                        images[i].Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(layers[i]));
+                        images[i].Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(layers[i]))
+                        {
+                            DecodePixelWidth = 96
+                        };
                         images[i].Visibility = Visibility.Visible;
                     }
                     catch
