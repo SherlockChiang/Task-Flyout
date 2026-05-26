@@ -436,10 +436,20 @@ namespace Task_Flyout.Services
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            return providers.Count > 0 && providers.All(provider => _cache.CachedRanges.Any(range =>
-                string.Equals(range.ProviderName, provider, StringComparison.OrdinalIgnoreCase) &&
-                string.Compare(range.StartDateKey, start, StringComparison.Ordinal) <= 0 &&
-                string.Compare(range.EndDateKey, end, StringComparison.Ordinal) >= 0));
+            if (providers.Count == 0) return false;
+
+            _cacheLock.Wait();
+            try
+            {
+                return providers.All(provider => _cache.CachedRanges.Any(range =>
+                    string.Equals(range.ProviderName, provider, StringComparison.OrdinalIgnoreCase) &&
+                    string.Compare(range.StartDateKey, start, StringComparison.Ordinal) <= 0 &&
+                    string.Compare(range.EndDateKey, end, StringComparison.Ordinal) >= 0));
+            }
+            finally
+            {
+                _cacheLock.Release();
+            }
         }
 
         private List<AgendaItem> GetCachedItems(DateTime min, DateTime max)
@@ -447,12 +457,20 @@ namespace Task_Flyout.Services
             string start = min.ToString("yyyy-MM-dd");
             string end = max.AddDays(-1).ToString("yyyy-MM-dd");
 
-            return _cache.DayItems
-                .Where(kvp =>
-                    string.Compare(kvp.Key, start, StringComparison.Ordinal) >= 0 &&
-                    string.Compare(kvp.Key, end, StringComparison.Ordinal) <= 0)
-                .SelectMany(kvp => kvp.Value)
-                .ToList();
+            _cacheLock.Wait();
+            try
+            {
+                return _cache.DayItems
+                    .Where(kvp =>
+                        string.Compare(kvp.Key, start, StringComparison.Ordinal) >= 0 &&
+                        string.Compare(kvp.Key, end, StringComparison.Ordinal) <= 0)
+                    .SelectMany(kvp => kvp.Value.Select(CloneAgendaItem))
+                    .ToList();
+            }
+            finally
+            {
+                _cacheLock.Release();
+            }
         }
 
         private async Task MergeIntoCacheAsync(DateTime min, DateTime max, List<AgendaItem> items, List<string> successfulProviders, List<string> attemptedProviders)
