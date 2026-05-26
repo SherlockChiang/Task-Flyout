@@ -158,6 +158,7 @@ namespace Task_Flyout.Services
         private bool _persistentCacheLoaded;
         private const int MaxBodyTextChars = 80_000;
         private const int MaxHtmlBodyChars = 160_000;
+        private const int MaxConcurrentGoogleMessageMetadataRequests = 6;
         public event EventHandler<NewMailNotificationEventArgs>? NewMailArrived;
 
         private sealed class CacheEntry<T>
@@ -993,14 +994,23 @@ namespace Task_Flyout.Services
             if (list?.Messages == null || list.Messages.Count == 0)
                 return new List<MailItem>();
 
+            using var metadataGate = new SemaphoreSlim(MaxConcurrentGoogleMessageMetadataRequests);
             var tasks = list.Messages
                 .Where(message => !string.IsNullOrWhiteSpace(message.Id))
                 .Select(async message =>
                 {
-                    var get = gmail.Users.Messages.Get("me", message.Id);
-                    get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
-                    get.MetadataHeaders = new[] { "From", "Subject", "Date" };
-                    return ToGoogleMailItem(account.Id, folder.Id, await get.ExecuteAsync());
+                    await metadataGate.WaitAsync();
+                    try
+                    {
+                        var get = gmail.Users.Messages.Get("me", message.Id);
+                        get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
+                        get.MetadataHeaders = new[] { "From", "Subject", "Date" };
+                        return ToGoogleMailItem(account.Id, folder.Id, await get.ExecuteAsync());
+                    }
+                    finally
+                    {
+                        metadataGate.Release();
+                    }
                 });
 
             var messages = await Task.WhenAll(tasks);
