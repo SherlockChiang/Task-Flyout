@@ -195,38 +195,17 @@ namespace Task_Flyout
 
         private void MailService_NewMailArrived(object? sender, NewMailNotificationEventArgs e)
         {
-            MainDispatcherQueue.TryEnqueue(() => ShowTrayNewMailNotification(e));
+            MainDispatcherQueue.TryEnqueue(() => UpdateTrayNewMailHint(e));
         }
 
-        private void ShowTrayNewMailNotification(NewMailNotificationEventArgs e)
+        private void UpdateTrayNewMailHint(NewMailNotificationEventArgs e)
         {
             if (_trayIcon == null) return;
 
             var subject = string.IsNullOrWhiteSpace(e.Item.Subject) ? "(No subject)" : e.Item.Subject;
-            var sender = string.IsNullOrWhiteSpace(e.Item.Sender) ? e.Account.DisplayTitle : e.Item.Sender;
-            var title = $"{(_loader.GetString("TextNewMail") ?? "New Mail")} · {e.Account.DisplayTitle}";
-            var message = $"{subject}\n{sender}";
 
             _trayToolTipText = $"Task Flyout · {(_loader.GetString("TextNewMail") ?? "New Mail")}: {TruncateForTray(subject, 48)}";
             _trayIcon.ToolTipText = _trayToolTipText;
-
-            try
-            {
-                _trayIcon.ShowNotification(
-                    title,
-                    TruncateForTray(message, 220),
-                    H.NotifyIcon.Core.NotificationIcon.Info,
-                    customIconHandle: null,
-                    largeIcon: true,
-                    sound: true,
-                    respectQuietTime: false,
-                    realtime: true,
-                    timeout: TimeSpan.FromSeconds(15));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Tray mail notification failed: {ex.Message}");
-            }
         }
 
         private static string TruncateForTray(string value, int maxLength)
