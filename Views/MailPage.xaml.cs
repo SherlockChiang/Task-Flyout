@@ -849,9 +849,11 @@ namespace Task_Flyout.Views
                             settings.IsStatusBarEnabled = false;
                             settings.IsPinchZoomEnabled = false;
                             settings.IsSwipeNavigationEnabled = false;
+                            coreWebView.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
                             coreWebView.NavigationStarting += MailHtml_NavigationStarting;
                             coreWebView.NavigationCompleted += MailHtml_NavigationCompleted;
                             coreWebView.NewWindowRequested += MailHtml_NewWindowRequested;
+                            coreWebView.WebResourceRequested += MailHtml_WebResourceRequested;
                         }
                         if (_selectedItem?.Id != itemId) return;
                         _isInternalMailHtmlNavigation = true;
@@ -892,6 +894,12 @@ namespace Task_Flyout.Views
             OpenSafeExternalUri(args.Uri);
         }
 
+        private void MailHtml_WebResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs args)
+        {
+            if (sender is CoreWebView2 coreWebView)
+                WebView2RuntimeService.BlockUnsafeEmbeddedResource(coreWebView, args);
+        }
+
         private WebView2 EnsureDetailHtmlView()
         {
             if (_detailHtmlView != null)
@@ -917,6 +925,7 @@ namespace Task_Flyout.Views
                     webView.CoreWebView2.NavigationStarting -= MailHtml_NavigationStarting;
                     webView.CoreWebView2.NavigationCompleted -= MailHtml_NavigationCompleted;
                     webView.CoreWebView2.NewWindowRequested -= MailHtml_NewWindowRequested;
+                    webView.CoreWebView2.WebResourceRequested -= MailHtml_WebResourceRequested;
                     webView.NavigateToString("<html></html>");
                 }
 
@@ -1079,8 +1088,8 @@ body { background-color: {{background}} !important; }
             value = RxEventHandlerUnquoted.Replace(value, "");
             value = RxScriptUriQuoted.Replace(value, "$1=\"#\"");
             value = RxScriptUriUnquoted.Replace(value, "$1=\"#\"");
-            value = RxRemoteResourceQuoted.Replace(value, "");
-            value = RxRemoteResourceUnquoted.Replace(value, "");
+            value = RxRemoteResourceQuoted.Replace(value, m => IsBackgroundResourceAttribute(m.Value) ? "" : m.Value);
+            value = RxRemoteResourceUnquoted.Replace(value, m => IsBackgroundResourceAttribute(m.Value) ? "" : m.Value);
             value = RxDangerousCssStyle.Replace(value, "");
             value = RxCssUrl.Replace(value, "none");
 
@@ -1089,6 +1098,9 @@ body { background-color: {{background}} !important; }
 
             return value;
         }
+
+        private static bool IsBackgroundResourceAttribute(string attribute)
+            => attribute.Contains("background", StringComparison.OrdinalIgnoreCase);
 
         private static string SanitizeTrustedMailHtml(string html)
         {

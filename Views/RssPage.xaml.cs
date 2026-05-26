@@ -710,9 +710,11 @@ namespace Task_Flyout.Views
                     settings.AreDevToolsEnabled = false;
                     settings.IsStatusBarEnabled = false;
                     settings.IsPinchZoomEnabled = true;
+                    webView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
                     webView.CoreWebView2.NavigationStarting += RssArticle_NavigationStarting;
                     webView.CoreWebView2.NavigationCompleted += RssArticle_NavigationCompleted;
                     webView.CoreWebView2.NewWindowRequested += RssArticle_NewWindowRequested;
+                    webView.CoreWebView2.WebResourceRequested += RssArticle_WebResourceRequested;
                 }
 
                 _isInternalArticleNavigation = true;
@@ -750,6 +752,7 @@ namespace Task_Flyout.Views
                     webView.CoreWebView2.NavigationStarting -= RssArticle_NavigationStarting;
                     webView.CoreWebView2.NavigationCompleted -= RssArticle_NavigationCompleted;
                     webView.CoreWebView2.NewWindowRequested -= RssArticle_NewWindowRequested;
+                    webView.CoreWebView2.WebResourceRequested -= RssArticle_WebResourceRequested;
                     webView.NavigateToString("<html></html>");
                 }
 
@@ -781,6 +784,12 @@ namespace Task_Flyout.Views
         {
             args.Handled = true;
             OpenSafeExternalUri(args.Uri);
+        }
+
+        private void RssArticle_WebResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs args)
+        {
+            if (sender is CoreWebView2 coreWebView)
+                WebView2RuntimeService.BlockUnsafeEmbeddedResource(coreWebView, args);
         }
 
         private void BackToArticleListButton_Click(object sender, RoutedEventArgs e)
@@ -876,8 +885,8 @@ pre, code { white-space: pre-wrap; overflow-wrap: anywhere; }
             value = Regex.Replace(value, @"\s+on\w+\s*=\s*[^\s>]+", "", RegexOptions.IgnoreCase);
             value = Regex.Replace(value, @"(href|src|action|formaction|data)\s*=\s*(['""])\s*(javascript|vbscript|data):.*?\2", "$1=\"#\"", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             value = Regex.Replace(value, @"(href|src|action|formaction|data)\s*=\s*(javascript|vbscript|data):[^\s>]+", "$1=\"#\"", RegexOptions.IgnoreCase);
-            value = Regex.Replace(value, @"\s(src|srcset|background)\s*=\s*(['""])\s*https?://.*?\2", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            value = Regex.Replace(value, @"\s(src|srcset|background)\s*=\s*https?://[^\s>]+", "", RegexOptions.IgnoreCase);
+            value = Regex.Replace(value, @"\sbackground\s*=\s*(['""])\s*https?://.*?\1", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            value = Regex.Replace(value, @"\sbackground\s*=\s*https?://[^\s>]+", "", RegexOptions.IgnoreCase);
             value = Regex.Replace(value, @"style\s*=\s*(['""])[^'""]*\b(expression|url\s*\(|-moz-binding|behavior)\b[^'""]*\1", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             return value;
         }
