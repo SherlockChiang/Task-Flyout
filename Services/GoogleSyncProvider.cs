@@ -4,6 +4,7 @@ using Google.Apis.Gmail.v1;
 using Google.Apis.Services;
 using Google.Apis.Tasks.v1;
 using Google.Apis.Util.Store;
+using Google.Apis.Auth.OAuth2.Responses;
 using System.Linq;
 using System;
 using System.Collections.Generic;
@@ -41,7 +42,9 @@ namespace Task_Flyout.Services
             if (CalendarSvc != null && TasksSvc != null && GmailSvc != null) return;
 
             string tokenPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TaskFlyout", "GoogleToken");
-            UserCredential credential = await AuthorizeAsync(tokenPath);
+            var dataStore = new ProtectedGoogleDataStore();
+            await TryMigrateLegacyTokenStoreAsync(tokenPath, dataStore);
+            UserCredential credential = await AuthorizeAsync(dataStore);
 
             var grantedScopes = credential.Token?.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
             if (!RequiredScopes.All(scope => grantedScopes.Contains(scope, StringComparer.OrdinalIgnoreCase)))
@@ -50,7 +53,8 @@ namespace Task_Flyout.Services
                 TasksSvc = null;
                 GmailSvc = null;
                 if (Directory.Exists(tokenPath)) Directory.Delete(tokenPath, true);
-                credential = await AuthorizeAsync(tokenPath);
+                await dataStore.ClearAsync();
+                credential = await AuthorizeAsync(dataStore);
             }
 
             CalendarSvc = new CalendarService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
@@ -58,7 +62,7 @@ namespace Task_Flyout.Services
             GmailSvc = new GmailService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
         }
 
-        private async Task<UserCredential> AuthorizeAsync(string tokenPath)
+        private async Task<UserCredential> AuthorizeAsync(IDataStore dataStore)
         {
             try
             {
@@ -69,12 +73,36 @@ namespace Task_Flyout.Services
                         RequiredScopes,
                         "user",
                         CancellationToken.None,
-                        new FileDataStore(tokenPath, true));
+                        dataStore);
                 }
             }
             catch (FileNotFoundException)
             {
                 throw new Exception(_loader.GetString("TextCredNotFound"));
+            }
+        }
+
+        private static async Task TryMigrateLegacyTokenStoreAsync(string tokenPath, IDataStore targetStore)
+        {
+            if (!Directory.Exists(tokenPath))
+                return;
+
+            try
+            {
+                if (await targetStore.GetAsync<TokenResponse>("user") != null)
+                    return;
+
+                var legacyStore = new FileDataStore(tokenPath, true);
+                var legacyToken = await legacyStore.GetAsync<TokenResponse>("user");
+                if (legacyToken == null)
+                    return;
+
+                await targetStore.StoreAsync("user", legacyToken);
+                Directory.Delete(tokenPath, recursive: true);
+            }
+            catch
+            {
+                // A failed migration should fall back to the normal authorization flow.
             }
         }
 

@@ -78,6 +78,29 @@ ON CONFLICT(scope, key) DO UPDATE SET value = excluded.value, updated_ticks = ex
             await command.ExecuteNonQueryAsync();
         }
 
+        public static async Task DeleteProtectedTextAsync(string scope, string key)
+        {
+            EnsureInitialized();
+            await using var connection = CreateConnection();
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM protected_store WHERE scope = $scope AND key = $key;";
+            command.Parameters.AddWithValue("$scope", scope);
+            command.Parameters.AddWithValue("$key", key);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        public static async Task DeleteProtectedScopeAsync(string scope)
+        {
+            EnsureInitialized();
+            await using var connection = CreateConnection();
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM protected_store WHERE scope = $scope;";
+            command.Parameters.AddWithValue("$scope", scope);
+            await command.ExecuteNonQueryAsync();
+        }
+
         private static void EnsureInitialized()
         {
             if (_initialized) return;
