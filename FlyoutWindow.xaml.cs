@@ -89,6 +89,8 @@ namespace Task_Flyout
         private bool _isDotRefreshPending = false;
 
         private ScrollViewer? _activeScrollViewer;
+        private readonly List<DotSpec> _dotSpecs = new();
+        private readonly Dictionary<uint, SolidColorBrush> _dotBrushCache = new();
 
         public ObservableCollection<AgendaItem> AgendaItems { get; set; } = new();
         public HashSet<string> MarkedDates { get; set; } = new();
@@ -101,6 +103,8 @@ namespace Task_Flyout
         private const int VisibleCacheFutureDays = 45;
         private static readonly SemaphoreSlim _syncLock = new(1, 1);
         private bool _backgroundRefreshQueued;
+
+        private readonly record struct DotSpec(double Left, double Top, SolidColorBrush Fill);
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern uint GetDpiForWindow(IntPtr hwnd);
@@ -362,14 +366,18 @@ namespace Task_Flyout
 
             if (MainCalendar.DisplayMode != CalendarViewDisplayMode.Month)
             {
-                DotOverlay.Children.Clear();
+                ClearDotOverlay();
                 return;
             }
 
             HookActiveScrollViewer();
-            DotOverlay.Children.Clear();
+            _dotSpecs.Clear();
 
-            if (EventCounts == null || EventCounts.Count == 0) return;
+            if (EventCounts == null || EventCounts.Count == 0)
+            {
+                ClearDotOverlay();
+                return;
+            }
 
             var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
 
@@ -425,23 +433,62 @@ namespace Task_Flyout
 
                     for (int i = 0; i < dotsToShow; i++)
                     {
-                        var dot = new Microsoft.UI.Xaml.Shapes.Ellipse
-                        {
-                            Width = dotSize,
-                            Height = dotSize,
-                            Fill = new SolidColorBrush(dotColors[i]),
-                            IsHitTestVisible = false
-                        };
-
-                        Canvas.SetLeft(dot, startX + i * (dotSize + spacing));
-                        Canvas.SetTop(dot, dotYInCanvas);
-                        DotOverlay.Children.Add(dot);
+                        _dotSpecs.Add(new DotSpec(
+                            startX + i * (dotSize + spacing),
+                            dotYInCanvas,
+                            GetDotBrush(dotColors[i])));
                     }
                 }
                 catch
                 {
                 }
             }
+
+            ApplyDotOverlay(_dotSpecs);
+        }
+
+        private void ApplyDotOverlay(IReadOnlyList<DotSpec> dots)
+        {
+            while (DotOverlay.Children.Count > dots.Count)
+                DotOverlay.Children.RemoveAt(DotOverlay.Children.Count - 1);
+
+            while (DotOverlay.Children.Count < dots.Count)
+            {
+                DotOverlay.Children.Add(new Ellipse
+                {
+                    Width = 4.5,
+                    Height = 4.5,
+                    IsHitTestVisible = false
+                });
+            }
+
+            for (int i = 0; i < dots.Count; i++)
+            {
+                var dot = (Ellipse)DotOverlay.Children[i];
+                dot.Fill = dots[i].Fill;
+                Canvas.SetLeft(dot, dots[i].Left);
+                Canvas.SetTop(dot, dots[i].Top);
+            }
+        }
+
+        private void ClearDotOverlay()
+        {
+            _dotSpecs.Clear();
+            DotOverlay.Children.Clear();
+        }
+
+        private SolidColorBrush GetDotBrush(Color color)
+        {
+            uint key = ((uint)color.A << 24) | ((uint)color.R << 16) | ((uint)color.G << 8) | color.B;
+            if (_dotBrushCache.TryGetValue(key, out var brush))
+                return brush;
+
+            if (_dotBrushCache.Count > 64)
+                _dotBrushCache.Clear();
+
+            brush = new SolidColorBrush(color);
+            _dotBrushCache[key] = brush;
+            return brush;
         }
 
         private List<CalendarViewDayItem> FindAllDayItems(DependencyObject parent)
