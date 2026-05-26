@@ -303,12 +303,12 @@ namespace Task_Flyout.Views
             if (_syncManager == null || AccountListRepeater == null) return;
             var mgr = _syncManager.AccountManager;
 
-            AccountListRepeater.ItemsSource = null;
-            AccountListRepeater.ItemsSource = mgr.Accounts;
+            if (!ReferenceEquals(AccountListRepeater.ItemsSource, mgr.Accounts))
+                AccountListRepeater.ItemsSource = mgr.Accounts;
 
             await _syncManager.SyncAllCalendarsAsync();
-            AccountListRepeater.ItemsSource = null;
-            AccountListRepeater.ItemsSource = mgr.Accounts;
+            if (!ReferenceEquals(AccountListRepeater.ItemsSource, mgr.Accounts))
+                AccountListRepeater.ItemsSource = mgr.Accounts;
         }
 
         private void BtnAddAccount_Click(object sender, RoutedEventArgs e)
