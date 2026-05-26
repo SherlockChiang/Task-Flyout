@@ -945,7 +945,7 @@ VALUES ($id, $name, $sortOrder);
             }
 
             var currentFolderIds = _cache.Folders.Select(f => f.Id ?? "").ToHashSet(StringComparer.Ordinal);
-            ExecuteNonQuery(connection, $"DELETE FROM rss_folders WHERE id NOT IN ('{string.Join("','", currentFolderIds)}');", transaction);
+            DeleteRowsNotIn(connection, transaction, "rss_folders", currentFolderIds);
 
             foreach (var subscription in _cache.Subscriptions)
             {
@@ -966,7 +966,7 @@ VALUES ($id, $title, $url, $folderId, $imageUrl, $localImagePath, $lastFetchedTi
             }
 
             var currentSubIds = _cache.Subscriptions.Select(s => s.Id ?? "").ToHashSet(StringComparer.Ordinal);
-            ExecuteNonQuery(connection, $"DELETE FROM rss_subscriptions WHERE id NOT IN ('{string.Join("','", currentSubIds)}');", transaction);
+            DeleteRowsNotIn(connection, transaction, "rss_subscriptions", currentSubIds);
 
             var keptArticleIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (var article in _cache.Articles.OrderByDescending(item => item.PublishedAt).Take(1000))
@@ -991,10 +991,7 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
                 command.ExecuteNonQuery();
             }
 
-            if (keptArticleIds.Count > 0)
-                ExecuteNonQuery(connection, $"DELETE FROM rss_articles WHERE id NOT IN ('{string.Join("','", keptArticleIds)}');", transaction);
-            else
-                ExecuteNonQuery(connection, "DELETE FROM rss_articles;", transaction);
+            DeleteRowsNotIn(connection, transaction, "rss_articles", keptArticleIds);
 
             transaction.Commit();
         }
@@ -1073,6 +1070,33 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
             using var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = sql;
+            command.ExecuteNonQuery();
+        }
+
+        private static void DeleteRowsNotIn(
+            SqliteConnection connection,
+            SqliteTransaction transaction,
+            string tableName,
+            IReadOnlyCollection<string> ids)
+        {
+            if (ids.Count == 0)
+            {
+                ExecuteNonQuery(connection, $"DELETE FROM {tableName};", transaction);
+                return;
+            }
+
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            var parameterNames = ids
+                .Select((id, index) =>
+                {
+                    var name = $"$id{index}";
+                    command.Parameters.AddWithValue(name, id);
+                    return name;
+                })
+                .ToArray();
+
+            command.CommandText = $"DELETE FROM {tableName} WHERE id NOT IN ({string.Join(",", parameterNames)});";
             command.ExecuteNonQuery();
         }
 
