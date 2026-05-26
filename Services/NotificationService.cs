@@ -20,12 +20,14 @@ namespace Task_Flyout.Services
         private int _reminderMinutes;
         private Dictionary<string, List<AgendaItem>>? _cachedItems;
         private DateTime _cacheReadTime = DateTime.MinValue;
+        private const string NotifiedIdsSettingsKey = "NotificationService.NotifiedIds";
         private static readonly TimeSpan CacheRefreshInterval = TimeSpan.FromMinutes(5);
 
         public NotificationService(SyncManager syncManager)
         {
             _syncManager = syncManager;
             _reminderMinutes = ApplicationData.Current.LocalSettings.Values["NotifyMinutes"] as int? ?? 15;
+            LoadNotifiedIds();
         }
 
         public void Initialize()
@@ -113,6 +115,7 @@ namespace Task_Flyout.Services
                         {
                             SendNotification(item, eventStart.Value);
                             _notifiedIds.Add(notifKey);
+                            SaveNotifiedIds();
                         }
                     }
                 }
@@ -121,6 +124,7 @@ namespace Task_Flyout.Services
                 {
                     var toRemove = _notifiedIds.Take(_notifiedIds.Count - 200).ToList();
                     foreach (var id in toRemove) _notifiedIds.Remove(id);
+                    SaveNotifiedIds();
                 }
             }
             catch (Exception ex)
@@ -173,6 +177,18 @@ namespace Task_Flyout.Services
             {
                 System.Diagnostics.Debug.WriteLine($"Send notification failed: {ex.Message}");
             }
+        }
+
+        private void LoadNotifiedIds()
+        {
+            var raw = ApplicationData.Current.LocalSettings.Values[NotifiedIdsSettingsKey] as string ?? "";
+            foreach (var id in raw.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                _notifiedIds.Add(id);
+        }
+
+        private void SaveNotifiedIds()
+        {
+            ApplicationData.Current.LocalSettings.Values[NotifiedIdsSettingsKey] = string.Join('\n', _notifiedIds);
         }
 
         private Dictionary<string, List<AgendaItem>>? LoadCacheItems()
