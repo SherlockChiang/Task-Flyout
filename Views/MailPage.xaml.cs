@@ -34,12 +34,11 @@ namespace Task_Flyout.Views
         private static readonly Regex RxSelfClosingDangerousTags = new(@"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*/?\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxEventHandlerQuoted = new(@"\s+on\w+\s*=\s*(['""]).*?\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxEventHandlerUnquoted = new(@"\s+on\w+\s*=\s*[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RxScriptUriQuoted = new(@"(href|src|action|formaction|data)\s*=\s*(['""])\s*(javascript|vbscript|data):.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxScriptUriUnquoted = new(@"(href|src|action|formaction|data)\s*=\s*(javascript|vbscript|data):[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RxRemoteResourceQuoted = new(@"\s(src|srcset|background)\s*=\s*(['""])\s*https?://.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxRemoteResourceUnquoted = new(@"\s(src|srcset|background)\s*=\s*https?://[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RxDangerousCssStyle = new(@"style\s*=\s*(['""])[^'""]*\b(expression|url\s*\(|-moz-binding|behavior)\b[^'""]*\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxCssUrl = new(@"url\s*\(\s*(['""]?)https?://.*?\1\s*\)", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxScriptUriQuoted = new(@"(href|src|action|formaction|data)\s*=\s*(['""])\s*(javascript|vbscript):.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxScriptUriUnquoted = new(@"(href|src|action|formaction|data)\s*=\s*(javascript|vbscript):[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxDataUriNavigationQuoted = new(@"(href|action|formaction|data)\s*=\s*(['""])\s*data:.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxDataUriNavigationUnquoted = new(@"(href|action|formaction|data)\s*=\s*data:[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxDangerousCssStyle = new(@"style\s*=\s*(['""])[^'""]*\b(expression|-moz-binding|behavior)\b[^'""]*\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxHtmlContentTags = new(@"<\s*(html|head|body|style|table|div|p|span|br|img|a|meta)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxHtmlTag = new(@"<\s*html\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxHeadClose = new(@"<\s*/\s*head\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -1093,19 +1092,15 @@ body { background-color: {{background}} !important; }
             value = RxEventHandlerUnquoted.Replace(value, "");
             value = RxScriptUriQuoted.Replace(value, "$1=\"#\"");
             value = RxScriptUriUnquoted.Replace(value, "$1=\"#\"");
-            value = RxRemoteResourceQuoted.Replace(value, m => IsBackgroundResourceAttribute(m.Value) ? "" : m.Value);
-            value = RxRemoteResourceUnquoted.Replace(value, m => IsBackgroundResourceAttribute(m.Value) ? "" : m.Value);
+            value = RxDataUriNavigationQuoted.Replace(value, "$1=\"#\"");
+            value = RxDataUriNavigationUnquoted.Replace(value, "$1=\"#\"");
             value = RxDangerousCssStyle.Replace(value, "");
-            value = RxCssUrl.Replace(value, "none");
 
             if (!RxHtmlContentTags.IsMatch(value))
                 value = $"<pre>{WebUtility.HtmlEncode(RemoveCssNoise(value))}</pre>";
 
             return value;
         }
-
-        private static bool IsBackgroundResourceAttribute(string attribute)
-            => attribute.Contains("background", StringComparison.OrdinalIgnoreCase);
 
         private static string SanitizeTrustedMailHtml(string html)
         {
@@ -1118,6 +1113,8 @@ body { background-color: {{background}} !important; }
             value = RxEventHandlerUnquoted.Replace(value, "");
             value = RxTrustedScriptUriQuoted.Replace(value, "$1=\"#\"");
             value = RxTrustedScriptUriUnquoted.Replace(value, "$1=\"#\"");
+            value = RxDataUriNavigationQuoted.Replace(value, "$1=\"#\"");
+            value = RxDataUriNavigationUnquoted.Replace(value, "$1=\"#\"");
             value = RxTrustedDangerousCss.Replace(value, "");
 
             if (!RxHtmlContentTags.IsMatch(value))
