@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Web.WebView2.Core;
+using Windows.Storage;
 using Windows.Storage.Streams;
 
 namespace Task_Flyout.Services
@@ -37,10 +38,12 @@ namespace Task_Flyout.Services
             if (!Uri.TryCreate(uriText, UriKind.Absolute, out var uri))
                 return false;
 
-            if (uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ||
-                uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase) ||
+            if (uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase) ||
                 uri.Scheme.Equals("about", StringComparison.OrdinalIgnoreCase))
                 return true;
+
+            if (uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase))
+                return ApplicationData.Current.LocalSettings.Values["AllowInsecureWebViewResources"] as bool? ?? false;
 
             return uri.Scheme.Equals("data", StringComparison.OrdinalIgnoreCase) &&
                    (uriText.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase) ||

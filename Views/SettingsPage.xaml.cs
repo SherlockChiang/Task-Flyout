@@ -54,6 +54,7 @@ namespace Task_Flyout.Views
             BackgroundToggle.IsOn = settings.Values["RunInBackground"] as bool? ?? true;
             NotifyToggle.IsOn = settings.Values["NotifyEnabled"] as bool? ?? true;
             MailPollingToggle.IsOn = settings.Values["MailPollingEnabled"] as bool? ?? true;
+            AllowInsecureWebViewResourcesToggle.IsOn = settings.Values["AllowInsecureWebViewResources"] as bool? ?? false;
             ShowSecondsToggle.IsOn = settings.Values["ShowSeconds"] as bool? ?? false;
             AboutVersionText.Text = GetVersionText();
 
@@ -439,6 +440,12 @@ namespace Task_Flyout.Views
                 if (App.Current is App app)
                     app.MailService.UpdateMailPollingSettings();
             }
+        }
+
+        private void AllowInsecureWebViewResourcesToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            ApplicationData.Current.LocalSettings.Values["AllowInsecureWebViewResources"] = AllowInsecureWebViewResourcesToggle.IsOn;
         }
 
         private async void StartupToggle_Toggled(object sender, RoutedEventArgs e)
