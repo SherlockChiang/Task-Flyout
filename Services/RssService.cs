@@ -662,17 +662,40 @@ namespace Task_Flyout.Services
             return DecodeFeedBytes(buffer.ToArray(), response.Content.Headers.ContentType?.CharSet);
         }
 
+        static RssService()
+        {
+            try { Encoding.RegisterProvider(CodePagesEncodingProvider.Instance); }
+            catch { }
+        }
+
+        private static readonly HashSet<string> AllowedFeedCharsets = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "utf-8", "utf8",
+            "utf-16", "utf-16le", "utf-16be",
+            "us-ascii", "ascii",
+            "iso-8859-1", "latin1",
+            "iso-8859-2", "iso-8859-15",
+            "windows-1250", "windows-1251", "windows-1252", "windows-1253", "windows-1254",
+            "gb2312", "gbk", "gb18030",
+            "big5",
+            "shift_jis", "shift-jis", "euc-jp", "iso-2022-jp",
+            "euc-kr"
+        };
+
         private static string DecodeFeedBytes(byte[] bytes, string? charset)
         {
             if (!string.IsNullOrWhiteSpace(charset))
             {
-                try
+                var normalizedCharset = charset.Trim().Trim('"', '\'').ToLowerInvariant();
+                if (AllowedFeedCharsets.Contains(normalizedCharset))
                 {
-                    var normalizedCharset = charset.Trim().Trim('"', '\'');
-                    return Encoding.GetEncoding(normalizedCharset).GetString(bytes);
-                }
-                catch
-                {
+                    try
+                    {
+                        return Encoding.GetEncoding(normalizedCharset).GetString(bytes);
+                    }
+                    catch
+                    {
+                    }
                 }
             }
 
