@@ -35,6 +35,8 @@ namespace Task_Flyout
         private int _mediaSessionInitializing;
         private GlobalSystemMediaTransportControlsSessionManager? _mediaSessionManager;
         private GlobalSystemMediaTransportControlsSession? _mediaSession;
+        private DesktopAcrylicBackdrop? _acrylicBackdrop;
+        private bool _inTransparentTopLevelMode;
         private int _lastBarX = int.MinValue;
         private int _lastBarY = int.MinValue;
         private int _lastBarWidth = int.MinValue;
@@ -146,6 +148,8 @@ namespace Task_Flyout
         private const uint SWP_NOACTIVATE = 0x0010;
         private const uint SWP_SHOWWINDOW = 0x0040;
         private const uint SWP_NOZORDER = 0x0004;
+        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
         private const int SW_SHOWNOACTIVATE = 4;
         private const uint WM_MOUSEACTIVATE = 0x0021;
         private const int MA_NOACTIVATE = 3;
@@ -228,6 +232,7 @@ namespace Task_Flyout
                     _mediaSessionManager = null;
                 }
                 SystemBackdrop = null;
+                _acrylicBackdrop = null;
             };
         }
 
@@ -254,8 +259,21 @@ namespace Task_Flyout
                     return;
                 }
 
-                bool needsReparent = currentTaskbar != _taskbarHwnd || GetParent(hWnd) != currentTaskbar;
-                if (needsReparent)
+                bool transparentMode = IsTransparentRequested;
+                bool needsAttach;
+                if (transparentMode)
+                {
+                    needsAttach = currentTaskbar != _taskbarHwnd
+                                  || !_inTransparentTopLevelMode
+                                  || GetParent(hWnd) != IntPtr.Zero;
+                }
+                else
+                {
+                    needsAttach = currentTaskbar != _taskbarHwnd
+                                  || _inTransparentTopLevelMode
+                                  || GetParent(hWnd) != currentTaskbar;
+                }
+                if (needsAttach)
                 {
                     _taskbarHwnd = currentTaskbar;
                     _isParented = false;
@@ -266,7 +284,7 @@ namespace Task_Flyout
                     _ = InitializeMediaSessionManagerAsync();
                 PositionOnTaskbar();
 
-                if ((needsReparent || !IsWindowVisible(hWnd)) && IsWindow(hWnd))
+                if ((needsAttach || !IsWindowVisible(hWnd)) && IsWindow(hWnd))
                     ShowWindow(hWnd, SW_SHOWNOACTIVATE);
 
                 // Keep polling after parenting: taskbar widgets and FluentFlyout media
@@ -303,6 +321,9 @@ namespace Task_Flyout
                 _reparentTimer.Interval = desired;
         }
 
+        private bool IsTransparentRequested =>
+            (App.Current as App)?.WeatherService?.WeatherBarTransparentBackground == true;
+
         private void AttachToTaskbar()
         {
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
@@ -311,6 +332,27 @@ namespace Task_Flyout
             if (_taskbarHwnd == IntPtr.Zero)
                 _taskbarHwnd = FindWindow("Shell_TrayWnd", null);
             if (_taskbarHwnd == IntPtr.Zero || !IsWindow(_taskbarHwnd)) return;
+
+            if (IsTransparentRequested)
+            {
+                // Top-level + topmost: SystemBackdrop (acrylic) only renders on top-level
+                // windows. We never SetParent into Shell_TrayWnd in this mode.
+                if (GetParent(hWnd) != IntPtr.Zero)
+                    SetParent(hWnd, IntPtr.Zero);
+
+                int popupStyle = GetWindowLong(hWnd, GWL_STYLE);
+                popupStyle &= ~WS_CHILD;
+                popupStyle |= WS_POPUP;
+                SetWindowLong(hWnd, GWL_STYLE, popupStyle);
+
+                _inTransparentTopLevelMode = true;
+                _isParented = true; // satisfies PositionOnTaskbar guard
+                ResetCachedWindowPlacement();
+                ApplyWindowsTheme();
+                return;
+            }
+
+            _inTransparentTopLevelMode = false;
 
             int style = GetWindowLong(hWnd, GWL_STYLE);
             style &= ~WS_POPUP;
@@ -422,16 +464,33 @@ namespace Task_Flyout
             int x = widgetsOffset + (widgetsOffset > 0 ? gap : 0);
             int y = (taskbarHeight - pillHeight) / 2;
 
-                // 如果检测到 FluentFlyout，把自己排在它后面（z-order 更低），避免遮挡
-                IntPtr insertAfter = _fluentFlyoutHwnd != IntPtr.Zero ? _fluentFlyoutHwnd : IntPtr.Zero;
-                uint flags = SWP_NOACTIVATE | SWP_SHOWWINDOW;
-                if (_fluentFlyoutHwnd == IntPtr.Zero)
-                    flags |= SWP_NOZORDER;
-
-                if (insertAfter != IntPtr.Zero && !IsWindow(insertAfter))
+                // In top-level transparent mode the coords above are still
+                // parent-relative to the taskbar — convert to screen coords.
+                if (_inTransparentTopLevelMode)
                 {
-                    insertAfter = IntPtr.Zero;
-                    flags |= SWP_NOZORDER;
+                    x += tbRect.Left;
+                    y += tbRect.Top;
+                }
+
+                // 如果检测到 FluentFlyout，把自己排在它后面（z-order 更低），避免遮挡
+                IntPtr insertAfter;
+                uint flags = SWP_NOACTIVATE | SWP_SHOWWINDOW;
+                if (_inTransparentTopLevelMode)
+                {
+                    // Top-level: must use HWND_TOPMOST since we sit above the taskbar.
+                    insertAfter = HWND_TOPMOST;
+                }
+                else
+                {
+                    insertAfter = _fluentFlyoutHwnd != IntPtr.Zero ? _fluentFlyoutHwnd : IntPtr.Zero;
+                    if (_fluentFlyoutHwnd == IntPtr.Zero)
+                        flags |= SWP_NOZORDER;
+
+                    if (insertAfter != IntPtr.Zero && !IsWindow(insertAfter))
+                    {
+                        insertAfter = IntPtr.Zero;
+                        flags |= SWP_NOZORDER;
+                    }
                 }
 
                 bool placementChanged =
@@ -798,21 +857,23 @@ namespace Task_Flyout
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 if (transparent)
                 {
-                    // Reparented child of Shell_TrayWnd: SystemBackdrop (acrylic/mica)
-                    // does NOT render on child windows. Fall back to a layered window
-                    // color-key, painting the bar background with a magic colour that
-                    // DWM turns into true transparency so the real taskbar shows through.
-                    SystemBackdrop = null;
-
+                    // Top-level window (not reparented into Shell_TrayWnd) — SystemBackdrop
+                    // can render here. Drop any layered/color-key styling left over from a
+                    // previous mode and attach DesktopAcrylicBackdrop.
                     int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-                    exStyle |= WS_EX_LAYERED;
+                    exStyle &= ~WS_EX_LAYERED;
                     SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
-                    SetLayeredWindowAttributes(hWnd, TransparencyKeyColorRef, 255, LWA_COLORKEY | LWA_ALPHA);
+
+                    _acrylicBackdrop ??= new DesktopAcrylicBackdrop();
+                    if (!ReferenceEquals(SystemBackdrop, _acrylicBackdrop))
+                        SystemBackdrop = _acrylicBackdrop;
 
                     if (mainBorder != null)
-                        mainBorder.Background = TransparencyKeyBrush;
+                        mainBorder.Background = new SolidColorBrush(Colors.Transparent);
                     if (topBorder != null)
-                        topBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
+                        topBorder.BorderBrush = new SolidColorBrush(_isLightTheme
+                            ? Color.FromArgb(28, 255, 255, 255)
+                            : Color.FromArgb(32, 255, 255, 255));
                     return;
                 }
 
@@ -872,25 +933,16 @@ namespace Task_Flyout
             ApplyWindowsTheme(); // restore resting Mica background + border
         }
 
-        // Magic colour used as a layered-window color key. R=1, G=0, B=1 is chosen because
-        // it almost never appears in real anti-aliased text/icons, and any AA fringe will
-        // blend with neighbouring colours rather than match exactly.
-        private static readonly Color TransparencyKeyColor = Color.FromArgb(255, 1, 0, 1);
-        // COLORREF is 0x00BBGGRR
-        private const uint TransparencyKeyColorRef = 0x00010001;
-        private static readonly Brush TransparencyKeyBrush = new SolidColorBrush(TransparencyKeyColor);
-
         private static Brush CreateTaskbarMaterialBrush(bool isLightTheme, bool hovered = false)
         {
-            // In layered-color-key mode the resting bar is fully see-through (painted with
-            // the magic color and keyed out by DWM). Hover paints a fully opaque tint so
-            // we don't blend with the key color (which would leave a pinkish fringe).
+            // Resting state defers to DesktopAcrylicBackdrop (no overlay). Hover paints a
+            // subtle translucent tint that blends with the acrylic.
             if (!hovered)
-                return TransparencyKeyBrush;
+                return new SolidColorBrush(Colors.Transparent);
 
             return new SolidColorBrush(isLightTheme
-                ? Color.FromArgb(255, 232, 232, 234)
-                : Color.FromArgb(255, 50, 50, 55));
+                ? Color.FromArgb(48, 255, 255, 255)
+                : Color.FromArgb(56, 255, 255, 255));
         }
 
         private static string FormatBarLocation(string city)
