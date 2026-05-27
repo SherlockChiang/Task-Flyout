@@ -187,6 +187,26 @@ namespace Task_Flyout.Services
                 .ToList();
         }
 
+        public IReadOnlyList<RssArticle> GetCachedArticlesPage(string? subscriptionId, string? folderId, int skip, int take)
+        {
+            EnsureLoaded();
+            skip = Math.Max(0, skip);
+            take = Math.Clamp(take, 1, 100);
+
+            try
+            {
+                InitializeDatabase();
+                return QueryCachedArticlesPage(subscriptionId, folderId, skip, take);
+            }
+            catch
+            {
+                return GetCachedArticles(subscriptionId, folderId)
+                    .Skip(skip)
+                    .Take(take)
+                    .ToList();
+            }
+        }
+
         public RssFolder AddFolder(string name)
         {
             EnsureLoaded();
@@ -289,11 +309,7 @@ namespace Task_Flyout.Services
 
         public Task<List<RssArticle>> LoadMoreArticlesAsync(string? subscriptionId, string? folderId, int skip, int take)
         {
-            EnsureLoaded();
-            return Task.FromResult(GetCachedArticles(subscriptionId, folderId)
-                .Skip(skip)
-                .Take(take)
-                .ToList());
+            return Task.FromResult(GetCachedArticlesPage(subscriptionId, folderId, skip, take).ToList());
         }
 
         public async Task RefreshSubscriptionAsync(RssSubscription subscription, bool force)
@@ -901,6 +917,9 @@ CREATE TABLE IF NOT EXISTS rss_articles (
     published_ticks INTEGER NOT NULL DEFAULT 0
 );
 """);
+            ExecuteNonQuery(connection, "CREATE INDEX IF NOT EXISTS idx_rss_articles_published ON rss_articles(published_ticks DESC);");
+            ExecuteNonQuery(connection, "CREATE INDEX IF NOT EXISTS idx_rss_articles_subscription_published ON rss_articles(subscription_id, published_ticks DESC);");
+            ExecuteNonQuery(connection, "CREATE INDEX IF NOT EXISTS idx_rss_subscriptions_folder ON rss_subscriptions(folder_id);");
 
             using var command = connection.CreateCommand();
             command.CommandText = "INSERT OR REPLACE INTO metadata(key, value) VALUES ('schema_version', $version);";
@@ -957,25 +976,59 @@ LIMIT 1000;
 """;
                 using var reader = command.ExecuteReader();
                 while (reader.Read())
-                {
-                    cache.Articles.Add(new RssArticle
-                    {
-                        Id = reader.GetString(0),
-                        SubscriptionId = reader.GetString(1),
-                        FeedTitle = reader.GetString(2),
-                        Title = reader.GetString(3),
-                        Link = reader.GetString(4),
-                        Summary = reader.GetString(5),
-                        HtmlContent = reader.GetString(6),
-                        ImageUrl = reader.GetString(7),
-                        LocalImagePath = reader.GetString(8),
-                        PublishedAt = FromTicks(reader.GetInt64(9))
-                    });
-                }
+                    cache.Articles.Add(ReadArticle(reader));
             }
 
             return cache;
         }
+
+        private List<RssArticle> QueryCachedArticlesPage(string? subscriptionId, string? folderId, int skip, int take)
+        {
+            var hasSubscription = !string.IsNullOrWhiteSpace(subscriptionId);
+            var hasFolder = folderId != null;
+
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+SELECT a.id, a.subscription_id, a.feed_title, a.title, a.link, a.summary, a.html_content, a.image_url, a.local_image_path, a.published_ticks
+FROM rss_articles a
+WHERE ($hasSubscription = 0 OR a.subscription_id = $subscriptionId)
+  AND ($hasFolder = 0 OR EXISTS (
+      SELECT 1 FROM rss_subscriptions s
+      WHERE s.id = a.subscription_id AND s.folder_id = $folderId
+  ))
+ORDER BY a.published_ticks DESC
+LIMIT $take OFFSET $skip;
+""";
+            command.Parameters.AddWithValue("$hasSubscription", hasSubscription ? 1 : 0);
+            command.Parameters.AddWithValue("$subscriptionId", subscriptionId ?? "");
+            command.Parameters.AddWithValue("$hasFolder", hasFolder ? 1 : 0);
+            command.Parameters.AddWithValue("$folderId", folderId ?? "");
+            command.Parameters.AddWithValue("$take", take);
+            command.Parameters.AddWithValue("$skip", skip);
+
+            var articles = new List<RssArticle>(take);
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                articles.Add(ReadArticle(reader));
+
+            return articles;
+        }
+
+        private static RssArticle ReadArticle(SqliteDataReader reader)
+            => new()
+            {
+                Id = reader.GetString(0),
+                SubscriptionId = reader.GetString(1),
+                FeedTitle = reader.GetString(2),
+                Title = reader.GetString(3),
+                Link = reader.GetString(4),
+                Summary = reader.GetString(5),
+                HtmlContent = reader.GetString(6),
+                ImageUrl = reader.GetString(7),
+                LocalImagePath = reader.GetString(8),
+                PublishedAt = FromTicks(reader.GetInt64(9))
+            };
 
         private void SaveToDatabase()
         {

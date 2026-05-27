@@ -195,9 +195,7 @@ namespace Task_Flyout.Views
 
             try
             {
-                var items = _rssService.GetCachedArticles(_selectedSubscriptionId, _selectedFolderId)
-                    .Take(PageSize)
-                    .ToList();
+                var items = _rssService.GetCachedArticlesPage(_selectedSubscriptionId, _selectedFolderId, 0, PageSize);
                 foreach (var item in items)
                     Articles.Add(item);
 
