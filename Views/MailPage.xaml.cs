@@ -39,6 +39,12 @@ namespace Task_Flyout.Views
         private static readonly Regex RxDataUriNavigationQuoted = new(@"(href|action|formaction|data)\s*=\s*(['""])\s*data:.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxDataUriNavigationUnquoted = new(@"(href|action|formaction|data)\s*=\s*data:[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxDangerousCssStyle = new(@"style\s*=\s*(['""])[^'""]*\b(expression|-moz-binding|behavior)\b[^'""]*\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxUntrustedRemoteResourceQuoted = new(@"\s+(src|srcset|poster|background)\s*=\s*(['""])\s*(?:https?:)?//.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxUntrustedRemoteResourceUnquoted = new(@"\s+(src|srcset|poster|background)\s*=\s*(?:https?:)?//[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxUntrustedRemoteCssStyle = new(@"\s+style\s*=\s*(['""])[^'""]*(?:@import|url\s*\(\s*['""]?\s*(?:https?:)?//)[^'""]*\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxUntrustedRemoteStyleBlock = new(@"<\s*style\b[^>]*>.*?(?:@import|url\s*\(\s*['""]?\s*(?:https?:)?//).*?<\s*/\s*style\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxUntrustedExternalLinkTag = new(@"<\s*link\b[^>]*\bhref\s*=\s*(['""])\s*(?:https?:)?//.*?\1[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxUntrustedMetaRefreshTag = new(@"<\s*meta\b[^>]*\bhttp-equiv\s*=\s*(['""]?)refresh\1[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxHtmlContentTags = new(@"<\s*(html|head|body|style|table|div|p|span|br|img|a|meta)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxHtmlTag = new(@"<\s*html\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxHeadClose = new(@"<\s*/\s*head\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -1138,6 +1144,7 @@ body { background-color: {{background}} !important; }
             value = RxDataUriNavigationQuoted.Replace(value, "$1=\"#\"");
             value = RxDataUriNavigationUnquoted.Replace(value, "$1=\"#\"");
             value = RxDangerousCssStyle.Replace(value, "");
+            value = StripUntrustedRemoteResources(value);
 
             if (!RxHtmlContentTags.IsMatch(value))
                 value = $"<pre>{WebUtility.HtmlEncode(RemoveCssNoise(value))}</pre>";
@@ -1164,6 +1171,17 @@ body { background-color: {{background}} !important; }
                 value = $"<pre>{WebUtility.HtmlEncode(RemoveCssNoise(value))}</pre>";
 
             return value;
+        }
+
+        private static string StripUntrustedRemoteResources(string html)
+        {
+            html = RxUntrustedExternalLinkTag.Replace(html, "");
+            html = RxUntrustedMetaRefreshTag.Replace(html, "");
+            html = RxUntrustedRemoteStyleBlock.Replace(html, "");
+            html = RxUntrustedRemoteCssStyle.Replace(html, "");
+            html = RxUntrustedRemoteResourceQuoted.Replace(html, "");
+            html = RxUntrustedRemoteResourceUnquoted.Replace(html, "");
+            return html;
         }
 
         private static bool HasVisibleHtmlContent(string html)
