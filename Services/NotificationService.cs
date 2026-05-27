@@ -14,7 +14,7 @@ namespace Task_Flyout.Services
     public class NotificationService
     {
         private readonly SyncManager _syncManager;
-        private readonly HashSet<string> _notifiedIds = new();
+        private readonly Dictionary<string, DateTimeOffset> _notifiedIds = new(StringComparer.Ordinal);
         private readonly ResourceLoader _loader = new();
         private DispatcherTimer? _timer;
         private int _reminderMinutes;
@@ -103,29 +103,24 @@ namespace Task_Flyout.Services
                         if (!IsItemVisible(item)) continue;
                         if (string.IsNullOrEmpty(item.Id)) continue;
 
-                        var notifKey = $"{item.Id}_{dateKey}";
-                        if (_notifiedIds.Contains(notifKey)) continue;
-
                         var eventStart = GetEventStartTime(item, dateKey);
                         if (eventStart == null) continue;
+
+                        var notifKey = BuildNotificationKey(item, dateKey, eventStart.Value);
+                        if (_notifiedIds.ContainsKey(notifKey)) continue;
 
                         var minutesUntilStart = (eventStart.Value - now).TotalMinutes;
 
                         if (minutesUntilStart > 0 && minutesUntilStart <= _reminderMinutes)
                         {
                             SendNotification(item, eventStart.Value);
-                            _notifiedIds.Add(notifKey);
+                            _notifiedIds[notifKey] = DateTimeOffset.UtcNow;
                             SaveNotifiedIds();
                         }
                     }
                 }
 
-                if (_notifiedIds.Count > 500)
-                {
-                    var toRemove = _notifiedIds.Take(_notifiedIds.Count - 200).ToList();
-                    foreach (var id in toRemove) _notifiedIds.Remove(id);
-                    SaveNotifiedIds();
-                }
+                PruneNotifiedIds();
             }
             catch (Exception ex)
             {
@@ -182,13 +177,54 @@ namespace Task_Flyout.Services
         private void LoadNotifiedIds()
         {
             var raw = ApplicationData.Current.LocalSettings.Values[NotifiedIdsSettingsKey] as string ?? "";
-            foreach (var id in raw.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                _notifiedIds.Add(id);
+            foreach (var line in raw.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var parts = line.Split('|', 2);
+                var key = WebUtility.UrlDecode(parts[0]);
+                if (string.IsNullOrWhiteSpace(key)) continue;
+
+                if (parts.Length == 2 && long.TryParse(parts[1], out var ticks))
+                    _notifiedIds[key] = new DateTimeOffset(ticks, TimeSpan.Zero);
+                else
+                    _notifiedIds[key] = DateTimeOffset.UtcNow;
+            }
         }
 
         private void SaveNotifiedIds()
         {
-            ApplicationData.Current.LocalSettings.Values[NotifiedIdsSettingsKey] = string.Join('\n', _notifiedIds);
+            ApplicationData.Current.LocalSettings.Values[NotifiedIdsSettingsKey] = string.Join('\n',
+                _notifiedIds.Select(kvp => $"{WebUtility.UrlEncode(kvp.Key)}|{kvp.Value.UtcTicks}"));
+        }
+
+        private static string BuildNotificationKey(AgendaItem item, string dateKey, DateTime eventStart)
+            => $"{item.Provider}|{item.Id}|{dateKey}|{eventStart.Ticks}";
+
+        private void PruneNotifiedIds()
+        {
+            var cutoff = DateTimeOffset.UtcNow.AddDays(-14);
+            var removed = false;
+
+            foreach (var key in _notifiedIds.Where(kvp => kvp.Value < cutoff).Select(kvp => kvp.Key).ToList())
+            {
+                _notifiedIds.Remove(key);
+                removed = true;
+            }
+
+            if (_notifiedIds.Count > 500)
+            {
+                foreach (var key in _notifiedIds
+                             .OrderBy(kvp => kvp.Value)
+                             .Take(_notifiedIds.Count - 300)
+                             .Select(kvp => kvp.Key)
+                             .ToList())
+                {
+                    _notifiedIds.Remove(key);
+                    removed = true;
+                }
+            }
+
+            if (removed)
+                SaveNotifiedIds();
         }
 
         private Dictionary<string, List<AgendaItem>>? LoadCacheItems()
