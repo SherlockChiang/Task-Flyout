@@ -256,6 +256,12 @@ namespace Task_Flyout.Services
             OpenFromActivationArguments(args.Argument);
         }
 
+        // Toast activation arguments can in theory come from anything that managed to
+        // raise a notification under our AUMID; cap parse cost and only accept ID-shaped
+        // values before handing them to navigation code.
+        private const int MaxActivationArgumentLength = 4096;
+        private const int MaxActivationIdLength = 256;
+
         public static void OpenFromActivationArguments(string argument)
         {
             var arguments = ParseArguments(argument);
@@ -265,7 +271,8 @@ namespace Task_Flyout.Services
                     action == "openMail" &&
                     arguments.TryGetValue("accountId", out var accountId) &&
                     arguments.TryGetValue("folderId", out var folderId) &&
-                    arguments.TryGetValue("messageId", out var messageId))
+                    arguments.TryGetValue("messageId", out var messageId) &&
+                    IsSafeIdToken(accountId) && IsSafeIdToken(folderId) && IsSafeIdToken(messageId))
                 {
                     App.OpenMainWindowInternal(window => window.NavigateToMailMessage(accountId, folderId, messageId));
                 }
@@ -276,10 +283,22 @@ namespace Task_Flyout.Services
             });
         }
 
+        private static bool IsSafeIdToken(string? value)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length > MaxActivationIdLength) return false;
+            foreach (var c in value)
+            {
+                if (!(char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '.' || c == '@' || c == '/' || c == '+' || c == '='))
+                    return false;
+            }
+            return true;
+        }
+
         private static Dictionary<string, string> ParseArguments(string argument)
         {
             var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrWhiteSpace(argument)) return result;
+            if (argument.Length > MaxActivationArgumentLength) return result;
 
             argument = WebUtility.HtmlDecode(argument).Trim().Trim('"');
             const string activationPrefix = "----AppNotificationActivated:";
