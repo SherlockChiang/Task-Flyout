@@ -179,7 +179,11 @@ namespace Task_Flyout
             ApplyWindowsTheme();
 
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
-            _refreshTimer.Tick += async (s, e) => await RefreshWeatherAsync();
+            _refreshTimer.Tick += async (_, _) =>
+            {
+                try { await RefreshWeatherAsync(); }
+                catch (Exception ex) { Debug.WriteLine($"Weather refresh tick failed: {ex.Message}"); }
+            };
             _refreshTimer.Start();
 
             _reparentTimer = new DispatcherTimer { Interval = NormalReparentInterval };

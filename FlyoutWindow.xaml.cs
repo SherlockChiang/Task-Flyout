@@ -227,7 +227,11 @@ namespace Task_Flyout
         {
             int intervalMin = Windows.Storage.ApplicationData.Current.LocalSettings.Values["SyncIntervalMinutes"] as int? ?? 15;
             _syncTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(intervalMin) };
-            _syncTimer.Tick += async (s, e) => await SyncAllDataAsync(true, forceRefresh: true);
+            _syncTimer.Tick += async (_, _) =>
+            {
+                try { await SyncAllDataAsync(true, forceRefresh: true); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Periodic sync tick failed: {ex.Message}"); }
+            };
             _syncTimer.Start();
         }
 

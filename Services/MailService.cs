@@ -251,6 +251,12 @@ namespace Task_Flyout.Services
             return true;
         }
 
+        private async Task SafeInitialMailCheckAsync()
+        {
+            try { await CheckNewMailAsync(); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Initial mail check failed: {ex.Message}"); }
+        }
+
         public void StartMailPolling()
         {
             StopMailPolling();
@@ -260,9 +266,13 @@ namespace Task_Flyout.Services
             {
                 Interval = TimeSpan.FromMinutes(Math.Max(1, MailPollingIntervalMinutes))
             };
-            _pollTimer.Tick += async (_, _) => await CheckNewMailAsync();
+            _pollTimer.Tick += async (_, _) =>
+            {
+                try { await CheckNewMailAsync(); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Mail poll tick failed: {ex.Message}"); }
+            };
             _pollTimer.Start();
-            _ = CheckNewMailAsync();
+            _ = SafeInitialMailCheckAsync();
         }
 
         public void StopMailPolling()
