@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -22,7 +23,9 @@ namespace Task_Flyout.Services
             if (_configured) return;
 
             var cachePath = CachePath;
-            PruneCacheIfNeeded(cachePath);
+            // Prune off the UI thread — at the 300 MB cap a sync sweep across ~10k
+            // entries was blocking first-open of mail / RSS pages noticeably.
+            _ = Task.Run(() => PruneCacheIfNeeded(cachePath));
             Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", cachePath, EnvironmentVariableTarget.Process);
             _configured = true;
         }
@@ -105,14 +108,24 @@ namespace Task_Flyout.Services
         {
             try
             {
-                var size = GetDirectorySize(path);
+                // Two passes: one to measure (stream), one to delete in age order
+                // (only realised when we actually need to prune). The naive
+                // single-pass alloc of all FileInfos cost > 10 MB at the cap.
+                long size = 0;
+                foreach (var file in EnumerateFiles(path))
+                    size += SafeLength(file);
+
                 if (size <= MaxCacheBytes) return;
 
-                foreach (var file in EnumerateFiles(path)
-                             .OrderBy(file => file.LastWriteTimeUtc))
+                var ordered = EnumerateFiles(path)
+                    .OrderBy(file => SafeLastWriteUtc(file))
+                    .ToList(); // only realised when we actually need to delete
+
+                foreach (var file in ordered)
                 {
+                    var len = SafeLength(file);
                     TryDeleteFile(file.FullName);
-                    size -= Math.Max(0, file.Length);
+                    size -= len;
                     if (size <= TargetCacheBytes) break;
                 }
 
@@ -124,25 +137,41 @@ namespace Task_Flyout.Services
         }
 
         private static long GetDirectorySize(string path)
-            => EnumerateFiles(path).Sum(file => SafeLength(file));
-
-        private static FileInfo[] EnumerateFiles(string path)
         {
+            long total = 0;
+            foreach (var file in EnumerateFiles(path))
+                total += SafeLength(file);
+            return total;
+        }
+
+        private static IEnumerable<FileInfo> EnumerateFiles(string path)
+        {
+            if (!Directory.Exists(path)) yield break;
+
+            IEnumerable<FileInfo> source;
             try
             {
-                if (!Directory.Exists(path)) return Array.Empty<FileInfo>();
-                return new DirectoryInfo(path).EnumerateFiles("*", SearchOption.AllDirectories).ToArray();
+                source = new DirectoryInfo(path).EnumerateFiles("*", SearchOption.AllDirectories);
             }
             catch
             {
-                return Array.Empty<FileInfo>();
+                yield break;
             }
+
+            foreach (var file in source)
+                yield return file;
         }
 
         private static long SafeLength(FileInfo file)
         {
             try { return file.Length; }
             catch { return 0; }
+        }
+
+        private static DateTime SafeLastWriteUtc(FileInfo file)
+        {
+            try { return file.LastWriteTimeUtc; }
+            catch { return DateTime.MinValue; }
         }
 
         private static void DeleteDirectoryChildren(string path)
