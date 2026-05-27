@@ -92,17 +92,6 @@ namespace Task_Flyout
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
 
-        private delegate bool EnumWindowProc(IntPtr hWnd, IntPtr lParam);
-
-        [DllImport("user32.dll")]
-        private static extern bool EnumWindows(EnumWindowProc lpEnumFunc, IntPtr lParam);
-
-        [DllImport("user32.dll")]
-        private static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowProc lpEnumFunc, IntPtr lParam);
-
-        [DllImport("user32.dll")]
-        private static extern int GetWindowRgnBox(IntPtr hWnd, out RECT lprc);
-
         [DllImport("user32.dll")]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
@@ -126,15 +115,6 @@ namespace Task_Flyout
         private const int WS_CLIPSIBLINGS = 0x04000000;
         private const int WS_EX_TOOLWINDOW = 0x00000080;
         private const int WS_EX_NOACTIVATE = 0x08000000;
-        private const int WS_EX_LAYERED = 0x00080000;
-
-        [DllImport("user32.dll")]
-        private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
-        private const uint LWA_COLORKEY = 0x01;
-        private const uint LWA_ALPHA = 0x02;
-
-        // 用一个极不可能出现的颜色作为透明 key（Win32 COLORREF 是 BGR）
-        private const uint TRANSPARENCY_KEY = 0x00010201; // R=1 G=2 B=1
 
         [DllImport("gdi32.dll")]
         private static extern IntPtr CreateRoundRectRgn(int x1, int y1, int x2, int y2, int cx, int cy);
@@ -795,7 +775,6 @@ namespace Task_Flyout
                 var weatherService = (App.Current as App)?.WeatherService;
                 bool transparent = weatherService?.WeatherBarTransparentBackground == true;
 
-                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 SystemBackdrop = null;
 
                 // NOTE: Real DWM transparency (acrylic / blur-behind) is not achievable
@@ -805,11 +784,6 @@ namespace Task_Flyout
                 // The "Match taskbar colour" toggle therefore only switches between two
                 // solid shade presets: the resting taskbar tone (on) vs a brighter chip
                 // that stands out from it (off).
-                int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-                exStyle |= WS_EX_LAYERED;
-                SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
-                SetLayeredWindowAttributes(hWnd, 0, 255, LWA_ALPHA);
-
                 Color barColor;
                 if (transparent)
                 {
