@@ -821,7 +821,7 @@ namespace Task_Flyout
                 if (root.FindName("WeatherIconBackdrop") is Microsoft.UI.Xaml.Controls.Border iconBackdrop)
                 {
                     iconBackdrop.Background = new SolidColorBrush(_isLightTheme
-                        ? Color.FromArgb(102, 0, 0, 0)
+                        ? Color.FromArgb(64, 0, 0, 0)
                         : Color.FromArgb(0, 0, 0, 0));
                 }
             }
