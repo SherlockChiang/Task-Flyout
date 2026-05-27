@@ -35,10 +35,6 @@ namespace Task_Flyout
         private int _mediaSessionInitializing;
         private GlobalSystemMediaTransportControlsSessionManager? _mediaSessionManager;
         private GlobalSystemMediaTransportControlsSession? _mediaSession;
-        private DesktopAcrylicController? _acrylicController;
-        private SystemBackdropConfiguration? _backdropConfig;
-        private object? _dispatcherQueueController;
-        private bool _inTransparentTopLevelMode;
         private int _lastBarX = int.MinValue;
         private int _lastBarY = int.MinValue;
         private int _lastBarWidth = int.MinValue;
@@ -140,19 +136,6 @@ namespace Task_Flyout
         // 用一个极不可能出现的颜色作为透明 key（Win32 COLORREF 是 BGR）
         private const uint TRANSPARENCY_KEY = 0x00010201; // R=1 G=2 B=1
 
-        [StructLayout(LayoutKind.Sequential)]
-        private struct DispatcherQueueOptions
-        {
-            internal int dwSize;
-            internal int threadType;
-            internal int apartmentType;
-        }
-
-        [DllImport("CoreMessaging.dll")]
-        private static extern int CreateDispatcherQueueController(
-            [In] DispatcherQueueOptions options,
-            [In, Out, MarshalAs(UnmanagedType.IUnknown)] ref object? dispatcherQueueController);
-
         [DllImport("gdi32.dll")]
         private static extern IntPtr CreateRoundRectRgn(int x1, int y1, int x2, int y2, int cx, int cy);
 
@@ -163,8 +146,6 @@ namespace Task_Flyout
         private const uint SWP_NOACTIVATE = 0x0010;
         private const uint SWP_SHOWWINDOW = 0x0040;
         private const uint SWP_NOZORDER = 0x0004;
-        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
-        private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
         private const int SW_SHOWNOACTIVATE = 4;
         private const uint WM_MOUSEACTIVATE = 0x0021;
         private const int MA_NOACTIVATE = 3;
@@ -247,7 +228,6 @@ namespace Task_Flyout
                     _mediaSessionManager = null;
                 }
                 SystemBackdrop = null;
-                DisposeManagedAcrylicBackdrop();
             };
         }
 
@@ -274,20 +254,7 @@ namespace Task_Flyout
                     return;
                 }
 
-                bool transparentMode = IsTransparentRequested;
-                bool needsAttach;
-                if (transparentMode)
-                {
-                    needsAttach = currentTaskbar != _taskbarHwnd
-                                  || !_inTransparentTopLevelMode
-                                  || GetParent(hWnd) != IntPtr.Zero;
-                }
-                else
-                {
-                    needsAttach = currentTaskbar != _taskbarHwnd
-                                  || _inTransparentTopLevelMode
-                                  || GetParent(hWnd) != currentTaskbar;
-                }
+                bool needsAttach = currentTaskbar != _taskbarHwnd || GetParent(hWnd) != currentTaskbar;
                 if (needsAttach)
                 {
                     _taskbarHwnd = currentTaskbar;
@@ -336,9 +303,6 @@ namespace Task_Flyout
                 _reparentTimer.Interval = desired;
         }
 
-        private bool IsTransparentRequested =>
-            (App.Current as App)?.WeatherService?.WeatherBarTransparentBackground == true;
-
         private void AttachToTaskbar()
         {
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
@@ -347,27 +311,6 @@ namespace Task_Flyout
             if (_taskbarHwnd == IntPtr.Zero)
                 _taskbarHwnd = FindWindow("Shell_TrayWnd", null);
             if (_taskbarHwnd == IntPtr.Zero || !IsWindow(_taskbarHwnd)) return;
-
-            if (IsTransparentRequested)
-            {
-                // Top-level + topmost: SystemBackdrop (acrylic) only renders on top-level
-                // windows. We never SetParent into Shell_TrayWnd in this mode.
-                if (GetParent(hWnd) != IntPtr.Zero)
-                    SetParent(hWnd, IntPtr.Zero);
-
-                int popupStyle = GetWindowLong(hWnd, GWL_STYLE);
-                popupStyle &= ~WS_CHILD;
-                popupStyle |= WS_POPUP;
-                SetWindowLong(hWnd, GWL_STYLE, popupStyle);
-
-                _inTransparentTopLevelMode = true;
-                _isParented = true; // satisfies PositionOnTaskbar guard
-                ResetCachedWindowPlacement();
-                ApplyWindowsTheme();
-                return;
-            }
-
-            _inTransparentTopLevelMode = false;
 
             int style = GetWindowLong(hWnd, GWL_STYLE);
             style &= ~WS_POPUP;
@@ -479,33 +422,16 @@ namespace Task_Flyout
             int x = widgetsOffset + (widgetsOffset > 0 ? gap : 0);
             int y = (taskbarHeight - pillHeight) / 2;
 
-                // In top-level transparent mode the coords above are still
-                // parent-relative to the taskbar — convert to screen coords.
-                if (_inTransparentTopLevelMode)
-                {
-                    x += tbRect.Left;
-                    y += tbRect.Top;
-                }
-
                 // 如果检测到 FluentFlyout，把自己排在它后面（z-order 更低），避免遮挡
-                IntPtr insertAfter;
+                IntPtr insertAfter = _fluentFlyoutHwnd != IntPtr.Zero ? _fluentFlyoutHwnd : IntPtr.Zero;
                 uint flags = SWP_NOACTIVATE | SWP_SHOWWINDOW;
-                if (_inTransparentTopLevelMode)
-                {
-                    // Top-level: must use HWND_TOPMOST since we sit above the taskbar.
-                    insertAfter = HWND_TOPMOST;
-                }
-                else
-                {
-                    insertAfter = _fluentFlyoutHwnd != IntPtr.Zero ? _fluentFlyoutHwnd : IntPtr.Zero;
-                    if (_fluentFlyoutHwnd == IntPtr.Zero)
-                        flags |= SWP_NOZORDER;
+                if (_fluentFlyoutHwnd == IntPtr.Zero)
+                    flags |= SWP_NOZORDER;
 
-                    if (insertAfter != IntPtr.Zero && !IsWindow(insertAfter))
-                    {
-                        insertAfter = IntPtr.Zero;
-                        flags |= SWP_NOZORDER;
-                    }
+                if (insertAfter != IntPtr.Zero && !IsWindow(insertAfter))
+                {
+                    insertAfter = IntPtr.Zero;
+                    flags |= SWP_NOZORDER;
                 }
 
                 bool placementChanged =
@@ -870,29 +796,28 @@ namespace Task_Flyout
                 bool transparent = weatherService?.WeatherBarTransparentBackground == true;
 
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                SystemBackdrop = null;
                 if (transparent)
                 {
+                    // WinUI 3 SystemBackdrops do not render on windows that are SetParent'd
+                    // into Shell_TrayWnd, and going top-level breaks z-ordering against the
+                    // taskbar. Instead paint a colour that visually matches the Win11
+                    // taskbar's apparent acrylic shade so the bar reads as integrated.
                     int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-                    exStyle &= ~WS_EX_LAYERED;
+                    exStyle |= WS_EX_LAYERED;
                     SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
-
-                    // Manually managed DesktopAcrylicController so we can force
-                    // IsInputActive = true (the bar never receives activation, otherwise
-                    // the XAML helper paints the dim "inactive" fallback) and pick the
-                    // thinner acrylic variant for more see-through.
-                    SystemBackdrop = null;
-                    EnsureManagedAcrylicBackdrop();
+                    SetLayeredWindowAttributes(hWnd, 0, 255, LWA_ALPHA);
 
                     if (mainBorder != null)
-                        mainBorder.Background = new SolidColorBrush(Colors.Transparent);
+                        mainBorder.Background = new SolidColorBrush(_isLightTheme
+                            ? Color.FromArgb(255, 243, 243, 243)
+                            : Color.FromArgb(255, 32, 32, 32));
                     if (topBorder != null)
                         topBorder.BorderBrush = new SolidColorBrush(_isLightTheme
-                            ? Color.FromArgb(28, 255, 255, 255)
-                            : Color.FromArgb(32, 255, 255, 255));
+                            ? Color.FromArgb(40, 0, 0, 0)
+                            : Color.FromArgb(60, 255, 255, 255));
                     return;
                 }
-
-                DisposeManagedAcrylicBackdrop();
 
                 int opaqueExStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
                 opaqueExStyle |= WS_EX_LAYERED;
@@ -922,12 +847,6 @@ namespace Task_Flyout
         {
             var border = sender as Microsoft.UI.Xaml.Controls.Border;
             if (border == null) return;
-            var weatherService = (App.Current as App)?.WeatherService;
-            if (weatherService?.WeatherBarTransparentBackground == true)
-            {
-                border.Background = CreateTaskbarMaterialBrush(_isLightTheme, hovered: true);
-                return;
-            }
 
             var topBorder = (this.Content as FrameworkElement)?.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
 
@@ -948,85 +867,6 @@ namespace Task_Flyout
         private void MainBorder_PointerExited(object sender, PointerRoutedEventArgs e)
         {
             ApplyWindowsTheme(); // restore resting Mica background + border
-        }
-
-        private void EnsureDispatcherQueueController()
-        {
-            if (Windows.System.DispatcherQueue.GetForCurrentThread() != null)
-                return;
-
-            if (_dispatcherQueueController != null)
-                return;
-
-            DispatcherQueueOptions options;
-            options.dwSize = Marshal.SizeOf(typeof(DispatcherQueueOptions));
-            options.threadType = 2;     // DQTYPE_THREAD_CURRENT
-            options.apartmentType = 2;  // DQTAT_COM_STA
-
-            object? controller = null;
-            CreateDispatcherQueueController(options, ref controller);
-            _dispatcherQueueController = controller;
-        }
-
-        private void EnsureManagedAcrylicBackdrop()
-        {
-            try
-            {
-                if (!DesktopAcrylicController.IsSupported())
-                    return;
-
-                EnsureDispatcherQueueController();
-
-                if (_backdropConfig == null)
-                    _backdropConfig = new SystemBackdropConfiguration();
-
-                _backdropConfig.IsInputActive = true; // force "active" variant
-                _backdropConfig.Theme = _isLightTheme
-                    ? SystemBackdropTheme.Light
-                    : SystemBackdropTheme.Dark;
-
-                if (_acrylicController == null)
-                {
-                    _acrylicController = new DesktopAcrylicController
-                    {
-                        Kind = DesktopAcrylicKind.Thin,
-                    };
-                    _acrylicController.AddSystemBackdropTarget(
-                        WinRT.CastExtensions.As<Microsoft.UI.Composition.ICompositionSupportsSystemBackdrop>(this));
-                    _acrylicController.SetSystemBackdropConfiguration(_backdropConfig);
-                }
-                else
-                {
-                    _acrylicController.Kind = DesktopAcrylicKind.Thin;
-                }
-            }
-            catch
-            {
-                DisposeManagedAcrylicBackdrop();
-            }
-        }
-
-        private void DisposeManagedAcrylicBackdrop()
-        {
-            try
-            {
-                _acrylicController?.Dispose();
-            }
-            catch { }
-            _acrylicController = null;
-            _backdropConfig = null;
-        }
-
-        private static Brush CreateTaskbarMaterialBrush(bool isLightTheme, bool hovered = false)
-        {
-            // Resting state defers to DesktopAcrylicBackdrop (no overlay). Hover paints a
-            // subtle translucent tint that blends with the acrylic.
-            if (!hovered)
-                return new SolidColorBrush(Colors.Transparent);
-
-            return new SolidColorBrush(isLightTheme
-                ? Color.FromArgb(48, 255, 255, 255)
-                : Color.FromArgb(56, 255, 255, 255));
         }
 
         private static string FormatBarLocation(string city)
