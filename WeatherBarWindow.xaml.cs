@@ -811,32 +811,28 @@ namespace Task_Flyout
                 SetLayeredWindowAttributes(hWnd, 0, 255, LWA_ALPHA);
 
                 Color barColor;
-                Color borderColor;
                 if (transparent)
                 {
-                    // On: blend with the taskbar's apparent acrylic shade.
+                    // On: tuned to read as part of the taskbar — Win11 acrylic adds
+                    // luminosity from the wallpaper so pure 32-gray comes out blacker
+                    // than the surrounding taskbar; lift it a touch.
                     barColor = _isLightTheme
-                        ? Color.FromArgb(255, 243, 243, 243)
-                        : Color.FromArgb(255, 32, 32, 32);
-                    borderColor = _isLightTheme
-                        ? Color.FromArgb(40, 0, 0, 0)
-                        : Color.FromArgb(60, 255, 255, 255);
+                        ? Color.FromArgb(255, 240, 240, 240)
+                        : Color.FromArgb(255, 46, 46, 46);
                 }
                 else
                 {
-                    // Off: brighter "chip" that visually stands out from the taskbar.
+                    // Off: a brighter "chip" that stands out from the taskbar.
                     barColor = _isLightTheme
                         ? Color.FromArgb(255, 252, 252, 252)
-                        : Color.FromArgb(255, 58, 58, 58);
-                    borderColor = _isLightTheme
-                        ? Color.FromArgb(50, 0, 0, 0)
-                        : Color.FromArgb(72, 255, 255, 255);
+                        : Color.FromArgb(255, 62, 62, 62);
                 }
 
                 if (mainBorder != null)
                     mainBorder.Background = new SolidColorBrush(barColor);
+                // No visible top separator — it always looked like an extra strip.
                 if (topBorder != null)
-                    topBorder.BorderBrush = new SolidColorBrush(borderColor);
+                    topBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
             }
             catch { }
         }
@@ -849,17 +845,12 @@ namespace Task_Flyout
             var topBorder = (this.Content as FrameworkElement)?.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
 
             if (_isLightTheme)
-            {
                 border.Background = new SolidColorBrush(Color.FromArgb(255, 255, 255, 255));
-                if (topBorder != null)
-                    topBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(237, 255, 255, 255));
-            }
             else
-            {
-                border.Background = new SolidColorBrush(Color.FromArgb(255, 60, 60, 60));
-                if (topBorder != null)
-                    topBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(64, 255, 255, 255));
-            }
+                border.Background = new SolidColorBrush(Color.FromArgb(255, 76, 76, 76));
+
+            if (topBorder != null)
+                topBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
         }
 
         private void MainBorder_PointerExited(object sender, PointerRoutedEventArgs e)
