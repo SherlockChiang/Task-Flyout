@@ -58,6 +58,7 @@ namespace Task_Flyout.Views
             AllowRssRemoteResourcesToggle.IsOn = settings.Values["AllowRssRemoteResources"] as bool? ?? false;
             ShowSecondsToggle.IsOn = settings.Values["ShowSeconds"] as bool? ?? false;
             AboutVersionText.Text = GetVersionText();
+            await UpdateWebViewCacheStatusAsync();
 
             // 👉 这里已经支持多语言了！只需在英文 resw 中添加键名 TextMinutes，值为 Minutes 即可。
             string minuteStr = GetSafeString("TextMinutes", "minutes");
@@ -453,6 +454,41 @@ namespace Task_Flyout.Views
         {
             if (_isInitializing) return;
             ApplicationData.Current.LocalSettings.Values["AllowRssRemoteResources"] = AllowRssRemoteResourcesToggle.IsOn;
+        }
+
+        private async void ClearWebViewCacheButton_Click(object sender, RoutedEventArgs e)
+        {
+            ClearWebViewCacheButton.IsEnabled = false;
+            WebViewCacheStatusText.Text = GetSafeString("TextCleaning", "Cleaning...");
+            try
+            {
+                var freed = await WebView2RuntimeService.ClearCacheAsync();
+                await UpdateWebViewCacheStatusAsync(freed);
+            }
+            catch
+            {
+                WebViewCacheStatusText.Text = GetSafeString("TextCleanFailed", "Clean failed");
+            }
+            finally
+            {
+                ClearWebViewCacheButton.IsEnabled = true;
+            }
+        }
+
+        private async System.Threading.Tasks.Task UpdateWebViewCacheStatusAsync(long? freedBytes = null)
+        {
+            var bytes = await WebView2RuntimeService.GetCacheSizeBytesAsync();
+            var sizeText = FormatBytes(bytes);
+            WebViewCacheStatusText.Text = freedBytes.HasValue
+                ? $"{GetSafeString("TextCleaned", "Cleaned")} {FormatBytes(freedBytes.Value)} · {sizeText}"
+                : sizeText;
+        }
+
+        private static string FormatBytes(long bytes)
+        {
+            if (bytes < 1024 * 1024)
+                return $"{Math.Round(bytes / 1024d, 1)} KB";
+            return $"{Math.Round(bytes / 1024d / 1024d, 1)} MB";
         }
 
         private async void StartupToggle_Toggled(object sender, RoutedEventArgs e)

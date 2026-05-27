@@ -51,6 +51,10 @@
                 <ComboBox x:Name="MailPollingIntervalComboBox" Header="新邮件检查间隔" Width="200" SelectionChanged="MailPollingIntervalComboBox_SelectionChanged" />
                 <ToggleSwitch x:Name="AllowInsecureWebViewResourcesToggle" Header="允许邮件加载 HTTP 图片资源" IsOn="False" Toggled="AllowInsecureWebViewResourcesToggle_Toggled"/>
                 <ToggleSwitch x:Name="AllowRssRemoteResourcesToggle" Header="允许 RSS 文章加载远程图片资源" IsOn="False" Toggled="AllowRssRemoteResourcesToggle_Toggled"/>
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Button x:Name="ClearWebViewCacheButton" Content="清理 WebView2 缓存" Click="ClearWebViewCacheButton_Click"/>
+                    <TextBlock x:Name="WebViewCacheStatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
+                </StackPanel>
             </StackPanel>
 
             <StackPanel Spacing="8">
