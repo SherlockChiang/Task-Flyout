@@ -770,6 +770,11 @@ namespace Task_Flyout
 
                 var root = this.Content as FrameworkElement;
                 if (root == null) return;
+                // Push the resolved theme into the XAML tree so ThemeResource brushes
+                // (TextFillColorPrimaryBrush etc.) and inherited Foregrounds match the
+                // bar's actual background — otherwise text follows the system theme and
+                // ends up white-on-light or black-on-dark when the two disagree.
+                root.RequestedTheme = _isLightTheme ? ElementTheme.Light : ElementTheme.Dark;
                 var mainBorder = root.FindName("MainBorder") as Microsoft.UI.Xaml.Controls.Border;
                 var topBorder = root.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
                 var weatherService = (App.Current as App)?.WeatherService;
@@ -954,9 +959,16 @@ namespace Task_Flyout
                 if (showDesc)
                 {
                     TxtDesc.Text = alert != null ? alert.Message : (info.Description ?? "");
-                    TxtDesc.Foreground = new SolidColorBrush(alert != null
-                        ? Color.FromArgb(255, 255, 170, 80)
-                        : Color.FromArgb(255, 180, 180, 180));
+                    if (alert != null)
+                    {
+                        TxtDesc.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 170, 80));
+                    }
+                    else
+                    {
+                        TxtDesc.Foreground = new SolidColorBrush(_isLightTheme
+                            ? Color.FromArgb(255, 90, 90, 90)
+                            : Color.FromArgb(255, 200, 200, 200));
+                    }
                 }
 
                 // 告警激活时隐藏副字段，避免文字挤占
