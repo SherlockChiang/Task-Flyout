@@ -976,15 +976,17 @@ CREATE TABLE IF NOT EXISTS rss_articles (
 
             using (var command = connection.CreateCommand())
             {
+                // Listing only — html_content is hydrated on demand via GetArticleHtml
+                // to keep startup memory in check (1000 articles × ~50 KB html = 50 MB).
                 command.CommandText = """
-SELECT id, subscription_id, feed_title, title, link, summary, html_content, image_url, local_image_path, published_ticks
+SELECT id, subscription_id, feed_title, title, link, summary, image_url, local_image_path, published_ticks
 FROM rss_articles
 ORDER BY published_ticks DESC
 LIMIT 1000;
 """;
                 using var reader = command.ExecuteReader();
                 while (reader.Read())
-                    cache.Articles.Add(ReadArticle(reader));
+                    cache.Articles.Add(ReadArticleListItem(reader));
             }
 
             return cache;
@@ -998,7 +1000,7 @@ LIMIT 1000;
             using var connection = OpenConnection();
             using var command = connection.CreateCommand();
             command.CommandText = """
-SELECT a.id, a.subscription_id, a.feed_title, a.title, a.link, a.summary, a.html_content, a.image_url, a.local_image_path, a.published_ticks
+SELECT a.id, a.subscription_id, a.feed_title, a.title, a.link, a.summary, a.image_url, a.local_image_path, a.published_ticks
 FROM rss_articles a
 WHERE ($hasSubscription = 0 OR a.subscription_id = $subscriptionId)
   AND ($hasFolder = 0 OR EXISTS (
@@ -1018,12 +1020,38 @@ LIMIT $take OFFSET $skip;
             var articles = new List<RssArticle>(take);
             using var reader = command.ExecuteReader();
             while (reader.Read())
-                articles.Add(ReadArticle(reader));
+                articles.Add(ReadArticleListItem(reader));
 
             return articles;
         }
 
-        private static RssArticle ReadArticle(SqliteDataReader reader)
+        /// <summary>
+        /// Fetch the full HTML body for a single article (cached column not loaded by
+        /// the list-paging code path). Returns empty string if missing.
+        /// </summary>
+        public string GetArticleHtml(string? articleId)
+        {
+            if (string.IsNullOrWhiteSpace(articleId)) return "";
+            EnsureLoaded();
+            try
+            {
+                InitializeDatabase();
+                using var connection = OpenConnection();
+                using var command = connection.CreateCommand();
+                command.CommandText = "SELECT html_content FROM rss_articles WHERE id = $id LIMIT 1;";
+                command.Parameters.AddWithValue("$id", articleId);
+                var value = command.ExecuteScalar();
+                return value as string ?? "";
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"GetArticleHtml failed for {articleId}: {ex.Message}");
+                return "";
+            }
+        }
+
+        // Listing rows: column order matches the abbreviated SELECT above (no html_content).
+        private static RssArticle ReadArticleListItem(SqliteDataReader reader)
             => new()
             {
                 Id = reader.GetString(0),
@@ -1032,10 +1060,10 @@ LIMIT $take OFFSET $skip;
                 Title = reader.GetString(3),
                 Link = reader.GetString(4),
                 Summary = reader.GetString(5),
-                HtmlContent = reader.GetString(6),
-                ImageUrl = reader.GetString(7),
-                LocalImagePath = reader.GetString(8),
-                PublishedAt = FromTicks(reader.GetInt64(9))
+                HtmlContent = "",
+                ImageUrl = reader.GetString(6),
+                LocalImagePath = reader.GetString(7),
+                PublishedAt = FromTicks(reader.GetInt64(8))
             };
 
         private void SaveToDatabase()

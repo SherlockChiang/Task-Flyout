@@ -715,6 +715,13 @@ namespace Task_Flyout.Views
                     webView.CoreWebView2.WebResourceRequested += RssArticle_WebResourceRequested;
                 }
 
+                // List rows no longer carry html_content (memory optimisation);
+                // hydrate on demand the first time the article is opened.
+                if (string.IsNullOrEmpty(article.HtmlContent) && _rssService != null)
+                {
+                    article.HtmlContent = _rssService.GetArticleHtml(article.Id);
+                }
+
                 _isInternalArticleNavigation = true;
                 webView.NavigateToString(BuildArticleHtml(article, IsDarkThemeActive()));
             }
