@@ -475,6 +475,10 @@ namespace Task_Flyout.Views
             }
         }
 
+        // Surface a warning when we get within 80% of the auto-prune ceiling so the
+        // user can clear pro-actively instead of paying the latency on next launch.
+        private const long WebViewCacheWarnBytes = 240L * 1024 * 1024;
+
         private async System.Threading.Tasks.Task UpdateWebViewCacheStatusAsync(long? freedBytes = null)
         {
             var bytes = await WebView2RuntimeService.GetCacheSizeBytesAsync();
@@ -482,6 +486,7 @@ namespace Task_Flyout.Views
             WebViewCacheStatusText.Text = freedBytes.HasValue
                 ? $"{GetSafeString("TextCleaned", "Cleaned")} {FormatBytes(freedBytes.Value)} · {sizeText}"
                 : sizeText;
+            WebViewCacheWarningBar.IsOpen = bytes >= WebViewCacheWarnBytes;
         }
 
         private static string FormatBytes(long bytes)

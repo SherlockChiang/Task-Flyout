@@ -55,6 +55,12 @@
                     <Button x:Name="ClearWebViewCacheButton" Content="清理 WebView2 缓存" Click="ClearWebViewCacheButton_Click"/>
                     <TextBlock x:Name="WebViewCacheStatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
                 </StackPanel>
+                <InfoBar x:Name="WebViewCacheWarningBar"
+                         IsOpen="False"
+                         IsClosable="False"
+                         Severity="Warning"
+                         Title="WebView2 缓存接近上限"
+                         Message="建议立即清理以避免下次启动时自动 prune 增加 I/O 开销。"/>
             </StackPanel>
 
             <StackPanel Spacing="8">
