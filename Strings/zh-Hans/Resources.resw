@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -920,5 +920,131 @@
   </data>
   <data name="TextYearFormat" xml:space="preserve">
     <value>{0}年</value>
+  </data>
+  <data name="AddAccount_GoogleTitle.Text" xml:space="preserve">
+    <value>Google</value>
+  </data>
+  <data name="AddAccount_MSTitle.Text" xml:space="preserve">
+    <value>Microsoft</value>
+  </data>
+  <data name="CalendarPage_AccountHeader.Text" xml:space="preserve">
+    <value>日程账户</value>
+  </data>
+  <data name="CalendarPage_TodoHeader.Text" xml:space="preserve">
+    <value>待办任务</value>
+  </data>
+  <data name="CalendarPage_AddAccount.Text" xml:space="preserve">
+    <value>添加账户</value>
+  </data>
+  <data name="CalendarPage_NoAccountTitle.Text" xml:space="preserve">
+    <value>尚未连接日程账户</value>
+  </data>
+  <data name="CalendarPage_NoAccountSub.Text" xml:space="preserve">
+    <value>连接 Google 或 Microsoft 账户后，这里将显示您的日程与待办。</value>
+  </data>
+  <data name="TasksPage_AccountHeader.Text" xml:space="preserve">
+    <value>任务账户</value>
+  </data>
+  <data name="TasksPage_TodoHeader.Text" xml:space="preserve">
+    <value>待办任务</value>
+  </data>
+  <data name="TasksPage_AddAccount.Text" xml:space="preserve">
+    <value>添加账户</value>
+  </data>
+  <data name="TasksPage_Title.Text" xml:space="preserve">
+    <value>任务</value>
+  </data>
+  <data name="TasksPage_Loading.Text" xml:space="preserve">
+    <value>正在加载任务</value>
+  </data>
+  <data name="TasksPage_AddTask.Text" xml:space="preserve">
+    <value>添加任务</value>
+  </data>
+  <data name="TasksPage_PendingHeader.Text" xml:space="preserve">
+    <value>待完成</value>
+  </data>
+  <data name="TasksPage_CompletedHeader.Text" xml:space="preserve">
+    <value>已完成</value>
+  </data>
+  <data name="TasksPage_NoPending.Text" xml:space="preserve">
+    <value>已经没有未完成任务</value>
+  </data>
+  <data name="MailPage_Title.Text" xml:space="preserve">
+    <value>邮件</value>
+  </data>
+  <data name="MailPage_Subtitle.Text" xml:space="preserve">
+    <value>账户、文件夹与收件箱</value>
+  </data>
+  <data name="MailPage_Compose.Text" xml:space="preserve">
+    <value>写邮件</value>
+  </data>
+  <data name="MailPage_Refresh.Text" xml:space="preserve">
+    <value>刷新</value>
+  </data>
+  <data name="MailPage_DeleteAccount.Text" xml:space="preserve">
+    <value>删除当前邮箱</value>
+  </data>
+  <data name="MailPage_AddAccount.Text" xml:space="preserve">
+    <value>添加新邮箱</value>
+  </data>
+  <data name="MailPage_SenderLabel.Text" xml:space="preserve">
+    <value>发件人</value>
+  </data>
+  <data name="MailPage_DateLabel.Text" xml:space="preserve">
+    <value>时间</value>
+  </data>
+  <data name="RssPage_Title.Text" xml:space="preserve">
+    <value>RSS</value>
+  </data>
+  <data name="RssPage_FeedLabel.Text" xml:space="preserve">
+    <value>订阅</value>
+  </data>
+  <data name="RssPage_Rename.Text" xml:space="preserve">
+    <value>重命名</value>
+  </data>
+  <data name="RssPage_Delete.Text" xml:space="preserve">
+    <value>删除</value>
+  </data>
+  <data name="RssPage_AddFeed.Text" xml:space="preserve">
+    <value>添加订阅</value>
+  </data>
+  <data name="RssPage_Browser.Text" xml:space="preserve">
+    <value>浏览器</value>
+  </data>
+  <data name="SettingsPage_MailSync.Text" xml:space="preserve">
+    <value>邮件同步</value>
+  </data>
+  <data name="SettingsPage_About.Text" xml:space="preserve">
+    <value>关于</value>
+  </data>
+  <data name="SettingsPage_Desc.Text" xml:space="preserve">
+    <value>日程、任务、天气、邮件与 RSS 的托盘浮窗效率工具。</value>
+  </data>
+  <data name="WeatherPage_BarTitle.Header" xml:space="preserve">
+    <value>任务栏天气栏</value>
+  </data>
+  <data name="WeatherPage_MatchTaskbar.Header" xml:space="preserve">
+    <value>匹配任务栏色</value>
+  </data>
+  <data name="SettingsPage_MailPolling.Header" xml:space="preserve">
+    <value>定时抓取新邮件并显示 Windows 通知</value>
+  </data>
+  <data name="SettingsPage_MailInterval.Header" xml:space="preserve">
+    <value>新邮件检查间隔</value>
+  </data>
+  <data name="SettingsPage_InsecureWebview.Header" xml:space="preserve">
+    <value>允许邮件加载 HTTP 图片资源</value>
+  </data>
+  <data name="SettingsPage_RssRemote.Header" xml:space="preserve">
+    <value>允许 RSS 文章加载远程图片资源</value>
+  </data>
+  <data name="SettingsPage_ClearCache.Content" xml:space="preserve">
+    <value>清理 WebView2 缓存</value>
+  </data>
+  <data name="SettingsPage_CacheWarning.Title" xml:space="preserve">
+    <value>WebView2 缓存接近上限</value>
+  </data>
+  <data name="SettingsPage_CacheWarning.Message" xml:space="preserve">
+    <value>建议立即清理以避免下次启动时自动 prune 增加 I/O 开销。</value>
   </data>
 </root>

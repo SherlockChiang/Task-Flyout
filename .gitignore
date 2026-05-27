@@ -9,3 +9,6 @@ Secrets.cs
 *.lscache
 *.pfx
 /.claude
+.harness/pipelines/task_flyout_pipeline.yaml
+build/build_harness.ps1
+msbuild-msix.log

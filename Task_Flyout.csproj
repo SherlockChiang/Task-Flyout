@@ -16,6 +16,15 @@
         <Nullable>enable</Nullable>
 		<ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     </PropertyGroup>
+
+    <PropertyGroup>
+        <MrmSupportLibraryArchitecture Condition="'$(MrmSupportLibraryArchitecture)' == '' and ('$(Platform)' == 'x64' or '$(RuntimeIdentifier)' == 'win-x64')">x64</MrmSupportLibraryArchitecture>
+        <MrmSupportLibraryArchitecture Condition="'$(MrmSupportLibraryArchitecture)' == '' and ('$(Platform)' == 'x86' or '$(RuntimeIdentifier)' == 'win-x86')">x86</MrmSupportLibraryArchitecture>
+        <MrmSupportLibraryArchitecture Condition="'$(MrmSupportLibraryArchitecture)' == '' and ('$(Platform)' == 'ARM64' or '$(RuntimeIdentifier)' == 'win-arm64')">arm64</MrmSupportLibraryArchitecture>
+        <MrmSupportLibraryArchitecture Condition="'$(MrmSupportLibraryArchitecture)' == ''">x64</MrmSupportLibraryArchitecture>
+        <MrmSupportLibrarySdkVersion Condition="'$(MrmSupportLibrarySdkVersion)' == '' and Exists('$(MSBuildProgramFiles32)\Windows Kits\10\bin\10.0.26100.0\$(MrmSupportLibraryArchitecture)\MrmSupport.dll')">10.0.26100.0</MrmSupportLibrarySdkVersion>
+        <MrmSupportLibraryPath Condition="'$(MrmSupportLibraryPath)' == '' and '$(MrmSupportLibrarySdkVersion)' != ''">$(MSBuildProgramFiles32)\Windows Kits\10\bin\$(MrmSupportLibrarySdkVersion)\$(MrmSupportLibraryArchitecture)\MrmSupport.dll</MrmSupportLibraryPath>
+    </PropertyGroup>
     
     <ItemGroup>
         <None Remove="AppIcon.ico" />

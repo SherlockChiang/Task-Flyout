@@ -46,16 +46,17 @@
             </StackPanel>
 
             <StackPanel Spacing="8">
-                <TextBlock Text="邮件同步" FontWeight="SemiBold" FontSize="16"/>
-                <ToggleSwitch x:Name="MailPollingToggle" Header="定时抓取新邮件并显示 Windows 通知" IsOn="True" Toggled="MailPollingToggle_Toggled"/>
-                <ComboBox x:Name="MailPollingIntervalComboBox" Header="新邮件检查间隔" Width="200" SelectionChanged="MailPollingIntervalComboBox_SelectionChanged" />
-                <ToggleSwitch x:Name="AllowInsecureWebViewResourcesToggle" Header="允许邮件加载 HTTP 图片资源" IsOn="False" Toggled="AllowInsecureWebViewResourcesToggle_Toggled"/>
-                <ToggleSwitch x:Name="AllowRssRemoteResourcesToggle" Header="允许 RSS 文章加载远程图片资源" IsOn="False" Toggled="AllowRssRemoteResourcesToggle_Toggled"/>
+                <TextBlock x:Uid="SettingsPage_MailSync" Text="邮件同步" FontWeight="SemiBold" FontSize="16"/>
+                <ToggleSwitch x:Uid="SettingsPage_MailPolling" x:Name="MailPollingToggle" Header="定时抓取新邮件并显示 Windows 通知" IsOn="True" Toggled="MailPollingToggle_Toggled"/>
+                <ComboBox x:Uid="SettingsPage_MailInterval" x:Name="MailPollingIntervalComboBox" Header="新邮件检查间隔" Width="200" SelectionChanged="MailPollingIntervalComboBox_SelectionChanged" />
+                <ToggleSwitch x:Uid="SettingsPage_InsecureWebview" x:Name="AllowInsecureWebViewResourcesToggle" Header="允许邮件加载 HTTP 图片资源" IsOn="False" Toggled="AllowInsecureWebViewResourcesToggle_Toggled"/>
+                <ToggleSwitch x:Uid="SettingsPage_RssRemote" x:Name="AllowRssRemoteResourcesToggle" Header="允许 RSS 文章加载远程图片资源" IsOn="False" Toggled="AllowRssRemoteResourcesToggle_Toggled"/>
                 <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                    <Button x:Name="ClearWebViewCacheButton" Content="清理 WebView2 缓存" Click="ClearWebViewCacheButton_Click"/>
+                    <Button x:Uid="SettingsPage_ClearCache" x:Name="ClearWebViewCacheButton" Content="清理 WebView2 缓存" Click="ClearWebViewCacheButton_Click"/>
                     <TextBlock x:Name="WebViewCacheStatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
                 </StackPanel>
-                <InfoBar x:Name="WebViewCacheWarningBar"
+                <InfoBar x:Uid="SettingsPage_CacheWarning"
+                         x:Name="WebViewCacheWarningBar"
                          IsOpen="False"
                          IsClosable="False"
                          Severity="Warning"
@@ -73,7 +74,7 @@
             </StackPanel>
 
             <StackPanel Spacing="8">
-                <TextBlock Text="关于" FontWeight="SemiBold" FontSize="16"/>
+                <TextBlock x:Uid="SettingsPage_About" Text="关于" FontWeight="SemiBold" FontSize="16"/>
                 <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -83,7 +84,7 @@
                     <StackPanel Grid.Column="1" Spacing="2">
                         <TextBlock Text="Task Flyout" FontWeight="SemiBold"/>
                         <TextBlock x:Name="AboutVersionText" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                        <TextBlock Text="日程、任务、天气、邮件与 RSS 的托盘浮窗工具。" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                        <TextBlock x:Uid="SettingsPage_Desc" Text="日程、任务、天气、邮件与 RSS 的托盘浮窗工具。" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Grid>
             </StackPanel>

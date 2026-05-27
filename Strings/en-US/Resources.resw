@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -920,5 +920,131 @@
   </data>
   <data name="TextYearFormat" xml:space="preserve">
     <value>{0}</value>
+  </data>
+  <data name="AddAccount_GoogleTitle.Text" xml:space="preserve">
+    <value>Google</value>
+  </data>
+  <data name="AddAccount_MSTitle.Text" xml:space="preserve">
+    <value>Microsoft</value>
+  </data>
+  <data name="CalendarPage_AccountHeader.Text" xml:space="preserve">
+    <value>Calendar Accounts</value>
+  </data>
+  <data name="CalendarPage_TodoHeader.Text" xml:space="preserve">
+    <value>Tasks</value>
+  </data>
+  <data name="CalendarPage_AddAccount.Text" xml:space="preserve">
+    <value>Add Account</value>
+  </data>
+  <data name="CalendarPage_NoAccountTitle.Text" xml:space="preserve">
+    <value>No Calendar Accounts Connected</value>
+  </data>
+  <data name="CalendarPage_NoAccountSub.Text" xml:space="preserve">
+    <value>Connect to Google or Microsoft to view your events and tasks.</value>
+  </data>
+  <data name="TasksPage_AccountHeader.Text" xml:space="preserve">
+    <value>Task Accounts</value>
+  </data>
+  <data name="TasksPage_TodoHeader.Text" xml:space="preserve">
+    <value>Tasks</value>
+  </data>
+  <data name="TasksPage_AddAccount.Text" xml:space="preserve">
+    <value>Add Account</value>
+  </data>
+  <data name="TasksPage_Title.Text" xml:space="preserve">
+    <value>Tasks</value>
+  </data>
+  <data name="TasksPage_Loading.Text" xml:space="preserve">
+    <value>Loading tasks...</value>
+  </data>
+  <data name="TasksPage_AddTask.Text" xml:space="preserve">
+    <value>Add Task</value>
+  </data>
+  <data name="TasksPage_PendingHeader.Text" xml:space="preserve">
+    <value>Pending</value>
+  </data>
+  <data name="TasksPage_CompletedHeader.Text" xml:space="preserve">
+    <value>Completed</value>
+  </data>
+  <data name="TasksPage_NoPending.Text" xml:space="preserve">
+    <value>No pending tasks</value>
+  </data>
+  <data name="MailPage_Title.Text" xml:space="preserve">
+    <value>Mail</value>
+  </data>
+  <data name="MailPage_Subtitle.Text" xml:space="preserve">
+    <value>Accounts, folders and inbox</value>
+  </data>
+  <data name="MailPage_Compose.Text" xml:space="preserve">
+    <value>Compose</value>
+  </data>
+  <data name="MailPage_Refresh.Text" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="MailPage_DeleteAccount.Text" xml:space="preserve">
+    <value>Delete Account</value>
+  </data>
+  <data name="MailPage_AddAccount.Text" xml:space="preserve">
+    <value>Add Account</value>
+  </data>
+  <data name="MailPage_SenderLabel.Text" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="MailPage_DateLabel.Text" xml:space="preserve">
+    <value>Date</value>
+  </data>
+  <data name="RssPage_Title.Text" xml:space="preserve">
+    <value>RSS</value>
+  </data>
+  <data name="RssPage_FeedLabel.Text" xml:space="preserve">
+    <value>Subscriptions</value>
+  </data>
+  <data name="RssPage_Rename.Text" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="RssPage_Delete.Text" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="RssPage_AddFeed.Text" xml:space="preserve">
+    <value>Add Feed</value>
+  </data>
+  <data name="RssPage_Browser.Text" xml:space="preserve">
+    <value>Browser</value>
+  </data>
+  <data name="SettingsPage_MailSync.Text" xml:space="preserve">
+    <value>Mail Sync</value>
+  </data>
+  <data name="SettingsPage_About.Text" xml:space="preserve">
+    <value>About</value>
+  </data>
+  <data name="SettingsPage_Desc.Text" xml:space="preserve">
+    <value>A desktop tray flyout tool for calendar, tasks, weather, mail, and RSS.</value>
+  </data>
+  <data name="WeatherPage_BarTitle.Header" xml:space="preserve">
+    <value>Taskbar Weather Bar</value>
+  </data>
+  <data name="WeatherPage_MatchTaskbar.Header" xml:space="preserve">
+    <value>Match Taskbar Color</value>
+  </data>
+  <data name="SettingsPage_MailPolling.Header" xml:space="preserve">
+    <value>Poll new mails periodically and show Windows notifications</value>
+  </data>
+  <data name="SettingsPage_MailInterval.Header" xml:space="preserve">
+    <value>New mail check interval</value>
+  </data>
+  <data name="SettingsPage_InsecureWebview.Header" xml:space="preserve">
+    <value>Allow emails to load HTTP image resources</value>
+  </data>
+  <data name="SettingsPage_RssRemote.Header" xml:space="preserve">
+    <value>Allow RSS articles to load remote image resources</value>
+  </data>
+  <data name="SettingsPage_ClearCache.Content" xml:space="preserve">
+    <value>Clear WebView2 Cache</value>
+  </data>
+  <data name="SettingsPage_CacheWarning.Title" xml:space="preserve">
+    <value>WebView2 Cache Near Limit</value>
+  </data>
+  <data name="SettingsPage_CacheWarning.Message" xml:space="preserve">
+    <value>Pruning is recommended to avoid high I/O overhead on next startup.</value>
   </data>
 </root>

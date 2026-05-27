@@ -15,7 +15,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="16">
                     <FontIcon Glyph="&#xE77B;" Foreground="#EA4335" FontSize="24"/>
                     <StackPanel Spacing="2" VerticalAlignment="Center">
-                        <TextBlock Text="Google" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock x:Uid="AddAccount_GoogleTitle" Text="Google" FontSize="16" FontWeight="SemiBold"/>
                         <TextBlock x:Uid="AddAccount_GoogleDesc" Text="Google 日历与任务" FontSize="12"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
@@ -28,7 +28,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="16">
                     <FontIcon Glyph="&#xE77B;" Foreground="#0078D4" FontSize="24"/>
                     <StackPanel Spacing="2" VerticalAlignment="Center">
-                        <TextBlock Text="Microsoft" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock x:Uid="AddAccount_MSTitle" Text="Microsoft" FontSize="16" FontWeight="SemiBold"/>
                         <TextBlock x:Uid="AddAccount_MSDesc" Text="Outlook 日历与 To Do" FontSize="12"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
