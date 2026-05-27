@@ -7,7 +7,7 @@
     Background="Transparent">
 
     <ScrollViewer Padding="40">
-        <StackPanel Spacing="28" MaxWidth="800" HorizontalAlignment="Left">
+        <StackPanel Spacing="28" MaxWidth="1040" HorizontalAlignment="Stretch">
             <TextBlock x:Uid="WeatherPage_Title" Style="{StaticResource TitleTextBlockStyle}"/>
 
             <!-- Current Weather Summary Card (top) -->
@@ -61,7 +61,7 @@
                         </ListView.ItemContainerStyle>
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:HourlyWeather">
-                                <StackPanel Width="56" Spacing="8" HorizontalAlignment="Center" Margin="2,6">
+                                <StackPanel Width="64" Spacing="8" HorizontalAlignment="Center" Margin="2,6">
                                     <TextBlock Text="{x:Bind Time}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                     <Grid Width="32" Height="32" HorizontalAlignment="Center">
                                         <TextBlock Text="{x:Bind Icon}" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -112,7 +112,7 @@
 
                         <ItemsRepeater x:Name="DetailFieldsRepeater" Grid.Column="1">
                             <ItemsRepeater.Layout>
-                                <UniformGridLayout MinItemWidth="140" MinColumnSpacing="8" MinRowSpacing="6"/>
+                                <UniformGridLayout MinItemWidth="170" MinColumnSpacing="12" MinRowSpacing="6"/>
                             </ItemsRepeater.Layout>
                         </ItemsRepeater>
                     </Grid>
@@ -141,7 +141,7 @@
                         </ListView.ItemContainerStyle>
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:DailyWeather">
-                                <StackPanel Width="104" Spacing="8" Margin="4,8" HorizontalAlignment="Center">
+                                <StackPanel Width="124" Spacing="8" Margin="4,8" HorizontalAlignment="Center">
                                     <StackPanel Spacing="2">
                                         <TextBlock Text="{x:Bind DayLabel}" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="13"/>
                                         <TextBlock Text="{x:Bind DateLabel}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
@@ -196,9 +196,9 @@
 
                 <StackPanel Spacing="8">
                     <TextBlock x:Uid="WeatherPage_CityHeader" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                    <Grid ColumnSpacing="12" HorizontalAlignment="Left">
+                    <Grid ColumnSpacing="12" HorizontalAlignment="Stretch" MaxWidth="640">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="300"/>
+                            <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
@@ -214,21 +214,21 @@
 
                 <!-- Weather Source -->
                 <StackPanel Spacing="8">
-                    <ComboBox x:Name="SourceComboBox" x:Uid="WeatherPage_SourceHeader" Width="300" HorizontalAlignment="Left" SelectionChanged="SourceComboBox_SelectionChanged">
+                    <ComboBox x:Name="SourceComboBox" x:Uid="WeatherPage_SourceHeader" Width="460" HorizontalAlignment="Left" SelectionChanged="SourceComboBox_SelectionChanged">
                         <ComboBoxItem Content="Open-Meteo" Tag="OpenMeteo"/>
                         <ComboBoxItem Content="wttr.in" Tag="WttrIn"/>
                     </ComboBox>
-                    <TextBlock x:Name="SourceHintText" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" MaxWidth="400"/>
+                    <TextBlock x:Name="SourceHintText" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" MaxWidth="680"/>
                 </StackPanel>
 
                 <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4"/>
 
                 <!-- Weather Icon (emoji / custom font / imported icon pack) -->
                 <StackPanel Spacing="8">
-                    <ComboBox x:Uid="WeatherPage_IconFontHeader" x:Name="IconFontComboBox" Width="300" HorizontalAlignment="Left" SelectionChanged="IconFontComboBox_SelectionChanged"/>
+                    <ComboBox x:Uid="WeatherPage_IconFontHeader" x:Name="IconFontComboBox" Width="460" HorizontalAlignment="Left" SelectionChanged="IconFontComboBox_SelectionChanged"/>
 
                     <AutoSuggestBox x:Uid="WeatherPage_CustomFontBox" x:Name="CustomFontBox"
-                                    Width="300" HorizontalAlignment="Left" Visibility="Collapsed"
+                                    Width="460" HorizontalAlignment="Left" Visibility="Collapsed"
                                     TextChanged="CustomFontBox_TextChanged"
                                     QuerySubmitted="CustomFontBox_QuerySubmitted"
                                     SuggestionChosen="CustomFontBox_SuggestionChosen"/>
@@ -250,7 +250,7 @@
                 <TextBlock x:Name="FlyoutFieldsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                 <ItemsRepeater x:Name="FieldToggleRepeater">
                     <ItemsRepeater.Layout>
-                        <UniformGridLayout MinItemWidth="180" MinColumnSpacing="12" MinRowSpacing="4"/>
+                        <UniformGridLayout MinItemWidth="220" MinColumnSpacing="16" MinRowSpacing="4"/>
                     </ItemsRepeater.Layout>
                 </ItemsRepeater>
             </StackPanel>
@@ -261,7 +261,7 @@
                 <TextBlock x:Name="BarFieldsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                 <ItemsRepeater x:Name="BarFieldToggleRepeater">
                     <ItemsRepeater.Layout>
-                        <UniformGridLayout MinItemWidth="180" MinColumnSpacing="12" MinRowSpacing="4"/>
+                        <UniformGridLayout MinItemWidth="220" MinColumnSpacing="16" MinRowSpacing="4"/>
                     </ItemsRepeater.Layout>
                 </ItemsRepeater>
             </StackPanel>
@@ -277,7 +277,7 @@
                 </StackPanel>
                 <ItemsRepeater x:Name="AlertTypeRepeater">
                     <ItemsRepeater.Layout>
-                        <UniformGridLayout MinItemWidth="180" MinColumnSpacing="12" MinRowSpacing="4"/>
+                        <UniformGridLayout MinItemWidth="220" MinColumnSpacing="16" MinRowSpacing="4"/>
                     </ItemsRepeater.Layout>
                 </ItemsRepeater>
             </StackPanel>

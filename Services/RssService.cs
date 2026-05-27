@@ -32,38 +32,34 @@ namespace Task_Flyout.Services
                 if (_localImagePath == value) return;
                 _localImagePath = value ?? "";
                 _imageCache = null;
-                _imageCacheMiss = false;
+                _imageCacheStamped = false;
             }
         }
         public DateTimeOffset LastFetchedAt { get; set; }
 
         [System.Text.Json.Serialization.JsonIgnore]
-        private WeakReference<Microsoft.UI.Xaml.Media.ImageSource>? _imageCache;
+        private Microsoft.UI.Xaml.Media.ImageSource? _imageCache;
         [System.Text.Json.Serialization.JsonIgnore]
-        private bool _imageCacheMiss;
+        private bool _imageCacheStamped;
 
         public Microsoft.UI.Xaml.Media.ImageSource? ImageSource
         {
             get
             {
-                if (_imageCache?.TryGetTarget(out var cached) == true) return cached;
-                if (_imageCacheMiss) return null;
+                if (_imageCacheStamped) return _imageCache;
+                _imageCacheStamped = true;
                 try
                 {
                     if (!string.IsNullOrWhiteSpace(_localImagePath) && File.Exists(_localImagePath))
                     {
-                        var image = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(_localImagePath))
+                        _imageCache = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(_localImagePath))
                         {
                             DecodePixelWidth = 32
                         };
-                        _imageCache = new WeakReference<Microsoft.UI.Xaml.Media.ImageSource>(image);
-                        return image;
                     }
                 }
-                catch { }
-
-                _imageCacheMiss = true;
-                return null;
+                catch { _imageCache = null; }
+                return _imageCache;
             }
         }
 
@@ -97,39 +93,35 @@ namespace Task_Flyout.Services
                 if (_localImagePath == value) return;
                 _localImagePath = value ?? "";
                 _imageCache = null;
-                _imageCacheMiss = false;
+                _imageCacheStamped = false;
             }
         }
         public DateTimeOffset PublishedAt { get; set; }
         public string PublishedText => PublishedAt == default ? "" : PublishedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 
         [System.Text.Json.Serialization.JsonIgnore]
-        private WeakReference<Microsoft.UI.Xaml.Media.ImageSource>? _imageCache;
+        private Microsoft.UI.Xaml.Media.ImageSource? _imageCache;
         [System.Text.Json.Serialization.JsonIgnore]
-        private bool _imageCacheMiss;
+        private bool _imageCacheStamped;
 
         public Microsoft.UI.Xaml.Media.ImageSource? ImageSource
         {
             get
             {
-                if (_imageCache?.TryGetTarget(out var cached) == true) return cached;
-                if (_imageCacheMiss) return null;
+                if (_imageCacheStamped) return _imageCache;
+                _imageCacheStamped = true;
                 try
                 {
                     if (!string.IsNullOrWhiteSpace(_localImagePath) && File.Exists(_localImagePath))
                     {
-                        var image = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(_localImagePath))
+                        _imageCache = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(_localImagePath))
                         {
                             DecodePixelWidth = 120
                         };
-                        _imageCache = new WeakReference<Microsoft.UI.Xaml.Media.ImageSource>(image);
-                        return image;
                     }
                 }
-                catch { }
-
-                _imageCacheMiss = true;
-                return null;
+                catch { _imageCache = null; }
+                return _imageCache;
             }
         }
 
