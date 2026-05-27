@@ -797,48 +797,46 @@ namespace Task_Flyout
 
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 SystemBackdrop = null;
-                if (transparent)
-                {
-                    // WinUI 3 SystemBackdrops do not render on windows that are SetParent'd
-                    // into Shell_TrayWnd, and going top-level breaks z-ordering against the
-                    // taskbar. Instead paint a colour that visually matches the Win11
-                    // taskbar's apparent acrylic shade so the bar reads as integrated.
-                    int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-                    exStyle |= WS_EX_LAYERED;
-                    SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
-                    SetLayeredWindowAttributes(hWnd, 0, 255, LWA_ALPHA);
 
-                    if (mainBorder != null)
-                        mainBorder.Background = new SolidColorBrush(_isLightTheme
-                            ? Color.FromArgb(255, 243, 243, 243)
-                            : Color.FromArgb(255, 32, 32, 32));
-                    if (topBorder != null)
-                        topBorder.BorderBrush = new SolidColorBrush(_isLightTheme
-                            ? Color.FromArgb(40, 0, 0, 0)
-                            : Color.FromArgb(60, 255, 255, 255));
-                    return;
-                }
-
-                int opaqueExStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-                opaqueExStyle |= WS_EX_LAYERED;
-                SetWindowLong(hWnd, GWL_EXSTYLE, opaqueExStyle);
-                SystemBackdrop = null;
+                // NOTE: Real DWM transparency (acrylic / blur-behind) is not achievable
+                // for a child window of Shell_TrayWnd on Win11 — every official path
+                // (SystemBackdrop, DesktopAcrylicController, WS_EX_LAYERED color-key,
+                // DwmEnableBlurBehindWindow) is rejected by DWM on shell-child HWNDs.
+                // The "Match taskbar colour" toggle therefore only switches between two
+                // solid shade presets: the resting taskbar tone (on) vs a brighter chip
+                // that stands out from it (off).
+                int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+                exStyle |= WS_EX_LAYERED;
+                SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
                 SetLayeredWindowAttributes(hWnd, 0, 255, LWA_ALPHA);
 
-                if (_isLightTheme)
+                Color barColor;
+                Color borderColor;
+                if (transparent)
                 {
-                    if (mainBorder != null)
-                        mainBorder.Background = new SolidColorBrush(Color.FromArgb(255, 243, 243, 243));
-                    if (topBorder != null)
-                        topBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0));
+                    // On: blend with the taskbar's apparent acrylic shade.
+                    barColor = _isLightTheme
+                        ? Color.FromArgb(255, 243, 243, 243)
+                        : Color.FromArgb(255, 32, 32, 32);
+                    borderColor = _isLightTheme
+                        ? Color.FromArgb(40, 0, 0, 0)
+                        : Color.FromArgb(60, 255, 255, 255);
                 }
                 else
                 {
-                    if (mainBorder != null)
-                        mainBorder.Background = new SolidColorBrush(Color.FromArgb(255, 44, 44, 44));
-                    if (topBorder != null)
-                        topBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255));
+                    // Off: brighter "chip" that visually stands out from the taskbar.
+                    barColor = _isLightTheme
+                        ? Color.FromArgb(255, 252, 252, 252)
+                        : Color.FromArgb(255, 58, 58, 58);
+                    borderColor = _isLightTheme
+                        ? Color.FromArgb(50, 0, 0, 0)
+                        : Color.FromArgb(72, 255, 255, 255);
                 }
+
+                if (mainBorder != null)
+                    mainBorder.Background = new SolidColorBrush(barColor);
+                if (topBorder != null)
+                    topBorder.BorderBrush = new SolidColorBrush(borderColor);
             }
             catch { }
         }
