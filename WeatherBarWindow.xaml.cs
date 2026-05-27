@@ -47,6 +47,7 @@ namespace Task_Flyout
         private static readonly TimeSpan NormalReparentInterval = TimeSpan.FromSeconds(8);
         private static readonly TimeSpan FastReparentInterval = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan FastReparentDuration = TimeSpan.FromSeconds(20);
+
         #region P/Invoke
 
         [DllImport("user32.dll")]
@@ -60,20 +61,6 @@ namespace Task_Flyout
 
         [DllImport("user32.dll")]
         private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct DWM_BLURBEHIND
-        {
-            public uint dwFlags;
-            public bool fEnable;
-            public IntPtr hRgnBlur;
-            public bool fTransitionOnMaximized;
-        }
-        private const uint DWM_BB_ENABLE = 0x00000001;
-        private const uint DWM_BB_BLURREGION = 0x00000002;
-
-        [DllImport("dwmapi.dll", PreserveSig = false)]
-        private static extern void DwmEnableBlurBehindWindow(IntPtr hWnd, ref DWM_BLURBEHIND blurBehind);
 
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -803,7 +790,6 @@ namespace Task_Flyout
 
                 var root = this.Content as FrameworkElement;
                 if (root == null) return;
-                var rootGrid = root.FindName("RootGrid") as Microsoft.UI.Xaml.Controls.Grid;
                 var mainBorder = root.FindName("MainBorder") as Microsoft.UI.Xaml.Controls.Border;
                 var topBorder = root.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
                 var weatherService = (App.Current as App)?.WeatherService;
@@ -813,22 +799,19 @@ namespace Task_Flyout
                 SystemBackdrop = null;
                 if (transparent)
                 {
-                    // Ask DWM for a blur-behind on this HWND. Combined with transparent
-                    // XAML backgrounds the bar should show wallpaper/taskbar blurred.
-                    // This is a long shot on a child window of Shell_TrayWnd — if DWM
-                    // refuses, we'll just see solid Transparent (i.e. black swap chain).
+                    // WinUI 3 SystemBackdrops do not render on windows that are SetParent'd
+                    // into Shell_TrayWnd, and going top-level breaks z-ordering against the
+                    // taskbar. Instead paint a colour that visually matches the Win11
+                    // taskbar's apparent acrylic shade so the bar reads as integrated.
                     int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-                    exStyle &= ~WS_EX_LAYERED;
+                    exStyle |= WS_EX_LAYERED;
                     SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
+                    SetLayeredWindowAttributes(hWnd, 0, 255, LWA_ALPHA);
 
-                    SetDwmBlurBehind(hWnd, true);
-
-                    if (rootGrid != null)
-                        rootGrid.Background = new SolidColorBrush(Colors.Transparent);
                     if (mainBorder != null)
                         mainBorder.Background = new SolidColorBrush(_isLightTheme
-                            ? Color.FromArgb(120, 255, 255, 255)
-                            : Color.FromArgb(140, 0, 0, 0));
+                            ? Color.FromArgb(255, 243, 243, 243)
+                            : Color.FromArgb(255, 32, 32, 32));
                     if (topBorder != null)
                         topBorder.BorderBrush = new SolidColorBrush(_isLightTheme
                             ? Color.FromArgb(40, 0, 0, 0)
@@ -836,17 +819,14 @@ namespace Task_Flyout
                     return;
                 }
 
-                SetDwmBlurBehind(hWnd, false);
-
                 int opaqueExStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-                opaqueExStyle &= ~WS_EX_LAYERED;
+                opaqueExStyle |= WS_EX_LAYERED;
                 SetWindowLong(hWnd, GWL_EXSTYLE, opaqueExStyle);
                 SystemBackdrop = null;
+                SetLayeredWindowAttributes(hWnd, 0, 255, LWA_ALPHA);
 
                 if (_isLightTheme)
                 {
-                    if (rootGrid != null)
-                        rootGrid.Background = new SolidColorBrush(Color.FromArgb(255, 243, 243, 243));
                     if (mainBorder != null)
                         mainBorder.Background = new SolidColorBrush(Color.FromArgb(255, 243, 243, 243));
                     if (topBorder != null)
@@ -854,8 +834,6 @@ namespace Task_Flyout
                 }
                 else
                 {
-                    if (rootGrid != null)
-                        rootGrid.Background = new SolidColorBrush(Color.FromArgb(255, 44, 44, 44));
                     if (mainBorder != null)
                         mainBorder.Background = new SolidColorBrush(Color.FromArgb(255, 44, 44, 44));
                     if (topBorder != null)
@@ -871,22 +849,16 @@ namespace Task_Flyout
             if (border == null) return;
 
             var topBorder = (this.Content as FrameworkElement)?.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
-            var weatherService = (App.Current as App)?.WeatherService;
-            bool transparent = weatherService?.WeatherBarTransparentBackground == true;
 
             if (_isLightTheme)
             {
-                border.Background = transparent
-                    ? CreateWeatherBarAcrylicBrush(true, true)
-                    : new SolidColorBrush(Color.FromArgb(255, 255, 255, 255));
+                border.Background = new SolidColorBrush(Color.FromArgb(255, 255, 255, 255));
                 if (topBorder != null)
                     topBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(237, 255, 255, 255));
             }
             else
             {
-                border.Background = transparent
-                    ? CreateWeatherBarAcrylicBrush(false, true)
-                    : new SolidColorBrush(Color.FromArgb(255, 60, 60, 60));
+                border.Background = new SolidColorBrush(Color.FromArgb(255, 60, 60, 60));
                 if (topBorder != null)
                     topBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(64, 255, 255, 255));
             }
@@ -894,42 +866,7 @@ namespace Task_Flyout
 
         private void MainBorder_PointerExited(object sender, PointerRoutedEventArgs e)
         {
-            ApplyWindowsTheme(); // restore resting background + border
-        }
-
-        private static void SetDwmBlurBehind(IntPtr hWnd, bool enable)
-        {
-            try
-            {
-                var bb = new DWM_BLURBEHIND
-                {
-                    dwFlags = DWM_BB_ENABLE,
-                    fEnable = enable,
-                    hRgnBlur = IntPtr.Zero,
-                    fTransitionOnMaximized = false
-                };
-                DwmEnableBlurBehindWindow(hWnd, ref bb);
-            }
-            catch { }
-        }
-
-        private static Brush CreateWeatherBarAcrylicBrush(bool isLightTheme, bool isHover)
-        {
-            var tint = isLightTheme
-                ? Color.FromArgb(255, 246, 246, 246)
-                : Color.FromArgb(255, isHover ? (byte)78 : (byte)66, isHover ? (byte)78 : (byte)66, isHover ? (byte)78 : (byte)66);
-            var fallback = isLightTheme
-                ? Color.FromArgb(255, isHover ? (byte)248 : (byte)238, isHover ? (byte)248 : (byte)238, isHover ? (byte)248 : (byte)238)
-                : Color.FromArgb(255, isHover ? (byte)72 : (byte)58, isHover ? (byte)72 : (byte)58, isHover ? (byte)72 : (byte)58);
-
-            return new AcrylicBrush
-            {
-                AlwaysUseFallback = true,
-                TintColor = tint,
-                TintOpacity = isLightTheme ? 0.86 : 0.92,
-                TintLuminosityOpacity = isLightTheme ? 0.90 : 0.82,
-                FallbackColor = fallback
-            };
+            ApplyWindowsTheme(); // restore resting Mica background + border
         }
 
         private static string FormatBarLocation(string city)
