@@ -24,14 +24,19 @@
                             Margin="10,0,10,0"
                             Tapped="ContentPanel_Tapped"
                             Background="Transparent">
-                    <Grid Width="24" Height="24" VerticalAlignment="Center">
-                        <TextBlock x:Name="WeatherIcon" Text="--" FontSize="20"
-                                   FontFamily="Segoe UI Emoji" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        <Image x:Name="WeatherIconImage" Visibility="Collapsed" Stretch="Uniform"/>
-                        <Image x:Name="WeatherIconImage1" Visibility="Collapsed" Stretch="Uniform"/>
-                        <Image x:Name="WeatherIconImage2" Visibility="Collapsed" Stretch="Uniform"/>
-                        <Image x:Name="WeatherIconImage3" Visibility="Collapsed" Stretch="Uniform"/>
-                    </Grid>
+                    <Border x:Name="WeatherIconBackdrop"
+                            CornerRadius="6"
+                            Padding="2"
+                            VerticalAlignment="Center">
+                        <Grid Width="24" Height="24" VerticalAlignment="Center">
+                            <TextBlock x:Name="WeatherIcon" Text="--" FontSize="20"
+                                       FontFamily="Segoe UI Emoji" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            <Image x:Name="WeatherIconImage" Visibility="Collapsed" Stretch="Uniform"/>
+                            <Image x:Name="WeatherIconImage1" Visibility="Collapsed" Stretch="Uniform"/>
+                            <Image x:Name="WeatherIconImage2" Visibility="Collapsed" Stretch="Uniform"/>
+                            <Image x:Name="WeatherIconImage3" Visibility="Collapsed" Stretch="Uniform"/>
+                        </Grid>
+                    </Border>
                     <TextBlock x:Name="TxtTemp" Text="--" FontSize="15" FontWeight="SemiBold"
                                Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                VerticalAlignment="Center"/>

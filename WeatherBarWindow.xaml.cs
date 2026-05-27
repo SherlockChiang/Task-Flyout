@@ -812,6 +812,18 @@ namespace Task_Flyout
                 // No visible top separator — it always looked like an extra strip.
                 if (topBorder != null)
                     topBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
+
+                // Color-emoji glyphs (Segoe UI Emoji) carry their own hues, and many
+                // third-party icon packs ship pure-white PNGs designed for the Win11
+                // dark taskbar. Both wash out completely on the light bar shade — paint
+                // a dark chip behind the icon container so light artwork still pops.
+                // Invisible in dark theme where contrast is already fine.
+                if (root.FindName("WeatherIconBackdrop") is Microsoft.UI.Xaml.Controls.Border iconBackdrop)
+                {
+                    iconBackdrop.Background = new SolidColorBrush(_isLightTheme
+                        ? Color.FromArgb(102, 0, 0, 0)
+                        : Color.FromArgb(0, 0, 0, 0));
+                }
             }
             catch { }
         }
