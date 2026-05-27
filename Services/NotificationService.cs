@@ -14,6 +14,10 @@ namespace Task_Flyout.Services
     public class NotificationService
     {
         private readonly SyncManager _syncManager;
+        // UI-thread only: all mutation paths (ctor LoadNotifiedIds, the DispatcherTimer
+        // tick that drives CheckUpcomingEvents, and OpenFromActivationArguments which
+        // marshals through MainDispatcherQueue) execute on the main UI thread. Do not
+        // add background-thread callers without wrapping access in a lock first.
         private readonly Dictionary<string, DateTimeOffset> _notifiedIds = new(StringComparer.Ordinal);
         private readonly ResourceLoader _loader = new();
         private DispatcherTimer? _timer;
@@ -196,8 +200,11 @@ namespace Task_Flyout.Services
                 _notifiedIds.Select(kvp => $"{WebUtility.UrlEncode(kvp.Key)}|{kvp.Value.UtcTicks}"));
         }
 
+        // Use minute-precision rather than ticks so that the same event re-fetched
+        // with a different DateTime.Kind / timezone offset (e.g. roaming laptop) still
+        // produces a stable dedupe key for a given local start time.
         private static string BuildNotificationKey(AgendaItem item, string dateKey, DateTime eventStart)
-            => $"{item.Provider}|{item.Id}|{dateKey}|{eventStart.Ticks}";
+            => $"{item.Provider}|{item.Id}|{dateKey}|{eventStart:HHmm}";
 
         private void PruneNotifiedIds()
         {

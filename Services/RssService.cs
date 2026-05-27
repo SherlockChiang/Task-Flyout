@@ -206,8 +206,9 @@ namespace Task_Flyout.Services
                 InitializeDatabase();
                 return QueryCachedArticlesPage(subscriptionId, folderId, skip, take);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"RSS SQL paging failed, falling back to in-memory: {ex.Message}");
                 return GetCachedArticles(subscriptionId, folderId)
                     .Skip(skip)
                     .Take(take)
