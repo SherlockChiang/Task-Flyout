@@ -338,7 +338,10 @@ namespace Task_Flyout.Services
                 _activeFilter = filter;
                 _activeDrawableDir = drawableDir;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Icon pack activation failed: {ex.Message}");
+            }
         }
 
         /// <summary>

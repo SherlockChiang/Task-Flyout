@@ -32,7 +32,10 @@ namespace Task_Flyout.Services
                     if (list != null)
                         foreach (var a in list) Accounts.Add(a);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Account load failed: {ex.Message}");
+                }
             }
             else
             {

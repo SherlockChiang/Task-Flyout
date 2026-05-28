@@ -1644,7 +1644,10 @@ namespace Task_Flyout.Services
                 if (!string.IsNullOrWhiteSpace(json))
                     _persistentCache = JsonSerializer.Deserialize(json, AppJsonContext.Default.MailPersistentCache);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Mail cache load failed: {ex.Message}");
+            }
 
             _persistentCache ??= new MailPersistentCache();
             _persistentCache.Folders ??= new Dictionary<string, List<MailFolder>>();
