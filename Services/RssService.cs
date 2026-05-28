@@ -52,6 +52,9 @@ namespace Task_Flyout.Services
                 {
                     if (!string.IsNullOrWhiteSpace(_localImagePath) && File.Exists(_localImagePath))
                     {
+                        if (!RssService.IsPlausibleCachedImageFile(_localImagePath))
+                            return null;
+
                         _imageCache = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(_localImagePath))
                         {
                             DecodePixelWidth = 32
@@ -114,6 +117,9 @@ namespace Task_Flyout.Services
                 {
                     if (!string.IsNullOrWhiteSpace(_localImagePath) && File.Exists(_localImagePath))
                     {
+                        if (!RssService.IsPlausibleCachedImageFile(_localImagePath))
+                            return null;
+
                         _imageCache = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(_localImagePath))
                         {
                             DecodePixelWidth = 120
@@ -402,7 +408,7 @@ namespace Task_Flyout.Services
             var summary = StripHtml(html);
             var published = ParseDate(GetElementValue(item, "pubDate") ?? GetElementValue(item, "date"));
             var id = GetElementValue(item, "guid") ?? link ?? $"{subscription.Id}:{title}";
-            var imageUrl = FindImageUrl(item, summary);
+            var imageUrl = FindImageUrl(item, html, link, subscription.Url);
 
             return new RssArticle
             {
@@ -428,7 +434,7 @@ namespace Task_Flyout.Services
             var summary = StripHtml(html);
             var published = ParseDate(GetElementValue(entry, "published") ?? GetElementValue(entry, "updated"));
             var id = GetElementValue(entry, "id") ?? link ?? $"{subscription.Id}:{title}";
-            var imageUrl = FindImageUrl(entry, summary);
+            var imageUrl = FindImageUrl(entry, html, link, subscription.Url);
 
             return new RssArticle
             {
@@ -458,31 +464,106 @@ namespace Task_Flyout.Services
             return System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
         }
 
-        private static string FindImageUrl(XElement item, string fallbackText)
+        private static string FindImageUrl(XElement item, string htmlContent, string? articleUrl, string feedUrl)
         {
-            var media = item.Descendants().FirstOrDefault(element =>
-                element.Name.LocalName is "thumbnail" or "content" &&
-                element.Attribute("url") != null);
-            if (media?.Attribute("url")?.Value is { Length: > 0 } mediaUrl)
-                return mediaUrl;
+            var baseUrl = !string.IsNullOrWhiteSpace(articleUrl) ? articleUrl : feedUrl;
+
+            foreach (var media in item.Descendants().Where(element =>
+                         element.Name.LocalName is "thumbnail" or "content" &&
+                         element.Attribute("url") != null))
+            {
+                var mediaUrl = media.Attribute("url")?.Value;
+                if (IsLikelyImageElement(media, mediaUrl) &&
+                    TryResolveImageUrl(mediaUrl, baseUrl, out var resolvedMediaUrl))
+                    return resolvedMediaUrl;
+            }
 
             var enclosure = item.Elements().FirstOrDefault(element =>
-                element.Name.LocalName == "enclosure" &&
-                (element.Attribute("type")?.Value.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ?? false));
-            if (enclosure?.Attribute("url")?.Value is { Length: > 0 } enclosureUrl)
+                element.Name.LocalName == "enclosure" && element.Attribute("url") != null &&
+                ((element.Attribute("type")?.Value.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ?? false) ||
+                 IsLikelyImageUrl(element.Attribute("url")?.Value)));
+            if (TryResolveImageUrl(enclosure?.Attribute("url")?.Value, baseUrl, out var enclosureUrl))
                 return enclosureUrl;
 
-            var imgMatch = System.Text.RegularExpressions.Regex.Match(
-                item.ToString(),
-                @"<\s*img\b[^>]+\bsrc\s*=\s*['""]([^'""]+)['""]",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (imgMatch.Success && imgMatch.Groups[1].Value is { Length: > 0 } imgSrc &&
-                (imgSrc.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                 imgSrc.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
-                return imgSrc;
+            var itemXml = item.ToString();
+            var rawHtml = string.Join(" ", htmlContent, itemXml, WebUtility.HtmlDecode(itemXml));
+            foreach (var attrName in new[] { "src", "data-src", "data-original", "data-lazy-src" })
+            {
+                var imgMatch = System.Text.RegularExpressions.Regex.Match(
+                    rawHtml,
+                    $@"<\s*img\b[^>]+\b{attrName}\s*=\s*['""]([^'""]+)['""]",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (imgMatch.Success &&
+                    TryResolveImageUrl(imgMatch.Groups[1].Value, baseUrl, out var imgUrl))
+                    return imgUrl;
+            }
 
-            var match = System.Text.RegularExpressions.Regex.Match(fallbackText, @"https?://[^\s'""]+\.(png|jpe?g|webp|gif)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            return match.Success ? match.Value : "";
+            var srcSetMatch = System.Text.RegularExpressions.Regex.Match(
+                rawHtml,
+                @"<\s*(?:img|source)\b[^>]+\bsrcset\s*=\s*['""]([^'""]+)['""]",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (srcSetMatch.Success)
+            {
+                foreach (var candidate in srcSetMatch.Groups[1].Value.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var src = candidate.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                    if (TryResolveImageUrl(src, baseUrl, out var srcSetUrl))
+                        return srcSetUrl;
+                }
+            }
+
+            var match = System.Text.RegularExpressions.Regex.Match(rawHtml, @"https?://[^\s'""]+\.(png|jpe?g|webp|gif)(?:\?[^\s'""]*)?", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return match.Success && TryResolveImageUrl(match.Value, baseUrl, out var fallbackUrl) ? fallbackUrl : "";
+        }
+
+        private static bool IsLikelyImageElement(XElement element, string? url)
+        {
+            if (element.Name.LocalName == "thumbnail") return true;
+            if (element.Attribute("type")?.Value.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true) return true;
+            if (string.Equals(element.Attribute("medium")?.Value, "image", StringComparison.OrdinalIgnoreCase)) return true;
+            return IsLikelyImageUrl(url);
+        }
+
+        private static bool IsLikelyImageUrl(string? url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            var path = url.Split('?', '#')[0];
+            return path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+                   || path.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase)
+                   || path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+                   || path.EndsWith(".webp", StringComparison.OrdinalIgnoreCase)
+                   || path.EndsWith(".gif", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool TryResolveImageUrl(string? value, string baseUrl, out string resolved)
+        {
+            resolved = "";
+            if (string.IsNullOrWhiteSpace(value)) return false;
+
+            var candidate = WebUtility.HtmlDecode(value).Trim();
+            if (candidate.Length == 0) return false;
+            if (candidate.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) return false;
+            if (candidate.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase)) return false;
+
+            if (candidate.StartsWith("//", StringComparison.Ordinal))
+                candidate = "https:" + candidate;
+
+            Uri? uri = null;
+            if (Uri.TryCreate(candidate, UriKind.Absolute, out var absolute))
+            {
+                uri = absolute;
+            }
+            else if (Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri) &&
+                     Uri.TryCreate(baseUri, candidate, out var relative))
+            {
+                uri = relative;
+            }
+
+            if (uri == null) return false;
+            if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) return false;
+
+            resolved = uri.ToString();
+            return true;
         }
 
         private static async ValueTask<Stream> ConnectToPublicAddressAsync(SocketsHttpConnectionContext context, System.Threading.CancellationToken cancellationToken)
@@ -615,6 +696,9 @@ namespace Task_Flyout.Services
         private static async Task<HttpResponseMessage> SendWithRedirectsAsync(HttpRequestMessage request)
         {
             var currentUri = request.RequestUri!;
+            var requestHeaders = request.Headers
+                .Select(header => (header.Key, Values: header.Value.ToArray()))
+                .ToList();
             if (!await IsSafeToFetchAsync(currentUri))
                 throw new InvalidOperationException("URL resolved to a non-public IP address.");
 
@@ -648,6 +732,8 @@ namespace Task_Flyout.Services
                 currentUri = location;
                 response.Dispose();
                 request = new HttpRequestMessage(HttpMethod.Get, currentUri);
+                foreach (var header in requestHeaders)
+                    request.Headers.TryAddWithoutValidation(header.Key, header.Values);
             }
         }
 
@@ -682,6 +768,12 @@ namespace Task_Flyout.Services
         static RssService()
         {
             try { Encoding.RegisterProvider(CodePagesEncodingProvider.Instance); }
+            catch { }
+
+            try
+            {
+                HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("TaskFlyout/1.0");
+            }
             catch { }
         }
 
@@ -738,11 +830,20 @@ namespace Task_Flyout.Services
                 if (string.IsNullOrWhiteSpace(extension) || extension.Length > 8)
                     extension = ".img";
                 var path = AppDataPathHelper.ResolveUnderRoot(imagesPath, HashText(imageUrl) + extension);
-                if (File.Exists(path)) return path;
+                if (File.Exists(path))
+                {
+                    if (IsPlausibleCachedImageFile(path)) return path;
+                    try { File.Delete(path); } catch { return ""; }
+                }
 
                 using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+                request.Headers.Accept.ParseAdd("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
                 using var response = await SendWithRedirectsAsync(request);
                 response.EnsureSuccessStatusCode();
+
+                var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
+                if (!IsAllowedImageContentType(contentType))
+                    return "";
 
                 if (response.Content.Headers.ContentLength is > MaxImageBytes)
                     return "";
@@ -758,13 +859,65 @@ namespace Task_Flyout.Services
                     buffer.Write(chunk, 0, bytesRead);
                 }
 
-                await File.WriteAllBytesAsync(path, buffer.ToArray());
+                var bytes = buffer.ToArray();
+                if (!IsPlausibleImageBytes(bytes))
+                    return "";
+
+                await File.WriteAllBytesAsync(path, bytes);
                 return path;
             }
             catch
             {
                 return "";
             }
+        }
+
+        internal static bool IsPlausibleCachedImageFile(string path)
+        {
+            try
+            {
+                if (!File.Exists(path)) return false;
+                var info = new FileInfo(path);
+                if (info.Length <= 8 || info.Length > MaxImageBytes) return false;
+
+                using var stream = File.OpenRead(path);
+                Span<byte> header = stackalloc byte[16];
+                var read = stream.Read(header);
+                return IsPlausibleImageHeader(header[..read]);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsAllowedImageContentType(string contentType)
+        {
+            if (string.IsNullOrWhiteSpace(contentType)) return true;
+            if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return true;
+            return contentType.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase)
+                   || contentType.Equals("binary/octet-stream", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsPlausibleImageBytes(byte[] bytes)
+            => bytes.Length > 8 && IsPlausibleImageHeader(bytes.AsSpan(0, Math.Min(bytes.Length, 16)));
+
+        private static bool IsPlausibleImageHeader(ReadOnlySpan<byte> bytes)
+        {
+            if (bytes.Length < 4) return false;
+
+            if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) return true;
+            if (bytes.Length >= 8 &&
+                bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 &&
+                bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A) return true;
+            if (bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x38) return true;
+            if (bytes.Length >= 12 &&
+                bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
+                bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50) return true;
+            if (bytes[0] == 0x42 && bytes[1] == 0x4D) return true;
+            if (bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0x01 && bytes[3] == 0x00) return true;
+
+            return false;
         }
 
         private void EnsureLoaded()

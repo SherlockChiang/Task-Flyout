@@ -4,6 +4,8 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using Task_Flyout.Models;
 
 namespace Task_Flyout.Services
@@ -12,6 +14,8 @@ namespace Task_Flyout.Services
     {
         private const string StoreScope = "calendar";
         private const string AccountsKey = "connected_accounts";
+        private readonly object _saveQueueLock = new();
+        private Task _saveQueue = Task.CompletedTask;
 
         public ObservableCollection<ConnectedAccountInfo> Accounts { get; } = new();
 
@@ -69,9 +73,30 @@ namespace Task_Flyout.Services
         public void Save()
         {
             var json = JsonSerializer.Serialize(Accounts.ToList(), AppJsonContext.Default.ListConnectedAccountInfo);
-            LocalSqliteStore.WriteProtectedText(StoreScope, AccountsKey, json);
-
             SyncToLegacySettings();
+            QueueProtectedStoreWrite(json);
+        }
+
+        private void QueueProtectedStoreWrite(string json)
+        {
+            lock (_saveQueueLock)
+            {
+                _saveQueue = _saveQueue.ContinueWith(
+                    _ =>
+                    {
+                        try
+                        {
+                            LocalSqliteStore.WriteProtectedText(StoreScope, AccountsKey, json);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Account save failed: {ex.Message}");
+                        }
+                    },
+                    CancellationToken.None,
+                    TaskContinuationOptions.None,
+                    TaskScheduler.Default);
+            }
         }
 
         private void SyncToLegacySettings()

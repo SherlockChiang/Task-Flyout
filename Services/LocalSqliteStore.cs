@@ -59,23 +59,7 @@ ON CONFLICT(scope, key) DO UPDATE SET value = excluded.value, updated_ticks = ex
 
         public static async Task WriteProtectedTextAsync(string scope, string key, string text)
         {
-            EnsureInitialized();
-            var bytes = Encoding.UTF8.GetBytes(text ?? "");
-            var encrypted = ProtectedData.Protect(bytes, Entropy, DataProtectionScope.CurrentUser);
-
-            await using var connection = CreateConnection();
-            await connection.OpenAsync();
-            await using var command = connection.CreateCommand();
-            command.CommandText = """
-INSERT INTO protected_store(scope, key, value, updated_ticks)
-VALUES ($scope, $key, $value, $updatedTicks)
-ON CONFLICT(scope, key) DO UPDATE SET value = excluded.value, updated_ticks = excluded.updated_ticks;
-""";
-            command.Parameters.AddWithValue("$scope", scope);
-            command.Parameters.AddWithValue("$key", key);
-            command.Parameters.Add("$value", SqliteType.Blob).Value = encrypted;
-            command.Parameters.AddWithValue("$updatedTicks", DateTimeOffset.UtcNow.UtcTicks);
-            await command.ExecuteNonQueryAsync();
+            await Task.Run(() => WriteProtectedText(scope, key, text));
         }
 
         public static async Task DeleteProtectedTextAsync(string scope, string key)

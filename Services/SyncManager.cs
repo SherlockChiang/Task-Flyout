@@ -15,7 +15,9 @@ namespace Task_Flyout.Services
         private readonly List<ISyncProvider> _providers = new();
         private AppCache _cache = new();
         private int _cacheLoaded;
-        private readonly SemaphoreSlim _cacheLock = new(1, 1);
+        private readonly ReaderWriterLockSlim _cacheLock = new(LockRecursionPolicy.NoRecursion);
+        private readonly object _dataRequestLock = new();
+        private readonly Dictionary<string, Task<List<AgendaItem>>> _inFlightDataRequests = new(StringComparer.Ordinal);
         private const string StoreScope = "calendar";
         private const string CacheKey = "local_cache_winui3";
         private const int RetainedTaskPastYears = 1;
@@ -80,14 +82,14 @@ namespace Task_Flyout.Services
         public AppCache GetLocalCache()
         {
             EnsureCacheLoaded();
-            _cacheLock.Wait();
+            _cacheLock.EnterReadLock();
             try
             {
                 return CloneCache(_cache);
             }
             finally
             {
-                _cacheLock.Release();
+                _cacheLock.ExitReadLock();
             }
         }
 
@@ -99,7 +101,7 @@ namespace Task_Flyout.Services
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
 
-            _cacheLock.Wait();
+            _cacheLock.EnterReadLock();
             try
             {
                 var result = new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal);
@@ -113,7 +115,7 @@ namespace Task_Flyout.Services
             }
             finally
             {
-                _cacheLock.Release();
+                _cacheLock.ExitReadLock();
             }
         }
 
@@ -123,7 +125,7 @@ namespace Task_Flyout.Services
             min = min.Date;
             max = max.Date;
 
-            _cacheLock.Wait();
+            _cacheLock.EnterReadLock();
             try
             {
                 var dayItems = new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal);
@@ -148,7 +150,7 @@ namespace Task_Flyout.Services
             }
             finally
             {
-                _cacheLock.Release();
+                _cacheLock.ExitReadLock();
             }
         }
 
@@ -156,7 +158,7 @@ namespace Task_Flyout.Services
         {
             EnsureCacheLoaded();
 
-            _cacheLock.Wait();
+            _cacheLock.EnterReadLock();
             try
             {
                 var dayItems = _cache.DayItems
@@ -179,14 +181,14 @@ namespace Task_Flyout.Services
             }
             finally
             {
-                _cacheLock.Release();
+                _cacheLock.ExitReadLock();
             }
         }
 
         public async Task UpsertCachedItemAsync(AgendaItem item, string? oldDateKey = null)
         {
             EnsureCacheLoaded();
-            await _cacheLock.WaitAsync();
+            _cacheLock.EnterWriteLock();
             try
             {
                 RemoveMatchingCachedItems(item, oldDateKey);
@@ -206,7 +208,7 @@ namespace Task_Flyout.Services
             }
             finally
             {
-                _cacheLock.Release();
+                _cacheLock.ExitWriteLock();
             }
 
             await SaveCacheAsync();
@@ -215,7 +217,7 @@ namespace Task_Flyout.Services
         public async Task RemoveCachedItemAsync(AgendaItem item)
         {
             EnsureCacheLoaded();
-            await _cacheLock.WaitAsync();
+            _cacheLock.EnterWriteLock();
             try
             {
                 RemoveMatchingCachedItems(item);
@@ -223,7 +225,7 @@ namespace Task_Flyout.Services
             }
             finally
             {
-                _cacheLock.Release();
+                _cacheLock.ExitWriteLock();
             }
 
             await SaveCacheAsync();
@@ -232,7 +234,7 @@ namespace Task_Flyout.Services
         public async Task SetCachedTaskCompletionAsync(AgendaItem target, bool isCompleted)
         {
             EnsureCacheLoaded();
-            await _cacheLock.WaitAsync();
+            _cacheLock.EnterWriteLock();
             try
             {
                 foreach (var items in _cache.DayItems.Values)
@@ -243,7 +245,7 @@ namespace Task_Flyout.Services
             }
             finally
             {
-                _cacheLock.Release();
+                _cacheLock.ExitWriteLock();
             }
 
             await SaveCacheAsync();
@@ -252,7 +254,7 @@ namespace Task_Flyout.Services
         public async Task SaveLocalCacheAsync(AppCache? localCache = null)
         {
             EnsureCacheLoaded();
-            await _cacheLock.WaitAsync();
+            _cacheLock.EnterWriteLock();
             try
             {
                 if (localCache != null)
@@ -261,13 +263,50 @@ namespace Task_Flyout.Services
             }
             finally
             {
-                _cacheLock.Release();
+                _cacheLock.ExitWriteLock();
             }
 
             await SaveCacheAsync();
         }
 
         public async Task<List<AgendaItem>> GetAllDataAsync(DateTime min, DateTime max, bool forceRefresh = false)
+        {
+            min = min.Date;
+            max = max.Date;
+
+            var providerKey = string.Join(',',
+                _providers
+                    .Where(provider => AccountManager.IsConnected(provider.ProviderName))
+                    .Select(provider => provider.ProviderName)
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
+            var requestKey = $"{min:yyyy-MM-dd}|{max:yyyy-MM-dd}|{forceRefresh}|{providerKey}";
+
+            Task<List<AgendaItem>> requestTask;
+            lock (_dataRequestLock)
+            {
+                if (!_inFlightDataRequests.TryGetValue(requestKey, out requestTask!))
+                {
+                    requestTask = GetAllDataCoreAsync(min, max, forceRefresh);
+                    _inFlightDataRequests[requestKey] = requestTask;
+                }
+            }
+
+            try
+            {
+                var result = await requestTask;
+                return result.Select(CloneAgendaItem).ToList();
+            }
+            finally
+            {
+                lock (_dataRequestLock)
+                {
+                    if (_inFlightDataRequests.TryGetValue(requestKey, out var current) && ReferenceEquals(current, requestTask))
+                        _inFlightDataRequests.Remove(requestKey);
+                }
+            }
+        }
+
+        private async Task<List<AgendaItem>> GetAllDataCoreAsync(DateTime min, DateTime max, bool forceRefresh)
         {
             EnsureCacheLoaded();
             min = min.Date;
@@ -364,7 +403,9 @@ namespace Task_Flyout.Services
         {
             if (Volatile.Read(ref _cacheLoaded) != 0) return;
 
-            _cacheLock.Wait();
+            AppCache? compactedSnapshot = null;
+
+            _cacheLock.EnterWriteLock();
             try
             {
                 if (Volatile.Read(ref _cacheLoaded) != 0) return;
@@ -394,20 +435,23 @@ namespace Task_Flyout.Services
                 _cache = loaded;
 
                 if (CompactCache(DateTime.Today))
-                    SaveCacheSyncNoLock();
+                    compactedSnapshot = CloneCache(_cache);
 
                 Volatile.Write(ref _cacheLoaded, 1);
             }
             finally
             {
-                _cacheLock.Release();
+                _cacheLock.ExitWriteLock();
             }
+
+            if (compactedSnapshot != null)
+                SaveCacheSync(compactedSnapshot);
         }
 
         private void RemoveProviderFromCache(string providerName)
         {
             EnsureCacheLoaded();
-            _cacheLock.Wait();
+            _cacheLock.EnterWriteLock();
             try
             {
                 foreach (var key in _cache.DayItems.Keys.ToList())
@@ -421,7 +465,7 @@ namespace Task_Flyout.Services
             }
             finally
             {
-                _cacheLock.Release();
+                _cacheLock.ExitWriteLock();
             }
         }
 
@@ -429,16 +473,17 @@ namespace Task_Flyout.Services
         {
             try
             {
-                string json;
-                await _cacheLock.WaitAsync();
+                AppCache snapshot;
+                _cacheLock.EnterReadLock();
                 try
                 {
-                    json = JsonSerializer.Serialize(_cache, AppJsonContext.Default.AppCache);
+                    snapshot = CloneCache(_cache);
                 }
                 finally
                 {
-                    _cacheLock.Release();
+                    _cacheLock.ExitReadLock();
                 }
+                string json = JsonSerializer.Serialize(snapshot, AppJsonContext.Default.AppCache);
                 await LocalSqliteStore.WriteProtectedTextAsync(StoreScope, CacheKey, json);
             }
             catch { }
@@ -455,7 +500,7 @@ namespace Task_Flyout.Services
 
             if (providers.Count == 0) return false;
 
-            _cacheLock.Wait();
+            _cacheLock.EnterReadLock();
             try
             {
                 return providers.All(provider => _cache.CachedRanges.Any(range =>
@@ -465,7 +510,7 @@ namespace Task_Flyout.Services
             }
             finally
             {
-                _cacheLock.Release();
+                _cacheLock.ExitReadLock();
             }
         }
 
@@ -474,7 +519,7 @@ namespace Task_Flyout.Services
             string start = min.ToString("yyyy-MM-dd");
             string end = max.AddDays(-1).ToString("yyyy-MM-dd");
 
-            _cacheLock.Wait();
+            _cacheLock.EnterReadLock();
             try
             {
                 return _cache.DayItems
@@ -486,18 +531,18 @@ namespace Task_Flyout.Services
             }
             finally
             {
-                _cacheLock.Release();
+                _cacheLock.ExitReadLock();
             }
         }
 
-        private async Task<bool> MergeIntoCacheAsync(DateTime min, DateTime max, List<AgendaItem> items, List<string> successfulProviders, List<string> attemptedProviders)
+        private Task<bool> MergeIntoCacheAsync(DateTime min, DateTime max, List<AgendaItem> items, List<string> successfulProviders, List<string> attemptedProviders)
         {
             string start = min.ToString("yyyy-MM-dd");
             string end = max.AddDays(-1).ToString("yyyy-MM-dd");
             var successfulProviderSet = successfulProviders.ToHashSet(StringComparer.OrdinalIgnoreCase);
             var attemptedProviderSet = attemptedProviders.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            await _cacheLock.WaitAsync();
+            _cacheLock.EnterWriteLock();
             try
             {
                 // Snapshot the affected slice before mutating so a no-op periodic sync
@@ -542,13 +587,13 @@ namespace Task_Flyout.Services
                 RebuildMarkedDates();
 
                 // CompactCache may touch items outside [min,max); OR it in directly.
-                return compacted
+                return Task.FromResult(compacted
                     || beforeRangeSig != GetRangeSignature(_cache.CachedRanges)
-                    || beforeItemsSig != BuildRangeItemsSignature(min, max);
+                    || beforeItemsSig != BuildRangeItemsSignature(min, max));
             }
             finally
             {
-                _cacheLock.Release();
+                _cacheLock.ExitWriteLock();
             }
         }
 
@@ -745,11 +790,11 @@ namespace Task_Flyout.Services
                 DateTimeStyles.None,
                 out date);
 
-        private void SaveCacheSyncNoLock()
+        private static void SaveCacheSync(AppCache snapshot)
         {
             try
             {
-                string json = JsonSerializer.Serialize(_cache, AppJsonContext.Default.AppCache);
+                string json = JsonSerializer.Serialize(snapshot, AppJsonContext.Default.AppCache);
                 LocalSqliteStore.WriteProtectedText(StoreScope, CacheKey, json);
             }
             catch { }

@@ -1,5 +1,6 @@
 using Google.Apis.Gmail.v1;
 using Google.Apis.Gmail.v1.Data;
+using Google.Apis.Requests;
 using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Search;
@@ -154,6 +155,8 @@ namespace Task_Flyout.Services
         private DispatcherTimer? _pollTimer;
         private int _isPollingMail;
         private int _knownUnreadLoaded;
+        private DateTimeOffset _lastMailPollStartedUtc = DateTimeOffset.MinValue;
+        private DateTimeOffset _lastMailPollCompletedUtc = DateTimeOffset.MinValue;
         // Per-account poll backoff: after a failure an account is skipped for an
         // exponentially growing number of poll cycles (capped) so a broken account
         // (expired token, unreachable server) stops being hammered every interval —
@@ -170,6 +173,8 @@ namespace Task_Flyout.Services
         private bool _persistentCacheLoaded;
         private readonly object _persistentCacheSaveLock = new();
         private CancellationTokenSource? _persistentCacheSaveCts;
+        private readonly object _accountSaveQueueLock = new();
+        private Task _accountSaveQueue = Task.CompletedTask;
         private const int MaxBodyTextChars = 80_000;
         private const int MaxHtmlBodyChars = 160_000;
         private const int MaxConcurrentGoogleMessageMetadataRequests = 6;
@@ -271,12 +276,28 @@ namespace Task_Flyout.Services
 
         public void StartMailPolling()
         {
-            StopMailPolling();
-            if (!MailPollingEnabled || !HasSetupCompleteAccounts()) return;
+            if (!MailPollingEnabled || !HasSetupCompleteAccounts())
+            {
+                StopMailPolling();
+                return;
+            }
+
+            var interval = TimeSpan.FromMinutes(Math.Max(1, MailPollingIntervalMinutes));
+            if (_pollTimer != null)
+            {
+                if (_pollTimer.Interval != interval)
+                    _pollTimer.Interval = interval;
+
+                if (!_pollTimer.IsEnabled)
+                    _pollTimer.Start();
+
+                QueueInitialMailCheckIfDue(interval);
+                return;
+            }
 
             _pollTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMinutes(Math.Max(1, MailPollingIntervalMinutes))
+                Interval = interval
             };
             _pollTimer.Tick += async (_, _) =>
             {
@@ -284,6 +305,19 @@ namespace Task_Flyout.Services
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Mail poll tick failed: {ex.Message}"); }
             };
             _pollTimer.Start();
+            QueueInitialMailCheckIfDue(interval);
+        }
+
+        private void QueueInitialMailCheckIfDue(TimeSpan interval)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var minGap = TimeSpan.FromTicks(Math.Min(
+                TimeSpan.FromMinutes(2).Ticks,
+                Math.Max(TimeSpan.FromSeconds(30).Ticks, interval.Ticks / 2)));
+
+            if (now - _lastMailPollStartedUtc < TimeSpan.FromSeconds(30)) return;
+            if (now - _lastMailPollCompletedUtc < minGap) return;
+
             _ = SafeInitialMailCheckAsync();
         }
 
@@ -743,6 +777,7 @@ namespace Task_Flyout.Services
         private async Task CheckNewMailAsync()
         {
             if (Interlocked.CompareExchange(ref _isPollingMail, 1, 0) != 0 || !MailPollingEnabled) return;
+            _lastMailPollStartedUtc = DateTimeOffset.UtcNow;
 
             try
             {
@@ -816,6 +851,7 @@ namespace Task_Flyout.Services
             }
             finally
             {
+                _lastMailPollCompletedUtc = DateTimeOffset.UtcNow;
                 Volatile.Write(ref _isPollingMail, 0);
             }
         }
@@ -1136,8 +1172,69 @@ namespace Task_Flyout.Services
             if (list?.Messages == null || list.Messages.Count == 0)
                 return new List<MailItem>();
 
+            var messageRefs = list.Messages
+                .Where(message => !string.IsNullOrWhiteSpace(message.Id))
+                .ToList();
+
+            var messages = await FetchGoogleMessageMetadataBatchAsync(gmail, account.Id, folder.Id, messageRefs);
+            return messages
+                .OrderByDescending(message => message.RawReceivedTime)
+                .ToList();
+        }
+
+        private async Task<List<MailItem>> FetchGoogleMessageMetadataBatchAsync(
+            GmailService gmail,
+            string accountId,
+            string folderId,
+            IReadOnlyList<GmailMessage> messageRefs)
+        {
+            if (messageRefs.Count == 0) return new List<MailItem>();
+
+            try
+            {
+                var batch = new BatchRequest(gmail);
+                var results = new ConcurrentDictionary<string, MailItem>(StringComparer.Ordinal);
+
+                foreach (var messageRef in messageRefs)
+                {
+                    var id = messageRef.Id;
+                    if (string.IsNullOrWhiteSpace(id)) continue;
+
+                    var get = gmail.Users.Messages.Get("me", id);
+                    get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
+                    get.MetadataHeaders = new[] { "From", "Subject", "Date" };
+
+                    batch.Queue<GmailMessage>(get, (content, error, _, _) =>
+                    {
+                        if (error != null || content == null || string.IsNullOrWhiteSpace(content.Id)) return;
+                        results[content.Id] = ToGoogleMailItem(accountId, folderId, content);
+                    });
+                }
+
+                await batch.ExecuteAsync();
+                if (results.Count > 0)
+                    return messageRefs
+                        .Select(message => message.Id)
+                        .Where(id => !string.IsNullOrWhiteSpace(id) && results.ContainsKey(id))
+                        .Select(id => results[id!])
+                        .ToList();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Gmail metadata batch failed, falling back to individual requests: {ex.Message}");
+            }
+
+            return await FetchGoogleMessageMetadataIndividuallyAsync(gmail, accountId, folderId, messageRefs);
+        }
+
+        private async Task<List<MailItem>> FetchGoogleMessageMetadataIndividuallyAsync(
+            GmailService gmail,
+            string accountId,
+            string folderId,
+            IReadOnlyList<GmailMessage> messageRefs)
+        {
             using var metadataGate = new SemaphoreSlim(MaxConcurrentGoogleMessageMetadataRequests);
-            var tasks = list.Messages
+            var tasks = messageRefs
                 .Where(message => !string.IsNullOrWhiteSpace(message.Id))
                 .Select(async message =>
                 {
@@ -1147,7 +1244,7 @@ namespace Task_Flyout.Services
                         var get = gmail.Users.Messages.Get("me", message.Id);
                         get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
                         get.MetadataHeaders = new[] { "From", "Subject", "Date" };
-                        return ToGoogleMailItem(account.Id, folder.Id, await get.ExecuteAsync());
+                        return ToGoogleMailItem(accountId, folderId, await get.ExecuteAsync());
                     }
                     finally
                     {
@@ -1155,10 +1252,7 @@ namespace Task_Flyout.Services
                     }
                 });
 
-            var messages = await Task.WhenAll(tasks);
-            return messages
-                .OrderByDescending(message => message.RawReceivedTime)
-                .ToList();
+            return (await Task.WhenAll(tasks)).ToList();
         }
 
         private async Task EnsureOutlookAuthorizedAsync()
@@ -1222,7 +1316,29 @@ namespace Task_Flyout.Services
             _pollBackoff.Clear();
             DisconnectAllPollImapClients();
             string json = JsonSerializer.Serialize(_accounts, AppJsonContext.Default.ListMailAccount);
-            LocalSqliteStore.WriteProtectedText("mail", "accounts", json);
+            QueueAccountStoreWrite(json);
+        }
+
+        private void QueueAccountStoreWrite(string json)
+        {
+            lock (_accountSaveQueueLock)
+            {
+                _accountSaveQueue = _accountSaveQueue.ContinueWith(
+                    _ =>
+                    {
+                        try
+                        {
+                            LocalSqliteStore.WriteProtectedText("mail", "accounts", json);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Mail account save failed: {ex.Message}");
+                        }
+                    },
+                    CancellationToken.None,
+                    TaskContinuationOptions.None,
+                    TaskScheduler.Default);
+            }
         }
 
         private static string GetAppDataPath()

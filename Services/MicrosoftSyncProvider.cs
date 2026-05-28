@@ -278,7 +278,21 @@ namespace Task_Flyout.Services
                     req.QueryParameters.Top = 100;
                 });
 
-                foreach (var list in lists?.Value?.Where(list => !string.IsNullOrWhiteSpace(list.Id)) ?? Enumerable.Empty<TodoTaskList>())
+                var allLists = new List<TodoTaskList>();
+                if (lists != null)
+                {
+                    var listIterator = PageIterator<TodoTaskList, TodoTaskListCollectionResponse>.CreatePageIterator(
+                        _graphClient,
+                        lists,
+                        list =>
+                        {
+                            allLists.Add(list);
+                            return true;
+                        });
+                    await listIterator.IterateAsync();
+                }
+
+                foreach (var list in allLists.Where(list => !string.IsNullOrWhiteSpace(list.Id)))
                 {
                     var tasks = await _graphClient.Me.Todo.Lists[list.Id].Tasks.GetAsync(req =>
                     {
