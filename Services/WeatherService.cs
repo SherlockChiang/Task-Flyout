@@ -545,30 +545,33 @@ namespace Task_Flyout.Services
             return new List<string>();
         }
 
-        public Task<WeatherInfo?> GetWeatherAsync(bool forceRefresh = false)
+        public async Task<WeatherInfo?> GetWeatherAsync(bool forceRefresh = false)
         {
             if (!IsEnabled || string.IsNullOrWhiteSpace(City))
-                return Task.FromResult<WeatherInfo?>(null);
+                return null;
 
+            var key = CurrentWeatherKey;
+            await TryLoadPersistentWeatherAsync(key);
+            Task<WeatherInfo?> taskToAwait;
             lock (_weatherLock)
             {
-                var key = CurrentWeatherKey;
-                TryLoadPersistentWeather(key);
-
                 if (!forceRefresh && _cachedWeather != null && _cachedWeatherKey == key
                     && (DateTime.Now - _lastFetchTime) < _cacheExpiry)
-                    return Task.FromResult<WeatherInfo?>(_cachedWeather);
+                    return _cachedWeather;
 
                 // Join an in-flight fetch only if it targets the same location/source;
                 // a city change starts its own fetch so callers never get stale data.
                 if (_inFlightWeatherFetch != null && _inFlightWeatherKey == key)
-                    return _inFlightWeatherFetch;
-
-                var task = FetchAndCacheWeatherAsync(key);
-                _inFlightWeatherFetch = task;
-                _inFlightWeatherKey = key;
-                return task;
+                    taskToAwait = _inFlightWeatherFetch;
+                else
+                {
+                    taskToAwait = FetchAndCacheWeatherAsync(key);
+                    _inFlightWeatherFetch = taskToAwait;
+                    _inFlightWeatherKey = key;
+                }
             }
+
+            return await taskToAwait;
         }
 
         private async Task<WeatherInfo?> FetchAndCacheWeatherAsync(string key)
@@ -600,7 +603,7 @@ namespace Task_Flyout.Services
 
                     // Write outside the lock — transient JSON string, no retained copy.
                     if (persistJson != null)
-                        WritePersistentWeather(persistJson);
+                        await WritePersistentWeatherAsync(persistJson);
                 }
             }
             catch (Exception ex)
@@ -625,22 +628,26 @@ namespace Task_Flyout.Services
             }
         }
 
-        // Lazily hydrate the in-memory cache from disk on first use (called under lock).
+        // Lazily hydrate the in-memory cache from disk on first use.
         // Only adopts the persisted entry when it matches the current location and is
         // still within the cache window — otherwise it's left for the network fetch.
-        private void TryLoadPersistentWeather(string currentKey)
+        private async Task TryLoadPersistentWeatherAsync(string currentKey)
         {
-            if (_persistentWeatherLoaded) return;
-            _persistentWeatherLoaded = true;
+            lock (_weatherLock)
+            {
+                if (_persistentWeatherLoaded) return;
+                _persistentWeatherLoaded = true;
 
-            if (_cachedWeather != null) return;
+                if (_cachedWeather != null) return;
+            }
 
             try
             {
-                var path = PersistentWeatherPath;
-                if (!File.Exists(path)) return;
-
-                var json = File.ReadAllText(path);
+                var json = await Task.Run(() =>
+                {
+                    var path = PersistentWeatherPath;
+                    return File.Exists(path) ? File.ReadAllText(path) : "";
+                });
                 if (string.IsNullOrWhiteSpace(json)) return;
 
                 var envelope = JsonSerializer.Deserialize(json, AppJsonContext.Default.WeatherCacheEnvelope);
@@ -649,9 +656,13 @@ namespace Task_Flyout.Services
                 var fetchedAt = new DateTime(envelope.FetchedTicks, DateTimeKind.Local);
                 if (DateTime.Now - fetchedAt >= _cacheExpiry) return;
 
-                _cachedWeather = envelope.Info;
-                _cachedWeatherKey = envelope.Key;
-                _lastFetchTime = fetchedAt;
+                lock (_weatherLock)
+                {
+                    if (currentKey != CurrentWeatherKey || _cachedWeather != null) return;
+                    _cachedWeather = envelope.Info;
+                    _cachedWeatherKey = envelope.Key;
+                    _lastFetchTime = fetchedAt;
+                }
             }
             catch (Exception ex)
             {
@@ -673,9 +684,9 @@ namespace Task_Flyout.Services
             }
         }
 
-        private static void WritePersistentWeather(string json)
+        private static async Task WritePersistentWeatherAsync(string json)
         {
-            try { File.WriteAllText(PersistentWeatherPath, json); }
+            try { await Task.Run(() => File.WriteAllText(PersistentWeatherPath, json)); }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Weather cache write failed: {ex.Message}"); }
         }
 
