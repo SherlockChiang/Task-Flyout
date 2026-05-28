@@ -393,6 +393,9 @@
   <data name="SettingsPage_Background.Header" xml:space="preserve">
     <value>关闭主窗口时保持后台运行 (推荐)</value>
   </data>
+  <data name="SettingsPage_EfficiencyMode.Header" xml:space="preserve">
+    <value>收起到托盘时启用效能模式 (省电)</value>
+  </data>
   <data name="RestartRequired_Primary" xml:space="preserve">
     <value>立即重启</value>
   </data>

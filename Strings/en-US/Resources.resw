@@ -393,6 +393,9 @@
   <data name="SettingsPage_Background.Header" xml:space="preserve">
     <value>Keep running in background when window is closed (Recommended)</value>
   </data>
+  <data name="SettingsPage_EfficiencyMode.Header" xml:space="preserve">
+    <value>Use efficiency mode while collapsed to the tray (saves power)</value>
+  </data>
   <data name="RestartRequired_Primary" xml:space="preserve">
     <value>Restart Now</value>
   </data>
