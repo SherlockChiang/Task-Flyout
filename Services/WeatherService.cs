@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -128,9 +129,19 @@ namespace Task_Flyout.Services
     {
         private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
         private WeatherInfo? _cachedWeather;
+        private string? _cachedWeatherKey;
         private DateTime _lastFetchTime = DateTime.MinValue;
         private readonly TimeSpan _cacheExpiry = TimeSpan.FromMinutes(30);
         private Dictionary<string, (double Lat, double Lon)> _lastSearchCoords = new();
+        // Coalesce concurrent weather fetches: the bar timer, flyout, nav icon and
+        // settings page can all ask at once (especially on a city change). Without this
+        // each hits the provider independently (OpenMeteo = 2 requests apiece).
+        private readonly object _weatherLock = new();
+        private Task<WeatherInfo?>? _inFlightWeatherFetch;
+        private string? _inFlightWeatherKey;
+
+        private string CurrentWeatherKey =>
+            $"{WeatherSource}|{City}|{CityLat.ToString(CultureInfo.InvariantCulture)}|{CityLon.ToString(CultureInfo.InvariantCulture)}";
 
         private static async Task<string> GetStringWithAgentAsync(string url, string userAgent, CancellationToken ct = default)
         {
@@ -521,14 +532,33 @@ namespace Task_Flyout.Services
             return new List<string>();
         }
 
-        public async Task<WeatherInfo?> GetWeatherAsync(bool forceRefresh = false)
+        public Task<WeatherInfo?> GetWeatherAsync(bool forceRefresh = false)
         {
             if (!IsEnabled || string.IsNullOrWhiteSpace(City))
-                return null;
+                return Task.FromResult<WeatherInfo?>(null);
 
-            if (!forceRefresh && _cachedWeather != null && (DateTime.Now - _lastFetchTime) < _cacheExpiry)
-                return _cachedWeather;
+            lock (_weatherLock)
+            {
+                var key = CurrentWeatherKey;
 
+                if (!forceRefresh && _cachedWeather != null && _cachedWeatherKey == key
+                    && (DateTime.Now - _lastFetchTime) < _cacheExpiry)
+                    return Task.FromResult<WeatherInfo?>(_cachedWeather);
+
+                // Join an in-flight fetch only if it targets the same location/source;
+                // a city change starts its own fetch so callers never get stale data.
+                if (_inFlightWeatherFetch != null && _inFlightWeatherKey == key)
+                    return _inFlightWeatherFetch;
+
+                var task = FetchAndCacheWeatherAsync(key);
+                _inFlightWeatherFetch = task;
+                _inFlightWeatherKey = key;
+                return task;
+            }
+        }
+
+        private async Task<WeatherInfo?> FetchAndCacheWeatherAsync(string key)
+        {
             try
             {
                 WeatherInfo info;
@@ -539,14 +569,37 @@ namespace Task_Flyout.Services
 
                 if (info != null)
                 {
-                    _cachedWeather = info;
-                    _lastFetchTime = DateTime.Now;
+                    lock (_weatherLock)
+                    {
+                        // Only publish if the location hasn't changed underneath us
+                        // (guards against a slow stale fetch overwriting newer data).
+                        if (key == CurrentWeatherKey)
+                        {
+                            _cachedWeather = info;
+                            _cachedWeatherKey = key;
+                            _lastFetchTime = DateTime.Now;
+                        }
+                    }
                 }
-                return _cachedWeather;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Weather fetch failed: {ex.Message}");
+            }
+            finally
+            {
+                lock (_weatherLock)
+                {
+                    if (_inFlightWeatherKey == key)
+                    {
+                        _inFlightWeatherFetch = null;
+                        _inFlightWeatherKey = null;
+                    }
+                }
+            }
+
+            lock (_weatherLock)
+            {
                 return _cachedWeather;
             }
         }
