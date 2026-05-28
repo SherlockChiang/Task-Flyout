@@ -305,8 +305,9 @@ namespace Task_Flyout.Services
                 }
             }
 
-            await MergeIntoCacheAsync(min, max, allItems, successfulProviders, attemptedProviders);
-            await SaveCacheAsync();
+            bool changed = await MergeIntoCacheAsync(min, max, allItems, successfulProviders, attemptedProviders);
+            if (changed)
+                await SaveCacheAsync();
 
             return GetCachedItems(min, max);
         }
@@ -489,7 +490,7 @@ namespace Task_Flyout.Services
             }
         }
 
-        private async Task MergeIntoCacheAsync(DateTime min, DateTime max, List<AgendaItem> items, List<string> successfulProviders, List<string> attemptedProviders)
+        private async Task<bool> MergeIntoCacheAsync(DateTime min, DateTime max, List<AgendaItem> items, List<string> successfulProviders, List<string> attemptedProviders)
         {
             string start = min.ToString("yyyy-MM-dd");
             string end = max.AddDays(-1).ToString("yyyy-MM-dd");
@@ -499,6 +500,12 @@ namespace Task_Flyout.Services
             await _cacheLock.WaitAsync();
             try
             {
+                // Snapshot the affected slice before mutating so a no-op periodic sync
+                // (remote data unchanged) can skip the expensive DPAPI-encrypt + SQLite
+                // write in SaveCacheAsync.
+                string beforeItemsSig = BuildRangeItemsSignature(min, max);
+                string beforeRangeSig = GetRangeSignature(_cache.CachedRanges);
+
                 for (var d = min; d < max; d = d.AddDays(1))
                 {
                     var key = d.ToString("yyyy-MM-dd");
@@ -531,13 +538,39 @@ namespace Task_Flyout.Services
                     _cache.CachedRanges.Add(new AgendaCacheRange { ProviderName = providerName, StartDateKey = start, EndDateKey = end });
 
                 MergeCacheRanges();
-                CompactCache(DateTime.Today);
+                bool compacted = CompactCache(DateTime.Today);
                 RebuildMarkedDates();
+
+                // CompactCache may touch items outside [min,max); OR it in directly.
+                return compacted
+                    || beforeRangeSig != GetRangeSignature(_cache.CachedRanges)
+                    || beforeItemsSig != BuildRangeItemsSignature(min, max);
             }
             finally
             {
                 _cacheLock.Release();
             }
+        }
+
+        // Order-independent content signature of the day items within [min,max).
+        private string BuildRangeItemsSignature(DateTime min, DateTime max)
+        {
+            var sb = new System.Text.StringBuilder();
+            for (var d = min; d < max; d = d.AddDays(1))
+            {
+                var key = d.ToString("yyyy-MM-dd");
+                if (!_cache.DayItems.TryGetValue(key, out var items) || items.Count == 0) continue;
+
+                sb.Append(key).Append('=');
+                foreach (var line in items
+                    .Select(i => $"{i.Provider}{i.Id}{i.Title}{i.IsCompleted}{(i.StartDateTime?.Ticks ?? 0)}{i.Subtitle}")
+                    .OrderBy(s => s, StringComparer.Ordinal))
+                {
+                    sb.Append(line).Append('');
+                }
+                sb.Append('');
+            }
+            return sb.ToString();
         }
 
         private void MergeCacheRanges()
