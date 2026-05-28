@@ -23,8 +23,11 @@ namespace Task_Flyout.Services
         private const uint PROCESS_POWER_THROTTLING_EXECUTION_SPEED = 0x1;
         private const int ProcessPowerThrottling = 4; // PROCESS_INFORMATION_CLASS
 
-        private const uint IDLE_PRIORITY_CLASS = 0x00000040;
-        private const uint NORMAL_PRIORITY_CLASS = 0x00000020;
+        // Background mode lowers I/O and memory priority but keeps a normal CPU
+        // scheduling class — unlike IDLE_PRIORITY_CLASS it won't starve background mail
+        // polling / notification checks when the machine is busy. Paired BEGIN/END.
+        private const uint PROCESS_MODE_BACKGROUND_BEGIN = 0x00100000;
+        private const uint PROCESS_MODE_BACKGROUND_END = 0x00200000;
 
         [DllImport("kernel32.dll")]
         private static extern IntPtr GetCurrentProcess();
@@ -60,8 +63,10 @@ namespace Task_Flyout.Services
                 SetProcessInformation(handle, ProcessPowerThrottling, ref state,
                     (uint)Marshal.SizeOf<PROCESS_POWER_THROTTLING_STATE>());
 
-                // Task Manager only shows the leaf when priority is also lowered.
-                SetPriorityClass(handle, enabled ? IDLE_PRIORITY_CLASS : NORMAL_PRIORITY_CLASS);
+                // Task Manager shows the leaf when EcoQoS + background mode are active.
+                // BACKGROUND_BEGIN/END only adjusts I/O & memory priority (reversible),
+                // so it won't choke the background poller like IDLE_PRIORITY_CLASS would.
+                SetPriorityClass(handle, enabled ? PROCESS_MODE_BACKGROUND_BEGIN : PROCESS_MODE_BACKGROUND_END);
             }
             catch (Exception ex)
             {
