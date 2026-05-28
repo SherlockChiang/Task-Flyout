@@ -161,6 +161,11 @@ namespace Task_Flyout.Services
         private sealed class PollBackoff { public int Failures; public DateTimeOffset NextAttemptUtc; }
         private readonly Dictionary<string, PollBackoff> _pollBackoff = new(StringComparer.Ordinal);
         private const int MaxPollBackoffCycles = 16;
+        // Persistent IMAP connections reused across background poll cycles to avoid a
+        // fresh TLS handshake + LOGIN every interval. Poll-only: CheckNewMailAsync is
+        // serialised by _isPollingMail, and the UI keeps using its own ephemeral clients,
+        // so these are never accessed concurrently (MailKit clients are not thread-safe).
+        private readonly Dictionary<string, ImapClient> _pollImapClients = new(StringComparer.Ordinal);
         private MailPersistentCache? _persistentCache;
         private bool _persistentCacheLoaded;
         private readonly object _persistentCacheSaveLock = new();
@@ -289,6 +294,7 @@ namespace Task_Flyout.Services
                 _pollTimer.Stop();
                 _pollTimer = null;
             }
+            DisconnectAllPollImapClients();
         }
 
         public void UpdateMailPollingSettings()
@@ -763,7 +769,7 @@ namespace Task_Flyout.Services
                             continue;
                         }
 
-                        var unreadItems = await FetchMessagesAsync(account, inbox, unreadOnly: true, pageSize: 5, forceRefresh: true);
+                        var unreadItems = await PollFetchInboxUnreadAsync(account, inbox);
                         MergeMessagesIntoPersistentCache(account.Id, inbox.Id, unreadItems);
 
                         string inboxKey = $"{account.Id}|{inbox.Id}";
@@ -838,6 +844,76 @@ namespace Task_Flyout.Services
                 _pollBackoff.Remove(accountId);
         }
 
+        // Returns a connected, live IMAP client for the poll path, reconnecting if the
+        // cached connection went away. Never called concurrently (see _pollImapClients).
+        private async Task<ImapClient> GetOrConnectPollImapClientAsync(MailAccount account)
+        {
+            if (_pollImapClients.TryGetValue(account.Id, out var existing))
+            {
+                if (existing.IsConnected && existing.IsAuthenticated)
+                {
+                    try
+                    {
+                        await existing.NoOpAsync();
+                        return existing;
+                    }
+                    catch
+                    {
+                        // Stale/dropped connection — fall through to reconnect.
+                    }
+                }
+
+                _pollImapClients.Remove(account.Id);
+                try { existing.Dispose(); } catch { }
+            }
+
+            var client = new ImapClient();
+            await ConnectImapAsync(client, account, GetImapPassword(account.Id));
+            _pollImapClients[account.Id] = client;
+            return client;
+        }
+
+        private void DisconnectPollImapClient(string accountId)
+        {
+            if (!_pollImapClients.TryGetValue(accountId, out var client)) return;
+            _pollImapClients.Remove(accountId);
+            try { if (client.IsConnected) client.Disconnect(true); } catch { }
+            try { client.Dispose(); } catch { }
+        }
+
+        private void DisconnectAllPollImapClients()
+        {
+            foreach (var accountId in _pollImapClients.Keys.ToList())
+                DisconnectPollImapClient(accountId);
+        }
+
+        // Fetch the inbox unread slice during a background poll. IMAP reuses the
+        // persistent connection; other providers go through the normal fetch path.
+        private async Task<List<MailItem>> PollFetchInboxUnreadAsync(MailAccount account, MailFolder inbox)
+        {
+            const int pollPageSize = 5;
+            if (account.Kind != MailAccountKind.Imap)
+                return await FetchMessagesAsync(account, inbox, unreadOnly: true, pageSize: pollPageSize, forceRefresh: true);
+
+            var client = await GetOrConnectPollImapClientAsync(account);
+            List<MailItem> messages;
+            try
+            {
+                messages = await FetchImapMessagesWithClientAsync(client, account, inbox, unreadOnly: true, pageSize: pollPageSize);
+            }
+            catch
+            {
+                // Connection likely went bad mid-fetch — drop it so the next poll reconnects.
+                DisconnectPollImapClient(account.Id);
+                throw;
+            }
+
+            string cacheKey = GetMessageCacheKey(account.Id, inbox.Id, true, pollPageSize);
+            _messageCache[cacheKey] = new CacheEntry<List<MailItem>> { Value = StripBodies(messages) };
+            UpdatePersistentMessages(cacheKey, messages);
+            return CloneMailItems(messages, includeBodies: false);
+        }
+
         private async Task<GmailService> EnsureGoogleMailAuthorizedAsync()
         {
             EnsureAccountsLoaded();
@@ -904,7 +980,20 @@ namespace Task_Flyout.Services
 
             using var client = new ImapClient();
             await ConnectImapAsync(client, account, GetImapPassword(account.Id));
+            try
+            {
+                return await FetchImapMessagesWithClientAsync(client, account, folder, unreadOnly, pageSize);
+            }
+            finally
+            {
+                try { await client.DisconnectAsync(true); } catch { }
+            }
+        }
 
+        // Core fetch against an already-connected client; the caller owns the connection
+        // lifetime (UI path opens/closes per call; the poll path reuses a persistent one).
+        private async Task<List<MailItem>> FetchImapMessagesWithClientAsync(ImapClient client, MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize)
+        {
             var mailFolder = await client.GetFolderAsync(folder.Id);
             await mailFolder.OpenAsync(FolderAccess.ReadOnly);
 
@@ -974,7 +1063,6 @@ namespace Task_Flyout.Services
                 }
             }
 
-            await client.DisconnectAsync(true);
             return items.OrderByDescending(item => item.RawReceivedTime).ToList();
         }
 
@@ -1129,8 +1217,10 @@ namespace Task_Flyout.Services
         {
             // An account was added / edited / removed — reset poll backoff so a freshly
             // re-authorised or reconfigured account is retried on the next poll instead
-            // of waiting out its previous failure window.
+            // of waiting out its previous failure window, and drop persistent IMAP
+            // connections so changed credentials / servers force a clean reconnect.
             _pollBackoff.Clear();
+            DisconnectAllPollImapClients();
             string json = JsonSerializer.Serialize(_accounts, AppJsonContext.Default.ListMailAccount);
             LocalSqliteStore.WriteProtectedText("mail", "accounts", json);
         }
