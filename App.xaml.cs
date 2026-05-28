@@ -403,13 +403,14 @@ namespace Task_Flyout
         private bool _isExiting;
 
         // Public entry point so the main window's close-to-exit path can terminate the app.
-        public static void ExitApp()
+        // Pass the window currently being closed so we don't re-enter its Close().
+        public static void ExitApp(Window? closingWindow = null)
         {
             if (Current is App app)
-                app.ExitAppInternal();
+                app.ExitAppInternal(closingWindow);
         }
 
-        private async void ExitAppInternal()
+        private async void ExitAppInternal(Window? closingWindow = null)
         {
             if (_isExiting) return;
             _isExiting = true;
@@ -421,8 +422,8 @@ namespace Task_Flyout
             if (_uiSettings != null) _uiSettings.ColorValuesChanged -= UiSettings_ColorValuesChanged;
             _trayIcon?.Dispose();
             MyWeatherBar?.Close();
-            MyFlyoutWindow?.Close();
-            MyMainWindow?.Close();
+            if (!ReferenceEquals(MyFlyoutWindow, closingWindow)) MyFlyoutWindow?.Close();
+            if (!ReferenceEquals(MyMainWindow, closingWindow)) MyMainWindow?.Close();
             Exit();
         }
 

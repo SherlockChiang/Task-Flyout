@@ -117,8 +117,9 @@ namespace Task_Flyout
             else
             {
                 // Close-to-exit: shut the whole process down rather than leaving an
-                // invisible tray-only instance running.
-                App.ExitApp();
+                // invisible tray-only instance running. Pass this window so the exit
+                // path doesn't re-enter the Close() we're already inside.
+                App.ExitApp(this);
             }
         }
 
