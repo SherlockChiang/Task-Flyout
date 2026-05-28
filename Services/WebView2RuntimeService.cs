@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
 using Windows.Storage;
@@ -89,19 +90,78 @@ namespace Task_Flyout.Services
 
         public static bool IsAllowedRssEmbeddedResource(string? uriText)
         {
-            if (ApplicationData.Current.LocalSettings.Values["AllowRssRemoteResources"] as bool? ?? false)
-                return IsAllowedEmbeddedResource(uriText);
-
             if (string.IsNullOrWhiteSpace(uriText))
                 return false;
 
             if (!Uri.TryCreate(uriText, UriKind.Absolute, out var uri))
                 return false;
 
-            return uri.Scheme.Equals("about", StringComparison.OrdinalIgnoreCase) ||
-                   (uri.Scheme.Equals("data", StringComparison.OrdinalIgnoreCase) &&
-                    (uriText.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase) ||
-                     uriText.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)));
+            if (uri.Scheme.Equals("about", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (uri.Scheme.Equals("data", StringComparison.OrdinalIgnoreCase))
+                return uriText.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase) ||
+                       uriText.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase);
+
+            if (ApplicationData.Current.LocalSettings.Values["AllowRssRemoteResources"] as bool? ?? false)
+                return IsAllowedRssRemoteResource(uri);
+
+            return false;
+        }
+
+        private static bool IsAllowedRssRemoteResource(Uri uri)
+        {
+            if (!uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (IsClearlyUnsafeHost(uri))
+                return false;
+
+            return true;
+        }
+
+        private static bool IsClearlyUnsafeHost(Uri uri)
+        {
+            var host = uri.Host.Trim('[', ']');
+            if (string.IsNullOrWhiteSpace(host)) return true;
+            if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase)) return true;
+            if (host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)) return true;
+            if (host.EndsWith(".local", StringComparison.OrdinalIgnoreCase)) return true;
+
+            return IPAddress.TryParse(host, out var address) && IsUnsafeAddress(address);
+        }
+
+        private static bool IsUnsafeAddress(IPAddress address)
+        {
+            if (address.IsIPv4MappedToIPv6)
+                address = address.MapToIPv4();
+
+            if (IPAddress.IsLoopback(address)) return true;
+
+            if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                var b = address.GetAddressBytes();
+                return b[0] == 0
+                       || b[0] == 10
+                       || b[0] == 127
+                       || (b[0] == 169 && b[1] == 254)
+                       || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
+                       || (b[0] == 192 && b[1] == 168)
+                       || (b[0] == 100 && b[1] >= 64 && b[1] <= 127)
+                       || (b[0] == 198 && (b[1] == 18 || b[1] == 19))
+                       || b[0] >= 224;
+            }
+
+            if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+            {
+                var b = address.GetAddressBytes();
+                return address.IsIPv6LinkLocal
+                       || address.IsIPv6SiteLocal
+                       || address.IsIPv6Multicast
+                       || ((b[0] & 0xFE) == 0xFC);
+            }
+
+            return true;
         }
 
         private static void PruneCacheIfNeeded(string path)
