@@ -154,6 +154,13 @@ namespace Task_Flyout.Services
         private DispatcherTimer? _pollTimer;
         private int _isPollingMail;
         private int _knownUnreadLoaded;
+        // Per-account poll backoff: after a failure an account is skipped for an
+        // exponentially growing number of poll cycles (capped) so a broken account
+        // (expired token, unreachable server) stops being hammered every interval —
+        // which both wastes IMAP connect/auth cycles and risks server-side lockouts.
+        private sealed class PollBackoff { public int Failures; public DateTimeOffset NextAttemptUtc; }
+        private readonly Dictionary<string, PollBackoff> _pollBackoff = new(StringComparer.Ordinal);
+        private const int MaxPollBackoffCycles = 16;
         private MailPersistentCache? _persistentCache;
         private bool _persistentCacheLoaded;
         private readonly object _persistentCacheSaveLock = new();
@@ -740,14 +747,21 @@ namespace Task_Flyout.Services
                 var currentUnreadIds = new HashSet<string>(StringComparer.Ordinal);
                 var newItems = new List<(MailAccount Account, MailItem Item)>();
 
+                var nowUtc = DateTimeOffset.UtcNow;
                 foreach (var account in _accounts.Where(account => account.IsSetupComplete))
                 {
+                    if (IsAccountInBackoff(account.Id, nowUtc)) continue;
+
                     try
                     {
                         var folders = await FetchFoldersAsync(account, forceRefresh: false);
                         var inbox = folders.FirstOrDefault(folder => IsInboxName(folder.Id) || IsInboxName(folder.DisplayName))
                                     ?? folders.FirstOrDefault(folder => !folder.IsPlaceholder);
-                        if (inbox == null) continue;
+                        if (inbox == null)
+                        {
+                            ClearAccountBackoff(account.Id);
+                            continue;
+                        }
 
                         var unreadItems = await FetchMessagesAsync(account, inbox, unreadOnly: true, pageSize: 5, forceRefresh: true);
                         MergeMessagesIntoPersistentCache(account.Id, inbox.Id, unreadItems);
@@ -775,9 +789,12 @@ namespace Task_Flyout.Services
 
                         if (newestTicks > previousSeenTicks)
                             SetLastSeenInboxTicks(inboxKey, newestTicks);
+
+                        ClearAccountBackoff(account.Id);
                     }
                     catch (Exception ex)
                     {
+                        RegisterAccountFailure(account.Id);
                         System.Diagnostics.Debug.WriteLine($"Mail polling failed for {account.DisplayTitle}: {ex.Message}");
                     }
                 }
@@ -795,6 +812,30 @@ namespace Task_Flyout.Services
             {
                 Volatile.Write(ref _isPollingMail, 0);
             }
+        }
+
+        private bool IsAccountInBackoff(string accountId, DateTimeOffset nowUtc)
+            => _pollBackoff.TryGetValue(accountId, out var state) && state.NextAttemptUtc > nowUtc;
+
+        private void RegisterAccountFailure(string accountId)
+        {
+            if (!_pollBackoff.TryGetValue(accountId, out var state))
+            {
+                state = new PollBackoff();
+                _pollBackoff[accountId] = state;
+            }
+
+            state.Failures = Math.Min(state.Failures + 1, 30);
+            // Skip 2^(failures-1) poll cycles, capped — e.g. 1,2,4,8,16 intervals.
+            int cycles = Math.Min(1 << Math.Min(state.Failures - 1, 4), MaxPollBackoffCycles);
+            var interval = TimeSpan.FromMinutes(Math.Max(1, MailPollingIntervalMinutes));
+            state.NextAttemptUtc = DateTimeOffset.UtcNow + TimeSpan.FromTicks(interval.Ticks * cycles);
+        }
+
+        private void ClearAccountBackoff(string accountId)
+        {
+            if (_pollBackoff.Count > 0)
+                _pollBackoff.Remove(accountId);
         }
 
         private async Task<GmailService> EnsureGoogleMailAuthorizedAsync()
@@ -1086,6 +1127,10 @@ namespace Task_Flyout.Services
 
         private void SaveAccounts()
         {
+            // An account was added / edited / removed — reset poll backoff so a freshly
+            // re-authorised or reconfigured account is retried on the next poll instead
+            // of waiting out its previous failure window.
+            _pollBackoff.Clear();
             string json = JsonSerializer.Serialize(_accounts, AppJsonContext.Default.ListMailAccount);
             LocalSqliteStore.WriteProtectedText("mail", "accounts", json);
         }
