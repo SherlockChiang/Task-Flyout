@@ -45,6 +45,13 @@ namespace Task_Flyout
 
         public App()
         {
+            // Global safety net against catastrophic regex backtracking (ReDoS) on
+            // untrusted input — the mail/RSS HTML sanitizers run many backtracking
+            // patterns over attacker-controlled content. Any Regex without an explicit
+            // timeout inherits this and throws RegexMatchTimeoutException instead of
+            // pinning a core. Must be set before the first Regex is constructed.
+            AppContext.SetData("REGEX_DEFAULT_MATCH_TIMEOUT", TimeSpan.FromSeconds(1));
+
             this.InitializeComponent();
             this.UnhandledException += (sender, e) =>
             {

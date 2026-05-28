@@ -1134,6 +1134,26 @@ body { background-color: {{background}} !important; }
         {
             if (string.IsNullOrWhiteSpace(html)) return "";
 
+            try
+            {
+                return SanitizeMailHtmlCore(html);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                // Malicious/pathological markup tripped ReDoS protection — fall back to
+                // a fully-escaped plain-text view, which can never execute anything.
+                return $"<pre>{WebUtility.HtmlEncode(StripAllTagsSafe(html))}</pre>";
+            }
+        }
+
+        private static string StripAllTagsSafe(string html)
+        {
+            try { return RxHtmlTagsOnly.Replace(html, " "); }
+            catch (RegexMatchTimeoutException) { return html; }
+        }
+
+        private static string SanitizeMailHtmlCore(string html)
+        {
             var value = html;
             value = RxPairedDangerousTags.Replace(value, "");
             value = RxSelfClosingDangerousTags.Replace(value, "");
@@ -1156,21 +1176,28 @@ body { background-color: {{background}} !important; }
         {
             if (string.IsNullOrWhiteSpace(html)) return "";
 
-            var value = html;
-            value = RxPairedDangerousTags.Replace(value, "");
-            value = RxSelfClosingDangerousTags.Replace(value, "");
-            value = RxEventHandlerQuoted.Replace(value, "");
-            value = RxEventHandlerUnquoted.Replace(value, "");
-            value = RxTrustedScriptUriQuoted.Replace(value, "$1=\"#\"");
-            value = RxTrustedScriptUriUnquoted.Replace(value, "$1=\"#\"");
-            value = RxDataUriNavigationQuoted.Replace(value, "$1=\"#\"");
-            value = RxDataUriNavigationUnquoted.Replace(value, "$1=\"#\"");
-            value = RxTrustedDangerousCss.Replace(value, "");
+            try
+            {
+                var value = html;
+                value = RxPairedDangerousTags.Replace(value, "");
+                value = RxSelfClosingDangerousTags.Replace(value, "");
+                value = RxEventHandlerQuoted.Replace(value, "");
+                value = RxEventHandlerUnquoted.Replace(value, "");
+                value = RxTrustedScriptUriQuoted.Replace(value, "$1=\"#\"");
+                value = RxTrustedScriptUriUnquoted.Replace(value, "$1=\"#\"");
+                value = RxDataUriNavigationQuoted.Replace(value, "$1=\"#\"");
+                value = RxDataUriNavigationUnquoted.Replace(value, "$1=\"#\"");
+                value = RxTrustedDangerousCss.Replace(value, "");
 
-            if (!RxHtmlContentTags.IsMatch(value))
-                value = $"<pre>{WebUtility.HtmlEncode(RemoveCssNoise(value))}</pre>";
+                if (!RxHtmlContentTags.IsMatch(value))
+                    value = $"<pre>{WebUtility.HtmlEncode(RemoveCssNoise(value))}</pre>";
 
-            return value;
+                return value;
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return $"<pre>{WebUtility.HtmlEncode(StripAllTagsSafe(html))}</pre>";
+            }
         }
 
         private static string StripUntrustedRemoteResources(string html)

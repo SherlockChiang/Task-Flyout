@@ -883,17 +883,28 @@ pre, code { white-space: pre-wrap; overflow-wrap: anywhere; }
         private static string SanitizeArticleHtml(string html)
         {
             if (string.IsNullOrWhiteSpace(html)) return "";
-            var value = html;
-            value = Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*>.*?<\s*/\s*\1\s*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            value = Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*/?\s*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            value = Regex.Replace(value, @"\s+on\w+\s*=\s*(['""]).*?\1", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            value = Regex.Replace(value, @"\s+on\w+\s*=\s*[^\s>]+", "", RegexOptions.IgnoreCase);
-            value = Regex.Replace(value, @"(href|src|action|formaction|data)\s*=\s*(['""])\s*(javascript|vbscript|data):.*?\2", "$1=\"#\"", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            value = Regex.Replace(value, @"(href|src|action|formaction|data)\s*=\s*(javascript|vbscript|data):[^\s>]+", "$1=\"#\"", RegexOptions.IgnoreCase);
-            value = Regex.Replace(value, @"\sbackground\s*=\s*(['""])\s*https?://.*?\1", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            value = Regex.Replace(value, @"\sbackground\s*=\s*https?://[^\s>]+", "", RegexOptions.IgnoreCase);
-            value = Regex.Replace(value, @"style\s*=\s*(['""])[^'""]*\b(expression|url\s*\(|-moz-binding|behavior)\b[^'""]*\1", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            return value;
+
+            try
+            {
+                var value = html;
+                value = Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*>.*?<\s*/\s*\1\s*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                value = Regex.Replace(value, @"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*/?\s*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                value = Regex.Replace(value, @"\s+on\w+\s*=\s*(['""]).*?\1", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                value = Regex.Replace(value, @"\s+on\w+\s*=\s*[^\s>]+", "", RegexOptions.IgnoreCase);
+                value = Regex.Replace(value, @"(href|src|action|formaction|data)\s*=\s*(['""])\s*(javascript|vbscript|data):.*?\2", "$1=\"#\"", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                value = Regex.Replace(value, @"(href|src|action|formaction|data)\s*=\s*(javascript|vbscript|data):[^\s>]+", "$1=\"#\"", RegexOptions.IgnoreCase);
+                value = Regex.Replace(value, @"\sbackground\s*=\s*(['""])\s*https?://.*?\1", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                value = Regex.Replace(value, @"\sbackground\s*=\s*https?://[^\s>]+", "", RegexOptions.IgnoreCase);
+                value = Regex.Replace(value, @"style\s*=\s*(['""])[^'""]*\b(expression|url\s*\(|-moz-binding|behavior)\b[^'""]*\1", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                return value;
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                // Pathological markup tripped the ReDoS guard — escape everything so the
+                // article renders as inert plain text rather than hanging the renderer.
+                try { return WebUtility.HtmlEncode(Regex.Replace(html, "<.*?>", " ", RegexOptions.Singleline)); }
+                catch { return WebUtility.HtmlEncode(html); }
+            }
         }
 
         private static void OpenSafeExternalUri(string uriText)
