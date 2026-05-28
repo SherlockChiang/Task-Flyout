@@ -396,6 +396,18 @@
   <data name="SettingsPage_EfficiencyMode.Header" xml:space="preserve">
     <value>收起到托盘时启用效能模式 (省电)</value>
   </data>
+  <data name="CloseToExit_Title" xml:space="preserve">
+    <value>退出 Task Flyout?</value>
+  </data>
+  <data name="CloseToExit_Content" xml:space="preserve">
+    <value>关闭窗口将退出 Task Flyout。你可以在设置中改为后台运行。</value>
+  </data>
+  <data name="CloseToExit_Exit" xml:space="preserve">
+    <value>退出</value>
+  </data>
+  <data name="CloseToExit_Background" xml:space="preserve">
+    <value>后台运行</value>
+  </data>
   <data name="RestartRequired_Primary" xml:space="preserve">
     <value>立即重启</value>
   </data>

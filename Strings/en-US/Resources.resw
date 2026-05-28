@@ -396,6 +396,18 @@
   <data name="SettingsPage_EfficiencyMode.Header" xml:space="preserve">
     <value>Use efficiency mode while collapsed to the tray (saves power)</value>
   </data>
+  <data name="CloseToExit_Title" xml:space="preserve">
+    <value>Exit Task Flyout?</value>
+  </data>
+  <data name="CloseToExit_Content" xml:space="preserve">
+    <value>Closing the window will quit Task Flyout. You can keep it running in the background from Settings.</value>
+  </data>
+  <data name="CloseToExit_Exit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
+  <data name="CloseToExit_Background" xml:space="preserve">
+    <value>Run in background</value>
+  </data>
   <data name="RestartRequired_Primary" xml:space="preserve">
     <value>Restart Now</value>
   </data>

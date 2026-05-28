@@ -116,9 +116,57 @@ namespace Task_Flyout
             }
             else
             {
-                // Close-to-exit: shut the whole process down rather than leaving an
-                // invisible tray-only instance running. Pass this window so the exit
-                // path doesn't re-enter the Close() we're already inside.
+                bool confirmed = ApplicationData.Current.LocalSettings.Values["CloseToExitConfirmed"] as bool? ?? false;
+                if (confirmed)
+                {
+                    // Pass this window so the exit path doesn't re-enter the Close()
+                    // we're already inside.
+                    App.ExitApp(this);
+                    return;
+                }
+
+                // First close-to-exit: confirm so the user doesn't quit by accident.
+                args.Cancel = true;
+                _ = ConfirmCloseToExitAsync();
+            }
+        }
+
+        private async System.Threading.Tasks.Task ConfirmCloseToExitAsync()
+        {
+            try
+            {
+                var dialog = new ContentDialog
+                {
+                    Title = GetSafeString("CloseToExit_Title", "Exit Task Flyout?"),
+                    Content = GetSafeString("CloseToExit_Content", "Closing the window will quit Task Flyout. You can keep it running in the background from Settings."),
+                    PrimaryButtonText = GetSafeString("CloseToExit_Exit", "Exit"),
+                    SecondaryButtonText = GetSafeString("CloseToExit_Background", "Run in background"),
+                    CloseButtonText = GetSafeString("CalendarDialog/CloseButtonText", "Cancel"),
+                    DefaultButton = ContentDialogButton.Close,
+                    XamlRoot = this.Content.XamlRoot
+                };
+
+                var result = await dialog.ShowAsync();
+                if (result == ContentDialogResult.Primary)
+                {
+                    ApplicationData.Current.LocalSettings.Values["CloseToExitConfirmed"] = true;
+                    App.ExitApp(this);
+                }
+                else if (result == ContentDialogResult.Secondary)
+                {
+                    // Switch to background mode permanently and minimise to tray now.
+                    ApplicationData.Current.LocalSettings.Values["RunInBackground"] = true;
+                    if (App.Current is App app)
+                        app.MailService.UpdateMailPollingSettings();
+                    ReleaseContentForBackground();
+                    AppWindow.Hide();
+                    App.UpdateEfficiencyMode();
+                }
+                // Cancel: leave the window open, do nothing.
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Close-to-exit confirm failed: {ex.Message}");
                 App.ExitApp(this);
             }
         }
