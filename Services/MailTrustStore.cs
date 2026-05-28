@@ -15,6 +15,12 @@ namespace Task_Flyout.Services
         private const string StoreScope = "mail";
         private const string TrustedSourcesKey = "trusted_sources";
 
+        // Compiled once and bounded by a timeout — sender strings are attacker-controlled.
+        private static readonly Regex AddressRegex = new(
+            @"[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled,
+            TimeSpan.FromMilliseconds(250));
+
         public MailTrustStore()
         {
             Load();
@@ -138,8 +144,12 @@ namespace Task_Flyout.Services
         {
             if (string.IsNullOrWhiteSpace(value)) return null;
 
-            var match = Regex.Match(value, @"[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}", RegexOptions.IgnoreCase);
-            if (match.Success) return match.Value;
+            try
+            {
+                var match = AddressRegex.Match(value);
+                if (match.Success) return match.Value;
+            }
+            catch (RegexMatchTimeoutException) { }
 
             var trimmed = value.Trim().Trim('<', '>', '"', '\'');
             return trimmed.Contains('@', StringComparison.Ordinal) ? trimmed : null;
