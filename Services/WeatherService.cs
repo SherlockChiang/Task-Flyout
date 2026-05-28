@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -125,6 +126,16 @@ namespace Task_Flyout.Services
         public List<DailyWeather> DailyForecast { get; set; } = new();
     }
 
+    // On-disk envelope for the last successful fetch so a cold start can show the
+    // previous result immediately (when still within the cache window) instead of
+    // always waiting on the network.
+    public class WeatherCacheEnvelope
+    {
+        public string Key { get; set; } = "";
+        public long FetchedTicks { get; set; }
+        public WeatherInfo? Info { get; set; }
+    }
+
     public class WeatherService
     {
         private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
@@ -139,6 +150,8 @@ namespace Task_Flyout.Services
         private readonly object _weatherLock = new();
         private Task<WeatherInfo?>? _inFlightWeatherFetch;
         private string? _inFlightWeatherKey;
+        private bool _persistentWeatherLoaded;
+        private static string PersistentWeatherPath => AppDataPathHelper.ResolveLocal("WeatherCache.json");
 
         private string CurrentWeatherKey =>
             $"{WeatherSource}|{City}|{CityLat.ToString(CultureInfo.InvariantCulture)}|{CityLon.ToString(CultureInfo.InvariantCulture)}";
@@ -540,6 +553,7 @@ namespace Task_Flyout.Services
             lock (_weatherLock)
             {
                 var key = CurrentWeatherKey;
+                TryLoadPersistentWeather(key);
 
                 if (!forceRefresh && _cachedWeather != null && _cachedWeatherKey == key
                     && (DateTime.Now - _lastFetchTime) < _cacheExpiry)
@@ -569,6 +583,7 @@ namespace Task_Flyout.Services
 
                 if (info != null)
                 {
+                    string? persistJson = null;
                     lock (_weatherLock)
                     {
                         // Only publish if the location hasn't changed underneath us
@@ -578,8 +593,14 @@ namespace Task_Flyout.Services
                             _cachedWeather = info;
                             _cachedWeatherKey = key;
                             _lastFetchTime = DateTime.Now;
+                            _persistentWeatherLoaded = true;
+                            persistJson = SerializePersistentWeather(key, _lastFetchTime, info);
                         }
                     }
+
+                    // Write outside the lock — transient JSON string, no retained copy.
+                    if (persistJson != null)
+                        WritePersistentWeather(persistJson);
                 }
             }
             catch (Exception ex)
@@ -602,6 +623,60 @@ namespace Task_Flyout.Services
             {
                 return _cachedWeather;
             }
+        }
+
+        // Lazily hydrate the in-memory cache from disk on first use (called under lock).
+        // Only adopts the persisted entry when it matches the current location and is
+        // still within the cache window — otherwise it's left for the network fetch.
+        private void TryLoadPersistentWeather(string currentKey)
+        {
+            if (_persistentWeatherLoaded) return;
+            _persistentWeatherLoaded = true;
+
+            if (_cachedWeather != null) return;
+
+            try
+            {
+                var path = PersistentWeatherPath;
+                if (!File.Exists(path)) return;
+
+                var json = File.ReadAllText(path);
+                if (string.IsNullOrWhiteSpace(json)) return;
+
+                var envelope = JsonSerializer.Deserialize(json, AppJsonContext.Default.WeatherCacheEnvelope);
+                if (envelope?.Info == null || envelope.Key != currentKey) return;
+
+                var fetchedAt = new DateTime(envelope.FetchedTicks, DateTimeKind.Local);
+                if (DateTime.Now - fetchedAt >= _cacheExpiry) return;
+
+                _cachedWeather = envelope.Info;
+                _cachedWeatherKey = envelope.Key;
+                _lastFetchTime = fetchedAt;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Weather cache load failed: {ex.Message}");
+            }
+        }
+
+        private static string? SerializePersistentWeather(string key, DateTime fetchedAt, WeatherInfo info)
+        {
+            try
+            {
+                return JsonSerializer.Serialize(
+                    new WeatherCacheEnvelope { Key = key, FetchedTicks = fetchedAt.Ticks, Info = info },
+                    AppJsonContext.Default.WeatherCacheEnvelope);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void WritePersistentWeather(string json)
+        {
+            try { File.WriteAllText(PersistentWeatherPath, json); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Weather cache write failed: {ex.Message}"); }
         }
 
         #region Open-Meteo Provider

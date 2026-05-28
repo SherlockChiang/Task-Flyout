@@ -10,6 +10,7 @@ namespace Task_Flyout
     [JsonSerializable(typeof(List<MailAccount>))]
     [JsonSerializable(typeof(MailPersistentCache))]
     [JsonSerializable(typeof(RssCache))]
+    [JsonSerializable(typeof(WeatherCacheEnvelope))]
     [JsonSerializable(typeof(HashSet<string>))]
     [JsonSerializable(typeof(Dictionary<string, List<AgendaItem>>))]
     [JsonSourceGenerationOptions(WriteIndented = true)]
