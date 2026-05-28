@@ -112,6 +112,13 @@ namespace Task_Flyout
                     app.MailService.UpdateMailPollingSettings();
                 ReleaseContentForBackground();
                 sender.Hide();
+                App.UpdateEfficiencyMode(); // back to tray — throttle
+            }
+            else
+            {
+                // Close-to-exit: shut the whole process down rather than leaving an
+                // invisible tray-only instance running.
+                App.ExitApp();
             }
         }
 

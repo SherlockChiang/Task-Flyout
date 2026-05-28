@@ -239,9 +239,14 @@ namespace Task_Flyout
         {
             if (_syncTimer != null)
             {
-                _syncTimer.Stop();
+                bool wasEnabled = _syncTimer.IsEnabled;
+                if (wasEnabled)
+                    _syncTimer.Stop();
+
                 _syncTimer.Interval = TimeSpan.FromMinutes(minutes);
-                _syncTimer.Start();
+
+                if (wasEnabled || _appWindow.IsVisible)
+                    _syncTimer.Start();
             }
         }
 
@@ -769,6 +774,7 @@ namespace Task_Flyout
                 AdjustWindowHeight();
                 Activate();
                 _appWindow.Show();
+                App.UpdateEfficiencyMode(); // flyout on screen — run at full speed
                 _clockTimer?.Start();
                 _syncTimer?.Start();
 
@@ -948,6 +954,7 @@ namespace Task_Flyout
             _syncTimer?.Stop();
             _appWindow.Hide();
             _lastHideTime = DateTime.Now;
+            App.UpdateEfficiencyMode(); // flyout dismissed — re-evaluate throttle
         }
 
         private void UpdateAutoHideTimer()

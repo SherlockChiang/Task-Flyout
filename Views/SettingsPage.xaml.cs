@@ -52,6 +52,7 @@ namespace Task_Flyout.Views
             LanguageComboBox.SelectedIndex = lang switch { "zh-Hans" => 1, "en-US" => 2, _ => 0 };
 
             BackgroundToggle.IsOn = settings.Values["RunInBackground"] as bool? ?? true;
+            EfficiencyModeToggle.IsOn = settings.Values["EfficiencyModeEnabled"] as bool? ?? true;
             NotifyToggle.IsOn = settings.Values["NotifyEnabled"] as bool? ?? true;
             MailPollingToggle.IsOn = settings.Values["MailPollingEnabled"] as bool? ?? true;
             AllowInsecureWebViewResourcesToggle.IsOn = settings.Values["AllowInsecureWebViewResources"] as bool? ?? false;
@@ -530,6 +531,13 @@ namespace Task_Flyout.Views
         {
             if (_isInitializing) return;
             ApplicationData.Current.LocalSettings.Values["RunInBackground"] = BackgroundToggle.IsOn;
+        }
+
+        private void EfficiencyModeToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            ApplicationData.Current.LocalSettings.Values["EfficiencyModeEnabled"] = EfficiencyModeToggle.IsOn;
+            App.UpdateEfficiencyMode();
         }
 
         private void ShowSecondsToggle_Toggled(object sender, RoutedEventArgs e)

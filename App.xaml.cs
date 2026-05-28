@@ -108,6 +108,38 @@ namespace Task_Flyout
 
             HandleLaunchActivation(args);
             QueueFlyoutPrewarmIfEnabled();
+
+            // Launched into the tray with no window on screen — start throttled.
+            UpdateEfficiencyMode();
+        }
+
+        public static bool EfficiencyModeEnabledSetting =>
+            ApplicationData.Current.LocalSettings.Values["EfficiencyModeEnabled"] as bool? ?? true;
+
+        /// <summary>
+        /// Re-evaluate EcoQoS: throttle when the app is collapsed to the tray (no main
+        /// window or flyout on screen), run at full speed while a window is visible.
+        /// </summary>
+        public static void UpdateEfficiencyMode()
+        {
+            try
+            {
+                if (!EfficiencyModeEnabledSetting)
+                {
+                    EfficiencyModeService.SetEfficiencyMode(false);
+                    return;
+                }
+
+                bool windowActive =
+                    (MyMainWindow?.AppWindow?.IsVisible == true) ||
+                    (MyFlyoutWindow?.AppWindow?.IsVisible == true);
+
+                EfficiencyModeService.SetEfficiencyMode(!windowActive);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"UpdateEfficiencyMode failed: {ex.Message}");
+            }
         }
 
         private void QueueFlyoutPrewarmIfEnabled()
@@ -297,7 +329,7 @@ namespace Task_Flyout
                 {
                     MyMainWindow = new MainWindow();
                     ApplyConfiguredThemeToOpenWindows();
-                    MyMainWindow.Closed += (s, args) => { MyMainWindow = null; };
+                    MyMainWindow.Closed += (s, args) => { MyMainWindow = null; UpdateEfficiencyMode(); };
                 }
 
                 if (onOpened == null)
@@ -307,6 +339,7 @@ namespace Task_Flyout
                 MyMainWindow.AppWindow.Show();
                 BringMainWindowToFront();
                 ClearTrayMailHint();
+                UpdateEfficiencyMode(); // window on screen — run at full speed
 
                 onOpened?.Invoke(MyMainWindow);
             });
@@ -359,8 +392,20 @@ namespace Task_Flyout
             catch { }
         }
 
+        private bool _isExiting;
+
+        // Public entry point so the main window's close-to-exit path can terminate the app.
+        public static void ExitApp()
+        {
+            if (Current is App app)
+                app.ExitAppInternal();
+        }
+
         private void ExitAppInternal()
         {
+            if (_isExiting) return;
+            _isExiting = true;
+
             NotificationService?.Stop();
             MailService.StopMailPolling();
             MailService.NewMailArrived -= MailService_NewMailArrived;
