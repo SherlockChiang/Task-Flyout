@@ -1341,6 +1341,12 @@ namespace Task_Flyout.Services
             }
         }
 
+        public Task FlushPendingSavesAsync()
+        {
+            lock (_accountSaveQueueLock)
+                return _accountSaveQueue;
+        }
+
         private static string GetAppDataPath()
             => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TaskFlyout");
 

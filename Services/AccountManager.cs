@@ -99,6 +99,12 @@ namespace Task_Flyout.Services
             }
         }
 
+        public Task FlushPendingSavesAsync()
+        {
+            lock (_saveQueueLock)
+                return _saveQueue;
+        }
+
         private void SyncToLegacySettings()
         {
             var settings = Windows.Storage.ApplicationData.Current.LocalSettings;

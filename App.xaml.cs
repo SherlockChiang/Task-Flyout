@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System.Linq;
 using System;
+using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Windows.Storage;
 using Windows.UI.ViewManagement;
@@ -401,7 +402,7 @@ namespace Task_Flyout
                 app.ExitAppInternal();
         }
 
-        private void ExitAppInternal()
+        private async void ExitAppInternal()
         {
             if (_isExiting) return;
             _isExiting = true;
@@ -409,12 +410,28 @@ namespace Task_Flyout
             NotificationService?.Stop();
             MailService.StopMailPolling();
             MailService.NewMailArrived -= MailService_NewMailArrived;
+            await FlushPendingSavesBeforeExitAsync();
             if (_uiSettings != null) _uiSettings.ColorValuesChanged -= UiSettings_ColorValuesChanged;
             _trayIcon?.Dispose();
             MyWeatherBar?.Close();
             MyFlyoutWindow?.Close();
             MyMainWindow?.Close();
             Exit();
+        }
+
+        private async Task FlushPendingSavesBeforeExitAsync()
+        {
+            try
+            {
+                await Task.WhenAll(
+                    SyncManager.AccountManager.FlushPendingSavesAsync(),
+                    MailService.FlushPendingSavesAsync())
+                    .WaitAsync(TimeSpan.FromSeconds(2));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Flush pending saves before exit failed: {ex.Message}");
+            }
         }
     }
 }
