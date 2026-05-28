@@ -14,6 +14,7 @@ namespace Task_Flyout.Services
     {
         private readonly List<ISyncProvider> _providers = new();
         private AppCache _cache = new();
+        private AppCache _publishedCache = new();
         private int _cacheLoaded;
         private readonly ReaderWriterLockSlim _cacheLock = new(LockRecursionPolicy.NoRecursion);
         private readonly object _dataRequestLock = new();
@@ -82,15 +83,7 @@ namespace Task_Flyout.Services
         public AppCache GetLocalCache()
         {
             EnsureCacheLoaded();
-            _cacheLock.EnterReadLock();
-            try
-            {
-                return CloneCache(_cache);
-            }
-            finally
-            {
-                _cacheLock.ExitReadLock();
-            }
+            return CloneCache(Volatile.Read(ref _publishedCache));
         }
 
         public Dictionary<string, List<AgendaItem>> GetDayItemsSnapshot(IEnumerable<string> dateKeys)
@@ -101,22 +94,15 @@ namespace Task_Flyout.Services
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
 
-            _cacheLock.EnterReadLock();
-            try
+            var cache = Volatile.Read(ref _publishedCache);
+            var result = new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal);
+            foreach (var key in keys)
             {
-                var result = new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal);
-                foreach (var key in keys)
-                {
-                    if (_cache.DayItems.TryGetValue(key, out var items))
-                        result[key] = items.Select(CloneAgendaItem).ToList();
-                }
+                if (cache.DayItems.TryGetValue(key, out var items))
+                    result[key] = items.Select(CloneAgendaItem).ToList();
+            }
 
-                return result;
-            }
-            finally
-            {
-                _cacheLock.ExitReadLock();
-            }
+            return result;
         }
 
         public AppCache GetRangeCacheSnapshot(DateTime min, DateTime max, bool tasksOnly = false)
@@ -125,64 +111,50 @@ namespace Task_Flyout.Services
             min = min.Date;
             max = max.Date;
 
-            _cacheLock.EnterReadLock();
-            try
+            var cache = Volatile.Read(ref _publishedCache);
+            var dayItems = new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal);
+            for (var day = min; day < max; day = day.AddDays(1))
             {
-                var dayItems = new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal);
-                for (var day = min; day < max; day = day.AddDays(1))
-                {
-                    var key = day.ToString("yyyy-MM-dd");
-                    if (!_cache.DayItems.TryGetValue(key, out var items)) continue;
+                var key = day.ToString("yyyy-MM-dd");
+                if (!cache.DayItems.TryGetValue(key, out var items)) continue;
 
-                    var snapshotItems = items
-                        .Where(item => !tasksOnly || item.IsTask)
-                        .Select(CloneAgendaItem)
-                        .ToList();
-                    if (snapshotItems.Count > 0)
-                        dayItems[key] = snapshotItems;
-                }
-
-                return new AppCache
-                {
-                    DayItems = dayItems,
-                    MarkedDates = dayItems.Keys.ToHashSet(StringComparer.Ordinal)
-                };
+                var snapshotItems = items
+                    .Where(item => !tasksOnly || item.IsTask)
+                    .Select(CloneAgendaItem)
+                    .ToList();
+                if (snapshotItems.Count > 0)
+                    dayItems[key] = snapshotItems;
             }
-            finally
+
+            return new AppCache
             {
-                _cacheLock.ExitReadLock();
-            }
+                DayItems = dayItems,
+                MarkedDates = dayItems.Keys.ToHashSet(StringComparer.Ordinal)
+            };
         }
 
         public AppCache GetTaskCacheSnapshot()
         {
             EnsureCacheLoaded();
 
-            _cacheLock.EnterReadLock();
-            try
-            {
-                var dayItems = _cache.DayItems
-                    .Select(kvp => new
-                    {
-                        kvp.Key,
-                        Items = kvp.Value
-                            .Where(item => item.IsTask)
-                            .Select(CloneAgendaItem)
-                            .ToList()
-                    })
-                    .Where(kvp => kvp.Items.Count > 0)
-                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Items, StringComparer.Ordinal);
-
-                return new AppCache
+            var cache = Volatile.Read(ref _publishedCache);
+            var dayItems = cache.DayItems
+                .Select(kvp => new
                 {
-                    DayItems = dayItems,
-                    MarkedDates = dayItems.Keys.ToHashSet(StringComparer.Ordinal)
-                };
-            }
-            finally
+                    kvp.Key,
+                    Items = kvp.Value
+                        .Where(item => item.IsTask)
+                        .Select(CloneAgendaItem)
+                        .ToList()
+                })
+                .Where(kvp => kvp.Items.Count > 0)
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Items, StringComparer.Ordinal);
+
+            return new AppCache
             {
-                _cacheLock.ExitReadLock();
-            }
+                DayItems = dayItems,
+                MarkedDates = dayItems.Keys.ToHashSet(StringComparer.Ordinal)
+            };
         }
 
         public async Task UpsertCachedItemAsync(AgendaItem item, string? oldDateKey = null)
@@ -205,6 +177,7 @@ namespace Task_Flyout.Services
                 }
 
                 RebuildMarkedDates();
+                PublishCacheSnapshotNoLock();
             }
             finally
             {
@@ -222,6 +195,7 @@ namespace Task_Flyout.Services
             {
                 RemoveMatchingCachedItems(item);
                 RebuildMarkedDates();
+                PublishCacheSnapshotNoLock();
             }
             finally
             {
@@ -242,6 +216,8 @@ namespace Task_Flyout.Services
                     foreach (var item in items.Where(item => item.IsTask && IsSameCachedItem(item, target)))
                         item.IsCompleted = isCompleted;
                 }
+
+                PublishCacheSnapshotNoLock();
             }
             finally
             {
@@ -260,6 +236,7 @@ namespace Task_Flyout.Services
                 if (localCache != null)
                     _cache = CloneCache(localCache);
                 RebuildMarkedDates();
+                PublishCacheSnapshotNoLock();
             }
             finally
             {
@@ -436,6 +413,7 @@ namespace Task_Flyout.Services
 
                 if (CompactCache(DateTime.Today))
                     compactedSnapshot = CloneCache(_cache);
+                PublishCacheSnapshotNoLock();
 
                 Volatile.Write(ref _cacheLoaded, 1);
             }
@@ -462,6 +440,7 @@ namespace Task_Flyout.Services
                 }
 
                 RebuildMarkedDates();
+                PublishCacheSnapshotNoLock();
             }
             finally
             {
@@ -473,16 +452,7 @@ namespace Task_Flyout.Services
         {
             try
             {
-                AppCache snapshot;
-                _cacheLock.EnterReadLock();
-                try
-                {
-                    snapshot = CloneCache(_cache);
-                }
-                finally
-                {
-                    _cacheLock.ExitReadLock();
-                }
+                var snapshot = CloneCache(Volatile.Read(ref _publishedCache));
                 string json = JsonSerializer.Serialize(snapshot, AppJsonContext.Default.AppCache);
                 await LocalSqliteStore.WriteProtectedTextAsync(StoreScope, CacheKey, json);
             }
@@ -500,18 +470,11 @@ namespace Task_Flyout.Services
 
             if (providers.Count == 0) return false;
 
-            _cacheLock.EnterReadLock();
-            try
-            {
-                return providers.All(provider => _cache.CachedRanges.Any(range =>
-                    string.Equals(range.ProviderName, provider, StringComparison.OrdinalIgnoreCase) &&
-                    string.Compare(range.StartDateKey, start, StringComparison.Ordinal) <= 0 &&
-                    string.Compare(range.EndDateKey, end, StringComparison.Ordinal) >= 0));
-            }
-            finally
-            {
-                _cacheLock.ExitReadLock();
-            }
+            var cache = Volatile.Read(ref _publishedCache);
+            return providers.All(provider => cache.CachedRanges.Any(range =>
+                string.Equals(range.ProviderName, provider, StringComparison.OrdinalIgnoreCase) &&
+                string.Compare(range.StartDateKey, start, StringComparison.Ordinal) <= 0 &&
+                string.Compare(range.EndDateKey, end, StringComparison.Ordinal) >= 0));
         }
 
         private List<AgendaItem> GetCachedItems(DateTime min, DateTime max)
@@ -519,20 +482,13 @@ namespace Task_Flyout.Services
             string start = min.ToString("yyyy-MM-dd");
             string end = max.AddDays(-1).ToString("yyyy-MM-dd");
 
-            _cacheLock.EnterReadLock();
-            try
-            {
-                return _cache.DayItems
-                    .Where(kvp =>
-                        string.Compare(kvp.Key, start, StringComparison.Ordinal) >= 0 &&
-                        string.Compare(kvp.Key, end, StringComparison.Ordinal) <= 0)
-                    .SelectMany(kvp => kvp.Value.Select(CloneAgendaItem))
-                    .ToList();
-            }
-            finally
-            {
-                _cacheLock.ExitReadLock();
-            }
+            var cache = Volatile.Read(ref _publishedCache);
+            return cache.DayItems
+                .Where(kvp =>
+                    string.Compare(kvp.Key, start, StringComparison.Ordinal) >= 0 &&
+                    string.Compare(kvp.Key, end, StringComparison.Ordinal) <= 0)
+                .SelectMany(kvp => kvp.Value.Select(CloneAgendaItem))
+                .ToList();
         }
 
         private Task<bool> MergeIntoCacheAsync(DateTime min, DateTime max, List<AgendaItem> items, List<string> successfulProviders, List<string> attemptedProviders)
@@ -585,6 +541,7 @@ namespace Task_Flyout.Services
                 MergeCacheRanges();
                 bool compacted = CompactCache(DateTime.Today);
                 RebuildMarkedDates();
+                PublishCacheSnapshotNoLock();
 
                 // CompactCache may touch items outside [min,max); OR it in directly.
                 return Task.FromResult(compacted
@@ -789,6 +746,9 @@ namespace Task_Flyout.Services
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.None,
                 out date);
+
+        private void PublishCacheSnapshotNoLock()
+            => Volatile.Write(ref _publishedCache, CloneCache(_cache));
 
         private static void SaveCacheSync(AppCache snapshot)
         {
