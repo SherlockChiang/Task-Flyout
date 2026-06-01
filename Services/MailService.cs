@@ -1212,6 +1212,17 @@ namespace Task_Flyout.Services
                 }
 
                 await batch.ExecuteAsync();
+
+                var missingRefs = messageRefs
+                    .Where(message => !string.IsNullOrWhiteSpace(message.Id) && !results.ContainsKey(message.Id))
+                    .ToList();
+                if (missingRefs.Count > 0)
+                {
+                    var fallbackItems = await FetchGoogleMessageMetadataIndividuallyAsync(gmail, accountId, folderId, missingRefs);
+                    foreach (var item in fallbackItems)
+                        results[item.Id] = item;
+                }
+
                 if (results.Count > 0)
                     return messageRefs
                         .Select(message => message.Id)
@@ -1246,13 +1257,21 @@ namespace Task_Flyout.Services
                         get.MetadataHeaders = new[] { "From", "Subject", "Date" };
                         return ToGoogleMailItem(accountId, folderId, await get.ExecuteAsync());
                     }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Gmail metadata request failed for {message.Id}: {ex.Message}");
+                        return null;
+                    }
                     finally
                     {
                         metadataGate.Release();
                     }
                 });
 
-            return (await Task.WhenAll(tasks)).ToList();
+            return (await Task.WhenAll(tasks))
+                .Where(item => item != null)
+                .Cast<MailItem>()
+                .ToList();
         }
 
         private async Task EnsureOutlookAuthorizedAsync()
@@ -1341,10 +1360,49 @@ namespace Task_Flyout.Services
             }
         }
 
-        public Task FlushPendingSavesAsync()
+        public async Task FlushPendingSavesAsync()
         {
+            Task accountSaveTask;
             lock (_accountSaveQueueLock)
-                return _accountSaveQueue;
+                accountSaveTask = _accountSaveQueue;
+
+            await accountSaveTask;
+            await FlushPersistentCacheAsync();
+        }
+
+        private async Task FlushPersistentCacheAsync()
+        {
+            CancellationTokenSource? pendingSave;
+            string? json;
+
+            lock (_persistentCacheSaveLock)
+            {
+                pendingSave = _persistentCacheSaveCts;
+                if (pendingSave == null || !_persistentCacheLoaded || _persistentCache == null)
+                    return;
+
+                _persistentCacheSaveCts = null;
+                try
+                {
+                    json = JsonSerializer.Serialize(_persistentCache, AppJsonContext.Default.MailPersistentCache);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Serialize mail cache during flush failed: {ex.Message}");
+                    json = null;
+                }
+            }
+
+            try
+            {
+                pendingSave.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            if (!string.IsNullOrWhiteSpace(json))
+                await LocalSqliteStore.WriteProtectedTextAsync("mail", "cache", json);
         }
 
         private static string GetAppDataPath()

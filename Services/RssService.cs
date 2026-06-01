@@ -152,6 +152,7 @@ namespace Task_Flyout.Services
         private const long MaxImageBytes = 5 * 1024 * 1024;
         private const long MaxFeedBytes = 5 * 1024 * 1024;
         private const int MaxRedirects = 5;
+        private const string ImageCacheDirectoryName = "RssImages";
         private static readonly HttpClient HttpClient = new(new SocketsHttpHandler
         {
             AllowAutoRedirect = false,
@@ -165,6 +166,7 @@ namespace Task_Flyout.Services
 
         private RssCache _cache = new();
         private volatile bool _loaded;
+        private DateTimeOffset _lastImageCachePrunedAt = DateTimeOffset.MinValue;
         private readonly object _loadLock = new();
         private bool _databaseInitialized;
         private string? _connectionString;
@@ -311,6 +313,7 @@ namespace Task_Flyout.Services
             EnsureLoaded();
             _cache.Subscriptions.RemoveAll(item => item.Id == subscriptionId);
             _cache.Articles.RemoveAll(item => item.SubscriptionId == subscriptionId);
+            PruneOrphanedImageCache(force: true);
             Save();
         }
 
@@ -825,7 +828,7 @@ namespace Task_Flyout.Services
 
             try
             {
-                var imagesPath = AppDataPathHelper.EnsureDirectory(AppDataPathHelper.ResolveLocal("RssImages"));
+                var imagesPath = GetImageCacheRoot();
                 var extension = Path.GetExtension(uri.AbsolutePath);
                 if (string.IsNullOrWhiteSpace(extension) || extension.Length > 8)
                     extension = ".img";
@@ -877,6 +880,8 @@ namespace Task_Flyout.Services
             try
             {
                 if (!File.Exists(path)) return false;
+                if (!IsPathUnderRoot(GetImageCacheRoot(), path)) return false;
+
                 var info = new FileInfo(path);
                 if (info.Length <= 8 || info.Length > MaxImageBytes) return false;
 
@@ -1020,6 +1025,72 @@ namespace Task_Flyout.Services
                 .OrderByDescending(article => article.PublishedAt)
                 .Take(1000)
                 .ToList();
+            PruneOrphanedImageCache();
+        }
+
+        private void PruneOrphanedImageCache(bool force = false)
+        {
+            try
+            {
+                var now = DateTimeOffset.UtcNow;
+                if (!force && now - _lastImageCachePrunedAt < TimeSpan.FromHours(6))
+                    return;
+                _lastImageCachePrunedAt = now;
+
+                var imagesPath = GetImageCacheRoot();
+                if (!Directory.Exists(imagesPath)) return;
+
+                var referencedPaths = _cache.Subscriptions
+                    .Select(subscription => subscription.LocalImagePath)
+                    .Concat(_cache.Articles.Select(article => article.LocalImagePath))
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .Select(path =>
+                    {
+                        try
+                        {
+                            return IsPathUnderRoot(imagesPath, path) ? Path.GetFullPath(path) : "";
+                        }
+                        catch
+                        {
+                            return "";
+                        }
+                    })
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var path in Directory.EnumerateFiles(imagesPath))
+                {
+                    try
+                    {
+                        var fullPath = Path.GetFullPath(path);
+                        if (!referencedPaths.Contains(fullPath) || !IsPlausibleCachedImageFile(fullPath))
+                            File.Delete(fullPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"RSS image cache cleanup failed for {path}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"RSS image cache cleanup failed: {ex.Message}");
+            }
+        }
+
+        private static string GetImageCacheRoot()
+            => AppDataPathHelper.EnsureDirectory(AppDataPathHelper.ResolveLocal(ImageCacheDirectoryName));
+
+        private static bool IsPathUnderRoot(string root, string path)
+        {
+            var fullRoot = Path.GetFullPath(root);
+            var fullPath = Path.GetFullPath(path);
+            var rootWithSeparator = fullRoot.EndsWith(Path.DirectorySeparatorChar)
+                ? fullRoot
+                : fullRoot + Path.DirectorySeparatorChar;
+
+            return fullPath.Equals(fullRoot, StringComparison.OrdinalIgnoreCase) ||
+                   fullPath.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase);
         }
 
         private void InitializeDatabase()
