@@ -41,7 +41,7 @@
                         HorizontalAlignment="Left" Padding="0" Click="BtnGoToToday_Click" ToolTipService.ToolTip="回到今天">
                     <StackPanel>
                         <TextBlock x:Name="TxtRealTimeClock" Text="10:30" FontSize="32" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
-                        <TextBlock x:Name="TxtRealTimeDate" Text="2023年10月24日 星期二" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock x:Name="TxtRealTimeDate" Text="2023-10-24" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
                 </Button>
 

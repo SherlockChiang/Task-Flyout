@@ -21,6 +21,7 @@ namespace Task_Flyout.Views
 
         public SettingsPage()
         {
+            this.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
             this.InitializeComponent();
             _loader = new ResourceLoader();
             this.Loaded += SettingsPage_Loaded;
@@ -99,17 +100,19 @@ namespace Task_Flyout.Views
 
         private static string GetVersionText()
         {
+            var loader = new ResourceLoader();
+            var versionPrefix = loader.GetString("TextVersion") ?? "Version";
             try
             {
                 var version = Package.Current.Id.Version;
-                return $"版本 {version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
+                return $"{versionPrefix} {version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
             }
             catch
             {
                 var version = Assembly.GetExecutingAssembly().GetName().Version;
                 return version == null
-                    ? "版本 unknown"
-                    : $"版本 {version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
+                    ? loader.GetString("TextVersionUnknown") ?? "Version unknown"
+                    : $"{versionPrefix} {version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
             }
         }
 

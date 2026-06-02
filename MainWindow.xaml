@@ -24,7 +24,7 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
-                <NavigationViewItem x:Name="TasksNavItem" Content="任务" Tag="Tasks">
+                <NavigationViewItem x:Uid="MainWindow_NavTasks" x:Name="TasksNavItem" Content="任务" Tag="Tasks">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE73E;" FontFamily="Segoe MDL2 Assets"/>
                     </NavigationViewItem.Icon>
@@ -36,13 +36,13 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
-                <NavigationViewItem x:Name="MailNavItem" Content="邮件" Tag="Mail">
+                <NavigationViewItem x:Uid="MainWindow_NavMail" x:Name="MailNavItem" Content="邮件" Tag="Mail">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE715;" FontFamily="Segoe MDL2 Assets"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
-                <NavigationViewItem x:Name="RssNavItem" Content="RSS" Tag="Rss">
+                <NavigationViewItem x:Uid="MainWindow_NavRss" x:Name="RssNavItem" Content="RSS" Tag="Rss">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE789;" FontFamily="Segoe MDL2 Assets"/>
                     </NavigationViewItem.Icon>

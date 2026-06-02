@@ -99,6 +99,7 @@ namespace Task_Flyout.Services
         public string Subject { get; set; } = "";
         public string Sender { get; set; } = "";
         public string SenderAddress { get; set; } = "";
+        public string Recipient { get; set; } = "";
         public string Preview { get; set; } = "";
         public string BodyText { get; set; } = "";
         public string HtmlBody { get; set; } = "";
@@ -262,7 +263,10 @@ namespace Task_Flyout.Services
             if (account.Kind == MailAccountKind.Imap)
                 RemoveImapPassword(account.Id);
 
+            DisconnectPollImapClient(account.Id);
+            ClearAccountBackoff(account.Id);
             ClearAccountCache(account.Id);
+            RemoveKnownUnreadForAccount(account.Id);
             SaveAccounts();
             UpdateMailPollingSettings();
             return true;
@@ -568,7 +572,7 @@ namespace Task_Flyout.Services
                     request.QueryParameters.Top = top;
                     request.QueryParameters.Select = new[]
                     {
-                        "id", "subject", "from", "receivedDateTime", "isRead",
+                        "id", "subject", "from", "toRecipients", "receivedDateTime", "isRead",
                         "bodyPreview", "webLink", "hasAttachments", "importance"
                     };
                     request.QueryParameters.Orderby = new[] { "receivedDateTime desc" };
@@ -1057,32 +1061,7 @@ namespace Task_Flyout.Services
                     || (unreadOnly ? false : await GetImapReadStateAsync(mailFolder, id, new Dictionary<uint, MessageFlags?>()));
                 try
                 {
-                    string preview = "";
-                    if (summary?.TextBody is BodyPartText textPart)
-                    {
-                        try
-                        {
-                            var entity = await mailFolder.GetBodyPartAsync(id, textPart);
-                            if (entity is TextPart textContent)
-                                preview = Truncate(CleanMailBody(textContent.Text ?? ""), 240).Trim();
-                        }
-                        catch { }
-                    }
-
-                    items.Add(new MailItem
-                    {
-                        AccountId = account.Id,
-                        FolderId = folder.Id,
-                        Id = id.Id.ToString(),
-                        Subject = string.IsNullOrWhiteSpace(summary?.Envelope?.Subject) ? "(No subject)" : summary.Envelope.Subject,
-                        Sender = summary?.Envelope?.From?.ToString() ?? "",
-                        SenderAddress = summary?.Envelope?.From?.Mailboxes?.FirstOrDefault()?.Address ?? "",
-                        Preview = preview,
-                        RawReceivedTime = summary?.Envelope?.Date,
-                        ReceivedTime = FormatReceivedTime(summary?.Envelope?.Date),
-                        IsRead = isRead,
-                        HasAttachments = summary?.Attachments?.Any() == true
-                    });
+                    items.Add(await BuildImapMailItemAsync(mailFolder, account, folder, id, summary, isRead));
                 }
                 catch
                 {
@@ -1100,6 +1079,85 @@ namespace Task_Flyout.Services
             }
 
             return items.OrderByDescending(item => item.RawReceivedTime).ToList();
+        }
+
+        private async Task<MailItem> BuildImapMailItemAsync(
+            IMailFolder mailFolder,
+            MailAccount account,
+            MailFolder folder,
+            UniqueId id,
+            IMessageSummary? summary,
+            bool isRead)
+        {
+            string preview = await TryGetImapPreviewAsync(mailFolder, id, summary);
+            if (HasUsefulImapEnvelope(summary))
+            {
+                var received = summary?.Envelope?.Date;
+                return new MailItem
+                {
+                    AccountId = account.Id,
+                    FolderId = folder.Id,
+                    Id = id.Id.ToString(),
+                    Subject = string.IsNullOrWhiteSpace(summary?.Envelope?.Subject) ? "(No subject)" : summary.Envelope.Subject,
+                    Sender = FormatInternetAddressList(summary?.Envelope?.From),
+                    SenderAddress = summary?.Envelope?.From?.Mailboxes?.FirstOrDefault()?.Address ?? "",
+                    Recipient = FormatInternetAddressList(summary?.Envelope?.To),
+                    Preview = preview,
+                    RawReceivedTime = received,
+                    ReceivedTime = FormatReceivedTime(received),
+                    IsRead = isRead,
+                    HasAttachments = summary?.Attachments?.Any() == true
+                };
+            }
+
+            try
+            {
+                var message = await mailFolder.GetMessageAsync(id);
+                var item = ToImapMailItem(account.Id, folder.Id, id.Id.ToString(), message, isRead);
+                if (string.IsNullOrWhiteSpace(item.Preview))
+                    item.Preview = preview;
+                return item;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"IMAP full message fallback failed for {id}: {ex.Message}");
+                return new MailItem
+                {
+                    AccountId = account.Id,
+                    FolderId = folder.Id,
+                    Id = id.Id.ToString(),
+                    Subject = "(No subject)",
+                    Sender = account.DisplayTitle,
+                    Preview = preview,
+                    RawReceivedTime = summary?.Envelope?.Date,
+                    ReceivedTime = FormatReceivedTime(summary?.Envelope?.Date),
+                    IsRead = isRead,
+                    HasAttachments = summary?.Attachments?.Any() == true
+                };
+            }
+        }
+
+        private static bool HasUsefulImapEnvelope(IMessageSummary? summary)
+            => !string.IsNullOrWhiteSpace(summary?.Envelope?.Subject) ||
+               summary?.Envelope?.From?.Mailboxes?.Any() == true ||
+               summary?.Envelope?.To?.Mailboxes?.Any() == true;
+
+        private static async Task<string> TryGetImapPreviewAsync(IMailFolder mailFolder, UniqueId id, IMessageSummary? summary)
+        {
+            if (summary?.TextBody is not BodyPartText textPart)
+                return "";
+
+            try
+            {
+                var entity = await mailFolder.GetBodyPartAsync(id, textPart);
+                return entity is TextPart textContent
+                    ? Truncate(CleanMailBody(textContent.Text ?? ""), 240).Trim()
+                    : "";
+            }
+            catch
+            {
+                return "";
+            }
         }
 
         private static async Task ConnectImapAsync(ImapClient client, MailAccount account, string password)
@@ -1202,7 +1260,7 @@ namespace Task_Flyout.Services
 
                     var get = gmail.Users.Messages.Get("me", id);
                     get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
-                    get.MetadataHeaders = new[] { "From", "Subject", "Date" };
+                    get.MetadataHeaders = new[] { "From", "To", "Subject", "Date" };
 
                     batch.Queue<GmailMessage>(get, (content, error, _, _) =>
                     {
@@ -1254,7 +1312,7 @@ namespace Task_Flyout.Services
                     {
                         var get = gmail.Users.Messages.Get("me", message.Id);
                         get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
-                        get.MetadataHeaders = new[] { "From", "Subject", "Date" };
+                        get.MetadataHeaders = new[] { "From", "To", "Subject", "Date" };
                         return ToGoogleMailItem(accountId, folderId, await get.ExecuteAsync());
                     }
                     catch (Exception ex)
@@ -1421,6 +1479,7 @@ namespace Task_Flyout.Services
                     ?? message.From?.EmailAddress?.Address
                     ?? "",
                 SenderAddress = message.From?.EmailAddress?.Address ?? "",
+                Recipient = FormatGraphRecipients(message.ToRecipients),
                 Preview = message.BodyPreview ?? "",
                 BodyText = "",
                 HtmlBody = "",
@@ -1478,6 +1537,7 @@ namespace Task_Flyout.Services
             string subject = GetGoogleHeader(message, "Subject");
             string sender = GetGoogleHeader(message, "From");
             string senderAddress = ExtractEmailAddress(sender);
+            string recipient = GetGoogleHeader(message, "To");
             string preview = message.Snippet ?? "";
             DateTimeOffset? received = null;
             if (message.InternalDate.HasValue)
@@ -1491,6 +1551,7 @@ namespace Task_Flyout.Services
                 Subject = string.IsNullOrWhiteSpace(subject) ? "(No subject)" : subject,
                 Sender = sender,
                 SenderAddress = senderAddress,
+                Recipient = recipient,
                 Preview = preview,
                 BodyText = "",
                 HtmlBody = "",
@@ -1517,8 +1578,9 @@ namespace Task_Flyout.Services
                 FolderId = folderId,
                 Id = id,
                 Subject = string.IsNullOrWhiteSpace(message.Subject) ? "(No subject)" : message.Subject,
-                Sender = message.From?.ToString() ?? "",
+                Sender = FormatInternetAddressList(message.From),
                 SenderAddress = message.From?.Mailboxes?.FirstOrDefault()?.Address ?? "",
+                Recipient = FormatInternetAddressList(message.To),
                 Preview = preview.Trim(),
                 BodyText = "",
                 HtmlBody = "",
@@ -1647,8 +1709,12 @@ namespace Task_Flyout.Services
             if (_persistentCache != null)
             {
                 _persistentCache.Folders.Remove(accountId);
+                _persistentCache.AccountOrder.RemoveAll(id => string.Equals(id, accountId, StringComparison.Ordinal));
+                _persistentCache.FolderOrder.Remove(accountId);
                 foreach (var key in _persistentCache.Messages.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
                     _persistentCache.Messages.Remove(key);
+                foreach (var key in _persistentCache.LastSeenInboxTicks.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
+                    _persistentCache.LastSeenInboxTicks.Remove(key);
                 SavePersistentCache();
             }
         }
@@ -1957,6 +2023,7 @@ namespace Task_Flyout.Services
                 Subject = item.Subject,
                 Sender = item.Sender,
                 SenderAddress = item.SenderAddress,
+                Recipient = item.Recipient,
                 Preview = item.Preview,
                 BodyText = includeBodies ? item.BodyText : "",
                 HtmlBody = includeBodies ? item.HtmlBody : "",
@@ -1980,6 +2047,15 @@ namespace Task_Flyout.Services
         private void SaveKnownUnreadIds()
         {
             ApplicationData.Current.LocalSettings.Values["MailKnownUnreadIds"] = string.Join('\n', _knownUnreadIds.Keys);
+        }
+
+        private void RemoveKnownUnreadForAccount(string accountId)
+        {
+            LoadKnownUnreadIds();
+            var prefix = accountId + "|";
+            foreach (var key in _knownUnreadIds.Keys.Where(key => key.StartsWith(prefix, StringComparison.Ordinal)).ToList())
+                _knownUnreadIds.TryRemove(key, out _);
+            SaveKnownUnreadIds();
         }
 
         private long GetLastSeenInboxTicks(string inboxKey)
@@ -2130,6 +2206,32 @@ namespace Task_Flyout.Services
             => message.Payload?.Headers?
                 .FirstOrDefault(header => string.Equals(header.Name, name, StringComparison.OrdinalIgnoreCase))
                 ?.Value ?? "";
+
+        private static string FormatGraphRecipients(IEnumerable<Recipient>? recipients)
+            => recipients == null
+                ? ""
+                : string.Join(", ", recipients
+                    .Select(recipient => recipient.EmailAddress)
+                    .Where(address => address != null)
+                    .Select(address => string.IsNullOrWhiteSpace(address!.Name)
+                        ? address.Address ?? ""
+                        : $"{address.Name} <{address.Address}>")
+                    .Where(value => !string.IsNullOrWhiteSpace(value)));
+
+        private static string FormatInternetAddressList(InternetAddressList? addresses)
+        {
+            if (addresses == null || addresses.Count == 0) return "";
+
+            var formatted = addresses
+                .Mailboxes
+                .Select(mailbox => string.IsNullOrWhiteSpace(mailbox.Name)
+                    ? mailbox.Address
+                    : $"{mailbox.Name} <{mailbox.Address}>")
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToList();
+
+            return formatted.Count > 0 ? string.Join(", ", formatted) : addresses.ToString();
+        }
 
         private static string ExtractEmailAddress(string value)
         {

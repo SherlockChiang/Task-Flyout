@@ -43,6 +43,7 @@ namespace Task_Flyout.Views
 
         public RssPage()
         {
+            this.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
             InitializeComponent();
             Loaded += RssPage_Loaded;
             Unloaded += (_, _) => DisposeLikeCleanup();

@@ -100,6 +100,7 @@ namespace Task_Flyout.Views
         public CalendarPage()
         {
             this.InitializeComponent();
+            this.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
             _loader = new ResourceLoader();
             if (Application.Current is App app) _syncManager = app.SyncManager;
             this.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(Global_PointerWheelChanged), handledEventsToo: true);
@@ -260,7 +261,7 @@ namespace Task_Flyout.Views
         private void MonthYearFlyout_Opened(object sender, object e)
         {
             _flyoutYear = _viewDate.Year;
-            FlyoutYearText.Text = _flyoutYear.ToString();
+            FlyoutYearText.Text = string.Format(_loader.GetString("TextYearFormat") ?? "{0}", _flyoutYear);
 
             FlyoutMonthGrid.ItemsSource = CultureInfo.CurrentUICulture.DateTimeFormat.MonthNames
                 .Where(m => !string.IsNullOrEmpty(m)).ToArray();

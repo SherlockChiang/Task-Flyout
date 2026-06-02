@@ -24,7 +24,7 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <ToggleSwitch x:Name="UnreadOnlyToggle" Header="仅未读" Toggled="UnreadOnlyToggle_Toggled"/>
+                <ToggleSwitch x:Uid="MailPage_UnreadOnlyToggle" x:Name="UnreadOnlyToggle" Header="仅未读" Toggled="UnreadOnlyToggle_Toggled"/>
                 <Button x:Name="ComposeButton" Click="ComposeButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <FontIcon Glyph="&#xE724;" FontSize="14"/>
@@ -103,8 +103,8 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock x:Name="MessageListTitle" Text="收件箱" FontWeight="SemiBold"/>
-                            <TextBlock x:Name="MessageListSubtitle" Text="请选择左侧文件夹" FontSize="12"
+                            <TextBlock x:Uid="MailPage_InboxHeader" x:Name="MessageListTitle" Text="收件箱" FontWeight="SemiBold"/>
+                            <TextBlock x:Uid="MailPage_SelectFolderPrompt" x:Name="MessageListSubtitle" Text="请选择左侧文件夹" FontSize="12"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                         </StackPanel>
                         <ProgressRing x:Name="LoadingRing" Grid.Column="1" IsActive="False" Width="24" Height="24"/>
@@ -161,11 +161,12 @@
                 <Grid>
                     <StackPanel x:Name="EmptyDetailPanel" Spacing="8" VerticalAlignment="Center" HorizontalAlignment="Center">
                         <FontIcon Glyph="&#xE715;" FontSize="36" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
-                        <TextBlock Text="选择一封邮件查看预览" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock x:Uid="MailPage_SelectMailPrompt" Text="选择一封邮件查看预览" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
 
                     <Grid x:Name="DetailPanel" Visibility="Collapsed" RowSpacing="10">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -187,31 +188,36 @@
                                 <TextBlock x:Name="DetailTime" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Right"/>
                             </StackPanel>
                         </Grid>
-                        <Border Grid.Row="2" Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
-                        <Grid Grid.Row="3" MinHeight="320">
+                        <StackPanel Grid.Row="2" Spacing="3">
+                            <TextBlock x:Uid="MailPage_ToHeader" Text="收件人" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                            <TextBlock x:Name="DetailRecipient" FontSize="13" TextWrapping="WrapWholeWords"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+                        <Border Grid.Row="3" Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+                        <Grid Grid.Row="4" MinHeight="320">
                             <Grid x:Name="DetailHtmlViewHost" Visibility="Collapsed"/>
                             <ScrollViewer x:Name="DetailTextScrollViewer" VerticalScrollBarVisibility="Auto">
                                 <TextBlock x:Name="DetailPreview" FontSize="14" TextWrapping="WrapWholeWords"
                                            LineHeight="22"/>
                             </ScrollViewer>
                         </Grid>
-                        <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8">
+                        <StackPanel Grid.Row="5" Orientation="Horizontal" Spacing="8">
                             <Button x:Name="TrustSenderButton" HorizontalAlignment="Left" Click="TrustSenderButton_Click">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <FontIcon Glyph="&#xE72E;" FontSize="14"/>
-                                    <TextBlock x:Name="TrustSenderButtonText" Text="信任此来源"/>
+                                    <TextBlock x:Uid="MailPage_BtnTrustSender" x:Name="TrustSenderButtonText" Text="信任此来源"/>
                                 </StackPanel>
                             </Button>
                             <Button x:Name="ReplyButton" HorizontalAlignment="Left" Click="ReplyButton_Click">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <FontIcon Glyph="&#xE97A;" FontSize="14"/>
-                                    <TextBlock Text="回复"/>
+                                    <TextBlock x:Uid="MailPage_BtnReply" Text="回复"/>
                                 </StackPanel>
                             </Button>
                             <Button x:Name="OpenInBrowserButton" HorizontalAlignment="Left" Click="OpenInBrowserButton_Click">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <FontIcon Glyph="&#xE8A7;" FontSize="14"/>
-                                    <TextBlock Text="在浏览器中打开"/>
+                                    <TextBlock x:Uid="MailPage_BtnOpenInBrowser" Text="在浏览器中打开"/>
                                 </StackPanel>
                             </Button>
                         </StackPanel>
@@ -222,8 +228,8 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel MaxWidth="560" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="18">
                                 <StackPanel Spacing="4">
-                                    <TextBlock x:Name="AddTitleText" Text="添加邮箱账户" FontSize="24" FontWeight="SemiBold"/>
-                                    <TextBlock x:Name="AddSubtitleText" Text="选择邮箱类型。Outlook 和 Gmail 使用 OAuth；IMAP 需要填写服务器设置。"
+                                    <TextBlock x:Name="AddTitleText" x:Uid="MailPage_AddAccountTitle" Text="添加邮箱账户" FontSize="24" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="AddSubtitleText" x:Uid="MailPage_AddAccountSubtitle" Text="选择邮箱类型。Outlook 和 Gmail 使用 OAuth；IMAP 需要填写服务器设置。"
                                                TextWrapping="WrapWholeWords"
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                 </StackPanel>
@@ -239,7 +245,7 @@
                                         <StackPanel Spacing="8">
                                             <FontIcon Glyph="&#xE715;" FontSize="24"/>
                                             <TextBlock Text="Outlook" FontWeight="SemiBold"/>
-                                            <TextBlock Text="Microsoft 账户" FontSize="12" TextWrapping="WrapWholeWords"
+                                            <TextBlock x:Uid="MailPage_BtnMSAccount" Text="Microsoft 账户" FontSize="12" TextWrapping="WrapWholeWords"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         </StackPanel>
                                     </Button>
@@ -248,7 +254,7 @@
                                         <StackPanel Spacing="8">
                                             <FontIcon Glyph="&#xE77B;" FontSize="24"/>
                                             <TextBlock Text="Gmail" FontWeight="SemiBold"/>
-                                            <TextBlock Text="Google OAuth" FontSize="12" TextWrapping="WrapWholeWords"
+                                            <TextBlock x:Uid="MailPage_BtnGoogleAccount" Text="Google OAuth" FontSize="12" TextWrapping="WrapWholeWords"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         </StackPanel>
                                     </Button>
@@ -257,41 +263,41 @@
                                         <StackPanel Spacing="8">
                                             <FontIcon Glyph="&#xE8D4;" FontSize="24"/>
                                             <TextBlock Text="IMAP" FontWeight="SemiBold"/>
-                                            <TextBlock Text="自定义邮箱" FontSize="12" TextWrapping="WrapWholeWords"
+                                            <TextBlock x:Uid="MailPage_BtnCustomAccount" Text="自定义邮箱" FontSize="12" TextWrapping="WrapWholeWords"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         </StackPanel>
                                     </Button>
                                 </Grid>
 
                                 <StackPanel x:Name="ImapSettingsPanel" Visibility="Collapsed" Spacing="10">
-                                    <TextBox x:Name="ImapDisplayNameBox" Header="显示名称" PlaceholderText="Work Mail"/>
-                                    <TextBox x:Name="ImapAddressBox" Header="邮箱地址" PlaceholderText="name@example.com"/>
-                                    <TextBox x:Name="ImapUserNameBox" Header="用户名" PlaceholderText="name@example.com"/>
-                                    <PasswordBox x:Name="ImapPasswordBox" Header="密码或应用专用密码"/>
+                                    <TextBox x:Name="ImapDisplayNameBox" x:Uid="MailPage_ImapDisplayName" Header="显示名称" PlaceholderText="Work Mail"/>
+                                    <TextBox x:Name="ImapAddressBox" x:Uid="MailPage_ImapAddress" Header="邮箱地址" PlaceholderText="name@example.com"/>
+                                    <TextBox x:Name="ImapUserNameBox" x:Uid="MailPage_ImapUserName" Header="用户名" PlaceholderText="name@example.com"/>
+                                    <PasswordBox x:Name="ImapPasswordBox" x:Uid="MailPage_ImapPassword" Header="密码或应用专用密码"/>
                                     <Grid ColumnSpacing="10">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="120"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="ImapHostBox" Header="IMAP 服务器" PlaceholderText="imap.example.com"/>
-                                        <NumberBox Grid.Column="1" x:Name="ImapPortBox" Header="端口" Value="993"
+                                        <TextBox x:Name="ImapHostBox" x:Uid="MailPage_ImapHost" Header="IMAP 服务器" PlaceholderText="imap.example.com"/>
+                                        <NumberBox Grid.Column="1" x:Name="ImapPortBox" x:Uid="MailPage_ImapPort" Header="端口" Value="993"
                                                    Minimum="1" Maximum="65535" SpinButtonPlacementMode="Inline"/>
                                     </Grid>
-                                    <ToggleSwitch x:Name="ImapSslToggle" Header="使用 SSL/TLS" IsOn="True"/>
+                                    <ToggleSwitch x:Name="ImapSslToggle" x:Uid="MailPage_ImapSsl" Header="使用 SSL/TLS" IsOn="True"/>
                                     <Grid ColumnSpacing="10">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="120"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="SmtpHostBox" Header="SMTP 服务器" PlaceholderText="smtp.example.com"/>
-                                        <NumberBox Grid.Column="1" x:Name="SmtpPortBox" Header="端口" Value="587"
+                                        <TextBox x:Name="SmtpHostBox" x:Uid="MailPage_SmtpHost" Header="SMTP 服务器" PlaceholderText="smtp.example.com"/>
+                                        <NumberBox Grid.Column="1" x:Name="SmtpPortBox" x:Uid="MailPage_SmtpPort" Header="端口" Value="587"
                                                    Minimum="1" Maximum="65535" SpinButtonPlacementMode="Inline"/>
                                     </Grid>
-                                    <TextBox x:Name="SmtpUserNameBox" Header="SMTP 用户名" PlaceholderText="默认使用 IMAP 用户名"/>
-                                    <ToggleSwitch x:Name="SmtpSslToggle" Header="SMTP 使用 SSL/TLS" IsOn="False"/>
+                                    <TextBox x:Name="SmtpUserNameBox" x:Uid="MailPage_SmtpUserName" Header="SMTP 用户名" PlaceholderText="默认使用 IMAP 用户名"/>
+                                    <ToggleSwitch x:Name="SmtpSslToggle" x:Uid="MailPage_SmtpSsl" Header="SMTP 使用 SSL/TLS" IsOn="False"/>
                                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                                        <Button Content="取消" Click="CancelImapButton_Click"/>
-                                        <Button x:Name="SaveImapButton" Content="连接并保存 IMAP 账户" Click="SaveImapButton_Click"/>
+                                        <Button x:Uid="MailPage_BtnCancel" Content="取消" Click="CancelImapButton_Click"/>
+                                        <Button x:Name="SaveImapButton" x:Uid="MailPage_BtnSaveImap" Content="连接并保存 IMAP 账户" Click="SaveImapButton_Click"/>
                                     </StackPanel>
                                 </StackPanel>
 
@@ -313,21 +319,21 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="ComposeTitleText" Text="写邮件" FontSize="24" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="ComposeTitleText" x:Uid="MailPage_ComposeTitle" Text="写邮件" FontSize="24" FontWeight="SemiBold"/>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                                        <Button Content="取消" Click="CancelComposeButton_Click"/>
+                                        <Button x:Uid="MailPage_BtnCancelCompose" Content="取消" Click="CancelComposeButton_Click"/>
                                         <Button x:Name="SendComposeButton" Click="SendComposeButton_Click">
                                             <StackPanel Orientation="Horizontal" Spacing="6">
                                                 <FontIcon Glyph="&#xE724;" FontSize="14"/>
-                                                <TextBlock Text="发送"/>
+                                                <TextBlock x:Uid="MailPage_TextSend" Text="发送"/>
                                             </StackPanel>
                                         </Button>
                                     </StackPanel>
                                 </Grid>
-                                <ComboBox x:Name="ComposeFromBox" Header="发件人" HorizontalAlignment="Stretch"/>
-                                <TextBox x:Name="ComposeToBox" Header="收件人" PlaceholderText="name@example.com; other@example.com"/>
-                                <TextBox x:Name="ComposeSubjectBox" Header="标题"/>
-                                <TextBox x:Name="ComposeBodyBox" Header="内容" AcceptsReturn="True"
+                                <ComboBox x:Name="ComposeFromBox" x:Uid="MailPage_ComposeFrom" Header="发件人" HorizontalAlignment="Stretch"/>
+                                <TextBox x:Name="ComposeToBox" x:Uid="MailPage_ComposeTo" Header="收件人" PlaceholderText="name@example.com; other@example.com"/>
+                                <TextBox x:Name="ComposeSubjectBox" x:Uid="MailPage_ComposeSubject" Header="标题"/>
+                                <TextBox x:Name="ComposeBodyBox" x:Uid="MailPage_ComposeBody" Header="内容" AcceptsReturn="True"
                                          TextWrapping="Wrap" MinHeight="220"/>
                                 <TextBlock x:Name="ComposeStatusText" FontSize="13"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"

@@ -1062,4 +1062,271 @@
   <data name="SettingsPage_CacheWarning.Message" xml:space="preserve">
     <value>Pruning is recommended to avoid high I/O overhead on next startup.</value>
   </data>
+  <data name="MainWindow_NavTasks.Content" xml:space="preserve">
+    <value>Tasks</value>
+  </data>
+  <data name="MainWindow_NavMail.Content" xml:space="preserve">
+    <value>Mail</value>
+  </data>
+  <data name="MainWindow_NavRss.Content" xml:space="preserve">
+    <value>RSS</value>
+  </data>
+  <data name="TextVersion" xml:space="preserve">
+    <value>Version</value>
+  </data>
+  <data name="TextVersionUnknown" xml:space="preserve">
+    <value>Version unknown</value>
+  </data>
+  <data name="TextRainStopSoon" xml:space="preserve">
+    <value>Rain now, should stop soon</value>
+  </data>
+  <data name="TextRainStopInAbout" xml:space="preserve">
+    <value>Rain now, should stop in about {0}</value>
+  </data>
+  <data name="TextRainContinues" xml:space="preserve">
+    <value>Rain continues for the next {0}h</value>
+  </data>
+  <data name="TextRainMinute" xml:space="preserve">
+    <value>{0} min</value>
+  </data>
+  <data name="TextWeatherDateFormat" xml:space="preserve">
+    <value>MMM d</value>
+  </data>
+  <data name="CalendarDialog_RecurrenceCombo.Header" xml:space="preserve">
+    <value>Recurrence</value>
+  </data>
+  <data name="CalendarDialog_RecurrenceNone.Content" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="CalendarDialog_RecurrenceDaily.Content" xml:space="preserve">
+    <value>Daily</value>
+  </data>
+  <data name="CalendarDialog_RecurrenceWeekly.Content" xml:space="preserve">
+    <value>Weekly</value>
+  </data>
+  <data name="CalendarDialog_RecurrenceMonthly.Content" xml:space="preserve">
+    <value>Monthly</value>
+  </data>
+  <data name="CalendarDialog_RecurrenceYearly.Content" xml:space="preserve">
+    <value>Yearly</value>
+  </data>
+  <data name="CalendarPage_BtnCollapseAccounts.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Collapse accounts</value>
+  </data>
+  <data name="CalendarPage_BtnRemoveAccount.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Remove account</value>
+  </data>
+  <data name="CalendarPage_BtnToggleAccounts.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Show/Hide accounts</value>
+  </data>
+  <data name="CalendarPage_BtnToggleTimeline.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Show/Hide agenda</value>
+  </data>
+  <data name="CalendarPage_BtnCollapseTimeline.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Collapse agenda</value>
+  </data>
+  <data name="CalendarPage_BtnAddText.Text" xml:space="preserve">
+    <value>New</value>
+  </data>
+  <data name="MailPage_UnreadOnlyToggle.Header" xml:space="preserve">
+    <value>Unread only</value>
+  </data>
+  <data name="MailPage_InboxHeader.Text" xml:space="preserve">
+    <value>Inbox</value>
+  </data>
+  <data name="MailPage_SelectFolderPrompt.Text" xml:space="preserve">
+    <value>Please select a folder on the left</value>
+  </data>
+  <data name="MailPage_SelectMailPrompt.Text" xml:space="preserve">
+    <value>Select a message to view preview</value>
+  </data>
+  <data name="MailPage_ToHeader.Text" xml:space="preserve">
+    <value>To</value>
+  </data>
+  <data name="MailPage_BtnTrustSender.Text" xml:space="preserve">
+    <value>Trust source</value>
+  </data>
+  <data name="MailPage_BtnReply.Text" xml:space="preserve">
+    <value>Reply</value>
+  </data>
+  <data name="MailPage_BtnOpenInBrowser.Text" xml:space="preserve">
+    <value>Open in browser</value>
+  </data>
+  <data name="MailPage_AddAccountTitle.Text" xml:space="preserve">
+    <value>Add email account</value>
+  </data>
+  <data name="MailPage_AddAccountSubtitle.Text" xml:space="preserve">
+    <value>Choose mail provider. Outlook and Gmail use OAuth; IMAP requires manual setup.</value>
+  </data>
+  <data name="MailPage_BtnMSAccount.Text" xml:space="preserve">
+    <value>Microsoft account</value>
+  </data>
+  <data name="MailPage_BtnCustomAccount.Text" xml:space="preserve">
+    <value>Custom mailbox</value>
+  </data>
+  <data name="MailPage_ImapDisplayName.Header" xml:space="preserve">
+    <value>Display Name</value>
+  </data>
+  <data name="MailPage_ImapAddress.Header" xml:space="preserve">
+    <value>Email Address</value>
+  </data>
+  <data name="MailPage_ImapUserName.Header" xml:space="preserve">
+    <value>User Name</value>
+  </data>
+  <data name="MailPage_ImapPassword.Header" xml:space="preserve">
+    <value>Password or App-specific Password</value>
+  </data>
+  <data name="MailPage_ImapHost.Header" xml:space="preserve">
+    <value>IMAP Server</value>
+  </data>
+  <data name="MailPage_ImapPort.Header" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="MailPage_ImapSsl.Header" xml:space="preserve">
+    <value>Use SSL/TLS</value>
+  </data>
+  <data name="MailPage_SmtpHost.Header" xml:space="preserve">
+    <value>SMTP Server</value>
+  </data>
+  <data name="MailPage_SmtpPort.Header" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="MailPage_SmtpUserName.Header" xml:space="preserve">
+    <value>SMTP User Name</value>
+  </data>
+  <data name="MailPage_SmtpSsl.Header" xml:space="preserve">
+    <value>SMTP Use SSL/TLS</value>
+  </data>
+  <data name="MailPage_BtnCancel.Content" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="MailPage_BtnSaveImap.Content" xml:space="preserve">
+    <value>Connect and save IMAP account</value>
+  </data>
+  <data name="MailPage_ComposeTitle.Text" xml:space="preserve">
+    <value>Compose</value>
+  </data>
+  <data name="MailPage_BtnCancelCompose.Content" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="MailPage_TextSend.Text" xml:space="preserve">
+    <value>Send</value>
+  </data>
+  <data name="MailPage_ComposeFrom.Header" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="MailPage_ComposeTo.Header" xml:space="preserve">
+    <value>To</value>
+  </data>
+  <data name="MailPage_ComposeSubject.Header" xml:space="preserve">
+    <value>Subject</value>
+  </data>
+  <data name="MailPage_ComposeBody.Header" xml:space="preserve">
+    <value>Body</value>
+  </data>
+  <data name="WeatherPage_WeatherBarDesc" xml:space="preserve">
+    <value>Show a floating weather pill on the taskbar (replaces Win11 widget weather)</value>
+  </data>
+  <data name="WeatherPage_DailyForecastTitle" xml:space="preserve">
+    <value>7-day forecast</value>
+  </data>
+  <data name="WeatherPage_BarFieldsHeader" xml:space="preserve">
+    <value>Taskbar Bar Content</value>
+  </data>
+  <data name="WeatherPage_BarFieldsDesc" xml:space="preserve">
+    <value>Pick which fields appear in the taskbar weather bar</value>
+  </data>
+  <data name="WeatherPage_AlertsHeader" xml:space="preserve">
+    <value>Extreme Weather Alerts</value>
+  </data>
+  <data name="WeatherPage_AlertsDesc" xml:space="preserve">
+    <value>Show alerts on the weather bar when extreme conditions are forecast</value>
+  </data>
+  <data name="WeatherPage_AlertsToggleHeader" xml:space="preserve">
+    <value>Enable alerts</value>
+  </data>
+  <data name="WeatherPage_AlertHoursLabel" xml:space="preserve">
+    <value>Look ahead (hours):</value>
+  </data>
+  <data name="WeatherPage_FeelsLike" xml:space="preserve">
+    <value>Feels like</value>
+  </data>
+  <data name="WeatherPage_Humidity" xml:space="preserve">
+    <value>Humidity</value>
+  </data>
+  <data name="WeatherPage_Wind" xml:space="preserve">
+    <value>Wind</value>
+  </data>
+  <data name="WeatherPage_PrecipProb" xml:space="preserve">
+    <value>Precip. prob.</value>
+  </data>
+  <data name="WeatherPage_Precipitation" xml:space="preserve">
+    <value>Precipitation</value>
+  </data>
+  <data name="WeatherPage_UVIndex" xml:space="preserve">
+    <value>UV Index</value>
+  </data>
+  <data name="WeatherPage_Visibility" xml:space="preserve">
+    <value>Visibility</value>
+  </data>
+  <data name="WeatherPage_Pressure" xml:space="preserve">
+    <value>Pressure</value>
+  </data>
+  <data name="WeatherPage_AQI" xml:space="preserve">
+    <value>AQI</value>
+  </data>
+  <data name="WeatherPage_GrassPollen" xml:space="preserve">
+    <value>Grass pollen</value>
+  </data>
+  <data name="WeatherPage_BirchPollen" xml:space="preserve">
+    <value>Birch pollen</value>
+  </data>
+  <data name="WeatherPage_RagweedPollen" xml:space="preserve">
+    <value>Ragweed pollen</value>
+  </data>
+  <data name="WeatherPage_AQIGood" xml:space="preserve">
+    <value>Good</value>
+  </data>
+  <data name="WeatherPage_AQIModerate" xml:space="preserve">
+    <value>Moderate</value>
+  </data>
+  <data name="WeatherPage_AQIUnhealthySensitive" xml:space="preserve">
+    <value>Unhealthy (Sensitive)</value>
+  </data>
+  <data name="WeatherPage_AQIUnhealthy" xml:space="preserve">
+    <value>Unhealthy</value>
+  </data>
+  <data name="WeatherPage_AQIHazardous" xml:space="preserve">
+    <value>Hazardous</value>
+  </data>
+  <data name="WeatherPage_IconFontEmoji" xml:space="preserve">
+    <value>Windows 11 Style (emoji)</value>
+  </data>
+  <data name="WeatherPage_IconFontSymbol" xml:space="preserve">
+    <value>Classical (Segoe UI Symbol)</value>
+  </data>
+  <data name="WeatherPage_IconFontCustom" xml:space="preserve">
+    <value>Custom font...</value>
+  </data>
+  <data name="WeatherPage_IconPackImporting" xml:space="preserve">
+    <value>Importing...</value>
+  </data>
+  <data name="WeatherPage_IconPackFailed" xml:space="preserve">
+    <value>Failed: drawable_filter.xml not found in zip</value>
+  </data>
+  <data name="WeatherPage_IconPackImported" xml:space="preserve">
+    <value>Imported: {0}</value>
+  </data>
+  <data name="RssPage_AllSubscriptions.Text" xml:space="preserve">
+    <value>All subscriptions</value>
+  </data>
+  <data name="RssPage_AllArticles.Text" xml:space="preserve">
+    <value>All Articles</value>
+  </data>
+  <data name="RssPage_BtnAddFolder.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Add folder</value>
+  </data>
+  <data name="RssPage_BtnBackToList.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Back to list</value>
+  </data>
 </root>

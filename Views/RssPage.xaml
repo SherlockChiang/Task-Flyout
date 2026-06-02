@@ -21,7 +21,7 @@
             <StackPanel Spacing="2">
                 <TextBlock x:Uid="RssPage_Title" Text="RSS" Style="{StaticResource TitleTextBlockStyle}"/>
                 <TextBlock x:Name="SubtitleText"
-                           x:Uid="TextAllSubscriptions"
+                           x:Uid="RssPage_AllSubscriptions"
                            Text="全部订阅文章"
                            FontSize="13"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
@@ -64,7 +64,8 @@
                         </Grid.RowDefinitions>
                         <Grid>
                             <TextBlock x:Uid="RssPage_FeedLabel" Text="订阅" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            <Button HorizontalAlignment="Right"
+                            <Button x:Uid="RssPage_BtnAddFolder"
+                                    HorizontalAlignment="Right"
                                     Width="32"
                                     Height="32"
                                     Padding="0"
@@ -128,7 +129,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock x:Name="ArticleListTitle" x:Uid="TextAllArticles" Text="全部文章" FontSize="18" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="ArticleListTitle" x:Uid="RssPage_AllArticles" Text="全部文章" FontSize="18" FontWeight="SemiBold"/>
                             <TextBlock x:Name="ArticleListSubtitle" Text="向下滚动加载更多" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                         </StackPanel>
                         <Button Grid.Column="1" Click="RefreshButton_Click">
@@ -202,7 +203,8 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <Button Width="36"
+                            <Button x:Uid="RssPage_BtnBackToList"
+                                    Width="36"
                                     Height="32"
                                     Padding="0"
                                     Click="BackToArticleListButton_Click"

@@ -21,6 +21,10 @@ namespace Task_Flyout
         public MainWindow()
         {
             this.InitializeComponent();
+            if (this.Content is FrameworkElement fe)
+            {
+                fe.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
+            }
             this.AppWindow.SetIcon(System.IO.Path.Combine(System.AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
             _loader = new ResourceLoader();
 

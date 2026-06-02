@@ -8,6 +8,7 @@ using System.Threading;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Windows.Storage;
+using Microsoft.Windows.ApplicationModel.Resources;
 
 namespace Task_Flyout.Services
 {
@@ -138,6 +139,7 @@ namespace Task_Flyout.Services
 
     public class WeatherService
     {
+        private static readonly ResourceLoader _loader = new();
         private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
         private WeatherInfo? _cachedWeather;
         private string? _cachedWeatherKey;
@@ -375,29 +377,28 @@ namespace Task_Flyout.Services
 
         private static string BuildRainEndingMessage(HourlyWeather? stopHour, DateTime now, DateTime? lastForecastTime, string lang)
         {
-            bool zh = lang == "zh";
             if (stopHour != null)
             {
                 var minutes = Math.Max(0, (int)Math.Round((stopHour.RawTime - now).TotalMinutes));
                 if (minutes <= 5)
-                    return zh ? "正在下雨，很快会停" : "Rain now, should stop soon";
+                    return _loader.GetString("TextRainStopSoon") ?? "Rain now, should stop soon";
 
-                var when = FormatRainTimeSpan(minutes, zh);
-                return zh ? $"正在下雨，约{when}后停" : $"Rain now, should stop in about {when}";
+                var when = FormatRainTimeSpan(minutes, lang == "zh");
+                return string.Format(_loader.GetString("TextRainStopInAbout") ?? "Rain now, should stop in about {0}", when);
             }
 
             var hours = lastForecastTime.HasValue
                 ? Math.Max(1, (int)Math.Ceiling((lastForecastTime.Value - now).TotalHours))
                 : 24;
-            return zh ? $"未来{hours}h雨还会持续" : $"Rain continues for the next {hours}h";
+            return string.Format(_loader.GetString("TextRainContinues") ?? "Rain continues for the next {0}h", hours);
         }
 
         private static string FormatRainTimeSpan(int minutes, bool zh)
         {
-            if (minutes < 60) return zh ? $"{minutes}分钟" : $"{minutes} min";
+            if (minutes < 60) return string.Format(_loader.GetString("TextRainMinute") ?? "{0} min", minutes);
 
             var hours = (int)Math.Round(minutes / 60.0);
-            return zh ? $"{Math.Max(1, hours)}h" : $"{Math.Max(1, hours)}h";
+            return $"{Math.Max(1, hours)}h";
         }
 
         private static bool MatchAlert(HourlyWeather h, WeatherAlertType type)
@@ -920,7 +921,7 @@ namespace Task_Flyout.Services
                     {
                         Date = date,
                         DayLabel = GetDailyDayLabel(date, lang),
-                        DateLabel = date.ToString(lang == "en" ? "MMM d" : "M月d日"),
+                        DateLabel = date.ToString(_loader.GetString("TextWeatherDateFormat") ?? "MMM d"),
                         WeatherCode = code,
                         HighTemperature = $"{high:F0}°",
                         LowTemperature = $"{low:F0}°",
@@ -942,16 +943,9 @@ namespace Task_Flyout.Services
         private static string GetDailyDayLabel(DateTime date, string lang)
         {
             int days = (date.Date - DateTime.Today).Days;
-            if (lang == "en")
-            {
-                if (days == 0) return "Today";
-                if (days == 1) return "Tomorrow";
-                return date.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture);
-            }
-
-            if (days == 0) return "今天";
-            if (days == 1) return "明天";
-            return date.ToString("ddd", System.Globalization.CultureInfo.GetCultureInfo("zh-CN"));
+            if (days == 0) return _loader.GetString("TextToday") ?? "Today";
+            if (days == 1) return _loader.GetString("TextTomorrow") ?? "Tomorrow";
+            return date.ToString("ddd", System.Globalization.CultureInfo.CurrentUICulture);
         }
 
         private static string GetCurrentLanguage()
@@ -1202,7 +1196,7 @@ namespace Task_Flyout.Services
                     {
                         Date = date,
                         DayLabel = GetDailyDayLabel(date, lang),
-                        DateLabel = date.ToString(lang == "en" ? "MMM d" : "M月d日"),
+                        DateLabel = date.ToString(_loader.GetString("TextWeatherDateFormat") ?? "MMM d"),
                         WeatherCode = rawDailyCode,
                         HighTemperature = string.IsNullOrEmpty(maxC) ? "" : $"{maxC}°",
                         LowTemperature = string.IsNullOrEmpty(minC) ? "" : $"{minC}°",

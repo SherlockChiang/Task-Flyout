@@ -70,6 +70,7 @@ namespace Task_Flyout.Views
 
         public MailPage()
         {
+            this.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
             InitializeComponent();
             Loaded += MailPage_Loaded;
             Unloaded += MailPage_Unloaded;
