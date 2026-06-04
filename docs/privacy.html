@@ -54,18 +54,38 @@
             <div class="lang-zh">
                 <h1 class="text-3xl font-bold mb-6 border-b border-black/10 pb-4">隐私政策</h1>
                 <div class="space-y-4 text-gray-600 leading-relaxed text-sm md:text-base">
-                    <p><strong>最后更新时间：</strong> 2026年3月</p>
-                    <p>Task Flyout（以下简称“本软件”）深知个人隐私的重要性。我们的核心理念是：<strong>您的数据，只属于您。</strong></p>
-                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">1. 我们收集什么数据？</h2>
-                    <p><strong>本软件不收集、不存储、不上传您的任何个人敏感信息至任何第三方服务器。</strong> 本软件仅作为连接您设备与官方日历服务（Google API、Microsoft Graph API）的本地桥梁。</p>
-                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">2. OAuth 授权与数据使用</h2>
-                    <p>当您授权本软件访问您的 Google 或 Microsoft 账户时：</p>
+                    <p><strong>最后更新时间：</strong> 2026年6月</p>
+                    <p>Task Flyout（以下简称“本软件”）采用“本地优先”的设计。<strong>开发者不运营任何服务器，您的数据保存在您自己的设备上，不会上传给开发者。</strong></p>
+
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">1. 各类数据如何存储</h2>
                     <ul class="list-disc pl-6 space-y-2">
-                        <li>您的访问令牌（Token）仅通过系统级加密保存在您<strong>本地计算机的硬盘上</strong>。</li>
-                        <li>您的日程和任务数据仅在您的设备内存中进行加载和展示，关闭软件后即从内存释放。</li>
-                        <li>本软件遵守 <a href="https://developers.google.com/terms/api-services-user-data-policy" class="text-[#0067C0] hover:underline" target="_blank">Google API 服务用户数据政策</a>，仅请求实现日历读写功能所必需的最少权限。</li>
+                        <li><strong>邮件：</strong>账户配置与邮件元数据（发件人、主题、预览）以 Windows 数据保护接口（DPAPI）加密后缓存在本地；邮件正文按需从您的邮件服务器加载，通常不持久化保存。</li>
+                        <li><strong>日历与任务：</strong>同步得到的日程与任务缓存经 DPAPI 加密后保存在本地，用于离线查看。</li>
+                        <li><strong>RSS：</strong>订阅列表与文章保存在本地的 SQLite 数据库中（均为公开的订阅源内容）。</li>
+                        <li><strong>天气：</strong>您选择的城市、坐标与显示设置保存在本地应用设置中。</li>
                     </ul>
-                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">3. 联系我们</h2>
+
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">2. 是否上传服务器</h2>
+                    <p><strong>本软件没有自有服务器，不收集任何遥测或使用分析，您的数据不会被收集或上传给开发者。</strong> 为实现功能，本软件仅在您的设备与下列您主动配置的官方/第三方服务之间直接通信：</p>
+                    <ul class="list-disc pl-6 space-y-2">
+                        <li>Google API、Microsoft Graph API（日历、任务、邮件）；</li>
+                        <li>您配置的 IMAP/SMTP 邮件服务器；</li>
+                        <li>您订阅的 RSS 源所在站点；</li>
+                        <li>天气服务（Open-Meteo 或 wttr.in）：获取天气时会向其发送您选择的地点信息。</li>
+                    </ul>
+
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">3. OAuth 令牌与密码如何保护</h2>
+                    <ul class="list-disc pl-6 space-y-2">
+                        <li><strong>OAuth 访问/刷新令牌：</strong>通过 Windows DPAPI（<code>CurrentUser</code> 范围并附加额外 entropy）加密保存在本地。加密密钥与您当前的 Windows 用户账户绑定，其他用户或其他设备无法解密。</li>
+                        <li><strong>Microsoft 登录：</strong>采用官方 MSAL 库，令牌缓存同样以 DPAPI 加密保存在本地。</li>
+                        <li><strong>IMAP/SMTP 密码：</strong>保存在 <strong>Windows 凭据管理器（Credential Manager）</strong> 中，而非明文文件。</li>
+                        <li><strong>最小权限：</strong>仅申请实现功能所必需的最少 OAuth 权限范围，并遵守 <a href="https://developers.google.com/terms/api-services-user-data-policy" class="text-[#0067C0] hover:underline" target="_blank">Google API 服务用户数据政策</a>。</li>
+                    </ul>
+
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">4. 删除数据</h2>
+                    <p>在应用内移除某个账户即会删除其对应的令牌、密码与缓存。卸载本软件将清除其在您设备上保存的所有本地数据。</p>
+
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">5. 联系我们</h2>
                     <p>如果您对本隐私政策有任何疑问或安全担忧，请通过 GitHub Issues 联系开发者。</p>
                 </div>
             </div>
@@ -73,18 +93,38 @@
             <div class="lang-en hidden-lang">
                 <h1 class="text-3xl font-bold mb-6 border-b border-black/10 pb-4">Privacy Policy</h1>
                 <div class="space-y-4 text-gray-600 leading-relaxed text-sm md:text-base">
-                    <p><strong>Last Updated:</strong> March 2026</p>
-                    <p>Task Flyout ("we", "our", or "the App") understands the importance of personal privacy. Our core philosophy is simple: <strong>Your data belongs to you.</strong></p>
-                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">1. What data do we collect?</h2>
-                    <p><strong>The App DOES NOT collect, store, or upload any of your personal or sensitive information to any third-party servers.</strong> It functions strictly as a local bridge connecting your device to official calendar services (Google API, Microsoft Graph API).</p>
-                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">2. OAuth Authorization and Data Usage</h2>
-                    <p>When you authorize the App to access your Google or Microsoft accounts:</p>
+                    <p><strong>Last Updated:</strong> June 2026</p>
+                    <p>Task Flyout ("the App") is local-first by design. <strong>The developer operates no servers; your data is kept on your own device and is never uploaded to the developer.</strong></p>
+
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">1. How each type of data is stored</h2>
                     <ul class="list-disc pl-6 space-y-2">
-                        <li>Your access tokens are encrypted and stored <strong>locally on your computer's hard drive</strong>.</li>
-                        <li>Your schedule and task data are loaded solely into your device's memory for display purposes and are released once the app is closed.</li>
-                        <li>The App complies fully with the <a href="https://developers.google.com/terms/api-services-user-data-policy" class="text-[#0067C0] hover:underline" target="_blank">Google API Services User Data Policy</a>, requesting only the minimum scopes necessary to provide calendar and task functionalities.</li>
+                        <li><strong>Mail:</strong> Account configuration and message metadata (sender, subject, preview) are cached locally, encrypted with the Windows Data Protection API (DPAPI). Full message bodies are loaded on demand from your mail server and are generally not persisted.</li>
+                        <li><strong>Calendar &amp; tasks:</strong> Synced events and tasks are cached locally, encrypted with DPAPI, for offline viewing.</li>
+                        <li><strong>RSS:</strong> Your subscriptions and articles are stored in a local SQLite database (all of it public feed content).</li>
+                        <li><strong>Weather:</strong> Your chosen city, coordinates, and display preferences are stored in local app settings.</li>
                     </ul>
-                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">3. Contact Us</h2>
+
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">2. Is anything uploaded to a server?</h2>
+                    <p><strong>The App has no backend of its own, collects no telemetry or usage analytics, and never sends your data to the developer.</strong> To provide its features it communicates only between your device and the following official / third-party services that you configure:</p>
+                    <ul class="list-disc pl-6 space-y-2">
+                        <li>Google API and Microsoft Graph API (calendar, tasks, mail);</li>
+                        <li>The IMAP/SMTP mail server you configure;</li>
+                        <li>The websites hosting the RSS feeds you subscribe to;</li>
+                        <li>The weather service (Open-Meteo or wttr.in): your chosen location is sent to it when fetching the forecast.</li>
+                    </ul>
+
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">3. How OAuth tokens and passwords are protected</h2>
+                    <ul class="list-disc pl-6 space-y-2">
+                        <li><strong>OAuth access/refresh tokens:</strong> Encrypted at rest with the Windows DPAPI (<code>CurrentUser</code> scope plus additional entropy). The encryption key is bound to your current Windows user account, so other users or other machines cannot decrypt it.</li>
+                        <li><strong>Microsoft sign-in:</strong> Uses the official MSAL library; its token cache is likewise stored locally, encrypted with DPAPI.</li>
+                        <li><strong>IMAP/SMTP passwords:</strong> Stored in the <strong>Windows Credential Manager</strong>, not in a plaintext file.</li>
+                        <li><strong>Least privilege:</strong> The App requests only the minimum OAuth scopes needed for its features and complies with the <a href="https://developers.google.com/terms/api-services-user-data-policy" class="text-[#0067C0] hover:underline" target="_blank">Google API Services User Data Policy</a>.</li>
+                    </ul>
+
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">4. Deleting your data</h2>
+                    <p>Removing an account inside the App deletes its tokens, passwords, and cache. Uninstalling the App clears all local data it kept on your device.</p>
+
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">5. Contact Us</h2>
                     <p>If you have any questions or security concerns regarding this Privacy Policy, please contact the developer via GitHub Issues.</p>
                 </div>
             </div>
