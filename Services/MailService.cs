@@ -76,7 +76,7 @@ namespace Task_Flyout.Services
 
         public string DisplayTitle => string.IsNullOrWhiteSpace(DisplayName) ? ProviderName : DisplayName;
         public string Subtitle => string.IsNullOrWhiteSpace(Address) ? ProviderName : Address;
-        public string SetupText => IsSetupComplete ? "" : (_accountLoader.GetString("TextSetupIncomplete") ?? "Setup required");
+        public string SetupText => IsSetupComplete ? "" : (_accountLoader.GetStringOrDefault("TextSetupIncomplete") ?? "Setup required");
     }
 
     public class MailFolder
@@ -506,7 +506,7 @@ namespace Task_Flyout.Services
                     {
                         AccountId = account.Id,
                         Id = "setup",
-                        DisplayName = _loader.GetString("TextFolderPlaceholder") ?? "Complete setup to view folders",
+                        DisplayName = _loader.GetStringOrDefault("TextFolderPlaceholder") ?? "Complete setup to view folders",
                         IsPlaceholder = true
                     }
                 };
@@ -1070,9 +1070,9 @@ namespace Task_Flyout.Services
                         AccountId = account.Id,
                         FolderId = folder.Id,
                         Id = id.Id.ToString(),
-                        Subject = _loader.GetString("TextMailReadError") ?? "Unable to read this email",
+                        Subject = _loader.GetStringOrDefault("TextMailReadError") ?? "Unable to read this email",
                         Sender = account.DisplayTitle,
-                        Preview = _loader.GetString("TextMailFetchError") ?? "IMAP server returned an invalid FETCH response.",
+                        Preview = _loader.GetStringOrDefault("TextMailFetchError") ?? "IMAP server returned an invalid FETCH response.",
                         IsRead = isRead
                     });
                 }
@@ -2085,7 +2085,7 @@ namespace Task_Flyout.Services
             try
             {
                 var notification = new AppNotificationBuilder()
-                    .AddText($"{(_loader.GetString("TextNewMail") ?? "New Mail")} · {account.DisplayTitle}")
+                    .AddText($"{(_loader.GetStringOrDefault("TextNewMail") ?? "New Mail")} · {account.DisplayTitle}")
                     .AddText(subject)
                     .AddText(sender)
                     .AddArgument("action", "openMail")

@@ -89,7 +89,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 LogRssError(ex);
-                ArticleListSubtitle.Text = string.Format(_loader.GetString("TextRssInitFailed") ?? "RSS initialization failed: {0}", ex.Message);
+                ArticleListSubtitle.Text = string.Format(_loader.GetStringOrDefault("TextRssInitFailed") ?? "RSS initialization failed: {0}", ex.Message);
             }
         }
 
@@ -120,7 +120,7 @@ namespace Task_Flyout.Views
 
             _allNode = new TreeViewNode
             {
-                Content = _loader.GetString("TextAllArticles") ?? "All Articles",
+                Content = _loader.GetStringOrDefault("TextAllArticles") ?? "All Articles",
                 IsExpanded = true
             };
             RssTree.RootNodes.Add(_allNode);
@@ -141,7 +141,7 @@ namespace Task_Flyout.Views
 
             var uncategorizedNode = new TreeViewNode
             {
-                Content = _loader.GetString("TextUncategorized") ?? "Uncategorized",
+                Content = _loader.GetStringOrDefault("TextUncategorized") ?? "Uncategorized",
                 IsExpanded = true
             };
             RssTree.RootNodes.Add(uncategorizedNode);
@@ -150,7 +150,7 @@ namespace Task_Flyout.Views
         }
 
         private string CreateFolderNodeContent(RssFolder folder)
-            => string.IsNullOrWhiteSpace(folder.Name) ? (_loader.GetString("TextFolder") ?? "Folder") : folder.Name;
+            => string.IsNullOrWhiteSpace(folder.Name) ? (_loader.GetStringOrDefault("TextFolder") ?? "Folder") : folder.Name;
 
         private void AddSubscriptionNode(TreeViewNode parent, RssSubscription subscription)
         {
@@ -176,8 +176,8 @@ namespace Task_Flyout.Views
         {
             if (SubscriptionStatusText == null) return;
             SubscriptionStatusText.Text = Subscriptions.Count == 0
-                ? (_loader.GetString("TextNoSubscriptionsHint") ?? "No subscriptions yet. Add an RSS URL to start reading.")
-                : string.Format(_loader.GetString("TextNSubscriptions") ?? "{0} subscriptions, {1} folders", Subscriptions.Count, Folders.Count);
+                ? (_loader.GetStringOrDefault("TextNoSubscriptionsHint") ?? "No subscriptions yet. Add an RSS URL to start reading.")
+                : string.Format(_loader.GetStringOrDefault("TextNSubscriptions") ?? "{0} subscriptions, {1} folders", Subscriptions.Count, Folders.Count);
         }
 
         private async Task ResetAndLoadArticlesAsync()
@@ -203,13 +203,13 @@ namespace Task_Flyout.Views
                 _loadedCount = items.Count;
                 _hasMore = items.Count == PageSize;
                 ArticleListSubtitle.Text = Articles.Count == 0
-                    ? (_loader.GetString("TextNoCachedArticles") ?? "No cached articles, click refresh to fetch")
-                    : _hasMore ? string.Format(_loader.GetString("TextNArticlesScroll") ?? "{0} articles, scroll down to load more", Articles.Count) : string.Format(_loader.GetString("TextNArticles") ?? "{0} articles", Articles.Count);
+                    ? (_loader.GetStringOrDefault("TextNoCachedArticles") ?? "No cached articles, click refresh to fetch")
+                    : _hasMore ? string.Format(_loader.GetStringOrDefault("TextNArticlesScroll") ?? "{0} articles, scroll down to load more", Articles.Count) : string.Format(_loader.GetStringOrDefault("TextNArticles") ?? "{0} articles", Articles.Count);
             }
             catch (Exception ex)
             {
                 LogRssError(ex);
-                ArticleListSubtitle.Text = string.Format(_loader.GetString("TextCacheLoadFailed") ?? "Cache load failed: {0}", ex.Message);
+                ArticleListSubtitle.Text = string.Format(_loader.GetStringOrDefault("TextCacheLoadFailed") ?? "Cache load failed: {0}", ex.Message);
             }
         }
 
@@ -228,13 +228,13 @@ namespace Task_Flyout.Views
                 _loadedCount += items.Count;
                 _hasMore = items.Count == PageSize;
                 ArticleListSubtitle.Text = Articles.Count == 0
-                    ? (_loader.GetString("TextNoArticles") ?? "No articles")
-                    : _hasMore ? string.Format(_loader.GetString("TextNArticlesClickLoad") ?? "{0} articles, click to load more", Articles.Count) : string.Format(_loader.GetString("TextNArticles") ?? "{0} articles", Articles.Count);
+                    ? (_loader.GetStringOrDefault("TextNoArticles") ?? "No articles")
+                    : _hasMore ? string.Format(_loader.GetStringOrDefault("TextNArticlesClickLoad") ?? "{0} articles, click to load more", Articles.Count) : string.Format(_loader.GetStringOrDefault("TextNArticles") ?? "{0} articles", Articles.Count);
             }
             catch (Exception ex)
             {
                 LogRssError(ex);
-                ArticleListSubtitle.Text = string.Format(_loader.GetString("TextLoadFailed") ?? "Load failed: {0}", ex.Message);
+                ArticleListSubtitle.Text = string.Format(_loader.GetStringOrDefault("TextLoadFailed") ?? "Load failed: {0}", ex.Message);
             }
             finally
             {
@@ -258,8 +258,8 @@ namespace Task_Flyout.Views
                 ShowArticleList();
                 _selectedSubscriptionId = null;
                 _selectedFolderId = null;
-                ArticleListTitle.Text = _loader.GetString("TextAllArticles") ?? "All Articles";
-                SubtitleText.Text = _loader.GetString("TextAllSubscriptions") ?? "All subscriptions";
+                ArticleListTitle.Text = _loader.GetStringOrDefault("TextAllArticles") ?? "All Articles";
+                SubtitleText.Text = _loader.GetStringOrDefault("TextAllSubscriptions") ?? "All subscriptions";
             }
             else if (_folderNodes.TryGetValue(node, out var folder))
             {
@@ -267,7 +267,7 @@ namespace Task_Flyout.Views
                 _selectedSubscriptionId = null;
                 _selectedFolderId = folder.Id;
                 ArticleListTitle.Text = folder.Name;
-                SubtitleText.Text = _loader.GetString("TextCurrentFolderArticles") ?? "RSS articles in current folder";
+                SubtitleText.Text = _loader.GetStringOrDefault("TextCurrentFolderArticles") ?? "RSS articles in current folder";
             }
             else if (_subscriptionNodes.TryGetValue(node, out var subscription))
             {
@@ -277,13 +277,13 @@ namespace Task_Flyout.Views
                 ArticleListTitle.Text = subscription.Title;
                 SubtitleText.Text = subscription.Url;
             }
-            else if (node.Content?.ToString() == (_loader.GetString("TextUncategorized") ?? "Uncategorized"))
+            else if (node.Content?.ToString() == (_loader.GetStringOrDefault("TextUncategorized") ?? "Uncategorized"))
             {
                 ShowArticleList();
                 _selectedSubscriptionId = null;
                 _selectedFolderId = "";
-                ArticleListTitle.Text = _loader.GetString("TextUncategorized") ?? "Uncategorized";
-                SubtitleText.Text = _loader.GetString("TextUncategorizedArticles") ?? "Uncategorized subscription articles";
+                ArticleListTitle.Text = _loader.GetStringOrDefault("TextUncategorized") ?? "Uncategorized";
+                SubtitleText.Text = _loader.GetStringOrDefault("TextUncategorizedArticles") ?? "Uncategorized subscription articles";
             }
             else
             {
@@ -297,7 +297,7 @@ namespace Task_Flyout.Views
         {
             var urlBox = new TextBox
             {
-                Header = _loader.GetString("TextRssAddress") ?? "RSS URL",
+                Header = _loader.GetStringOrDefault("TextRssAddress") ?? "RSS URL",
                 PlaceholderText = "https://example.com/feed.xml"
             };
             var folderBox = CreateFolderComboBox(_selectedFolderId);
@@ -307,10 +307,10 @@ namespace Task_Flyout.Views
 
             var dialog = new ContentDialog
             {
-                Title = _loader.GetString("TextAddRssSubscription") ?? "Add RSS Subscription",
+                Title = _loader.GetStringOrDefault("TextAddRssSubscription") ?? "Add RSS Subscription",
                 Content = panel,
-                PrimaryButtonText = _loader.GetString("TextAdd") ?? "Add",
-                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
+                PrimaryButtonText = _loader.GetStringOrDefault("TextAdd") ?? "Add",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = XamlRoot
             };
@@ -336,14 +336,14 @@ namespace Task_Flyout.Views
                     BuildSubscriptionTree();
                     _selectedSubscriptionId = null;
                     _selectedFolderId = null;
-                    ArticleListTitle.Text = _loader.GetString("TextAllArticles") ?? "All Articles";
-                    SubtitleText.Text = _loader.GetString("TextAllSubscriptions") ?? "All subscriptions";
+                    ArticleListTitle.Text = _loader.GetStringOrDefault("TextAllArticles") ?? "All Articles";
+                    SubtitleText.Text = _loader.GetStringOrDefault("TextAllSubscriptions") ?? "All subscriptions";
                     ResetAndLoadCachedArticles();
                 }
                 catch (Exception ex)
                 {
                     args.Cancel = true;
-                    SubscriptionStatusText.Text = string.Format(_loader.GetString("TextAddFailed2") ?? "Add failed: {0}", ex.Message);
+                    SubscriptionStatusText.Text = string.Format(_loader.GetStringOrDefault("TextAddFailed2") ?? "Add failed: {0}", ex.Message);
                 }
                 finally
                 {
@@ -365,10 +365,10 @@ namespace Task_Flyout.Views
         {
             var dialog = new ContentDialog
             {
-                Title = _loader.GetString("TextDeleteSubscription") ?? "Delete Subscription",
-                Content = string.Format(_loader.GetString("TextDeleteSubscriptionContent") ?? "Delete \"{0}\"? Cached articles will also be removed.", subscription.Title),
-                PrimaryButtonText = _loader.GetString("CalendarDialog.SecondaryButtonText") ?? "Delete",
-                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
+                Title = _loader.GetStringOrDefault("TextDeleteSubscription") ?? "Delete Subscription",
+                Content = string.Format(_loader.GetStringOrDefault("TextDeleteSubscriptionContent") ?? "Delete \"{0}\"? Cached articles will also be removed.", subscription.Title),
+                PrimaryButtonText = _loader.GetStringOrDefault("CalendarDialog.SecondaryButtonText") ?? "Delete",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = XamlRoot
             };
@@ -380,8 +380,8 @@ namespace Task_Flyout.Views
             if (_selectedSubscriptionId == subscription.Id)
             {
                 _selectedSubscriptionId = null;
-                ArticleListTitle.Text = _loader.GetString("TextAllArticles") ?? "All Articles";
-                SubtitleText.Text = _loader.GetString("TextAllSubscriptions") ?? "All subscriptions";
+                ArticleListTitle.Text = _loader.GetStringOrDefault("TextAllArticles") ?? "All Articles";
+                SubtitleText.Text = _loader.GetStringOrDefault("TextAllSubscriptions") ?? "All subscriptions";
             }
             LoadSubscriptions();
             BuildSubscriptionTree();
@@ -420,13 +420,13 @@ namespace Task_Flyout.Views
 
         private async Task RenameFolderAsync(RssFolder folder)
         {
-            var box = new TextBox { Header = _loader.GetString("TextFolderName") ?? "Folder name", Text = folder.Name };
+            var box = new TextBox { Header = _loader.GetStringOrDefault("TextFolderName") ?? "Folder name", Text = folder.Name };
             var dialog = new ContentDialog
             {
-                Title = _loader.GetString("TextRenameFolder") ?? "Rename Folder",
+                Title = _loader.GetStringOrDefault("TextRenameFolder") ?? "Rename Folder",
                 Content = box,
-                PrimaryButtonText = _loader.GetString("CalendarDialog.PrimaryButtonText") ?? "Save",
-                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
+                PrimaryButtonText = _loader.GetStringOrDefault("CalendarDialog.PrimaryButtonText") ?? "Save",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = XamlRoot
             };
@@ -442,13 +442,13 @@ namespace Task_Flyout.Views
 
         private async Task RenameSubscriptionAsync(RssSubscription subscription)
         {
-            var box = new TextBox { Header = _loader.GetString("TextSubscriptionName") ?? "Subscription name", Text = subscription.Title };
+            var box = new TextBox { Header = _loader.GetStringOrDefault("TextSubscriptionName") ?? "Subscription name", Text = subscription.Title };
             var dialog = new ContentDialog
             {
-                Title = _loader.GetString("TextRenameSubscription") ?? "Rename Subscription",
+                Title = _loader.GetStringOrDefault("TextRenameSubscription") ?? "Rename Subscription",
                 Content = box,
-                PrimaryButtonText = _loader.GetString("CalendarDialog.PrimaryButtonText") ?? "Save",
-                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
+                PrimaryButtonText = _loader.GetStringOrDefault("CalendarDialog.PrimaryButtonText") ?? "Save",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = XamlRoot
             };
@@ -465,15 +465,15 @@ namespace Task_Flyout.Views
         {
             var nameBox = new TextBox
             {
-                Header = _loader.GetString("TextFolderName") ?? "Folder name",
-                PlaceholderText = _loader.GetString("TextFolderNamePlaceholder") ?? "e.g. Tech, News, Blog"
+                Header = _loader.GetStringOrDefault("TextFolderName") ?? "Folder name",
+                PlaceholderText = _loader.GetStringOrDefault("TextFolderNamePlaceholder") ?? "e.g. Tech, News, Blog"
             };
             var dialog = new ContentDialog
             {
-                Title = _loader.GetString("TextAddRssFolder") ?? "Add RSS Folder",
+                Title = _loader.GetStringOrDefault("TextAddRssFolder") ?? "Add RSS Folder",
                 Content = nameBox,
-                PrimaryButtonText = _loader.GetString("TextAdd") ?? "Add",
-                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
+                PrimaryButtonText = _loader.GetStringOrDefault("TextAdd") ?? "Add",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = XamlRoot
             };
@@ -506,10 +506,10 @@ namespace Task_Flyout.Views
         {
             var dialog = new ContentDialog
             {
-                Title = _loader.GetString("TextDeleteFolder") ?? "Delete Folder",
-                Content = string.Format(_loader.GetString("TextDeleteFolderContent") ?? "Delete \"{0}\"? Subscriptions will be moved to Uncategorized.", folder.Name),
-                PrimaryButtonText = _loader.GetString("CalendarDialog.SecondaryButtonText") ?? "Delete",
-                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
+                Title = _loader.GetStringOrDefault("TextDeleteFolder") ?? "Delete Folder",
+                Content = string.Format(_loader.GetStringOrDefault("TextDeleteFolderContent") ?? "Delete \"{0}\"? Subscriptions will be moved to Uncategorized.", folder.Name),
+                PrimaryButtonText = _loader.GetStringOrDefault("CalendarDialog.SecondaryButtonText") ?? "Delete",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = XamlRoot
             };
@@ -521,8 +521,8 @@ namespace Task_Flyout.Views
             if (_selectedFolderId == folder.Id)
             {
                 _selectedFolderId = null;
-                ArticleListTitle.Text = _loader.GetString("TextAllArticles") ?? "All Articles";
-                SubtitleText.Text = _loader.GetString("TextAllSubscriptions") ?? "All subscriptions";
+                ArticleListTitle.Text = _loader.GetStringOrDefault("TextAllArticles") ?? "All Articles";
+                SubtitleText.Text = _loader.GetStringOrDefault("TextAllSubscriptions") ?? "All subscriptions";
             }
             LoadFolders();
             LoadSubscriptions();
@@ -537,10 +537,10 @@ namespace Task_Flyout.Views
             var folderBox = CreateFolderComboBox(subscription.FolderId);
             var dialog = new ContentDialog
             {
-                Title = string.Format(_loader.GetString("TextSetFolder") ?? "Set folder for \"{0}\"", subscription.Title),
+                Title = string.Format(_loader.GetStringOrDefault("TextSetFolder") ?? "Set folder for \"{0}\"", subscription.Title),
                 Content = folderBox,
-                PrimaryButtonText = _loader.GetString("CalendarDialog.PrimaryButtonText") ?? "Save",
-                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
+                PrimaryButtonText = _loader.GetStringOrDefault("CalendarDialog.PrimaryButtonText") ?? "Save",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = XamlRoot
             };
@@ -602,7 +602,7 @@ namespace Task_Flyout.Views
                     _rssService.MoveSubscriptionToFolder(_subscriptionNodes[child].Id, folder.Id);
             }
 
-            foreach (var root in RssTree.RootNodes.Where(node => node.Content?.ToString() == (_loader.GetString("TextUncategorized") ?? "Uncategorized")))
+            foreach (var root in RssTree.RootNodes.Where(node => node.Content?.ToString() == (_loader.GetStringOrDefault("TextUncategorized") ?? "Uncategorized")))
             {
                 foreach (var child in root.Children.Where(node => _subscriptionNodes.ContainsKey(node)))
                     _rssService.MoveSubscriptionToFolder(_subscriptionNodes[child].Id, "");
@@ -614,10 +614,10 @@ namespace Task_Flyout.Views
         {
             var folderBox = new ComboBox
             {
-                Header = _loader.GetString("TextFolder") ?? "Folder",
+                Header = _loader.GetStringOrDefault("TextFolder") ?? "Folder",
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
-            folderBox.Items.Add(new ComboBoxItem { Content = _loader.GetString("TextUncategorized") ?? "Uncategorized", Tag = "" });
+            folderBox.Items.Add(new ComboBoxItem { Content = _loader.GetStringOrDefault("TextUncategorized") ?? "Uncategorized", Tag = "" });
             foreach (var folder in _rssService.GetFolders())
                 folderBox.Items.Add(new ComboBoxItem { Content = folder.Name, Tag = folder.Id });
 
@@ -630,22 +630,44 @@ namespace Task_Flyout.Views
 
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedSubscriptionId == null)
+            try
             {
-                IEnumerable<RssSubscription> visibleSubscriptions = _rssService.GetSubscriptions();
-                if (_selectedFolderId != null)
-                    visibleSubscriptions = visibleSubscriptions.Where(subscription => subscription.FolderId == _selectedFolderId);
+                SetLoading(true);
+                if (_selectedSubscriptionId == null)
+                {
+                    IEnumerable<RssSubscription> visibleSubscriptions = _rssService.GetSubscriptions();
+                    if (_selectedFolderId != null)
+                        visibleSubscriptions = visibleSubscriptions.Where(subscription => subscription.FolderId == _selectedFolderId);
 
-                foreach (var subscription in visibleSubscriptions.Take(10))
+                    foreach (var subscription in visibleSubscriptions.Take(10))
+                        await _rssService.RefreshSubscriptionAsync(subscription, force: true);
+                }
+                else if (_rssService.GetSubscriptions().FirstOrDefault(item => item.Id == _selectedSubscriptionId) is { } subscription)
+                {
                     await _rssService.RefreshSubscriptionAsync(subscription, force: true);
-            }
-            else if (_rssService.GetSubscriptions().FirstOrDefault(item => item.Id == _selectedSubscriptionId) is { } subscription)
-            {
-                await _rssService.RefreshSubscriptionAsync(subscription, force: true);
-            }
+                }
 
-            LoadSubscriptions();
-            ResetAndLoadCachedArticles();
+                LoadSubscriptions();
+                ResetAndLoadCachedArticles();
+            }
+            catch (Exception ex)
+            {
+                LogRssError(ex);
+                ArticleListSubtitle.Text = FormatRssRefreshError(ex);
+            }
+            finally
+            {
+                SetLoading(false);
+            }
+        }
+
+        private static string FormatRssRefreshError(Exception ex)
+        {
+            var message = ex.Message ?? "";
+            if (message.Contains("non-public IP", StringComparison.OrdinalIgnoreCase))
+                return "刷新被安全策略拦截：RSS 地址或重定向解析到了非公网 IP。若正在使用 TUN/本地代理，可在设置中开启 RSS 本地网络访问。";
+
+            return $"刷新失败：{message}";
         }
 
         private void AttachArticleScrollViewer()
@@ -729,7 +751,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 LogRssError(ex);
-                ArticleListSubtitle.Text = string.Format(_loader.GetString("TextArticleRenderFailed") ?? "Article render failed: {0}", ex.Message);
+                ArticleListSubtitle.Text = string.Format(_loader.GetStringOrDefault("TextArticleRenderFailed") ?? "Article render failed: {0}", ex.Message);
             }
         }
 

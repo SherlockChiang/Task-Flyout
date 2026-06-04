@@ -140,7 +140,7 @@ namespace Task_Flyout.Services
             if (!DateTime.TryParse(dateKey, out var date)) return null;
 
             var subtitle = item.Subtitle?.Trim();
-            var allDayText = _loader.GetString("TextAllDay") ?? "All Day";
+            var allDayText = _loader.GetStringOrDefault("TextAllDay") ?? "All Day";
             if (string.IsNullOrEmpty(subtitle) || subtitle == "全天" || subtitle == "All day" || subtitle == allDayText)
                 return null;
 
@@ -157,11 +157,11 @@ namespace Task_Flyout.Services
             {
                 var minutesLeft = (int)Math.Ceiling((startTime - DateTime.Now).TotalMinutes);
                 var timeText = minutesLeft <= 1
-                    ? (_loader.GetString("TextOneMinuteLater") ?? "Starts in 1 minute")
-                    : string.Format(_loader.GetString("TextMinutesLater") ?? "Starts in {0} minutes", minutesLeft);
+                    ? (_loader.GetStringOrDefault("TextOneMinuteLater") ?? "Starts in 1 minute")
+                    : string.Format(_loader.GetStringOrDefault("TextMinutesLater") ?? "Starts in {0} minutes", minutesLeft);
 
                 var builder = new AppNotificationBuilder()
-                    .AddText(item.Title ?? (_loader.GetString("TextEventReminder") ?? "Event Reminder"))
+                    .AddText(item.Title ?? (_loader.GetStringOrDefault("TextEventReminder") ?? "Event Reminder"))
                     .AddText($"{timeText} · {startTime:HH:mm}");
 
                 if (!string.IsNullOrEmpty(item.Location))

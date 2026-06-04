@@ -261,13 +261,13 @@ namespace Task_Flyout.Views
         private void MonthYearFlyout_Opened(object sender, object e)
         {
             _flyoutYear = _viewDate.Year;
-            FlyoutYearText.Text = string.Format(_loader.GetString("TextYearFormat") ?? "{0}", _flyoutYear);
+            FlyoutYearText.Text = string.Format(_loader.GetStringOrDefault("TextYearFormat") ?? "{0}", _flyoutYear);
 
             FlyoutMonthGrid.ItemsSource = CultureInfo.CurrentUICulture.DateTimeFormat.MonthNames
                 .Where(m => !string.IsNullOrEmpty(m)).ToArray();
         }
-        private void FlyoutPrevYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = string.Format(_loader.GetString("TextYearFormat") ?? "{0}", --_flyoutYear);
-        private void FlyoutNextYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = string.Format(_loader.GetString("TextYearFormat") ?? "{0}", ++_flyoutYear);
+        private void FlyoutPrevYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = string.Format(_loader.GetStringOrDefault("TextYearFormat") ?? "{0}", --_flyoutYear);
+        private void FlyoutNextYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = string.Format(_loader.GetStringOrDefault("TextYearFormat") ?? "{0}", ++_flyoutYear);
         private void FlyoutMonthGrid_ItemClick(object sender, ItemClickEventArgs e)
         {
             if (e.ClickedItem is string monthStr)
@@ -349,10 +349,10 @@ namespace Task_Flyout.Views
 
             var dialog = new ContentDialog
             {
-                Title = _loader.GetString("TextRemoveAccountTitle") ?? "Remove Account",
-                Content = string.Format(_loader.GetString("TextRemoveAccountContent") ?? "Are you sure you want to remove the {0} account?", providerName),
-                PrimaryButtonText = _loader.GetString("TextConfirm") ?? "Confirm",
-                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
+                Title = _loader.GetStringOrDefault("TextRemoveAccountTitle") ?? "Remove Account",
+                Content = string.Format(_loader.GetStringOrDefault("TextRemoveAccountContent") ?? "Are you sure you want to remove the {0} account?", providerName),
+                PrimaryButtonText = _loader.GetStringOrDefault("TextConfirm") ?? "Confirm",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 XamlRoot = XamlRoot,
                 DefaultButton = ContentDialogButton.Close
             };
@@ -393,7 +393,7 @@ namespace Task_Flyout.Views
 
         private void UpdateSideBar(DayCellViewModel cell)
         {
-            TxtSideBarDate.Text = cell.Date.ToString("M", CultureInfo.CurrentUICulture) + " " + _loader.GetString("TextOnwards");
+            TxtSideBarDate.Text = cell.Date.ToString("M", CultureInfo.CurrentUICulture) + " " + (_loader.GetStringOrDefault("TextOnwards") ?? "");
             SelectedDayItems.Clear();
 
             string selectedDateKey = cell.Date.ToString("yyyy-MM-dd");
@@ -406,7 +406,7 @@ namespace Task_Flyout.Views
             {
                 var sortedItems = _localCache.DayItems[dateKey]
                     .Where(IsItemVisible)
-                    .OrderBy(i => (i.Subtitle == "全天" || i.Subtitle == (_loader.GetString("TextAllDay") ?? "All Day")) ? 0 : 1)
+                    .OrderBy(i => (i.Subtitle == "全天" || i.Subtitle == (_loader.GetStringOrDefault("TextAllDay") ?? "All Day")) ? 0 : 1)
                     .ThenBy(i => i.Subtitle);
                 foreach (var item in sortedItems)
                 {
@@ -414,7 +414,7 @@ namespace Task_Flyout.Views
                     {
                         Id = item.Id,
                         Title = item.Title,
-                        Subtitle = $"{DateTime.Parse(dateKey).ToString("M", CultureInfo.CurrentUICulture)}\n{(item.Subtitle == "全天" || item.Subtitle == "All Day" ? (_loader.GetString("TextAllDay") ?? "All Day") : item.Subtitle)}",
+                        Subtitle = $"{DateTime.Parse(dateKey).ToString("M", CultureInfo.CurrentUICulture)}\n{(item.Subtitle == "全天" || item.Subtitle == "All Day" ? (_loader.GetStringOrDefault("TextAllDay") ?? "All Day") : item.Subtitle)}",
                         Location = item.Location,
                         Description = item.Description,
                         IsEvent = item.IsEvent,
@@ -441,7 +441,7 @@ namespace Task_Flyout.Views
             {
                 SelectedDayItems.Add(new AgendaItem
                 {
-                    Title = _loader.GetString("TextNoAgendaTitle") ?? "No upcoming events",
+                    Title = _loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events",
                     Subtitle = "-",
                     IsEvent = true
                 });
@@ -524,7 +524,7 @@ namespace Task_Flyout.Views
             EditEndTimePicker.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
             EditRecurrenceComboBox.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
             if (!isEvent) EditRecurrenceComboBox.SelectedIndex = 0;
-            EditStartTimePicker.Header = isEvent ? _loader.GetString("TextStartTime") : _loader.GetString("TextDueTime");
+            EditStartTimePicker.Header = isEvent ? (_loader.GetStringOrDefault("TextStartTime") ?? "Start time") : (_loader.GetStringOrDefault("TextDueTime") ?? "Due time");
         }
 
         private void SetupEditProviderComboBox(string? forceSelectProvider = null)
@@ -560,7 +560,7 @@ namespace Task_Flyout.Views
         private void BtnAddNew_Click(object sender, RoutedEventArgs e)
         {
             _itemBeingEdited = null;
-            EditDialog.Title = _loader.GetString("TextNewItem") ?? "New Event / Task";
+            EditDialog.Title = _loader.GetStringOrDefault("TextNewItem") ?? "New Event / Task";
             EditDialog.SecondaryButtonText = "";
             SetupEditProviderComboBox();
             EditCmbProvider.IsEnabled = true;
@@ -585,8 +585,8 @@ namespace Task_Flyout.Views
         private void PrepareDialogForEdit(AgendaItem item)
         {
             _itemBeingEdited = item;
-            EditDialog.Title = _loader.GetString("CalendarDialog/Title") ?? "Edit Event / Task";
-            EditDialog.SecondaryButtonText = _loader.GetString("CalendarDialog/SecondaryButtonText") ?? "Delete";
+            EditDialog.Title = _loader.GetStringOrDefault("CalendarDialog.Title") ?? "Edit Event / Task";
+            EditDialog.SecondaryButtonText = _loader.GetStringOrDefault("CalendarDialog.SecondaryButtonText") ?? "Delete";
 
             EditTxtTitle.Text = item.Title;
             EditTxtLocation.Text = item.Location;
@@ -605,7 +605,7 @@ namespace Task_Flyout.Views
             if (DateTime.TryParse(item.DateKey, out var d)) EditDatePicker.Date = d;
 
             var timePart = item.Subtitle?.Split('\n').LastOrDefault()?.Trim();
-            if (timePart == _loader.GetString("TextAllDay") || string.IsNullOrEmpty(timePart))
+            if (timePart == _loader.GetStringOrDefault("TextAllDay") || string.IsNullOrEmpty(timePart))
             {
                 EditChkAllDay.IsChecked = true;
                 EditStartTimePicker.SelectedTime = null;
@@ -628,7 +628,7 @@ namespace Task_Flyout.Views
             if (e.OriginalSource is FrameworkElement src && (src is CheckBox || src.Parent is CheckBox)) return;
             if ((sender as FrameworkElement)?.DataContext is AgendaItem item)
             {
-                if (item.Title != null && item.Title.Contains(_loader.GetString("TextNoAgendaTitle") ?? "No upcoming events")) return;
+                if (item.Title != null && item.Title.Contains(_loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events")) return;
                 PrepareDialogForEdit(item);
                 EditDialog.XamlRoot = this.XamlRoot;
                 await EditDialog.ShowAsync();
@@ -654,7 +654,7 @@ namespace Task_Flyout.Views
             TimeSpan? newStartTime = EditChkAllDay.IsChecked == true ? null : EditStartTimePicker.SelectedTime;
             TimeSpan? newEndTime = EditChkAllDay.IsChecked == true ? null : EditEndTimePicker.SelectedTime;
 
-            string newSubtitleText = _loader.GetString("TextAllDay") ?? "All Day";
+            string newSubtitleText = _loader.GetStringOrDefault("TextAllDay") ?? "All Day";
             if (newStartTime.HasValue && newEndTime.HasValue) newSubtitleText = $"{newStartTime.Value:hh\\:mm} - {newEndTime.Value:hh\\:mm}";
             else if (newStartTime.HasValue) newSubtitleText = $"{newStartTime.Value:hh\\:mm}";
 
@@ -792,33 +792,33 @@ namespace Task_Flyout.Views
             var dialog = new ContentDialog
             {
                 XamlRoot = XamlRoot,
-                Title = _loader.GetString("TextDeleteRecurringTitle") ?? "Delete Recurring Event",
-                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
+                Title = _loader.GetStringOrDefault("TextDeleteRecurringTitle") ?? "Delete Recurring Event",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Close
             };
 
             var panel = new StackPanel { Spacing = 8 };
             panel.Children.Add(new TextBlock
             {
-                Text = _loader.GetString("TextDeleteRecurringPrompt") ?? "Select the scope of deletion.",
+                Text = _loader.GetStringOrDefault("TextDeleteRecurringPrompt") ?? "Select the scope of deletion.",
                 TextWrapping = TextWrapping.Wrap
             });
 
-            var singleButton = CreateDeleteModeButton(_loader.GetString("TextDeleteThisEvent") ?? "Delete this event only");
+            var singleButton = CreateDeleteModeButton(_loader.GetStringOrDefault("TextDeleteThisEvent") ?? "Delete this event only");
             singleButton.Click += (_, _) =>
             {
                 selectedMode = RecurringDeleteMode.Single;
                 dialog.Hide();
             };
 
-            var followingButton = CreateDeleteModeButton(_loader.GetString("TextDeleteThisAndFollowing") ?? "Delete this and following events");
+            var followingButton = CreateDeleteModeButton(_loader.GetStringOrDefault("TextDeleteThisAndFollowing") ?? "Delete this and following events");
             followingButton.Click += (_, _) =>
             {
                 selectedMode = RecurringDeleteMode.ThisAndFollowing;
                 dialog.Hide();
             };
 
-            var allButton = CreateDeleteModeButton(_loader.GetString("TextDeleteAllRecurring") ?? "Delete all recurring events");
+            var allButton = CreateDeleteModeButton(_loader.GetStringOrDefault("TextDeleteAllRecurring") ?? "Delete all recurring events");
             allButton.Click += (_, _) =>
             {
                 selectedMode = RecurringDeleteMode.All;

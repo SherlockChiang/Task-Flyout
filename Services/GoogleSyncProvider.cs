@@ -78,7 +78,7 @@ namespace Task_Flyout.Services
             }
             catch (FileNotFoundException)
             {
-                throw new Exception(_loader.GetString("TextCredNotFound"));
+                throw new Exception(_loader.GetStringOrDefault("TextCredNotFound") ?? "Credential file not found.");
             }
         }
 
@@ -255,7 +255,7 @@ namespace Task_Flyout.Services
                             {
                                 Id = ev.Id ?? "",
                                 Title = ev.Summary ?? "",
-                                Subtitle = ev.Start?.DateTimeDateTimeOffset == null ? _loader.GetString("TextAllDay") : ev.Start.DateTimeDateTimeOffset.Value.ToString("HH:mm"),
+                                Subtitle = ev.Start?.DateTimeDateTimeOffset == null ? (_loader.GetStringOrDefault("TextAllDay") ?? "All Day") : ev.Start.DateTimeDateTimeOffset.Value.ToString("HH:mm"),
                                 Location = ev.Location ?? "",
                                 Description = ev.Description ?? "",
                                 IsEvent = true,
@@ -309,7 +309,7 @@ namespace Task_Flyout.Services
                         {
                             Id = t.Id ?? "",
                             Title = t.Title ?? "",
-                            Subtitle = _loader.GetString("TextTask"),
+                            Subtitle = _loader.GetStringOrDefault("TextTask") ?? "Task",
                             IsEvent = false,
                             IsTask = true,
                             IsCompleted = isDone,

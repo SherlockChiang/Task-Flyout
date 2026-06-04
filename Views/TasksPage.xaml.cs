@@ -119,11 +119,11 @@ namespace Task_Flyout.Views
                     ? GetTaskSortDate(b).CompareTo(GetTaskSortDate(a))
                     : string.Compare(a.Title, b.Title, StringComparison.CurrentCultureIgnoreCase));
 
-            PendingHeaderText.Text = string.Format(_loader.GetString("TextPendingTasks") ?? "Pending ({0})", PendingTasks.Count);
-            CompletedHeaderText.Text = string.Format(_loader.GetString("TextCompletedTasks") ?? "Completed ({0})", CompletedTasks.Count);
+            PendingHeaderText.Text = string.Format(_loader.GetStringOrDefault("TextPendingTasks") ?? "Pending ({0})", PendingTasks.Count);
+            CompletedHeaderText.Text = string.Format(_loader.GetStringOrDefault("TextCompletedTasks") ?? "Completed ({0})", CompletedTasks.Count);
             TaskSummaryText.Text = PendingTasks.Count == 0
-                ? string.Format(_loader.GetString("TextAllDone") ?? "All done, {0} completed", CompletedTasks.Count)
-                : string.Format(_loader.GetString("TextTaskSummary") ?? "{0} pending, {1} completed", PendingTasks.Count, CompletedTasks.Count);
+                ? string.Format(_loader.GetStringOrDefault("TextAllDone") ?? "All done, {0} completed", CompletedTasks.Count)
+                : string.Format(_loader.GetStringOrDefault("TextTaskSummary") ?? "{0} pending, {1} completed", PendingTasks.Count, CompletedTasks.Count);
             PendingTasksList.Visibility = PendingTasks.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
             PendingEmptyText.Visibility = PendingTasks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -198,9 +198,9 @@ namespace Task_Flyout.Views
             {
                 await new ContentDialog
                 {
-                    Title = _loader.GetString("TextNoAccountAvailable") ?? "No Account Available",
-                    Content = _loader.GetString("TextAddAccountForTasks") ?? "Please add and sign in to a task-supporting account first.",
-                    CloseButtonText = _loader.GetString("TextConfirm") ?? "Confirm",
+                    Title = _loader.GetStringOrDefault("TextNoAccountAvailable") ?? "No Account Available",
+                    Content = _loader.GetStringOrDefault("TextAddAccountForTasks") ?? "Please add and sign in to a task-supporting account first.",
+                    CloseButtonText = _loader.GetStringOrDefault("TextConfirm") ?? "Confirm",
                     XamlRoot = XamlRoot
                 }.ShowAsync();
                 return;
@@ -208,24 +208,24 @@ namespace Task_Flyout.Views
 
             var titleBox = new TextBox
             {
-                Header = _loader.GetString("TextTitle") ?? "Title",
-                PlaceholderText = _loader.GetString("TextTaskName") ?? "Task name"
+                Header = _loader.GetStringOrDefault("TextTitle") ?? "Title",
+                PlaceholderText = _loader.GetStringOrDefault("TextTaskName") ?? "Task name"
             };
             var providerBox = new ComboBox
             {
-                Header = _loader.GetString("TextAccount") ?? "Account",
+                Header = _loader.GetStringOrDefault("TextAccount") ?? "Account",
                 ItemsSource = providerNames,
                 SelectedIndex = 0,
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
             var datePicker = new DatePicker
             {
-                Header = _loader.GetString("TextDate") ?? "Date",
+                Header = _loader.GetStringOrDefault("TextDate") ?? "Date",
                 Date = DateTimeOffset.Now
             };
             var timePicker = new TimePicker
             {
-                Header = _loader.GetString("TextTime") ?? "Time",
+                Header = _loader.GetStringOrDefault("TextTime") ?? "Time",
                 Time = new TimeSpan(9, 0, 0)
             };
             var panel = new StackPanel { Spacing = 12 };
@@ -236,10 +236,10 @@ namespace Task_Flyout.Views
 
             var dialog = new ContentDialog
             {
-                Title = _loader.GetString("TextAddTask") ?? "Add Task",
+                Title = _loader.GetStringOrDefault("TextAddTask") ?? "Add Task",
                 Content = panel,
-                PrimaryButtonText = _loader.GetString("CalendarDialog.PrimaryButtonText") ?? "Save",
-                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
+                PrimaryButtonText = _loader.GetStringOrDefault("CalendarDialog.PrimaryButtonText") ?? "Save",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = XamlRoot
             };
@@ -250,7 +250,7 @@ namespace Task_Flyout.Views
                 if (string.IsNullOrWhiteSpace(title))
                 {
                     args.Cancel = true;
-                    titleBox.PlaceholderText = _loader.GetString("TextEnterTaskName") ?? "Please enter task name";
+                    titleBox.PlaceholderText = _loader.GetStringOrDefault("TextEnterTaskName") ?? "Please enter task name";
                     titleBox.Focus(FocusState.Programmatic);
                     return;
                 }
@@ -280,10 +280,10 @@ namespace Task_Flyout.Views
 
             var dialog = new ContentDialog
             {
-                Title = _loader.GetString("TextDeleteTask") ?? "Delete Task",
-                Content = string.Format(_loader.GetString("TextDeleteTaskContent") ?? "Delete \"{0}\"?", item.Title),
-                PrimaryButtonText = _loader.GetString("CalendarDialog.SecondaryButtonText") ?? "Delete",
-                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
+                Title = _loader.GetStringOrDefault("TextDeleteTask") ?? "Delete Task",
+                Content = string.Format(_loader.GetStringOrDefault("TextDeleteTaskContent") ?? "Delete \"{0}\"?", item.Title),
+                PrimaryButtonText = _loader.GetStringOrDefault("CalendarDialog.SecondaryButtonText") ?? "Delete",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = XamlRoot
             };
@@ -375,10 +375,10 @@ namespace Task_Flyout.Views
 
             var dialog = new ContentDialog
             {
-                Title = _loader.GetString("TextRemoveAccount") ?? "Remove Account",
-                Content = string.Format(_loader.GetString("TextRemoveAccountConfirm") ?? "Remove {0} account?", providerName),
-                PrimaryButtonText = _loader.GetString("TextConfirm") ?? "Confirm",
-                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
+                Title = _loader.GetStringOrDefault("TextRemoveAccount") ?? "Remove Account",
+                Content = string.Format(_loader.GetStringOrDefault("TextRemoveAccountConfirm") ?? "Remove {0} account?", providerName),
+                PrimaryButtonText = _loader.GetStringOrDefault("TextConfirm") ?? "Confirm",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 XamlRoot = XamlRoot,
                 DefaultButton = ContentDialogButton.Close
             };

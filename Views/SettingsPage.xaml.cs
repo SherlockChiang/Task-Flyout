@@ -32,8 +32,9 @@ namespace Task_Flyout.Views
             if (_loader == null) return fallbackText;
             try
             {
-                string safeKey = key.Replace(".", "/");
-                string result = _loader.GetString(safeKey);
+                var result = _loader.GetStringOrDefault(key);
+                if (string.IsNullOrEmpty(result) && key.Contains('.'))
+                    result = _loader.GetStringOrDefault(key.Replace(".", "/"));
                 return string.IsNullOrEmpty(result) ? fallbackText : result;
             }
             catch
@@ -58,6 +59,7 @@ namespace Task_Flyout.Views
             MailPollingToggle.IsOn = settings.Values["MailPollingEnabled"] as bool? ?? true;
             AllowInsecureWebViewResourcesToggle.IsOn = settings.Values["AllowInsecureWebViewResources"] as bool? ?? false;
             AllowRssRemoteResourcesToggle.IsOn = settings.Values["AllowRssRemoteResources"] as bool? ?? false;
+            AllowRssLocalNetworkAccessToggle.IsOn = settings.Values["AllowRssLocalNetworkAccess"] as bool? ?? false;
             ShowSecondsToggle.IsOn = settings.Values["ShowSeconds"] as bool? ?? false;
             AboutVersionText.Text = GetVersionText();
             await UpdateWebViewCacheStatusAsync();
@@ -101,7 +103,7 @@ namespace Task_Flyout.Views
         private static string GetVersionText()
         {
             var loader = new ResourceLoader();
-            var versionPrefix = loader.GetString("TextVersion") ?? "Version";
+            var versionPrefix = loader.GetStringOrDefault("TextVersion") ?? "Version";
             try
             {
                 var version = Package.Current.Id.Version;
@@ -111,7 +113,7 @@ namespace Task_Flyout.Views
             {
                 var version = Assembly.GetExecutingAssembly().GetName().Version;
                 return version == null
-                    ? loader.GetString("TextVersionUnknown") ?? "Version unknown"
+                    ? loader.GetStringOrDefault("TextVersionUnknown") ?? "Version unknown"
                     : $"{versionPrefix} {version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
             }
         }
@@ -310,7 +312,7 @@ namespace Task_Flyout.Views
             // 5. 底部按钮
             var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Margin = new Thickness(0, 8, 0, 0) };
 
-            var cancelBtn = new Button { Content = GetSafeString("CalendarDialog/CloseButtonText", "Cancel") };
+            var cancelBtn = new Button { Content = GetSafeString("CalendarDialog.CloseButtonText", "Cancel") };
             cancelBtn.Click += (s, e) => flyout.Hide();
 
             var applyBtn = new Button
@@ -458,6 +460,12 @@ namespace Task_Flyout.Views
         {
             if (_isInitializing) return;
             ApplicationData.Current.LocalSettings.Values["AllowRssRemoteResources"] = AllowRssRemoteResourcesToggle.IsOn;
+        }
+
+        private void AllowRssLocalNetworkAccessToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            ApplicationData.Current.LocalSettings.Values["AllowRssLocalNetworkAccess"] = AllowRssLocalNetworkAccessToggle.IsOn;
         }
 
         private async void ClearWebViewCacheButton_Click(object sender, RoutedEventArgs e)

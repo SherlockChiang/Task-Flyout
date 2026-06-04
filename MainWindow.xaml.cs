@@ -6,6 +6,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
+using Task_Flyout.Services;
 using Task_Flyout.Views;
 using Windows.Storage;
 using Microsoft.Windows.ApplicationModel.Resources;
@@ -47,8 +48,9 @@ namespace Task_Flyout
             if (_loader == null) return fallbackText;
             try
             {
-                string safeKey = key.Replace(".", "/");
-                string result = _loader.GetString(safeKey);
+                var result = _loader.GetStringOrDefault(key);
+                if (string.IsNullOrEmpty(result) && key.Contains('.'))
+                    result = _loader.GetStringOrDefault(key.Replace(".", "/"));
                 return string.IsNullOrEmpty(result) ? fallbackText : result;
             }
             catch
@@ -145,7 +147,7 @@ namespace Task_Flyout
                     Content = GetSafeString("CloseToExit_Content", "Closing the window will quit Task Flyout. You can keep it running in the background from Settings."),
                     PrimaryButtonText = GetSafeString("CloseToExit_Exit", "Exit"),
                     SecondaryButtonText = GetSafeString("CloseToExit_Background", "Run in background"),
-                    CloseButtonText = GetSafeString("CalendarDialog/CloseButtonText", "Cancel"),
+                    CloseButtonText = GetSafeString("CalendarDialog.CloseButtonText", "Cancel"),
                     DefaultButton = ContentDialogButton.Close,
                     XamlRoot = this.Content.XamlRoot
                 };
@@ -279,7 +281,7 @@ namespace Task_Flyout
                     Title = GetSafeString("TextRemoveAccountTitle", "Remove Account"),
                     Content = string.Format(GetSafeString("TextRemoveAccountContent", "Are you sure you want to remove the {0} account?"), providerName),
                     PrimaryButtonText = GetSafeString("TextConfirm", "Confirm"),
-                    CloseButtonText = GetSafeString("CalendarDialog/CloseButtonText", "Cancel"),
+                    CloseButtonText = GetSafeString("CalendarDialog.CloseButtonText", "Cancel"),
                     XamlRoot = this.Content.XamlRoot,
                     DefaultButton = ContentDialogButton.Close
                 };

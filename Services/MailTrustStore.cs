@@ -89,7 +89,7 @@ namespace Task_Flyout.Services
 
         public string GetDisplaySource(MailItem item)
         {
-            return GetSourceKey(item) ?? (_loader.GetString("TextUnknownSource") ?? "Unknown source");
+            return GetSourceKey(item) ?? (_loader.GetStringOrDefault("TextUnknownSource") ?? "Unknown source");
         }
 
         public string? GetDomain(MailItem item)

@@ -545,7 +545,7 @@ namespace Task_Flyout
         {
             if (_selectedDay.Date == DateTime.Today)
             {
-                TxtSelectedDateHeader.Text = _loader.GetString("CalendarPage_BtnToday/Content") ?? "Today";
+                TxtSelectedDateHeader.Text = _loader.GetStringOrDefault("CalendarPage_BtnToday/Content") ?? "Today";
                 if (TxtRelativeDate != null) TxtRelativeDate.Visibility = Visibility.Collapsed;
             }
             else
@@ -555,7 +555,7 @@ namespace Task_Flyout
                 if (TxtRelativeDate != null)
                 {
                     int days = (_selectedDay.Date - DateTime.Today).Days;
-                    string relativeStr = days > 0 ? string.Format(_loader.GetString("TextDaysLater") ?? "In {0} days", days) : string.Format(_loader.GetString("TextDaysAgo") ?? "{0} days ago", -days);
+                    string relativeStr = days > 0 ? string.Format(_loader.GetStringOrDefault("TextDaysLater") ?? "In {0} days", days) : string.Format(_loader.GetStringOrDefault("TextDaysAgo") ?? "{0} days ago", -days);
 
                     TxtRelativeDate.Text = $"({relativeStr})";
                     TxtRelativeDate.Visibility = Visibility.Visible;
@@ -572,8 +572,8 @@ namespace Task_Flyout
             {
                 tempAgenda.Add(new AgendaItem
                 {
-                    Title = _loader.GetString("TextWelcomeTitle") ?? "Welcome to Task Flyout",
-                    Subtitle = _loader.GetString("TextWelcomeSub") ?? "Click setting icon to link accounts",
+                    Title = _loader.GetStringOrDefault("TextWelcomeTitle") ?? "Welcome to Task Flyout",
+                    Subtitle = _loader.GetStringOrDefault("TextWelcomeSub") ?? "Click setting icon to link accounts",
                     IsEvent = false,
                     IsTask = false
                 });
@@ -588,8 +588,8 @@ namespace Task_Flyout
             {
                 tempAgenda.Add(new AgendaItem
                 {
-                    Title = _loader.GetString("TextNoAgendaTitle") ?? "No upcoming events",
-                    Subtitle = _loader.GetString("TextNoAgendaSub") ?? "Take a break",
+                    Title = _loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events",
+                    Subtitle = _loader.GetStringOrDefault("TextNoAgendaSub") ?? "Take a break",
                     IsEvent = false,
                     IsTask = false
                 });
@@ -604,8 +604,8 @@ namespace Task_Flyout
                     var nextItems = _localCache.DayItems[nextDayKey].Where(IsItemVisible).ToList();
                     DateTime nextDate = DateTime.Parse(nextDayKey);
                     int daysDiff = (nextDate - date).Days;
-                    string daysLaterText = daysDiff == 1 ? (_loader.GetString("TextTomorrow") ?? "Tomorrow")
-                                                         : (daysDiff == 2 ? (_loader.GetString("TextDayAfterTomorrow") ?? "The day after tomorrow")
+                    string daysLaterText = daysDiff == 1 ? (_loader.GetStringOrDefault("TextTomorrow") ?? "Tomorrow")
+                                                         : (daysDiff == 2 ? (_loader.GetStringOrDefault("TextDayAfterTomorrow") ?? "The day after tomorrow")
                                                          : nextDate.ToString("M", CultureInfo.CurrentUICulture));
                     foreach (var item in nextItems)
                     {
@@ -614,7 +614,7 @@ namespace Task_Flyout
                         {
                             Id = item.Id,
                             Title = item.Title,
-                            Subtitle = $"{(_loader.GetString("TextUpcoming") ?? "Upcoming")} · {daysLaterText} {item.Subtitle}",
+                            Subtitle = $"{(_loader.GetStringOrDefault("TextUpcoming") ?? "Upcoming")} · {daysLaterText} {item.Subtitle}",
                             Location = item.Location,
                             IsEvent = item.IsEvent,
                             IsTask = item.IsTask,
@@ -648,8 +648,8 @@ namespace Task_Flyout
                     AgendaItems.Clear();
                     AgendaItems.Add(new AgendaItem
                     {
-                        Title = _loader.GetString("TextWelcomeTitle") ?? "Welcome to Task Flyout",
-                        Subtitle = _loader.GetString("TextWelcomeSub") ?? "Click setting icon to link accounts",
+                        Title = _loader.GetStringOrDefault("TextWelcomeTitle") ?? "Welcome to Task Flyout",
+                        Subtitle = _loader.GetStringOrDefault("TextWelcomeSub") ?? "Click setting icon to link accounts",
                         IsEvent = false,
                         IsTask = false
                     });
@@ -668,8 +668,8 @@ namespace Task_Flyout
                     AgendaItems.Clear();
                     AgendaItems.Add(new AgendaItem
                     {
-                        Title = _loader.GetString("TextFullSyncTitle") ?? "Full Syncing...",
-                        Subtitle = _loader.GetString("TextFullSyncSub") ?? "Fetching all your events and tasks",
+                        Title = _loader.GetStringOrDefault("TextFullSyncTitle") ?? "Full Syncing...",
+                        Subtitle = _loader.GetStringOrDefault("TextFullSyncSub") ?? "Fetching all your events and tasks",
                         IsEvent = false,
                         IsTask = false
                     });
@@ -739,7 +739,7 @@ namespace Task_Flyout
                     AgendaItems.Clear();
                     AgendaItems.Add(new AgendaItem
                     {
-                        Title = _loader.GetString("TextSyncFailed") ?? "Sync failed",
+                        Title = _loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed",
                         Subtitle = ex.Message,
                         IsEvent = false,
                         IsTask = false
@@ -865,8 +865,8 @@ namespace Task_Flyout
                 int listHeight = 0;
                 foreach (var item in AgendaItems)
                 {
-                    if (item.Title == (_loader.GetString("TextNoAgendaTitle") ?? "No upcoming events")) listHeight += 50;
-                    else if (item.Subtitle != null && item.Subtitle.Contains(_loader.GetString("TextUpcoming") ?? "Upcoming")) listHeight += 65;
+                    if (item.Title == (_loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events")) listHeight += 50;
+                    else if (item.Subtitle != null && item.Subtitle.Contains(_loader.GetStringOrDefault("TextUpcoming") ?? "Upcoming")) listHeight += 65;
                     else listHeight += !string.IsNullOrEmpty(item.Location) ? 75 : 65;
                 }
 
@@ -1007,7 +1007,7 @@ namespace Task_Flyout
             TxtLocation.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
             TimePickerEnd.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
 
-            TimePickerStart.Header = isEvent ? (_loader.GetString("TextStartTime") ?? "Start time") : (_loader.GetString("TextDueTime") ?? "Due time");
+            TimePickerStart.Header = isEvent ? (_loader.GetStringOrDefault("TextStartTime") ?? "Start time") : (_loader.GetStringOrDefault("TextDueTime") ?? "Due time");
 
             if (AddPanel != null && AddPanel.Visibility == Visibility.Visible)
             {
@@ -1219,10 +1219,10 @@ namespace Task_Flyout
         {
             if (e.ClickedItem is AgendaItem item)
             {
-                string noAgenda = _loader.GetString("TextNoAgendaTitle") ?? "No upcoming events";
+                string noAgenda = _loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events";
                 if (item.Title != null && (item.Title.Contains(noAgenda) || item.Title.Contains("No upcoming events") || item.Title.Contains("没有安排") || item.Title.Contains("近期没有安排"))) return;
 
-                string welcomeTitle = _loader.GetString("TextWelcomeTitle") ?? "Welcome to Task Flyout";
+                string welcomeTitle = _loader.GetStringOrDefault("TextWelcomeTitle") ?? "Welcome to Task Flyout";
                 if (item.Title == welcomeTitle || item.Title == "未连接账户" || item.Title == "Welcome to Task Flyout" || item.Title == "欢迎使用 Task Flyout")
                 {
                     HideFlyout(autoHide: false);
@@ -1314,11 +1314,11 @@ namespace Task_Flyout
 
             try
             {
-                string timeDisplay = isAllDay ? (_loader.GetString("TextAllDay") ?? "All Day") : (isEvent ? $"{exactStartDateTime:HH\\:mm} - {exactEndDateTime:HH\\:mm}" : $"{exactStartDateTime:HH\\:mm}");
+                string timeDisplay = isAllDay ? (_loader.GetStringOrDefault("TextAllDay") ?? "All Day") : (isEvent ? $"{exactStartDateTime:HH\\:mm} - {exactEndDateTime:HH\\:mm}" : $"{exactStartDateTime:HH\\:mm}");
                 AgendaItems.Add(new AgendaItem
                 {
                     Title = title,
-                    Subtitle = $"{timeDisplay} ({_loader.GetString("TextSyncing") ?? "Syncing..."})",
+                    Subtitle = $"{timeDisplay} ({_loader.GetStringOrDefault("TextSyncing") ?? "Syncing..."})",
                     Location = location,
                     IsTask = !isEvent,
                     IsEvent = isEvent,
@@ -1336,7 +1336,7 @@ namespace Task_Flyout
 
                 AgendaItems.Insert(0, new AgendaItem
                 {
-                    Title = _loader.GetString("TextAddFailed") ?? "Failed to add task",
+                    Title = _loader.GetStringOrDefault("TextAddFailed") ?? "Failed to add task",
                     Subtitle = ex.Message,
                     IsEvent = false,
                     IsTask = false

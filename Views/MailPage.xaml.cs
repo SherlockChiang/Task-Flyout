@@ -77,6 +77,20 @@ namespace Task_Flyout.Views
             ActualThemeChanged += MailPage_ActualThemeChanged;
         }
 
+        private string GetResourceStringOrDefault(string resourceId, string fallback)
+        {
+            try
+            {
+                var value = _loader.GetStringOrDefault(resourceId);
+                return string.IsNullOrWhiteSpace(value) ? fallback : value;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Resource lookup failed for {resourceId}: {ex.Message}");
+                return fallback;
+            }
+        }
+
         private void MailPage_Unloaded(object sender, RoutedEventArgs e)
         {
             DisposeLikeCleanup();
@@ -164,7 +178,7 @@ namespace Task_Flyout.Views
             bool hasAccounts = accounts.Count > 0;
             AddAccountPanel.Visibility = hasAccounts ? Visibility.Collapsed : Visibility.Visible;
             EmptyDetailPanel.Visibility = hasAccounts ? EmptyDetailPanel.Visibility : Visibility.Collapsed;
-            MessageListSubtitle.Text = hasAccounts ? (_loader.GetString("TextSelectFolder") ?? "Select a folder on the left") : (_loader.GetString("TextAddMailAccountFirst") ?? "Add an email account first");
+            MessageListSubtitle.Text = hasAccounts ? (_loader.GetStringOrDefault("TextSelectFolder") ?? "Select a folder on the left") : (_loader.GetStringOrDefault("TextAddMailAccountFirst") ?? "Add an email account first");
             if (!hasAccounts)
             {
                 _items.Clear();
@@ -254,7 +268,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Load folders failed: {ex.Message}");
-                AddStatusText.Text = _loader.GetString("TextLoadFoldersFailed") ?? "Failed to load folders, please try again later.";
+                AddStatusText.Text = _loader.GetStringOrDefault("TextLoadFoldersFailed") ?? "Failed to load folders, please try again later.";
             }
         }
 
@@ -317,7 +331,7 @@ namespace Task_Flyout.Views
                 if (target != null)
                 {
                     _items.Insert(0, target);
-                    MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetString("TextNMailItems") ?? "{0} messages", _items.Count)}";
+                    MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}";
                 }
             }
 
@@ -334,7 +348,7 @@ namespace Task_Flyout.Views
             }
             else
             {
-                MessageListSubtitle.Text = _loader.GetString("TextMailNotFound") ?? "This message was not found in the local cache or current folder.";
+                MessageListSubtitle.Text = _loader.GetStringOrDefault("TextMailNotFound") ?? "This message was not found in the local cache or current folder.";
                 ClearDetail();
             }
         }
@@ -444,7 +458,7 @@ namespace Task_Flyout.Views
             LoadingRing.IsActive = true;
             RefreshButton.IsEnabled = false;
             MessageListTitle.Text = _selectedFolder.DisplayName;
-            MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {(_loader.GetString("TextLoading") ?? "Loading")}";
+            MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {(_loader.GetStringOrDefault("TextLoading") ?? "Loading")}";
 
             try
             {
@@ -454,7 +468,7 @@ namespace Task_Flyout.Views
                 foreach (var item in messages.OrderByDescending(item => item.RawReceivedTime))
                     _items.Add(item);
 
-                MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetString("TextNMailItems") ?? "{0} messages", _items.Count)}";
+                MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}";
                 var itemToSelect = !string.IsNullOrWhiteSpace(previousSelectedId)
                     ? _items.FirstOrDefault(item => item.Id == previousSelectedId)
                     : null;
@@ -471,7 +485,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Load messages failed: {ex.Message}");
-                MessageListSubtitle.Text = _loader.GetString("TextLoadMailFailed") ?? "Failed to load messages, please try again later.";
+                MessageListSubtitle.Text = _loader.GetStringOrDefault("TextLoadMailFailed") ?? "Failed to load messages, please try again later.";
             }
             finally
             {
@@ -527,10 +541,10 @@ namespace Task_Flyout.Views
             var dialog = new ContentDialog
             {
                 XamlRoot = XamlRoot,
-                Title = _loader.GetString("TextDeleteMailAccount") ?? "Delete Email Account",
-                Content = string.Format(_loader.GetString("TextDeleteMailAccountContent") ?? "Remove {0} - {1} from Task Flyout? This will not delete emails on the server.", account.ProviderName, account.Subtitle),
-                PrimaryButtonText = _loader.GetString("CalendarDialog.SecondaryButtonText") ?? "Delete",
-                CloseButtonText = _loader.GetString("CalendarDialog/CloseButtonText") ?? "Cancel",
+                Title = GetResourceStringOrDefault("TextDeleteMailAccount", "Delete Email Account"),
+                Content = string.Format(GetResourceStringOrDefault("TextDeleteMailAccountContent", "Remove {0} - {1} from Task Flyout? This will not delete emails on the server."), account.ProviderName, account.Subtitle),
+                PrimaryButtonText = GetResourceStringOrDefault("CalendarDialog.SecondaryButtonText", "Delete"),
+                CloseButtonText = GetResourceStringOrDefault("CalendarDialog.CloseButtonText", "Cancel"),
                 DefaultButton = ContentDialogButton.Close
             };
 
@@ -569,7 +583,7 @@ namespace Task_Flyout.Views
         {
             if (_mailService == null) return;
 
-            ComposeTitleText.Text = replyTo == null ? (_loader.GetString("TextCompose") ?? "Compose") : (_loader.GetString("TextReply") ?? "Reply");
+            ComposeTitleText.Text = replyTo == null ? (_loader.GetStringOrDefault("TextCompose") ?? "Compose") : (_loader.GetStringOrDefault("TextReply") ?? "Reply");
             ComposeFromBox.Items.Clear();
             var accounts = _mailService.GetAccounts().Where(account => account.IsSetupComplete).ToList();
             foreach (var account in accounts)
@@ -594,7 +608,7 @@ namespace Task_Flyout.Views
             ComposeToBox.Text = replyTo == null ? "" : GetReplyRecipient(replyTo);
             ComposeSubjectBox.Text = replyTo == null ? "" : CreateReplySubject(replyTo.Subject);
             ComposeBodyBox.Text = replyTo == null ? "" : CreateReplyBody(replyTo);
-            ComposeStatusText.Text = accounts.Count == 0 ? (_loader.GetString("TextAddMailAccountFirst") ?? "Please add an email account first.") : "";
+            ComposeStatusText.Text = accounts.Count == 0 ? (_loader.GetStringOrDefault("TextAddMailAccountFirst") ?? "Please add an email account first.") : "";
 
             ComposePanel.Visibility = Visibility.Visible;
             AddAccountPanel.Visibility = Visibility.Collapsed;
@@ -607,18 +621,18 @@ namespace Task_Flyout.Views
             if (_mailService == null) return;
 
             SetAddButtonsEnabled(false);
-            AddStatusText.Text = _loader.GetString("TextOpeningMSAuth") ?? "Opening Microsoft authorization...";
+            AddStatusText.Text = _loader.GetStringOrDefault("TextOpeningMSAuth") ?? "Opening Microsoft authorization...";
 
             try
             {
                 var account = await _mailService.AddOutlookAccountAsync();
-                AddStatusText.Text = string.Format(_loader.GetString("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
+                AddStatusText.Text = string.Format(_loader.GetStringOrDefault("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
                 await RefreshAccountsAsync();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Add Outlook account failed: {ex.Message}");
-                AddStatusText.Text = _loader.GetString("TextAddOutlookFailed") ?? "Failed to add Outlook account. Please check authorization or network.";
+                AddStatusText.Text = _loader.GetStringOrDefault("TextAddOutlookFailed") ?? "Failed to add Outlook account. Please check authorization or network.";
             }
             finally
             {
@@ -641,18 +655,18 @@ namespace Task_Flyout.Views
             if (_mailService == null) return;
 
             SetAddButtonsEnabled(false);
-            AddStatusText.Text = _loader.GetString("TextOpeningGoogleAuth") ?? "Opening Google authorization...";
+            AddStatusText.Text = _loader.GetStringOrDefault("TextOpeningGoogleAuth") ?? "Opening Google authorization...";
 
             try
             {
                 var account = await _mailService.AddGoogleAccountAsync();
-                AddStatusText.Text = string.Format(_loader.GetString("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
+                AddStatusText.Text = string.Format(_loader.GetStringOrDefault("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
                 await RefreshAccountsAsync();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Add Google account failed: {ex.Message}");
-                AddStatusText.Text = _loader.GetString("TextAddGmailFailed") ?? "Failed to add Gmail account. Please check authorization or network.";
+                AddStatusText.Text = _loader.GetStringOrDefault("TextAddGmailFailed") ?? "Failed to add Gmail account. Please check authorization or network.";
             }
             finally
             {
@@ -674,7 +688,7 @@ namespace Task_Flyout.Views
             SmtpPortBox.Value = 587;
             SmtpUserNameBox.Text = "";
             SmtpSslToggle.IsOn = false;
-            AddStatusText.Text = _loader.GetString("TextImapSetupHint") ?? "Please enter IMAP server info. Gmail/Outlook OAuth is recommended.";
+            AddStatusText.Text = _loader.GetStringOrDefault("TextImapSetupHint") ?? "Please enter IMAP server info. Gmail/Outlook OAuth is recommended.";
         }
 
         private void CancelImapButton_Click(object sender, RoutedEventArgs e)
@@ -697,27 +711,27 @@ namespace Task_Flyout.Views
             string smtpUserName = SmtpUserNameBox.Text.Trim();
             if (string.IsNullOrWhiteSpace(address))
             {
-                AddStatusText.Text = _loader.GetString("TextEnterEmail") ?? "Please enter email address.";
+                AddStatusText.Text = _loader.GetStringOrDefault("TextEnterEmail") ?? "Please enter email address.";
                 return;
             }
             if (string.IsNullOrWhiteSpace(host))
             {
-                AddStatusText.Text = _loader.GetString("TextEnterImapServer") ?? "Please enter IMAP server.";
+                AddStatusText.Text = _loader.GetStringOrDefault("TextEnterImapServer") ?? "Please enter IMAP server.";
                 return;
             }
             if (string.IsNullOrWhiteSpace(password))
             {
-                AddStatusText.Text = _loader.GetString("TextEnterPassword") ?? "Please enter password or app-specific password.";
+                AddStatusText.Text = _loader.GetStringOrDefault("TextEnterPassword") ?? "Please enter password or app-specific password.";
                 return;
             }
             if (string.IsNullOrWhiteSpace(smtpHost))
             {
-                AddStatusText.Text = _loader.GetString("TextEnterSmtpServer") ?? "Please enter SMTP server. IMAP accounts need it to send mail.";
+                AddStatusText.Text = _loader.GetStringOrDefault("TextEnterSmtpServer") ?? "Please enter SMTP server. IMAP accounts need it to send mail.";
                 return;
             }
 
             SetAddButtonsEnabled(false);
-            AddStatusText.Text = _loader.GetString("TextConnectingImap") ?? "Connecting to IMAP server...";
+            AddStatusText.Text = _loader.GetStringOrDefault("TextConnectingImap") ?? "Connecting to IMAP server...";
 
             try
             {
@@ -734,13 +748,13 @@ namespace Task_Flyout.Views
                     SmtpSslToggle.IsOn,
                     smtpUserName);
 
-                AddStatusText.Text = string.Format(_loader.GetString("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
+                AddStatusText.Text = string.Format(_loader.GetStringOrDefault("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
                 await RefreshAccountsAsync();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Add IMAP account failed: {ex.Message}");
-                AddStatusText.Text = _loader.GetString("TextImapConnectFailed") ?? "Failed to connect to IMAP server. Please check settings and credentials.";
+                AddStatusText.Text = _loader.GetStringOrDefault("TextImapConnectFailed") ?? "Failed to connect to IMAP server. Please check settings and credentials.";
             }
             finally
             {
@@ -811,7 +825,7 @@ namespace Task_Flyout.Views
                     _suppressSelectionClear = false;
                 }
 
-                MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetString("TextNMailItems") ?? "{0} messages", _items.Count)}";
+                MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}";
             }
 
             return remoteSyncTask;
@@ -826,7 +840,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Mark as read failed: {ex.Message}");
-                MessageListSubtitle.Text = _loader.GetString("TextReadSyncFailed") ?? "Failed to sync read status.";
+                MessageListSubtitle.Text = _loader.GetStringOrDefault("TextReadSyncFailed") ?? "Failed to sync read status.";
             }
         }
 
@@ -1001,7 +1015,7 @@ namespace Task_Flyout.Views
                 fallbackText = BuildPlainTextFallback(item.HtmlBody);
 
             DetailPreview.Text = string.IsNullOrWhiteSpace(fallbackText)
-                ? string.IsNullOrWhiteSpace(item.Preview) ? (_loader.GetString("TextNoBody") ?? "No body available.") : item.Preview
+                ? string.IsNullOrWhiteSpace(item.Preview) ? (_loader.GetStringOrDefault("TextNoBody") ?? "No body available.") : item.Preview
                 : fallbackText;
         }
 
@@ -1012,22 +1026,22 @@ namespace Task_Flyout.Views
             var domainTrusted = _mailTrustStore.IsDomainTrusted(item);
             var domain = _mailTrustStore.GetDomain(item);
 
-            TrustSenderButton.IsEnabled = source != (_loader.GetString("TextUnknownSource") ?? "Unknown source");
+            TrustSenderButton.IsEnabled = source != (_loader.GetStringOrDefault("TextUnknownSource") ?? "Unknown source");
 
             if (senderTrusted && !domainTrusted)
             {
-                TrustSenderButtonText.Text = _loader.GetString("TextUntrustSource") ?? "Untrust source";
-                ToolTipService.SetToolTip(TrustSenderButton, string.Format(_loader.GetString("TextTrusted") ?? "Trusted: {0}", source));
+                TrustSenderButtonText.Text = _loader.GetStringOrDefault("TextUntrustSource") ?? "Untrust source";
+                ToolTipService.SetToolTip(TrustSenderButton, string.Format(_loader.GetStringOrDefault("TextTrusted") ?? "Trusted: {0}", source));
             }
             else if (domainTrusted)
             {
-                TrustSenderButtonText.Text = string.Format(_loader.GetString("TextUntrustDomain") ?? "Untrust @{0}", domain);
-                ToolTipService.SetToolTip(TrustSenderButton, string.Format(_loader.GetString("TextDomainTrusted") ?? "Domain trusted: @{0}", domain));
+                TrustSenderButtonText.Text = string.Format(_loader.GetStringOrDefault("TextUntrustDomain") ?? "Untrust @{0}", domain);
+                ToolTipService.SetToolTip(TrustSenderButton, string.Format(_loader.GetStringOrDefault("TextDomainTrusted") ?? "Domain trusted: @{0}", domain));
             }
             else
             {
-                TrustSenderButtonText.Text = _loader.GetString("TextTrustSender") ?? "Trust this sender";
-                ToolTipService.SetToolTip(TrustSenderButton, string.Format(_loader.GetString("TextTrustTooltip") ?? "Trusting will allow loading remote content from: {0}", source));
+                TrustSenderButtonText.Text = _loader.GetStringOrDefault("TextTrustSender") ?? "Trust this sender";
+                ToolTipService.SetToolTip(TrustSenderButton, string.Format(_loader.GetStringOrDefault("TextTrustTooltip") ?? "Trusting will allow loading remote content from: {0}", source));
             }
         }
 
@@ -1299,37 +1313,37 @@ body { background-color: {{background}} !important; }
 
             if (ComposeFromBox.SelectedItem is not ComboBoxItem selectedFrom)
             {
-                ComposeStatusText.Text = _loader.GetString("TextSelectSender") ?? "Please select a sender.";
+                ComposeStatusText.Text = _loader.GetStringOrDefault("TextSelectSender") ?? "Please select a sender.";
                 return;
             }
 
             var account = _mailService.GetAccounts().FirstOrDefault(a => a.Id == selectedFrom.Tag?.ToString());
             if (account == null)
             {
-                ComposeStatusText.Text = _loader.GetString("TextSenderNotFound") ?? "Sender account not found.";
+                ComposeStatusText.Text = _loader.GetStringOrDefault("TextSenderNotFound") ?? "Sender account not found.";
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(ComposeToBox.Text))
             {
-                ComposeStatusText.Text = _loader.GetString("TextEnterRecipient") ?? "Please enter a recipient.";
+                ComposeStatusText.Text = _loader.GetStringOrDefault("TextEnterRecipient") ?? "Please enter a recipient.";
                 return;
             }
 
             SendComposeButton.IsEnabled = false;
-            ComposeStatusText.Text = _loader.GetString("TextSending") ?? "Sending...";
+            ComposeStatusText.Text = _loader.GetStringOrDefault("TextSending") ?? "Sending...";
 
             try
             {
                 await _mailService.SendMailAsync(account, ComposeToBox.Text, ComposeSubjectBox.Text, ComposeBodyBox.Text);
-                ComposeStatusText.Text = _loader.GetString("TextMailSent") ?? "Email sent.";
+                ComposeStatusText.Text = _loader.GetStringOrDefault("TextMailSent") ?? "Email sent.";
                 ComposePanel.Visibility = Visibility.Collapsed;
                 ClearDetail();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Send mail failed: {ex.Message}");
-                ComposeStatusText.Text = _loader.GetString("TextSendFailed") ?? "Failed to send email. Please check network and account settings.";
+                ComposeStatusText.Text = _loader.GetStringOrDefault("TextSendFailed") ?? "Failed to send email. Please check network and account settings.";
             }
             finally
             {
@@ -1356,7 +1370,7 @@ body { background-color: {{background}} !important; }
             {
                 flyout.Items.Add(new MenuFlyoutItem
                 {
-                    Text = _loader.GetString("TextTrustSender") ?? "Trust this sender",
+                    Text = _loader.GetStringOrDefault("TextTrustSender") ?? "Trust this sender",
                 });
                 ((MenuFlyoutItem)flyout.Items[^1]).Click += async (_, _) =>
                 {
@@ -1369,7 +1383,7 @@ body { background-color: {{background}} !important; }
             {
                 flyout.Items.Add(new MenuFlyoutItem
                 {
-                    Text = _loader.GetString("TextUntrustSource") ?? "Untrust source",
+                    Text = _loader.GetStringOrDefault("TextUntrustSource") ?? "Untrust source",
                 });
                 ((MenuFlyoutItem)flyout.Items[^1]).Click += async (_, _) =>
                 {
@@ -1383,7 +1397,7 @@ body { background-color: {{background}} !important; }
             {
                 flyout.Items.Add(new MenuFlyoutItem
                 {
-                    Text = string.Format(_loader.GetString("TextTrustDomain") ?? "Trust all @{0}", domain),
+                    Text = string.Format(_loader.GetStringOrDefault("TextTrustDomain") ?? "Trust all @{0}", domain),
                 });
                 ((MenuFlyoutItem)flyout.Items[^1]).Click += async (_, _) =>
                 {
@@ -1396,7 +1410,7 @@ body { background-color: {{background}} !important; }
             {
                 flyout.Items.Add(new MenuFlyoutItem
                 {
-                    Text = string.Format(_loader.GetString("TextUntrustDomain") ?? "Untrust @{0}", domain),
+                    Text = string.Format(_loader.GetStringOrDefault("TextUntrustDomain") ?? "Untrust @{0}", domain),
                 });
                 ((MenuFlyoutItem)flyout.Items[^1]).Click += async (_, _) =>
                 {
@@ -1422,10 +1436,10 @@ body { background-color: {{background}} !important; }
         {
             var received = item.RawReceivedTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? item.ReceivedTime;
             var original = string.IsNullOrWhiteSpace(item.BodyText) ? item.Preview : item.BodyText;
-            var originalMail = _loader.GetString("TextOriginalMail") ?? "---- Original Message ----";
-            var fromLabel = _loader.GetString("TextOriginalSender") ?? "From";
-            var dateLabel = _loader.GetString("TextOriginalTime") ?? "Date";
-            var subjectLabel = _loader.GetString("TextOriginalSubject") ?? "Subject";
+            var originalMail = _loader.GetStringOrDefault("TextOriginalMail") ?? "---- Original Message ----";
+            var fromLabel = _loader.GetStringOrDefault("TextOriginalSender") ?? "From";
+            var dateLabel = _loader.GetStringOrDefault("TextOriginalTime") ?? "Date";
+            var subjectLabel = _loader.GetStringOrDefault("TextOriginalSubject") ?? "Subject";
             return $"\r\n\r\n{originalMail}\r\n{fromLabel}: {item.Sender}\r\n{dateLabel}: {received}\r\n{subjectLabel}: {item.Subject}\r\n\r\n{original}";
         }
     }

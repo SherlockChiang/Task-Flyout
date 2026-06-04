@@ -237,7 +237,7 @@ namespace Task_Flyout.Services
                         {
                             Id = ev.Id ?? "",
                             Title = ev.Subject ?? "",
-                            Subtitle = ev.IsAllDay == true ? _loader.GetString("TextAllDay") : start.ToString("HH:mm"),
+                            Subtitle = ev.IsAllDay == true ? (_loader.GetStringOrDefault("TextAllDay") ?? "All Day") : start.ToString("HH:mm"),
                             Location = ev.Location?.DisplayName ?? "",
                             Description = ev.BodyPreview ?? "",
                             IsEvent = true,
@@ -343,7 +343,7 @@ namespace Task_Flyout.Services
                             {
                                 Id = task.Id ?? "",
                                 Title = task.Title ?? "",
-                                Subtitle = _loader.GetString("TextTask"),
+                                Subtitle = _loader.GetStringOrDefault("TextTask") ?? "Task",
                                 Description = task.Body?.Content ?? "",
                                 IsEvent = false,
                                 IsTask = true,

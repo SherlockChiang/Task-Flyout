@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System.Linq;
@@ -244,7 +244,7 @@ namespace Task_Flyout
 
             var subject = string.IsNullOrWhiteSpace(e.Item.Subject) ? "(No subject)" : e.Item.Subject;
 
-            _trayToolTipText = $"Task Flyout · {(_loader.GetString("TextNewMail") ?? "New Mail")}: {TruncateForTray(subject, 48)}";
+            _trayToolTipText = $"Task Flyout · {(_loader.GetStringOrDefault("TextNewMail") ?? "New Mail")}: {TruncateForTray(subject, 48)}";
             _trayIcon.ToolTipText = _trayToolTipText;
         }
 

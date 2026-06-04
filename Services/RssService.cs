@@ -13,6 +13,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
+using Windows.Storage;
 
 namespace Task_Flyout.Services
 {
@@ -222,7 +223,7 @@ namespace Task_Flyout.Services
             name = name.Trim();
             var folder = new RssFolder
             {
-                Name = string.IsNullOrWhiteSpace(name) ? (_loader.GetString("TextNewFolder") ?? "New folder") : name,
+                Name = string.IsNullOrWhiteSpace(name) ? (_loader.GetStringOrDefault("TextNewFolder") ?? "New folder") : name,
                 SortOrder = _cache.Folders.Count == 0 ? 0 : _cache.Folders.Max(item => item.SortOrder) + 1
             };
             _cache.Folders.Add(folder);
@@ -574,7 +575,7 @@ namespace Task_Flyout.Services
             var host = context.DnsEndPoint.Host;
             var port = context.DnsEndPoint.Port;
 
-            var addresses = await ResolvePublicAddressesAsync(host, cancellationToken);
+            var addresses = await ResolveConnectAddressesAsync(host, cancellationToken);
             if (addresses.Count == 0)
                 throw new InvalidOperationException("URL resolved to a non-public IP address.");
 
@@ -599,6 +600,9 @@ namespace Task_Flyout.Services
 
         private static async Task<bool> IsSafeToFetchAsync(Uri uri)
         {
+            if (AllowRssLocalNetworkAccess)
+                return true;
+
             if (uri.HostNameType is not (UriHostNameType.IPv4 or UriHostNameType.IPv6))
             {
                 try
@@ -616,6 +620,24 @@ namespace Task_Flyout.Services
                 return IsPublicIpAddress(parsed);
 
             return false;
+        }
+
+        private static bool AllowRssLocalNetworkAccess
+            => ApplicationData.Current.LocalSettings.Values["AllowRssLocalNetworkAccess"] as bool? ?? false;
+
+        private static async Task<List<IPAddress>> ResolveConnectAddressesAsync(string host, System.Threading.CancellationToken cancellationToken)
+        {
+            if (!AllowRssLocalNetworkAccess)
+                return await ResolvePublicAddressesAsync(host, cancellationToken);
+
+            IPAddress[] addresses = IPAddress.TryParse(host, out var parsed)
+                ? new[] { parsed }
+                : await Dns.GetHostAddressesAsync(host, cancellationToken);
+
+            return addresses
+                .Select(NormalizeIpAddress)
+                .Distinct()
+                .ToList();
         }
 
         private static async Task<List<IPAddress>> ResolvePublicAddressesAsync(string host, System.Threading.CancellationToken cancellationToken)
@@ -960,7 +982,7 @@ namespace Task_Flyout.Services
                 foreach (var folder in loaded.Folders)
                 {
                     folder.Id ??= Guid.NewGuid().ToString("N");
-                    folder.Name ??= (_loader.GetString("TextFolder") ?? "Folder");
+                    folder.Name ??= (_loader.GetStringOrDefault("TextFolder") ?? "Folder");
                 }
 
                 foreach (var article in loaded.Articles)
@@ -1395,7 +1417,7 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
             foreach (var folder in _cache.Folders)
             {
                 folder.Id ??= Guid.NewGuid().ToString("N");
-                folder.Name ??= (_loader.GetString("TextFolder") ?? "Folder");
+                folder.Name ??= (_loader.GetStringOrDefault("TextFolder") ?? "Folder");
             }
 
             foreach (var article in _cache.Articles)

@@ -37,8 +37,9 @@ namespace Task_Flyout.Views
             if (_loader == null) return fallbackText;
             try
             {
-                string safeKey = key.Replace(".", "/");
-                string result = _loader.GetString(safeKey);
+                var result = _loader.GetStringOrDefault(key);
+                if (string.IsNullOrEmpty(result) && key.Contains('.'))
+                    result = _loader.GetStringOrDefault(key.Replace(".", "/"));
                 return string.IsNullOrEmpty(result) ? fallbackText : result;
             }
             catch { return fallbackText; }
@@ -56,8 +57,7 @@ namespace Task_Flyout.Views
             bool weatherBarEnabled = Windows.Storage.ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false;
             WeatherBarToggle.IsOn = weatherBarEnabled;
             WeatherBarTransparentToggle.IsOn = _weatherService.WeatherBarTransparentBackground;
-            string lang = GetCurrentLang();
-            WeatherBarDesc.Text = GetSafeString("WeatherPage_WeatherBarDesc", "在任务栏上显示浮动天气条（替代 Win11 小组件天气）");
+            WeatherBarDesc.Text = GetSafeString("WeatherPage_WeatherBarDesc", "Show a floating weather bar on the taskbar.");
 
             // Source ComboBox
             string src = _weatherService.WeatherSource;
@@ -68,25 +68,25 @@ namespace Task_Flyout.Views
 
             RefreshIconSourceComboBox();
 
-            DailyForecastTitle.Text = GetSafeString("WeatherPage_DailyForecastTitle", "未来 7 天预报");
+            DailyForecastTitle.Text = GetSafeString("WeatherPage_DailyForecastTitle", "7-day forecast");
 
             // Flyout Fields header
-            FlyoutFieldsHeader.Text = GetSafeString("WeatherPage_FlyoutFields", "浮窗显示字段");
-            FlyoutFieldsDesc.Text = GetSafeString("WeatherPage_FlyoutFieldsDesc", "勾选希望在系统浮窗中显示的天气信息");
+            FlyoutFieldsHeader.Text = GetSafeString("WeatherPage_FlyoutFields", "Flyout fields");
+            FlyoutFieldsDesc.Text = GetSafeString("WeatherPage_FlyoutFieldsDesc", "Choose weather details shown in the system flyout.");
 
             BuildFieldToggles();
 
             // Weather bar fields
-            BarFieldsHeader.Text = GetSafeString("WeatherPage_BarFieldsHeader", "任务栏天气条内容");
-            BarFieldsDesc.Text = GetSafeString("WeatherPage_BarFieldsDesc", "选择任务栏天气条上显示的字段");
+            BarFieldsHeader.Text = GetSafeString("WeatherPage_BarFieldsHeader", "Taskbar weather bar content");
+            BarFieldsDesc.Text = GetSafeString("WeatherPage_BarFieldsDesc", "Choose fields shown on the taskbar weather bar.");
             BuildBarFieldToggles();
 
             // Alerts
-            AlertsHeader.Text = GetSafeString("WeatherPage_AlertsHeader", "极端天气预警");
-            AlertsDesc.Text = GetSafeString("WeatherPage_AlertsDesc", "检测到极端天气时在天气条上显示预警");
-            AlertsToggle.Header = GetSafeString("WeatherPage_AlertsToggleHeader", "启用预警");
+            AlertsHeader.Text = GetSafeString("WeatherPage_AlertsHeader", "Extreme weather alerts");
+            AlertsDesc.Text = GetSafeString("WeatherPage_AlertsDesc", "Show alerts on the weather bar when severe conditions are detected.");
+            AlertsToggle.Header = GetSafeString("WeatherPage_AlertsToggleHeader", "Enable alerts");
             AlertsToggle.IsOn = _weatherService.BarAlertsEnabled;
-            AlertHoursLabel.Text = GetSafeString("WeatherPage_AlertHoursLabel", "预警提前量（小时）：");
+            AlertHoursLabel.Text = GetSafeString("WeatherPage_AlertHoursLabel", "Alert lead time (hours):");
             AlertHoursBox.Value = _weatherService.BarAlertHours;
             BuildAlertTypeToggles();
 
@@ -177,7 +177,6 @@ namespace Task_Flyout.Views
         private void BuildFieldToggles()
         {
             var enabled = _weatherService.GetEnabledFields();
-            string lang = GetCurrentLang();
             var items = new List<StackPanel>();
 
             foreach (var field in WeatherService.AllFlyoutFields)
@@ -203,7 +202,7 @@ namespace Task_Flyout.Views
 
                 var label = new TextBlock
                 {
-                    Text = lang == "en" ? field.EnLabel : field.ZhLabel,
+                    Text = GetSafeString(field.ResourceKey, field.EnLabel),
                     FontSize = 13,
                     VerticalAlignment = VerticalAlignment.Center
                 };
@@ -235,7 +234,6 @@ namespace Task_Flyout.Views
         private void BuildBarFieldToggles()
         {
             var enabled = _weatherService.GetEnabledBarFields();
-            string lang = GetCurrentLang();
             var items = new List<StackPanel>();
 
             foreach (var field in WeatherService.AllBarFields)
@@ -253,7 +251,7 @@ namespace Task_Flyout.Views
 
                 var label = new TextBlock
                 {
-                    Text = lang == "en" ? field.EnLabel : field.ZhLabel,
+                    Text = GetSafeString(field.ResourceKey, field.EnLabel),
                     FontSize = 13,
                     VerticalAlignment = VerticalAlignment.Center
                 };
@@ -282,7 +280,6 @@ namespace Task_Flyout.Views
         private void BuildAlertTypeToggles()
         {
             var enabled = _weatherService.GetEnabledAlertTypes();
-            string lang = GetCurrentLang();
             var items = new List<StackPanel>();
 
             foreach (var entry in WeatherService.AllAlertTypes)
@@ -300,7 +297,7 @@ namespace Task_Flyout.Views
 
                 var label = new TextBlock
                 {
-                    Text = lang == "en" ? entry.EnLabel : entry.ZhLabel,
+                    Text = GetSafeString(entry.ResourceKey, entry.EnLabel),
                     FontSize = 13,
                     VerticalAlignment = VerticalAlignment.Center
                 };
@@ -371,10 +368,10 @@ namespace Task_Flyout.Views
             string src = _weatherService?.WeatherSource ?? "OpenMeteo";
             if (src == "OpenMeteo")
                 SourceHintText.Text = GetSafeString("WeatherPage_SourceHintOM",
-                    "Open-Meteo: \u514D\u8D39\u3001\u65E0\u9700 API Key\u3001\u652F\u6301\u7A7A\u6C14\u8D28\u91CF\u4E0E\u82B1\u7C89\u6570\u636E\u3001\u771F\u6B63\u903C\u65F6\u9884\u62A5");
+                    "Open-Meteo: Free, no API key, supports air quality and pollen data, true hourly forecast.");
             else
                 SourceHintText.Text = GetSafeString("WeatherPage_SourceHintWttr",
-                    "wttr.in: \u514D\u8D39\u3001\u65E0\u9700 API Key\u3001\u4EC5\u63D0\u4F9B\u57FA\u7840\u5929\u6C14\u6570\u636E\u3001\u6BCF 3 \u5C0F\u65F6\u63D2\u503C\u9884\u62A5");
+                    "wttr.in: Free, no API key, basic weather data only, interpolated 3-hour forecast.");
         }
 
         #endregion
@@ -494,17 +491,17 @@ namespace Task_Flyout.Views
             // Built-in font presets. Labels mirror the old resw strings so zh/en stay consistent.
             IconFontComboBox.Items.Add(new ComboBoxItem
             {
-                Content = GetSafeString("WeatherPage_IconFontEmoji", "Windows 11 风格（emoji）"),
+                Content = GetSafeString("WeatherPage_IconFontEmoji", "Windows 11 style (emoji)"),
                 Tag = "Segoe UI Emoji"
             });
             IconFontComboBox.Items.Add(new ComboBoxItem
             {
-                Content = GetSafeString("WeatherPage_IconFontSymbol", "经典风格（Segoe UI Symbol）"),
+                Content = GetSafeString("WeatherPage_IconFontSymbol", "Classic style (Segoe UI Symbol)"),
                 Tag = "Segoe UI Symbol"
             });
             IconFontComboBox.Items.Add(new ComboBoxItem
             {
-                Content = GetSafeString("WeatherPage_IconFontCustom", "自定义字体…"),
+                Content = GetSafeString("WeatherPage_IconFontCustom", "Custom font..."),
                 Tag = "__custom__"
             });
 
@@ -570,19 +567,18 @@ namespace Task_Flyout.Views
                 var file = await picker.PickSingleFileAsync();
                 if (file == null) return;
 
-                string lang = GetCurrentLang();
-                IconPackStatusText.Text = GetSafeString("WeatherPage_IconPackImporting", "正在导入…");
+                IconPackStatusText.Text = GetSafeString("WeatherPage_IconPackImporting", "Importing...");
 
                 var id = await IconPackService.Instance.ImportFromZipAsync(file, System.IO.Path.GetFileNameWithoutExtension(file.Name));
                 if (id == null)
                 {
-                    IconPackStatusText.Text = GetSafeString("WeatherPage_IconPackFailed", "失败：ZIP 中未找到 drawable_filter.xml");
+                    IconPackStatusText.Text = GetSafeString("WeatherPage_IconPackFailed", "Failed: drawable_filter.xml was not found in the ZIP.");
                     return;
                 }
 
                 IconPackService.Instance.ActivePackId = id;
                 RefreshIconSourceComboBox();
-                IconPackStatusText.Text = string.Format(GetSafeString("WeatherPage_IconPackImported", "导入完成：{0}"), id);
+                IconPackStatusText.Text = string.Format(GetSafeString("WeatherPage_IconPackImported", "Imported: {0}"), id);
                 if (_weatherService != null) await LoadWeatherDataAsync(forceRefresh: true);
             }
             catch (Exception ex)
@@ -709,7 +705,6 @@ namespace Task_Flyout.Views
 
         private void BuildDetailFields(HourlyWeather hw)
         {
-            string lang = GetCurrentLang();
             var items = new List<StackPanel>();
 
             void AddField(string glyph, string label, string? value)
@@ -735,40 +730,32 @@ namespace Task_Flyout.Views
                 items.Add(panel);
             }
 
-            AddField("\uE9CA", GetSafeString("WeatherPage_FeelsLike", "体感"), hw.FeelsLike);
-            AddField("\uE945", GetSafeString("WeatherPage_Humidity", "湿度"), hw.Humidity);
-            AddField("\uEBE7", GetSafeString("WeatherPage_Wind", "风速"), $"{hw.WindSpeed} {hw.WindDirection}");
-            AddField("\uE790", GetSafeString("WeatherPage_PrecipProb", "降水概率"), hw.PrecipProbability);
-            AddField("\uE790", GetSafeString("WeatherPage_Precipitation", "降水量"), hw.Precipitation);
-            AddField("\uE706", GetSafeString("WeatherPage_UVIndex", "UV 指数"), hw.UVIndex);
-            AddField("\uE7B3", GetSafeString("WeatherPage_Visibility", "能见度"), hw.Visibility);
-            AddField("\uEC49", GetSafeString("WeatherPage_Pressure", "气压"), hw.Pressure);
-            AddField("\uE9CA", GetSafeString("WeatherPage_AQI", "空气质量"), FormatAqi(hw.AirQuality, lang));
+            AddField("\uE9CA", GetSafeString("WeatherPage_FeelsLike", "Feels like"), hw.FeelsLike);
+            AddField("\uE945", GetSafeString("WeatherPage_Humidity", "Humidity"), hw.Humidity);
+            AddField("\uEBE7", GetSafeString("WeatherPage_Wind", "Wind"), $"{hw.WindSpeed} {hw.WindDirection}");
+            AddField("\uE790", GetSafeString("WeatherPage_PrecipProb", "Precipitation probability"), hw.PrecipProbability);
+            AddField("\uE790", GetSafeString("WeatherPage_Precipitation", "Precipitation"), hw.Precipitation);
+            AddField("\uE706", GetSafeString("WeatherPage_UVIndex", "UV index"), hw.UVIndex);
+            AddField("\uE7B3", GetSafeString("WeatherPage_Visibility", "Visibility"), hw.Visibility);
+            AddField("\uEC49", GetSafeString("WeatherPage_Pressure", "Pressure"), hw.Pressure);
+            AddField("\uE9CA", GetSafeString("WeatherPage_AQI", "Air quality"), FormatAqi(hw.AirQuality));
             AddField("\uE9CA", "PM2.5", hw.PM25);
             AddField("\uE9CA", "PM10", hw.PM10);
-            AddField("\uE710", GetSafeString("WeatherPage_GrassPollen", "草类花粉"), hw.PollenGrass);
-            AddField("\uE710", GetSafeString("WeatherPage_BirchPollen", "桦树花粉"), hw.PollenBirch);
-            AddField("\uE710", GetSafeString("WeatherPage_RagweedPollen", "豚草花粉"), hw.PollenRagweed);
+            AddField("\uE710", GetSafeString("WeatherPage_GrassPollen", "Grass pollen"), hw.PollenGrass);
+            AddField("\uE710", GetSafeString("WeatherPage_BirchPollen", "Birch pollen"), hw.PollenBirch);
+            AddField("\uE710", GetSafeString("WeatherPage_RagweedPollen", "Ragweed pollen"), hw.PollenRagweed);
 
             DetailFieldsRepeater.ItemsSource = items;
         }
 
-        private static string? FormatAqi(string? aqi, string lang)
+        private static string? FormatAqi(string? aqi)
         {
             if (string.IsNullOrEmpty(aqi)) return null;
             if (!double.TryParse(aqi, out var val)) return aqi;
-            string level;
             var loader = new ResourceLoader();
             string key = val <= 50 ? "WeatherPage_AQIGood" : val <= 100 ? "WeatherPage_AQIModerate" : val <= 150 ? "WeatherPage_AQIUnhealthySensitive" : val <= 200 ? "WeatherPage_AQIUnhealthy" : "WeatherPage_AQIHazardous";
-            
-            string defaultVal = val <= 50 ? "优" : val <= 100 ? "良" : val <= 150 ? "轻度污染" : val <= 200 ? "中度污染" : "重度污染";
-            if (lang == "en")
-            {
-                defaultVal = val <= 50 ? "Good" : val <= 100 ? "Moderate" : val <= 150 ? "Unhealthy (Sensitive)" : val <= 200 ? "Unhealthy" : "Hazardous";
-            }
-            
-            string result = loader.GetString(key);
-            level = string.IsNullOrEmpty(result) ? defaultVal : result;
+            string defaultVal = val <= 50 ? "Good" : val <= 100 ? "Moderate" : val <= 150 ? "Unhealthy for sensitive groups" : val <= 200 ? "Unhealthy" : "Hazardous";
+            var level = loader.GetStringOrDefault(key, defaultVal);
             
             return $"{aqi} ({level})";
         }

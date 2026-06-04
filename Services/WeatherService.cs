@@ -381,21 +381,21 @@ namespace Task_Flyout.Services
             {
                 var minutes = Math.Max(0, (int)Math.Round((stopHour.RawTime - now).TotalMinutes));
                 if (minutes <= 5)
-                    return _loader.GetString("TextRainStopSoon") ?? "Rain now, should stop soon";
+                    return _loader.GetStringOrDefault("TextRainStopSoon") ?? "Rain now, should stop soon";
 
                 var when = FormatRainTimeSpan(minutes, lang == "zh");
-                return string.Format(_loader.GetString("TextRainStopInAbout") ?? "Rain now, should stop in about {0}", when);
+                return string.Format(_loader.GetStringOrDefault("TextRainStopInAbout") ?? "Rain now, should stop in about {0}", when);
             }
 
             var hours = lastForecastTime.HasValue
                 ? Math.Max(1, (int)Math.Ceiling((lastForecastTime.Value - now).TotalHours))
                 : 24;
-            return string.Format(_loader.GetString("TextRainContinues") ?? "Rain continues for the next {0}h", hours);
+            return string.Format(_loader.GetStringOrDefault("TextRainContinues") ?? "Rain continues for the next {0}h", hours);
         }
 
         private static string FormatRainTimeSpan(int minutes, bool zh)
         {
-            if (minutes < 60) return string.Format(_loader.GetString("TextRainMinute") ?? "{0} min", minutes);
+            if (minutes < 60) return string.Format(_loader.GetStringOrDefault("TextRainMinute") ?? "{0} min", minutes);
 
             var hours = (int)Math.Round(minutes / 60.0);
             return $"{Math.Max(1, hours)}h";
@@ -468,29 +468,29 @@ namespace Task_Flyout.Services
             return zh ? $"{when}{label}" : $"{label} {when}";
         }
 
-        public static readonly (string Key, string ZhLabel, string EnLabel)[] AllBarFields = new[]
+        public static readonly (string Key, string ResourceKey, string EnLabel)[] AllBarFields = new[]
         {
-            ("icon",         "\u56fe\u6807",     "Icon"),
-            ("temperature",  "\u6e29\u5ea6",     "Temperature"),
-            ("description",  "\u63cf\u8ff0",     "Description"),
-            ("location",     "\u5730\u70b9",     "Location"),
-            ("feelslike",    "\u4f53\u611f",     "Feels like"),
-            ("humidity",     "\u6e7f\u5ea6",     "Humidity"),
-            ("wind",         "\u98ce\u901f",     "Wind"),
+            ("icon",         "WeatherField_Icon",        "Icon"),
+            ("temperature",  "WeatherField_Temperature", "Temperature"),
+            ("description",  "WeatherField_Description", "Description"),
+            ("location",     "WeatherField_Location",    "Location"),
+            ("feelslike",    "WeatherField_FeelsLike",   "Feels like"),
+            ("humidity",     "WeatherField_Humidity",    "Humidity"),
+            ("wind",         "WeatherField_Wind",        "Wind"),
         };
 
-        public static readonly (WeatherAlertType Type, string ZhLabel, string EnLabel)[] AllAlertTypes = new[]
+        public static readonly (WeatherAlertType Type, string ResourceKey, string EnLabel)[] AllAlertTypes = new[]
         {
-            (WeatherAlertType.Thunderstorm, "\u96f7\u9635\u96e8",   "Thunderstorm"),
-            (WeatherAlertType.FreezingRain, "\u51bb\u96e8",         "Freezing rain"),
-            (WeatherAlertType.HeavyRain,    "\u5927\u96e8",         "Heavy rain"),
-            (WeatherAlertType.Rain,         "\u964d\u96e8",         "Rain"),
-            (WeatherAlertType.HeavySnow,    "\u5927\u96ea",         "Heavy snow"),
-            (WeatherAlertType.Snow,         "\u964d\u96ea",         "Snow"),
-            (WeatherAlertType.Fog,          "\u8d77\u96fe",         "Fog"),
-            (WeatherAlertType.HighWind,     "\u5927\u98ce",         "Strong wind"),
-            (WeatherAlertType.ExtremeHeat,  "\u9ad8\u6e29",         "Extreme heat"),
-            (WeatherAlertType.ExtremeCold,  "\u4e25\u5bd2",         "Extreme cold"),
+            (WeatherAlertType.Thunderstorm, "WeatherAlert_Thunderstorm", "Thunderstorm"),
+            (WeatherAlertType.FreezingRain, "WeatherAlert_FreezingRain", "Freezing rain"),
+            (WeatherAlertType.HeavyRain,    "WeatherAlert_HeavyRain",    "Heavy rain"),
+            (WeatherAlertType.Rain,         "WeatherAlert_Rain",         "Rain"),
+            (WeatherAlertType.HeavySnow,    "WeatherAlert_HeavySnow",    "Heavy snow"),
+            (WeatherAlertType.Snow,         "WeatherAlert_Snow",         "Snow"),
+            (WeatherAlertType.Fog,          "WeatherAlert_Fog",          "Fog"),
+            (WeatherAlertType.HighWind,     "WeatherAlert_HighWind",     "Strong wind"),
+            (WeatherAlertType.ExtremeHeat,  "WeatherAlert_ExtremeHeat",  "Extreme heat"),
+            (WeatherAlertType.ExtremeCold,  "WeatherAlert_ExtremeCold",  "Extreme cold"),
         };
 
         public HashSet<string> GetEnabledFields()
@@ -921,7 +921,7 @@ namespace Task_Flyout.Services
                     {
                         Date = date,
                         DayLabel = GetDailyDayLabel(date, lang),
-                        DateLabel = date.ToString(_loader.GetString("TextWeatherDateFormat") ?? "MMM d"),
+                        DateLabel = date.ToString(_loader.GetStringOrDefault("TextWeatherDateFormat") ?? "MMM d"),
                         WeatherCode = code,
                         HighTemperature = $"{high:F0}°",
                         LowTemperature = $"{low:F0}°",
@@ -943,8 +943,8 @@ namespace Task_Flyout.Services
         private static string GetDailyDayLabel(DateTime date, string lang)
         {
             int days = (date.Date - DateTime.Today).Days;
-            if (days == 0) return _loader.GetString("TextToday") ?? "Today";
-            if (days == 1) return _loader.GetString("TextTomorrow") ?? "Tomorrow";
+            if (days == 0) return _loader.GetStringOrDefault("TextToday") ?? "Today";
+            if (days == 1) return _loader.GetStringOrDefault("TextTomorrow") ?? "Tomorrow";
             return date.ToString("ddd", System.Globalization.CultureInfo.CurrentUICulture);
         }
 
@@ -1196,7 +1196,7 @@ namespace Task_Flyout.Services
                     {
                         Date = date,
                         DayLabel = GetDailyDayLabel(date, lang),
-                        DateLabel = date.ToString(_loader.GetString("TextWeatherDateFormat") ?? "MMM d"),
+                        DateLabel = date.ToString(_loader.GetStringOrDefault("TextWeatherDateFormat") ?? "MMM d"),
                         WeatherCode = rawDailyCode,
                         HighTemperature = string.IsNullOrEmpty(maxC) ? "" : $"{maxC}°",
                         LowTemperature = string.IsNullOrEmpty(minC) ? "" : $"{minC}°",
@@ -1340,21 +1340,21 @@ namespace Task_Flyout.Services
 
         #endregion
 
-        public static readonly (string Key, string ZhLabel, string EnLabel, string Glyph)[] AllFlyoutFields = new[]
+        public static readonly (string Key, string ResourceKey, string EnLabel, string Glyph)[] AllFlyoutFields = new[]
         {
-            ("temperature",    "\u6E29\u5EA6",         "Temperature",    "\uE9CA"),
-            ("feelslike",      "\u4F53\u611F\u6E29\u5EA6",     "Feels like",     "\uE9CA"),
-            ("description",    "\u5929\u6C14\u63CF\u8FF0",     "Description",    "\uE286"),
-            ("humidity",       "\u6E7F\u5EA6",         "Humidity",       "\uE945"),
-            ("wind",           "\u98CE\u901F",         "Wind",           "\uEBE7"),
-            ("precipitation",  "\u964D\u6C34\u6982\u7387",     "Precipitation",  "\uE790"),
-            ("uv",             "UV \u6307\u6570",      "UV Index",       "\uE706"),
-            ("visibility",     "\u80FD\u89C1\u5EA6",       "Visibility",     "\uE7B3"),
-            ("pressure",       "\u6C14\u538B",         "Pressure",       "\uEC49"),
-            ("airquality",     "\u7A7A\u6C14\u8D28\u91CF",     "Air Quality",    "\uE9CA"),
-            ("pollen",         "\u82B1\u7C89\u8FC7\u654F",     "Pollen",         "\uE710"),
-            ("sun",            "\u65E5\u51FA\u65E5\u843D",     "Sunrise/Sunset", "\uE706"),
-            ("moon",           "\u6708\u76F8",         "Moon Phase",     "\uE708"),
+            ("temperature",    "WeatherField_Temperature",   "Temperature",    "\uE9CA"),
+            ("feelslike",      "WeatherField_FeelsLike",     "Feels like",     "\uE9CA"),
+            ("description",    "WeatherField_Description",   "Description",    "\uE286"),
+            ("humidity",       "WeatherField_Humidity",      "Humidity",       "\uE945"),
+            ("wind",           "WeatherField_Wind",          "Wind",           "\uEBE7"),
+            ("precipitation",  "WeatherField_Precipitation", "Precipitation",  "\uE790"),
+            ("uv",             "WeatherField_UVIndex",       "UV Index",       "\uE706"),
+            ("visibility",     "WeatherField_Visibility",    "Visibility",     "\uE7B3"),
+            ("pressure",       "WeatherField_Pressure",      "Pressure",       "\uEC49"),
+            ("airquality",     "WeatherField_AirQuality",    "Air Quality",    "\uE9CA"),
+            ("pollen",         "WeatherField_Pollen",        "Pollen",         "\uE710"),
+            ("sun",            "WeatherField_Sun",           "Sunrise/Sunset", "\uE706"),
+            ("moon",           "WeatherField_Moon",          "Moon Phase",     "\uE708"),
         };
     }
 }

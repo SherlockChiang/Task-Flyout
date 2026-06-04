@@ -1053,6 +1053,9 @@
   <data name="SettingsPage_RssRemote.Header" xml:space="preserve">
     <value>Allow RSS articles to load remote image resources</value>
   </data>
+  <data name="SettingsPage_RssLocalNetwork.Header" xml:space="preserve">
+    <value>Allow RSS feeds to access local network addresses</value>
+  </data>
   <data name="SettingsPage_ClearCache.Content" xml:space="preserve">
     <value>Clear WebView2 Cache</value>
   </data>
@@ -1316,6 +1319,81 @@
   </data>
   <data name="WeatherPage_IconPackImported" xml:space="preserve">
     <value>Imported: {0}</value>
+  </data>
+  <data name="WeatherField_Icon" xml:space="preserve">
+    <value>Icon</value>
+  </data>
+  <data name="WeatherField_Temperature" xml:space="preserve">
+    <value>Temperature</value>
+  </data>
+  <data name="WeatherField_Description" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="WeatherField_Location" xml:space="preserve">
+    <value>Location</value>
+  </data>
+  <data name="WeatherField_FeelsLike" xml:space="preserve">
+    <value>Feels like</value>
+  </data>
+  <data name="WeatherField_Humidity" xml:space="preserve">
+    <value>Humidity</value>
+  </data>
+  <data name="WeatherField_Wind" xml:space="preserve">
+    <value>Wind</value>
+  </data>
+  <data name="WeatherField_Precipitation" xml:space="preserve">
+    <value>Precipitation</value>
+  </data>
+  <data name="WeatherField_UVIndex" xml:space="preserve">
+    <value>UV Index</value>
+  </data>
+  <data name="WeatherField_Visibility" xml:space="preserve">
+    <value>Visibility</value>
+  </data>
+  <data name="WeatherField_Pressure" xml:space="preserve">
+    <value>Pressure</value>
+  </data>
+  <data name="WeatherField_AirQuality" xml:space="preserve">
+    <value>Air Quality</value>
+  </data>
+  <data name="WeatherField_Pollen" xml:space="preserve">
+    <value>Pollen</value>
+  </data>
+  <data name="WeatherField_Sun" xml:space="preserve">
+    <value>Sunrise/Sunset</value>
+  </data>
+  <data name="WeatherField_Moon" xml:space="preserve">
+    <value>Moon Phase</value>
+  </data>
+  <data name="WeatherAlert_Thunderstorm" xml:space="preserve">
+    <value>Thunderstorm</value>
+  </data>
+  <data name="WeatherAlert_FreezingRain" xml:space="preserve">
+    <value>Freezing rain</value>
+  </data>
+  <data name="WeatherAlert_HeavyRain" xml:space="preserve">
+    <value>Heavy rain</value>
+  </data>
+  <data name="WeatherAlert_Rain" xml:space="preserve">
+    <value>Rain</value>
+  </data>
+  <data name="WeatherAlert_HeavySnow" xml:space="preserve">
+    <value>Heavy snow</value>
+  </data>
+  <data name="WeatherAlert_Snow" xml:space="preserve">
+    <value>Snow</value>
+  </data>
+  <data name="WeatherAlert_Fog" xml:space="preserve">
+    <value>Fog</value>
+  </data>
+  <data name="WeatherAlert_HighWind" xml:space="preserve">
+    <value>Strong wind</value>
+  </data>
+  <data name="WeatherAlert_ExtremeHeat" xml:space="preserve">
+    <value>Extreme heat</value>
+  </data>
+  <data name="WeatherAlert_ExtremeCold" xml:space="preserve">
+    <value>Extreme cold</value>
   </data>
   <data name="RssPage_AllSubscriptions.Text" xml:space="preserve">
     <value>All subscriptions</value>
