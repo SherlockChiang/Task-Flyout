@@ -1,6 +1,7 @@
 ﻿.vs/
 bin/
 obj/
+pics/
 AppPackages/
 pixel-icon-provider/
 credentials.json
