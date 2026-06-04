@@ -29,6 +29,11 @@ namespace Task_Flyout.Views
         private readonly MailTrustStore _mailTrustStore = new();
         private readonly ResourceLoader _loader = new();
 
+        // How many messages the current folder view is requesting. Grows by PageStep
+        // when the user taps "Load more"; reset to the base PageSize on a fresh load.
+        private int _loadedCount;
+        private const int PageStep = 25;
+
         // Pre-compiled regex patterns for mail HTML sanitization
         private static readonly Regex RxPairedDangerousTags = new(@"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*>.*?<\s*/\s*\1\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxSelfClosingDangerousTags = new(@"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*/?\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
@@ -449,26 +454,38 @@ namespace Task_Flyout.Views
             await LoadMessagesAsync();
         }
 
-        private async Task LoadMessagesAsync(bool forceRefresh = false, string? preferredMessageId = null, bool selectFirstWhenNoMatch = true)
+        private async Task LoadMessagesAsync(bool forceRefresh = false, string? preferredMessageId = null, bool selectFirstWhenNoMatch = true, bool loadMore = false)
         {
             if (_mailService == null || _selectedAccount == null || _selectedFolder == null) return;
+
+            // A fresh load (folder switch, refresh, toggle) starts from the base page
+            // size again; only "Load more" keeps the grown window.
+            if (!loadMore)
+                _loadedCount = Math.Clamp(_mailService.PageSize, MailService.MinPageSize, MailService.MaxPageSize);
 
             _isLoadingMessages = true;
             AddAccountPanel.Visibility = Visibility.Collapsed;
             LoadingRing.IsActive = true;
             RefreshButton.IsEnabled = false;
+            LoadMoreButton.IsEnabled = false;
             MessageListTitle.Text = _selectedFolder.DisplayName;
             MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {(_loader.GetStringOrDefault("TextLoading") ?? "Loading")}";
 
             try
             {
-                var messages = await _mailService.FetchMessagesAsync(_selectedAccount, _selectedFolder, UnreadOnlyToggle.IsOn, forceRefresh: forceRefresh);
+                var messages = await _mailService.FetchMessagesAsync(_selectedAccount, _selectedFolder, UnreadOnlyToggle.IsOn, pageSize: _loadedCount, forceRefresh: forceRefresh || loadMore);
                 var previousSelectedId = !string.IsNullOrWhiteSpace(preferredMessageId) ? preferredMessageId : _selectedItem?.Id;
                 _items.Clear();
                 foreach (var item in messages.OrderByDescending(item => item.RawReceivedTime))
                     _items.Add(item);
 
                 MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}";
+
+                // Offer "Load more" only while the server filled the whole window (so older
+                // messages likely remain) and we haven't hit the fetch ceiling.
+                bool mightHaveMore = _items.Count >= _loadedCount && _loadedCount < MailService.MaxPageSize && !UnreadOnlyToggle.IsOn;
+                LoadMoreButton.Visibility = mightHaveMore ? Visibility.Visible : Visibility.Collapsed;
+
                 var itemToSelect = !string.IsNullOrWhiteSpace(previousSelectedId)
                     ? _items.FirstOrDefault(item => item.Id == previousSelectedId)
                     : null;
@@ -492,7 +509,21 @@ namespace Task_Flyout.Views
                 _isLoadingMessages = false;
                 LoadingRing.IsActive = false;
                 RefreshButton.IsEnabled = true;
+                LoadMoreButton.IsEnabled = true;
             }
+        }
+
+        private async void LoadMoreButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoadingMessages || _mailService == null) return;
+
+            int previousCount = _items.Count;
+            _loadedCount = Math.Min(_loadedCount + PageStep, MailService.MaxPageSize);
+            await LoadMessagesAsync(loadMore: true, selectFirstWhenNoMatch: false);
+
+            // Nothing new came back — we've reached the end of the folder.
+            if (_items.Count <= previousCount)
+                LoadMoreButton.Visibility = Visibility.Collapsed;
         }
 
         private async void UnreadOnlyToggle_Toggled(object sender, RoutedEventArgs e)

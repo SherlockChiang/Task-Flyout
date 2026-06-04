@@ -1143,6 +1143,9 @@
   <data name="MailPage_InboxHeader.Text" xml:space="preserve">
     <value>Inbox</value>
   </data>
+  <data name="MailPage_LoadMore.Text" xml:space="preserve">
+    <value>Load more</value>
+  </data>
   <data name="MailPage_SelectFolderPrompt.Text" xml:space="preserve">
     <value>Please select a folder on the left</value>
   </data>

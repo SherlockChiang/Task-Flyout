@@ -95,6 +95,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <Grid ColumnSpacing="12" Padding="6,4">
@@ -149,6 +150,14 @@
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
+
+                    <Button Grid.Row="2" x:Name="LoadMoreButton" Visibility="Collapsed"
+                            HorizontalAlignment="Stretch" Click="LoadMoreButton_Click" Margin="4,0">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE74B;" FontSize="12"/>
+                            <TextBlock x:Uid="MailPage_LoadMore" Text="加载更多邮件"/>
+                        </StackPanel>
+                    </Button>
                 </Grid>
             </Border>
 

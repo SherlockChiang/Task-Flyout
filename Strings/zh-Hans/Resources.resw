@@ -1143,6 +1143,9 @@
   <data name="MailPage_InboxHeader.Text" xml:space="preserve">
     <value>收件箱</value>
   </data>
+  <data name="MailPage_LoadMore.Text" xml:space="preserve">
+    <value>加载更多邮件</value>
+  </data>
   <data name="MailPage_SelectFolderPrompt.Text" xml:space="preserve">
     <value>请选择左侧文件夹</value>
   </data>

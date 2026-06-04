@@ -188,6 +188,12 @@ namespace Task_Flyout.Services
             public T Value { get; set; } = default!;
         }
 
+        // Lower/upper bounds for how many messages a single fetch returns. The upper
+        // bound is the ceiling the "Load more" UI can grow a folder's window to; older
+        // messages beyond it stay out until requested.
+        public const int MinPageSize = 10;
+        public const int MaxPageSize = 200;
+
         public int PageSize
         {
             get => ApplicationData.Current.LocalSettings.Values["MailPageSize"] as int? ?? 25;
@@ -566,7 +572,7 @@ namespace Task_Flyout.Services
                 await EnsureOutlookAuthorizedAsync();
                 if (_outlookClient == null) return new List<MailItem>();
 
-                int top = Math.Clamp(pageSize ?? PageSize, 10, 50);
+                int top = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
                 var response = await _outlookClient.Me.MailFolders[folder.Id].Messages.GetAsync(request =>
                 {
                     request.QueryParameters.Top = top;
@@ -1039,7 +1045,7 @@ namespace Task_Flyout.Services
 
             var query = unreadOnly ? MailKit.Search.SearchQuery.NotSeen : MailKit.Search.SearchQuery.All;
             var ids = await mailFolder.SearchAsync(query);
-            int top = Math.Clamp(pageSize ?? PageSize, 10, 50);
+            int top = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
             var selectedIds = ids.Reverse().Take(top).ToList();
 
             var summaryItems = MessageSummaryItems.Envelope | MessageSummaryItems.Flags | MessageSummaryItems.BodyStructure;
@@ -1218,7 +1224,7 @@ namespace Task_Flyout.Services
                 return new List<MailItem>();
 
             var gmail = await EnsureGoogleMailAuthorizedAsync();
-            int top = Math.Clamp(pageSize ?? PageSize, 10, 50);
+            int top = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
 
             var listRequest = gmail.Users.Messages.List("me");
             listRequest.LabelIds = folder.Id;
@@ -1920,7 +1926,7 @@ namespace Task_Flyout.Services
                 var messages = StripBodies(_persistentCache.Messages[key]);
                 _persistentCache.Messages[key] = messages
                     .OrderByDescending(item => item.RawReceivedTime)
-                    .Take(Math.Clamp(GetPageSizeFromCacheKey(key), 10, 50))
+                    .Take(Math.Clamp(GetPageSizeFromCacheKey(key), MinPageSize, MaxPageSize))
                     .ToList();
             }
         }
@@ -1984,7 +1990,7 @@ namespace Task_Flyout.Services
 
                 _persistentCache.Messages[key] = existing
                     .OrderByDescending(item => item.RawReceivedTime)
-                    .Take(Math.Clamp(pageSize, 10, 50))
+                    .Take(Math.Clamp(pageSize, MinPageSize, MaxPageSize))
                     .ToList();
 
                 _messageCache[key] = new CacheEntry<List<MailItem>> { Value = StripBodies(_persistentCache.Messages[key]) };
