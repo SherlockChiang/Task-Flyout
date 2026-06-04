@@ -89,7 +89,7 @@ namespace Task_Flyout
             _uiSettings = new UISettings();
             _uiSettings.ColorValuesChanged += UiSettings_ColorValuesChanged;
             UpdateTrayIconTheme();
-            _trayIcon.ForceCreate(enablesEfficiencyMode: false);
+            _trayIcon.ForceCreate(enablesEfficiencyMode: EfficiencyModeEnabledSetting);
             MailService.StartMailPolling();
 
             _trayIcon.LeftClickCommand = new RelayCommand(() => EnsureFlyoutWindow().ToggleFlyout());
