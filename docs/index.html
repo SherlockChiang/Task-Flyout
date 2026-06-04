@@ -7,34 +7,47 @@
     <title>Task Flyout</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* Windows 11 light "Mica" tonality: soft desaturated background, dark text,
+           default Windows accent blue. */
         body {
-            background-color: #0f172a; 
-            color: #f8fafc;
-            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: #f3f3f3;
+            background-image:
+                radial-gradient(60rem 40rem at 50% -10%, rgba(0, 103, 192, 0.10), transparent 60%),
+                linear-gradient(180deg, #fbfbfd 0%, #eef1f6 100%);
+            background-attachment: fixed;
+            color: #1c1c1c;
+            font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
             scroll-behavior: smooth;
         }
-        .glass-card {
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        /* Acrylic-style translucent surface. */
+        .acrylic {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(20px) saturate(160%);
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+        /* Poster fades into the page along its lower edge so it feels immersive
+           rather than a hard-edged rectangle. */
+        .poster-immersive {
+            -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 100%);
+            mask-image: linear-gradient(180deg, #000 78%, transparent 100%);
         }
         .hidden-lang { display: none !important; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <nav class="fixed top-0 w-full flex justify-between items-center py-4 px-6 md:px-10 glass-card z-50">
-        <div class="text-xl font-bold tracking-wider flex items-center gap-3">
-            <span class="text-blue-500">Task</span> Flyout
+    <nav class="fixed top-0 w-full flex justify-between items-center py-3 px-6 md:px-10 acrylic z-50">
+        <div class="text-lg font-semibold tracking-wide flex items-center gap-2">
+            <span class="text-[#0067C0]">Task</span> Flyout
         </div>
         <div class="flex items-center space-x-4 md:space-x-6 text-sm font-medium">
-            <a href="privacy.html" class="hover:text-blue-400 transition">
+            <a href="privacy.html" class="text-gray-600 hover:text-[#0067C0] transition">
                 <span class="lang-zh">隐私政策</span>
                 <span class="lang-en hidden-lang">Privacy Policy</span>
             </a>
-            
-            <button onclick="toggleLang()" class="text-gray-300 hover:text-white transition p-2 rounded-full hover:bg-white/10" title="切换语言 / Toggle Language">
+
+            <button onclick="toggleLang()" class="text-gray-500 hover:text-[#0067C0] transition p-2 rounded-md hover:bg-black/5" title="切换语言 / Toggle Language">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802" />
                 </svg>
@@ -42,110 +55,117 @@
         </div>
     </nav>
 
-    <header class="relative w-full">
-        <img src="poster.png" alt="Task Flyout Poster" class="w-full h-auto object-cover object-top max-h-[75vh]">
-        <div class="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none"></div>
-    </header>
+    <main class="flex-grow">
 
-    <main class="flex-grow flex flex-col items-center text-center px-4 pt-12 pb-24 relative z-10">
-        <h1 class="text-4xl md:text-6xl font-extrabold mb-6 leading-tight">
-            <span class="lang-zh">日程与任务，<br><span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">一触即达。</span></span>
-            <span class="lang-en hidden-lang">Schedules and Tasks,<br><span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">Just a Click Away.</span></span>
-        </h1>
-        
-        <p class="text-base md:text-xl text-gray-300 mb-12 max-w-2xl">
-            <span class="lang-zh">专为 Windows 11 打造的现代托盘助手。日历、任务、邮件、RSS 与天气一窗汇聚，让你的每一天井然有序。</span>
-            <span class="lang-en hidden-lang">A modern tray companion for Windows 11. Calendar, tasks, mail, RSS, and weather in one flyout — keeping your whole day organized.</span>
-        </p>
-        
-        <div class="flex gap-4">
-            <a href="https://github.com/SherlockChiang/Task-Flyout/releases/latest" class="bg-white text-slate-900 font-bold px-8 py-3.5 rounded-full hover:bg-gray-200 transition shadow-[0_0_30px_rgba(59,130,246,0.3)] flex items-center gap-2 text-lg">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+        <!-- Immersive poster at the top: height-capped so the download button below
+             stays above the fold; soft glow behind and a fade into the page. -->
+        <section class="px-4 pt-24 md:pt-28">
+            <div class="relative max-w-4xl mx-auto">
+                <div class="absolute inset-x-8 top-2 bottom-0 -z-10 bg-gradient-to-br from-[#0067C0]/25 to-[#8B5CF6]/25 blur-3xl rounded-full"></div>
+                <img src="poster.png" alt="Task Flyout"
+                     class="poster-immersive block w-full h-auto max-h-[48vh] object-contain mx-auto rounded-xl border border-black/5">
+            </div>
+        </section>
+
+        <!-- Hero: headline + download button, directly under the poster -->
+        <section class="flex flex-col items-center text-center px-4 pt-4 pb-20">
+            <h1 class="text-4xl md:text-5xl font-bold mb-5 leading-tight">
+                <span class="lang-zh">日程与任务，<br><span class="text-transparent bg-clip-text bg-gradient-to-r from-[#0067C0] to-[#8B5CF6]">一触即达。</span></span>
+                <span class="lang-en hidden-lang">Schedules and Tasks,<br><span class="text-transparent bg-clip-text bg-gradient-to-r from-[#0067C0] to-[#8B5CF6]">Just a Click Away.</span></span>
+            </h1>
+
+            <p class="text-base md:text-lg text-gray-600 mb-8 max-w-2xl">
+                <span class="lang-zh">专为 Windows 11 打造的现代托盘助手。日历、任务、邮件、RSS 与天气一窗汇聚，让你的每一天井然有序。</span>
+                <span class="lang-en hidden-lang">A modern tray companion for Windows 11. Calendar, tasks, mail, RSS, and weather in one flyout — keeping your whole day organized.</span>
+            </p>
+
+            <a href="https://github.com/SherlockChiang/Task-Flyout/releases/latest" class="bg-[#0067C0] hover:bg-[#005FB8] text-white font-semibold px-7 py-3 rounded-lg transition shadow-lg shadow-blue-600/20 flex items-center gap-2 text-base">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                 <span class="lang-zh">免费下载 (Windows x64)</span>
                 <span class="lang-en hidden-lang">Download Free (Win x64)</span>
             </a>
-        </div>
+        </section>
 
         <!-- Features -->
-        <section class="w-full max-w-6xl mt-28">
+        <section class="w-full max-w-6xl mx-auto px-4 pb-24 text-center">
             <h2 class="text-3xl md:text-4xl font-bold mb-3">
                 <span class="lang-zh">一个小窗，承载全部</span>
                 <span class="lang-en hidden-lang">Everything in one flyout</span>
             </h2>
-            <p class="text-gray-400 mb-12 max-w-2xl mx-auto">
+            <p class="text-gray-600 mb-12 max-w-2xl mx-auto">
                 <span class="lang-zh">日历、任务、邮件、RSS 与天气，汇聚于一个原生托盘小窗——不必再为查看下一项安排而打开浏览器。</span>
                 <span class="lang-en hidden-lang">Calendar, tasks, mail, RSS, and weather in one native tray flyout — no browser tab required just to see what's next.</span>
             </p>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
 
-                <div class="glass-card rounded-2xl p-6 border border-white/5 hover:border-blue-500/40 transition">
+                <div class="acrylic rounded-xl p-6 hover:border-[#0067C0]/40 transition shadow-sm">
                     <div class="text-3xl mb-4">📅</div>
                     <h3 class="text-lg font-semibold mb-2">
                         <span class="lang-zh">日历与任务</span>
                         <span class="lang-en hidden-lang">Calendar &amp; Tasks</span>
                     </h3>
-                    <p class="text-sm text-gray-400 leading-relaxed">
+                    <p class="text-sm text-gray-600 leading-relaxed">
                         <span class="lang-zh">与 Google Calendar 和 Microsoft To Do 双向同步，在托盘中即可新建、修改与完成。</span>
                         <span class="lang-en hidden-lang">Two-way sync with Google Calendar and Microsoft To Do. Create, edit, and complete right from the tray.</span>
                     </p>
                 </div>
 
-                <div class="glass-card rounded-2xl p-6 border border-white/5 hover:border-blue-500/40 transition">
+                <div class="acrylic rounded-xl p-6 hover:border-[#0067C0]/40 transition shadow-sm">
                     <div class="text-3xl mb-4">📬</div>
                     <h3 class="text-lg font-semibold mb-2">
                         <span class="lang-zh">邮件</span>
                         <span class="lang-en hidden-lang">Mail</span>
                     </h3>
-                    <p class="text-sm text-gray-400 leading-relaxed">
+                    <p class="text-sm text-gray-600 leading-relaxed">
                         <span class="lang-zh">支持 Gmail、Outlook 及任意 IMAP/SMTP 账户，后台抓取，新邮件即弹出原生通知。</span>
                         <span class="lang-en hidden-lang">Connect Gmail, Outlook, or any IMAP/SMTP account. Background polling delivers native toasts on arrival.</span>
                     </p>
                 </div>
 
-                <div class="glass-card rounded-2xl p-6 border border-white/5 hover:border-blue-500/40 transition">
+                <div class="acrylic rounded-xl p-6 hover:border-[#0067C0]/40 transition shadow-sm">
                     <div class="text-3xl mb-4">📰</div>
                     <h3 class="text-lg font-semibold mb-2">
                         <span class="lang-zh">RSS 阅读器</span>
                         <span class="lang-en hidden-lang">RSS Reader</span>
                     </h3>
-                    <p class="text-sm text-gray-400 leading-relaxed">
+                    <p class="text-sm text-gray-600 leading-relaxed">
                         <span class="lang-zh">内置阅读器订阅你喜爱的源，并提供精细的图片与隐私加载控制。</span>
                         <span class="lang-en hidden-lang">Follow your favorite feeds with a built-in reader and fine-grained image &amp; privacy controls.</span>
                     </p>
                 </div>
 
-                <div class="glass-card rounded-2xl p-6 border border-white/5 hover:border-blue-500/40 transition">
+                <div class="acrylic rounded-xl p-6 hover:border-[#0067C0]/40 transition shadow-sm">
                     <div class="text-3xl mb-4">🌤️</div>
                     <h3 class="text-lg font-semibold mb-2">
                         <span class="lang-zh">天气</span>
                         <span class="lang-en hidden-lang">Weather</span>
                     </h3>
-                    <p class="text-sm text-gray-400 leading-relaxed">
+                    <p class="text-sm text-gray-600 leading-relaxed">
                         <span class="lang-zh">由 Open-Meteo 驱动的实时天气面板，并可选开启常驻视野的任务栏天气栏。</span>
                         <span class="lang-en hidden-lang">A live forecast pane powered by Open-Meteo, plus an optional always-in-view taskbar weather bar.</span>
                     </p>
                 </div>
 
-                <div class="glass-card rounded-2xl p-6 border border-white/5 hover:border-blue-500/40 transition">
+                <div class="acrylic rounded-xl p-6 hover:border-[#0067C0]/40 transition shadow-sm">
                     <div class="text-3xl mb-4">🌈</div>
                     <h3 class="text-lg font-semibold mb-2">
                         <span class="lang-zh">原生现代设计</span>
                         <span class="lang-en hidden-lang">Native Modern Design</span>
                     </h3>
-                    <p class="text-sm text-gray-400 leading-relaxed">
+                    <p class="text-sm text-gray-600 leading-relaxed">
                         <span class="lang-zh">WinUI 3 + Mica 材质与沉浸式暗色模式；莫奈调色盘为每个日历与列表配色。</span>
                         <span class="lang-en hidden-lang">WinUI 3 with Mica material and dark mode; a Monet palette colors every calendar and list.</span>
                     </p>
                 </div>
 
-                <div class="glass-card rounded-2xl p-6 border border-white/5 hover:border-blue-500/40 transition">
+                <div class="acrylic rounded-xl p-6 hover:border-[#0067C0]/40 transition shadow-sm">
                     <div class="text-3xl mb-4">⚡</div>
                     <h3 class="text-lg font-semibold mb-2">
                         <span class="lang-zh">轻量高效</span>
                         <span class="lang-en hidden-lang">Lightweight &amp; Efficient</span>
                     </h3>
-                    <p class="text-sm text-gray-400 leading-relaxed">
+                    <p class="text-sm text-gray-600 leading-relaxed">
                         <span class="lang-zh">常驻托盘，支持开机自启与后台运行；收起后自动启用 Windows 11 效能模式 (EcoQoS) 省电省内存。</span>
                         <span class="lang-en hidden-lang">Lives in the tray with launch-on-startup; collapses into Windows 11 Efficiency Mode (EcoQoS) to save power and memory.</span>
                     </p>
@@ -155,8 +175,8 @@
         </section>
     </main>
 
-    <footer class="py-8 text-center text-gray-500 text-sm mt-auto">
-        &copy; 2026 Task Flyout. Built with ❤️ and WinUI 3.
+    <footer class="py-8 text-center text-gray-500 text-sm mt-auto border-t border-black/5">
+        &copy; 2026 Task Flyout. Built with WinUI 3.
     </footer>
 
     <script>
