@@ -19,14 +19,23 @@
 
 ## English
 
-**Schedules and Tasks, Just a Click Away.**<br>
-A modern tray calendar built for Windows 11. Seamlessly syncs with Google Calendar and Microsoft To Do.
+**Your whole day, one click from the tray.**<br>
+Task Flyout is a modern Windows 11 tray companion that brings your calendar, tasks, mail, RSS, and weather into a single, native flyout — so you never have to open a browser tab just to check what's next.
 
 ### ✨ Features
-* 🎨 **Native Modern Design**: Built with WinUI 3, supporting Mica material and immersive dark mode.
-* 🔄 **Seamless Sync**: Bind your Google Calendar and Microsoft accounts. Create, edit, and complete tasks directly from the system tray flyout.
-* ⚡ **Lightweight & Fast**: Lives in your system tray. Supports launch on startup and background running.
-* 🌍 **Multilingual**: Built-in English and Simplified Chinese, automatically switching based on your system language.
+
+**📌 Everything in one flyout**
+* 📅 **Calendar & Tasks** — Two-way sync with **Google Calendar** and **Microsoft To Do**. Create, edit, and complete tasks and events right from the tray.
+* 📬 **Mail** — Connect **Gmail, Outlook, or any IMAP/SMTP** account. Background polling delivers native Windows toasts the moment new mail arrives.
+* 📰 **RSS Reader** — Follow your favorite feeds with a built-in reader and fine-grained image & privacy controls.
+* 🌤️ **Weather** — A live forecast pane powered by [Open-Meteo](https://open-meteo.com/), plus an optional **taskbar weather bar** that's always in view.
+* 🔔 **Smart Reminders** — Get a toast a configurable number of minutes before any event begins.
+
+**🎨 Designed for Windows 11**
+* **Native & Modern** — Built with WinUI 3, with Mica material and immersive dark mode that blends into the desktop.
+* 🌈 **Monet Palette** — Assign a signature color to each calendar and task list; it flows through the sidebar and every view.
+* ⚡ **Lightweight & Efficient** — Lives quietly in the tray with launch-on-startup and background running. Collapse it and it switches to **Windows 11 Efficiency Mode (EcoQoS)** to cut CPU, power, and memory use.
+* 🌍 **Multilingual** — Built-in English and Simplified Chinese, switching automatically with your system language.
 
 ### 🚀 Installation
 1. Go to the [Releases page](https://github.com/SherlockChiang/Task-Flyout/releases/latest) and download the latest `.zip` package.
@@ -41,7 +50,7 @@ This app is currently undergoing Google's official verification process. You mig
 
 ### 🔒 Privacy & Security
 **Your data belongs to you.**
-This software runs locally on your device as a "Public Client". All OAuth credentials and calendar data are saved on your local machine and are **NEVER** collected, stored, or uploaded to any third-party servers. Read our full [Privacy Policy](https://sherlockchiang.github.io/Task-Flyout/#privacy).
+This software runs locally on your device as a "Public Client". All OAuth credentials, mail, and calendar data are saved on your local machine and are **NEVER** collected, stored, or uploaded to any third-party servers. Read our full [Privacy Policy](https://sherlockchiang.github.io/Task-Flyout/#privacy).
 
 **Why the app declares `runFullTrust`:**
 Task Flyout uses the restricted `runFullTrust` capability for desktop integration that packaged WinUI apps cannot provide through UWP-only APIs: the system tray icon, startup task registration, taskbar weather bar placement, and toast activation routing. It is not used to run background installers, elevate privileges, or execute arbitrary downloaded code.
@@ -50,14 +59,23 @@ Task Flyout uses the restricted `runFullTrust` capability for desktop integratio
 
 ## 简体中文
 
-**日程与任务，一触即达。**<br>
-专为 Windows 11 打造的现代托盘日历，完美双向同步 Google Calendar 与 Microsoft To Do。
+**你的一整天，从托盘一键直达。**<br>
+Task Flyout 是一款现代化的 Windows 11 托盘助手，将日历、任务、邮件、RSS 与天气汇聚到一个原生小窗中——再也不用为了看一眼接下来的安排而专门打开浏览器。
 
 ### ✨ 核心特性
-* 🎨 **原生现代设计**：采用 WinUI 3 打造，支持 Mica (云母) 材质与沉浸式暗色模式，完美融入 Windows 11 桌面生态。
-* 🔄 **双端无缝同步**：支持绑定 Google Calendar 与 Microsoft 账号。在托盘小窗中即可新建、修改和完成全平台的任务与日程。
-* ⚡ **极致轻量快捷**：常驻系统右下角托盘，一键唤出。支持开机自启与后台静默运行。
-* 🌍 **多语言支持**：内置简体中文与英文，随系统语言自动切换。
+
+**📌 一个小窗，承载全部**
+* 📅 **日历与任务** — 与 **Google Calendar** 和 **Microsoft To Do** 双向同步。在托盘小窗中即可新建、修改、完成任务与日程。
+* 📬 **邮件** — 支持 **Gmail、Outlook 以及任意 IMAP/SMTP** 账户。后台定时抓取，新邮件抵达即弹出原生 Windows 通知。
+* 📰 **RSS 阅读器** — 内置阅读器订阅你喜爱的源，并提供精细的图片与隐私加载控制。
+* 🌤️ **天气** — 由 [Open-Meteo](https://open-meteo.com/) 驱动的实时天气面板，并可选开启常驻视野的**任务栏天气栏**。
+* 🔔 **智能提醒** — 在日程开始前的自定义分钟数，准时弹出通知。
+
+**🎨 为 Windows 11 而生**
+* **原生现代** — 基于 WinUI 3 打造，支持 Mica（云母）材质与沉浸式暗色模式，完美融入桌面。
+* 🌈 **莫奈调色盘** — 为每个日历与任务列表指定专属代表色，并贯穿侧栏与各个视图。
+* ⚡ **极致轻量高效** — 常驻系统托盘，支持开机自启与后台静默运行。收起后自动切换至 **Windows 11 效能模式 (EcoQoS)**，降低 CPU、功耗与内存占用。
+* 🌍 **多语言支持** — 内置简体中文与英文，随系统语言自动切换。
 
 ### 🚀 安装指南
 1. 前往 [Releases 页面](https://github.com/SherlockChiang/Task-Flyout/releases/latest) 下载最新的 `.zip` 压缩包。
@@ -72,12 +90,12 @@ Task Flyout uses the restricted `runFullTrust` capability for desktop integratio
 
 ### 🔒 隐私与安全
 **您的数据，只属于您。**
-本软件作为“公共客户端 (Public Client)”运行在您的本地设备上。所有的 OAuth 凭证与日程数据均保存在您的本地计算机中，**绝不会**收集、存储或上传任何敏感信息至任何第三方服务器。阅读完整的 [隐私政策 (Privacy Policy)](https://sherlockchiang.github.io/Task-Flyout/#privacy)。
+本软件作为“公共客户端 (Public Client)”运行在您的本地设备上。所有的 OAuth 凭证、邮件与日程数据均保存在您的本地计算机中，**绝不会**收集、存储或上传任何敏感信息至任何第三方服务器。阅读完整的 [隐私政策 (Privacy Policy)](https://sherlockchiang.github.io/Task-Flyout/#privacy)。
 
 **为什么声明 `runFullTrust`：**
 Task Flyout 使用受限的 `runFullTrust` 能力，是为了实现纯 UWP API 无法覆盖的桌面集成：系统托盘图标、开机启动任务、任务栏天气栏定位，以及通知激活路由。它不会用于后台安装程序、提权或执行任意下载代码。
 
 ---
 <div align="center">
-&copy; 2026 Task Flyout. Built with ❤️ and Gemini
+&copy; 2026 Task Flyout. Built with ❤️ and WinUI 3
 </div>
