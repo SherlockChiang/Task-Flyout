@@ -212,13 +212,15 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Uid="CalendarPage_Sun" Grid.Column="0" Text="周日" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
-                <TextBlock x:Uid="CalendarPage_Mon" Grid.Column="1" Text="周一" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
-                <TextBlock x:Uid="CalendarPage_Tue" Grid.Column="2" Text="周二" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
-                <TextBlock x:Uid="CalendarPage_Wed" Grid.Column="3" Text="周三" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
-                <TextBlock x:Uid="CalendarPage_Thu" Grid.Column="4" Text="周四" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
-                <TextBlock x:Uid="CalendarPage_Fri" Grid.Column="5" Text="周五" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
-                <TextBlock x:Uid="CalendarPage_Sat" Grid.Column="6" Text="周六" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
+                <!-- Weekday headers are filled at runtime from the app-language culture
+                     (see SetWeekdayHeaders) so they localize beyond the bundled resw files. -->
+                <TextBlock x:Name="WeekHeader0" Grid.Column="0" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
+                <TextBlock x:Name="WeekHeader1" Grid.Column="1" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
+                <TextBlock x:Name="WeekHeader2" Grid.Column="2" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
+                <TextBlock x:Name="WeekHeader3" Grid.Column="3" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
+                <TextBlock x:Name="WeekHeader4" Grid.Column="4" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
+                <TextBlock x:Name="WeekHeader5" Grid.Column="5" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
+                <TextBlock x:Name="WeekHeader6" Grid.Column="6" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
             </Grid>
 
             <GridView x:Name="CalendarGrid" Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ItemsSource="{x:Bind DayCells}" SizeChanged="CalendarGrid_SizeChanged" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="CalendarGrid_ItemClick" ScrollViewer.VerticalScrollBarVisibility="Hidden" ScrollViewer.VerticalScrollMode="Disabled">

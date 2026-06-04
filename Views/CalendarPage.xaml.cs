@@ -102,6 +102,7 @@ namespace Task_Flyout.Views
             this.InitializeComponent();
             this.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
             _loader = new ResourceLoader();
+            SetWeekdayHeaders();
             if (Application.Current is App app) _syncManager = app.SyncManager;
             this.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(Global_PointerWheelChanged), handledEventsToo: true);
             this.Loaded += (s, e) =>
@@ -109,6 +110,17 @@ namespace Task_Flyout.Views
                 RefreshAccountList();
                 LoadCalendar(_viewDate);
             };
+        }
+
+        // Fill the column headers (Sunday-first, matching the grid layout) from the
+        // app-language culture's abbreviated day names so they follow the in-app
+        // language rather than the OS locale or a missing resw entry.
+        private void SetWeekdayHeaders()
+        {
+            var headers = new[] { WeekHeader0, WeekHeader1, WeekHeader2, WeekHeader3, WeekHeader4, WeekHeader5, WeekHeader6 };
+            var dayNames = LocalizationHelper.AppCulture.DateTimeFormat.AbbreviatedDayNames; // index 0 == Sunday
+            for (int i = 0; i < headers.Length && i < dayNames.Length; i++)
+                headers[i].Text = dayNames[i];
         }
 
         private void LoadCache(DateTime date)
@@ -125,7 +137,7 @@ namespace Task_Flyout.Views
 
             LoadCache(date);
             DayCells.Clear();
-            BtnMonthYear.Content = date.ToString("Y", CultureInfo.CurrentUICulture);
+            BtnMonthYear.Content = date.ToString("Y", LocalizationHelper.AppCulture);
 
             DateTime firstOfEntry = new DateTime(date.Year, date.Month, 1);
             int offset = (int)firstOfEntry.DayOfWeek;
@@ -263,7 +275,7 @@ namespace Task_Flyout.Views
             _flyoutYear = _viewDate.Year;
             FlyoutYearText.Text = string.Format(_loader.GetStringOrDefault("TextYearFormat") ?? "{0}", _flyoutYear);
 
-            FlyoutMonthGrid.ItemsSource = CultureInfo.CurrentUICulture.DateTimeFormat.MonthNames
+            FlyoutMonthGrid.ItemsSource = LocalizationHelper.AppCulture.DateTimeFormat.MonthNames
                 .Where(m => !string.IsNullOrEmpty(m)).ToArray();
         }
         private void FlyoutPrevYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = string.Format(_loader.GetStringOrDefault("TextYearFormat") ?? "{0}", --_flyoutYear);
@@ -272,7 +284,7 @@ namespace Task_Flyout.Views
         {
             if (e.ClickedItem is string monthStr)
             {
-                var months = CultureInfo.CurrentUICulture.DateTimeFormat.MonthNames;
+                var months = LocalizationHelper.AppCulture.DateTimeFormat.MonthNames;
                 int month = Array.IndexOf(months, monthStr) + 1;
                 _viewDate = new DateTime(_flyoutYear, month, 1);
                 LoadCalendar(_viewDate);
@@ -393,7 +405,7 @@ namespace Task_Flyout.Views
 
         private void UpdateSideBar(DayCellViewModel cell)
         {
-            TxtSideBarDate.Text = cell.Date.ToString("M", CultureInfo.CurrentUICulture) + " " + (_loader.GetStringOrDefault("TextOnwards") ?? "");
+            TxtSideBarDate.Text = cell.Date.ToString("M", LocalizationHelper.AppCulture) + " " + (_loader.GetStringOrDefault("TextOnwards") ?? "");
             SelectedDayItems.Clear();
 
             string selectedDateKey = cell.Date.ToString("yyyy-MM-dd");
@@ -414,7 +426,7 @@ namespace Task_Flyout.Views
                     {
                         Id = item.Id,
                         Title = item.Title,
-                        Subtitle = $"{DateTime.Parse(dateKey).ToString("M", CultureInfo.CurrentUICulture)}\n{(item.Subtitle == "全天" || item.Subtitle == "All Day" ? (_loader.GetStringOrDefault("TextAllDay") ?? "All Day") : item.Subtitle)}",
+                        Subtitle = $"{DateTime.Parse(dateKey).ToString("M", LocalizationHelper.AppCulture)}\n{(item.Subtitle == "全天" || item.Subtitle == "All Day" ? (_loader.GetStringOrDefault("TextAllDay") ?? "All Day") : item.Subtitle)}",
                         Location = item.Location,
                         Description = item.Description,
                         IsEvent = item.IsEvent,

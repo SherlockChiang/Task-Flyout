@@ -921,7 +921,7 @@ namespace Task_Flyout.Services
                     {
                         Date = date,
                         DayLabel = GetDailyDayLabel(date, lang),
-                        DateLabel = date.ToString(_loader.GetStringOrDefault("TextWeatherDateFormat") ?? "MMM d"),
+                        DateLabel = date.ToString(_loader.GetStringOrDefault("TextWeatherDateFormat") ?? "MMM d", LocalizationHelper.AppCulture),
                         WeatherCode = code,
                         HighTemperature = $"{high:F0}°",
                         LowTemperature = $"{low:F0}°",
@@ -945,7 +945,7 @@ namespace Task_Flyout.Services
             int days = (date.Date - DateTime.Today).Days;
             if (days == 0) return _loader.GetStringOrDefault("TextToday") ?? "Today";
             if (days == 1) return _loader.GetStringOrDefault("TextTomorrow") ?? "Tomorrow";
-            return date.ToString("ddd", System.Globalization.CultureInfo.CurrentUICulture);
+            return date.ToString("ddd", LocalizationHelper.AppCulture);
         }
 
         private static string GetCurrentLanguage()
@@ -1196,7 +1196,7 @@ namespace Task_Flyout.Services
                     {
                         Date = date,
                         DayLabel = GetDailyDayLabel(date, lang),
-                        DateLabel = date.ToString(_loader.GetStringOrDefault("TextWeatherDateFormat") ?? "MMM d"),
+                        DateLabel = date.ToString(_loader.GetStringOrDefault("TextWeatherDateFormat") ?? "MMM d", LocalizationHelper.AppCulture),
                         WeatherCode = rawDailyCode,
                         HighTemperature = string.IsNullOrEmpty(maxC) ? "" : $"{maxC}°",
                         LowTemperature = string.IsNullOrEmpty(minC) ? "" : $"{minC}°",
