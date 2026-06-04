@@ -2099,10 +2099,12 @@ namespace Task_Flyout.Services
                     .AddArgument("folderId", item.FolderId)
                     .AddArgument("messageId", item.Id);
 
-                // Verification-code mail: offer a one-tap "copy code" button on the toast.
+                // Verification-code mail: offer a one-tap "copy code" button on the toast,
+                // showing the detected code right on the button.
                 if (VerificationCodeDetector.TryExtract(item.Subject, item.Preview, out var code))
                 {
-                    builder.AddButton(new AppNotificationButton(_loader.GetStringOrDefault("MailCopyCode") ?? "Copy code")
+                    var copyLabel = $"{_loader.GetStringOrDefault("MailCopyCode") ?? "Copy code"} {code}";
+                    builder.AddButton(new AppNotificationButton(copyLabel)
                         .AddArgument("action", "copyCode")
                         .AddArgument("code", code));
                 }
