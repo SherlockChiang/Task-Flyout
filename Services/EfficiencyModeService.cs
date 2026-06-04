@@ -20,18 +20,34 @@ namespace Task_Flyout.Services
             public uint StateMask;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MEMORY_PRIORITY_INFORMATION
+        {
+            public uint MemoryPriority;
+        }
+
         private const uint PROCESS_POWER_THROTTLING_CURRENT_VERSION = 1;
         private const uint PROCESS_POWER_THROTTLING_EXECUTION_SPEED = 0x1;
         private const uint PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION = 0x4;
         private const int ProcessPowerThrottling = 4; // PROCESS_INFORMATION_CLASS
         private const int ThreadPowerThrottling = 3; // THREAD_INFORMATION_CLASS
 
-        // Background mode lowers I/O and memory priority but keeps a normal CPU
-        // scheduling class — unlike IDLE_PRIORITY_CLASS it won't starve background mail
-        // polling / notification checks when the machine is busy. Paired BEGIN/END.
-        private const uint PROCESS_MODE_BACKGROUND_BEGIN = 0x00100000;
-        private const uint PROCESS_MODE_BACKGROUND_END = 0x00200000;
+        // Task Manager shows the green "Efficiency mode" leaf only when EcoQoS
+        // (EXECUTION_SPEED throttling) is paired with a low base priority. IDLE +
+        // EcoQoS is the same combination Edge/PowerToys use to enter the mode. The
+        // trade-off versus the old background mode: under heavy CPU contention the
+        // background mail/notification poller may be preempted more aggressively —
+        // which is the intended semantics of efficiency mode.
+        private const uint IDLE_PRIORITY_CLASS = 0x00000040;
+        private const uint NORMAL_PRIORITY_CLASS = 0x00000020;
         private const int THREAD_SET_INFORMATION = 0x0020;
+
+        // Idle + EcoQoS alone don't trim resident memory the way the old background
+        // mode did. Lowering memory priority and trimming the working set restores
+        // those savings: pages get paged out / compressed and fault back in lazily.
+        private const int ProcessMemoryPriority = 0; // PROCESS_INFORMATION_CLASS
+        private const uint MEMORY_PRIORITY_LOW = 2;
+        private const uint MEMORY_PRIORITY_NORMAL = 5;
 
         [DllImport("kernel32.dll")]
         private static extern IntPtr GetCurrentProcess();
@@ -55,6 +71,22 @@ namespace Task_Flyout.Services
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool SetPriorityClass(IntPtr hProcess, uint dwPriorityClass);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetProcessInformation(
+            IntPtr hProcess,
+            int processInformationClass,
+            ref MEMORY_PRIORITY_INFORMATION processInformation,
+            uint processInformationSize);
+
+        // Passing (SIZE_T)-1 for both bounds asks the memory manager to trim as many
+        // pages out of the working set as possible.
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetProcessWorkingSetSizeEx(
+            IntPtr hProcess,
+            IntPtr dwMinimumWorkingSetSize,
+            IntPtr dwMaximumWorkingSetSize,
+            uint flags);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool CloseHandle(IntPtr hObject);
@@ -84,13 +116,14 @@ namespace Task_Flyout.Services
                     LogLastWin32Error("SetProcessInformation(ProcessPowerThrottling)", enabled);
                 }
 
-                // Task Manager shows the leaf when EcoQoS + background mode are active.
-                // BACKGROUND_BEGIN/END only adjusts I/O & memory priority (reversible),
-                // so it won't choke the background poller like IDLE_PRIORITY_CLASS would.
-                if (!SetPriorityClass(handle, enabled ? PROCESS_MODE_BACKGROUND_BEGIN : PROCESS_MODE_BACKGROUND_END))
-                    LogLastWin32Error("SetPriorityClass(background mode)", enabled);
+                // Drop the base priority to Idle while throttled so Task Manager
+                // recognizes the EcoQoS state and shows the efficiency-mode leaf;
+                // restore Normal when a window is on screen.
+                if (!SetPriorityClass(handle, enabled ? IDLE_PRIORITY_CLASS : NORMAL_PRIORITY_CLASS))
+                    LogLastWin32Error("SetPriorityClass(idle/normal)", enabled);
 
                 ApplyThreadPowerThrottling(state, enabled);
+                ApplyMemoryCompression(handle, enabled);
                 _current = enabled;
             }
             catch (Exception ex)
@@ -130,6 +163,39 @@ namespace Task_Flyout.Services
             catch (Exception ex)
             {
                 Debug.WriteLine($"ApplyThreadPowerThrottling({enabled}) failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Restore the memory savings the old background mode gave us: lower the
+        /// process memory priority while throttled and trim the working set so resident
+        /// pages are paged out / compressed. On restore, bump priority back to normal
+        /// (trimmed pages fault back in lazily, so there's nothing to "untrim").
+        /// </summary>
+        private static void ApplyMemoryCompression(IntPtr handle, bool enabled)
+        {
+            try
+            {
+                var mem = new MEMORY_PRIORITY_INFORMATION
+                {
+                    MemoryPriority = enabled ? MEMORY_PRIORITY_LOW : MEMORY_PRIORITY_NORMAL,
+                };
+
+                if (!SetProcessInformation(handle, ProcessMemoryPriority, ref mem,
+                        (uint)Marshal.SizeOf<MEMORY_PRIORITY_INFORMATION>()))
+                {
+                    LogLastWin32Error("SetProcessInformation(ProcessMemoryPriority)", enabled);
+                }
+
+                if (enabled &&
+                    !SetProcessWorkingSetSizeEx(handle, (IntPtr)(-1), (IntPtr)(-1), 0))
+                {
+                    LogLastWin32Error("SetProcessWorkingSetSizeEx(trim)", enabled);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"ApplyMemoryCompression({enabled}) failed: {ex.Message}");
             }
         }
 
