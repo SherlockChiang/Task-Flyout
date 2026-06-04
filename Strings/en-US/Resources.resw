@@ -582,6 +582,12 @@
   <data name="TextNewMail" xml:space="preserve">
     <value>New Mail</value>
   </data>
+  <data name="MailCopyCode" xml:space="preserve">
+    <value>Copy code</value>
+  </data>
+  <data name="MailCodeCopied" xml:space="preserve">
+    <value>Verification code copied</value>
+  </data>
   <data name="TextSetupIncomplete" xml:space="preserve">
     <value>Setup required</value>
   </data>

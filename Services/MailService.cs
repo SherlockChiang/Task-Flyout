@@ -2084,17 +2084,24 @@ namespace Task_Flyout.Services
 
             try
             {
-                var notification = new AppNotificationBuilder()
+                var builder = new AppNotificationBuilder()
                     .AddText($"{(_loader.GetStringOrDefault("TextNewMail") ?? "New Mail")} · {account.DisplayTitle}")
                     .AddText(subject)
                     .AddText(sender)
                     .AddArgument("action", "openMail")
                     .AddArgument("accountId", item.AccountId)
                     .AddArgument("folderId", item.FolderId)
-                    .AddArgument("messageId", item.Id)
-                    .BuildNotification();
+                    .AddArgument("messageId", item.Id);
 
-                AppNotificationManager.Default.Show(notification);
+                // Verification-code mail: offer a one-tap "copy code" button on the toast.
+                if (VerificationCodeDetector.TryExtract(item.Subject, item.Preview, out var code))
+                {
+                    builder.AddButton(new AppNotificationButton(_loader.GetStringOrDefault("MailCopyCode") ?? "Copy code")
+                        .AddArgument("action", "copyCode")
+                        .AddArgument("code", code));
+                }
+
+                AppNotificationManager.Default.Show(builder.BuildNotification());
             }
             catch (Exception ex)
             {

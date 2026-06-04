@@ -274,6 +274,15 @@ namespace Task_Flyout.Services
             var arguments = ParseArguments(argument);
             App.MainDispatcherQueue?.TryEnqueue(() =>
             {
+                if (arguments.TryGetValue("action", out var copyAction) &&
+                    copyAction == "copyCode" &&
+                    arguments.TryGetValue("code", out var code) &&
+                    IsVerificationCode(code))
+                {
+                    CopyVerificationCodeToClipboard(code);
+                    return;
+                }
+
                 if (arguments.TryGetValue("action", out var action) &&
                     action == "openMail" &&
                     arguments.TryGetValue("accountId", out var accountId) &&
@@ -288,6 +297,34 @@ namespace Task_Flyout.Services
                     App.OpenMainWindowInternal();
                 }
             });
+        }
+
+        private static bool IsVerificationCode(string? value)
+            => !string.IsNullOrEmpty(value) && value.Length is >= 4 and <= 8 && value.All(char.IsDigit);
+
+        // Copy a verification code straight to the clipboard from the toast button,
+        // without opening the main window. Flush so the value survives even if the app
+        // is later closed.
+        private static void CopyVerificationCodeToClipboard(string code)
+        {
+            try
+            {
+                var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                package.SetText(code);
+                Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+                try { Windows.ApplicationModel.DataTransfer.Clipboard.Flush(); } catch { }
+
+                var loader = new ResourceLoader();
+                var confirm = new AppNotificationBuilder()
+                    .AddText(loader.GetStringOrDefault("MailCodeCopied") ?? "Verification code copied")
+                    .AddText(code)
+                    .BuildNotification();
+                AppNotificationManager.Default.Show(confirm);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Copy verification code failed: {ex.Message}");
+            }
         }
 
         private static bool IsSafeIdToken(string? value)
