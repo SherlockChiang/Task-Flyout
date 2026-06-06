@@ -755,6 +755,15 @@ namespace Task_Flyout
         {
             try
             {
+                // After an Explorer restart this bar (a WS_CHILD of Shell_TrayWnd) has its
+                // HWND destroyed together with the taskbar, but the managed Window object
+                // lingers. Touching its XAML/composition (RequestedTheme, brushes) now
+                // triggers a *native* access violation that bypasses managed try/catch and
+                // crashes the process. Bail out while the window handle is dead — the
+                // `root == null` check below is not enough because Content stays non-null.
+                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
+
                 var configuredTheme = App.GetConfiguredTheme();
                 if (configuredTheme == ElementTheme.Light)
                 {
@@ -786,19 +795,17 @@ namespace Task_Flyout
 
                 SystemBackdrop = null;
 
-                // NOTE: Real DWM transparency (acrylic / blur-behind) is not achievable
-                // for a child window of Shell_TrayWnd on Win11 — every official path
-                // (SystemBackdrop, DesktopAcrylicController, WS_EX_LAYERED color-key,
-                // DwmEnableBlurBehindWindow) is rejected by DWM on shell-child HWNDs.
-                // The "Match taskbar colour" toggle therefore only switches between two
-                // solid shade presets: the resting taskbar tone (on) vs a brighter chip
-                // that stands out from it (off).
+                // NOTE: Genuine transparency (showing the wallpaper / taskbar acrylic through
+                // the bar) is NOT achievable on Windows App SDK 1.8 for a child window of
+                // Shell_TrayWnd: a null backdrop falls back to an opaque base (black), and a
+                // custom transparent SystemBackdrop crashes / still renders black on a reparented
+                // shell-child HWND. First-class transparent windows only arrived with
+                // SystemBackdropElement in WinUI / Windows App SDK 2.0. Until an SDK upgrade the
+                // "Match taskbar colour" toggle just picks between two solid shade presets.
                 Color barColor;
                 if (transparent)
                 {
-                    // On: tuned to read as part of the taskbar — Win11 acrylic adds
-                    // luminosity from the wallpaper so pure 32-gray comes out blacker
-                    // than the surrounding taskbar; lift it a touch.
+                    // On: a shade tuned to sit close to the resting taskbar tone.
                     barColor = _isLightTheme
                         ? Color.FromArgb(255, 240, 240, 240)
                         : Color.FromArgb(255, 46, 46, 46);
@@ -1051,6 +1058,43 @@ namespace Task_Flyout
         private void ContentPanel_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
         {
             App.OpenMainWindowInternal(win => win.NavigateToWeather());
+        }
+
+        /// <summary>True while the underlying native window still exists. Returns false once
+        /// Explorer has destroyed the taskbar (and with it this WS_CHILD window).</summary>
+        public bool IsAlive()
+        {
+            try
+            {
+                var h = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                return h != IntPtr.Zero && IsWindow(h);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Tear down a bar whose native window Explorer already destroyed so its timers stop
+        /// keeping the object alive, allowing the App to replace it with a fresh window.
+        /// </summary>
+        public void DetachForRecovery()
+        {
+            try { _refreshTimer?.Stop(); } catch { }
+            try { _reparentTimer?.Stop(); } catch { }
+            try { UnsubscribeMediaSession(); } catch { }
+            try
+            {
+                if (_mediaSessionManager != null)
+                {
+                    _mediaSessionManager.SessionsChanged -= MediaSessionsChanged;
+                    _mediaSessionManager.CurrentSessionChanged -= MediaCurrentSessionChanged;
+                    _mediaSessionManager = null;
+                }
+            }
+            catch { }
+            try { Close(); } catch { }
         }
 
         public void ShowBar()

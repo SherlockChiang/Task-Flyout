@@ -29,7 +29,11 @@ namespace Task_Flyout
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
+        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
+
         private H.NotifyIcon.TaskbarIcon? _trayIcon;
+        private Microsoft.UI.Dispatching.DispatcherQueueTimer? _weatherBarWatchdog;
         private UISettings _uiSettings = null!;
         private ResourceLoader _loader = new();
         private string _trayToolTipText = "Task Flyout";
@@ -96,6 +100,7 @@ namespace Task_Flyout
 
             // Initialize weather bar if enabled
             InitWeatherBar();
+            StartWeatherBarWatchdog();
 
             _trayIcon.DoubleClickCommand = new RelayCommand(() => OpenMainWindowInternal());
 
@@ -298,6 +303,50 @@ namespace Task_Flyout
             }
         }
 
+        // The weather bar is reparented as a WS_CHILD of Shell_TrayWnd, so an Explorer restart
+        // destroys its native window and it silently disappears — and any later call into the
+        // dead window (e.g. toggling "match taskbar") crashes natively. This watchdog detects
+        // the dead/missing bar and rebuilds a fresh one once the taskbar is back.
+        private void StartWeatherBarWatchdog()
+        {
+            if (_weatherBarWatchdog != null) return;
+
+            _weatherBarWatchdog = MainDispatcherQueue.CreateTimer();
+            _weatherBarWatchdog.Interval = TimeSpan.FromSeconds(5);
+            _weatherBarWatchdog.Tick += (_, _) => CheckWeatherBarAlive();
+            _weatherBarWatchdog.Start();
+        }
+
+        private void CheckWeatherBarAlive()
+        {
+            try
+            {
+                bool enabled = (ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false)
+                               && WeatherService.IsEnabled;
+                if (!enabled) return;
+
+                // Alive and well — nothing to do (also covers the user-hidden case: the HWND
+                // still exists when merely hidden).
+                if (MyWeatherBar != null && MyWeatherBar.IsAlive()) return;
+
+                // Don't recreate mid-restart before the taskbar exists, or the new bar would
+                // briefly float as a stray top-level window.
+                if (FindWindow("Shell_TrayWnd", null) == IntPtr.Zero) return;
+
+                var dead = MyWeatherBar;
+                MyWeatherBar = null;
+                dead?.DetachForRecovery();
+
+                MyWeatherBar = new WeatherBarWindow();
+                ApplyConfiguredThemeToOpenWindows();
+                MyWeatherBar.ShowBar();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"WeatherBar watchdog failed: {ex.Message}");
+            }
+        }
+
         public static void ToggleWeatherBar(bool enabled)
         {
             MainDispatcherQueue.TryEnqueue(async () =>
@@ -415,6 +464,7 @@ namespace Task_Flyout
             if (_isExiting) return;
             _isExiting = true;
 
+            _weatherBarWatchdog?.Stop();
             NotificationService?.Stop();
             MailService.StopMailPolling();
             MailService.NewMailArrived -= MailService_NewMailArrived;
