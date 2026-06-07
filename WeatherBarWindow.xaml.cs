@@ -788,6 +788,8 @@ namespace Task_Flyout
         private bool _isTransparentBackground;
         private bool _usingAcrylicBackdrop;
         private bool _usingLayeredTransparency;
+        private bool _barAlertActive;
+        private int _themeRefreshGeneration;
 
         // Collapse a burst of theme/colour change notifications into a single ApplyWindowsTheme
         // call so a sunset light/dark switch doesn't re-theme the bar several times in a row.
@@ -803,8 +805,79 @@ namespace Task_Flyout
                 };
             }
 
+            Interlocked.Increment(ref _themeRefreshGeneration);
             _themeRefreshTimer.Stop();
             _themeRefreshTimer.Start();
+            _ = ApplyThemeAfterSystemSettlesAsync(_themeRefreshGeneration);
+        }
+
+        public void RefreshAfterSystemThemeChanged()
+        {
+            try
+            {
+                if (!IsAlive()) return;
+                ScheduleThemeRefresh();
+            }
+            catch { }
+        }
+
+        private async Task ApplyThemeAfterSystemSettlesAsync(int generation)
+        {
+            try
+            {
+                await Task.Delay(800);
+                QueueThemeRefreshIfCurrent(generation);
+
+                await Task.Delay(1700);
+                QueueThemeRefreshIfCurrent(generation);
+            }
+            catch { }
+        }
+
+        private void QueueThemeRefreshIfCurrent(int generation)
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (generation != _themeRefreshGeneration) return;
+                ApplyWindowsTheme();
+            });
+        }
+
+        private static bool ResolveWeatherBarLightTheme(bool matchTaskbar)
+        {
+            var configuredTheme = App.GetConfiguredTheme();
+            if (!matchTaskbar)
+            {
+                if (configuredTheme == ElementTheme.Light) return true;
+                if (configuredTheme == ElementTheme.Dark) return false;
+            }
+
+            if (TryReadWindowsLightTheme("SystemUsesLightTheme", out bool systemLight))
+                return systemLight;
+
+            if (TryReadWindowsLightTheme("AppsUseLightTheme", out bool appsLight))
+                return appsLight;
+
+            return configuredTheme != ElementTheme.Dark;
+        }
+
+        private static bool TryReadWindowsLightTheme(string valueName, out bool isLightTheme)
+        {
+            isLightTheme = true;
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(
+                    @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+                var val = key?.GetValue(valueName);
+                if (val is int intValue)
+                {
+                    isLightTheme = intValue == 1;
+                    return true;
+                }
+            }
+            catch { }
+
+            return false;
         }
 
         public void ApplyWindowsTheme()
@@ -820,22 +893,8 @@ namespace Task_Flyout
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
 
-                var configuredTheme = App.GetConfiguredTheme();
-                if (configuredTheme == ElementTheme.Light)
-                {
-                    _isLightTheme = true;
-                }
-                else if (configuredTheme == ElementTheme.Dark)
-                {
-                    _isLightTheme = false;
-                }
-                else
-                {
-                    using var key = Registry.CurrentUser.OpenSubKey(
-                        @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-                    var val = key?.GetValue("SystemUsesLightTheme");
-                    _isLightTheme = val is int v && v == 1;
-                }
+                _isTransparentBackground = false;
+                _isLightTheme = ResolveWeatherBarLightTheme(matchTaskbar: _isTransparentBackground);
 
                 var root = this.Content as FrameworkElement;
                 if (root == null) return;
@@ -847,8 +906,6 @@ namespace Task_Flyout
                 var rootGrid = root.FindName("RootGrid") as Microsoft.UI.Xaml.Controls.Grid;
                 var mainBorder = root.FindName("MainBorder") as Microsoft.UI.Xaml.Controls.Border;
                 var topBorder = root.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
-                var weatherService = (App.Current as App)?.WeatherService;
-                _isTransparentBackground = weatherService?.WeatherBarTransparentBackground == true;
                 SystemBackdrop = null;
                 _usingLayeredTransparency = ApplyLayeredTransparency(hWnd, _isTransparentBackground);
                 _usingAcrylicBackdrop = _isTransparentBackground &&
@@ -886,8 +943,29 @@ namespace Task_Flyout
                         ? Color.FromArgb(64, 0, 0, 0)
                         : Color.FromArgb(0, 0, 0, 0));
                 }
+
+                ApplyWeatherBarTextBrush(root, includeDescription: !_barAlertActive);
             }
             catch { }
+        }
+
+        private SolidColorBrush CreateWeatherBarTextBrush()
+        {
+            return new SolidColorBrush(_isLightTheme ? Colors.Black : Colors.White);
+        }
+
+        private void ApplyWeatherBarTextBrush(FrameworkElement root, bool includeDescription)
+        {
+            var brush = CreateWeatherBarTextBrush();
+            string[] names = includeDescription
+                ? new[] { "WeatherIcon", "TxtTemp", "TxtDesc", "TxtLocation", "TxtFeels", "TxtHumidity", "TxtWind" }
+                : new[] { "WeatherIcon", "TxtTemp", "TxtLocation", "TxtFeels", "TxtHumidity", "TxtWind" };
+
+            foreach (string name in names)
+            {
+                if (root.FindName(name) is Microsoft.UI.Xaml.Controls.TextBlock textBlock)
+                    textBlock.Foreground = brush;
+            }
         }
 
         private bool ApplyLayeredTransparency(IntPtr hWnd, bool enabled)
@@ -918,7 +996,7 @@ namespace Task_Flyout
                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
                 }
 
-                byte alpha = _isLightTheme ? (byte)168 : (byte)148;
+                byte alpha = _isLightTheme ? (byte)232 : (byte)224;
                 if (!SetLayeredWindowAttributes(hWnd, 0, alpha, LWA_ALPHA))
                 {
                     Debug.WriteLine($"WeatherBar alpha transparency failed: {Marshal.GetLastWin32Error()}");
@@ -1048,6 +1126,9 @@ namespace Task_Flyout
             {
                 DispatcherQueue.TryEnqueue(() =>
                 {
+                    _barAlertActive = false;
+                    if (this.Content is FrameworkElement root)
+                        ApplyWeatherBarTextBrush(root, includeDescription: true);
                     WeatherIcon.Text = "--";
                     TxtTemp.Text = "--";
                     TxtDesc.Text = "";
@@ -1066,6 +1147,9 @@ namespace Task_Flyout
             {
                 if (info == null)
                 {
+                    _barAlertActive = false;
+                    if (this.Content is FrameworkElement root)
+                        ApplyWeatherBarTextBrush(root, includeDescription: true);
                     WeatherIcon.Text = "--";
                     TxtTemp.Text = "--";
                     TxtDesc.Text = "";
@@ -1073,6 +1157,10 @@ namespace Task_Flyout
                     TxtLocation.Visibility = Visibility.Collapsed;
                     return;
                 }
+
+                _barAlertActive = alert != null;
+                if (this.Content is FrameworkElement contentRoot)
+                    ApplyWeatherBarTextBrush(contentRoot, includeDescription: alert == null);
 
                 var enabledFields = weatherService.GetEnabledBarFields();
 
@@ -1144,9 +1232,7 @@ namespace Task_Flyout
                     }
                     else
                     {
-                        TxtDesc.Foreground = new SolidColorBrush(_isLightTheme
-                            ? Color.FromArgb(255, 90, 90, 90)
-                            : Color.FromArgb(255, 200, 200, 200));
+                        TxtDesc.Foreground = CreateWeatherBarTextBrush();
                     }
                 }
 
@@ -1251,7 +1337,12 @@ namespace Task_Flyout
                 }
             }
             catch { }
-            try { Close(); } catch { }
+            try
+            {
+                if (IsAlive())
+                    Close();
+            }
+            catch { }
         }
 
         public void ShowBar()

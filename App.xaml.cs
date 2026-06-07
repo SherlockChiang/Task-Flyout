@@ -222,7 +222,7 @@ namespace Task_Flyout
             {
                 UpdateTrayIconTheme();
                 ApplyConfiguredThemeToOpenWindows();
-                MyWeatherBar?.ApplyWindowsTheme();
+                MyWeatherBar?.RefreshAfterSystemThemeChanged();
             });
         }
 
@@ -471,7 +471,7 @@ namespace Task_Flyout
             await FlushPendingSavesBeforeExitAsync();
             if (_uiSettings != null) _uiSettings.ColorValuesChanged -= UiSettings_ColorValuesChanged;
             _trayIcon?.Dispose();
-            MyWeatherBar?.Close();
+            MyWeatherBar?.DetachForRecovery();
             if (!ReferenceEquals(MyFlyoutWindow, closingWindow)) MyFlyoutWindow?.Close();
             if (!ReferenceEquals(MyMainWindow, closingWindow)) MyMainWindow?.Close();
             Exit();

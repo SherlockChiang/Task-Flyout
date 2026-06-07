@@ -56,7 +56,6 @@ namespace Task_Flyout.Views
             // Weather bar toggle
             bool weatherBarEnabled = Windows.Storage.ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false;
             WeatherBarToggle.IsOn = weatherBarEnabled;
-            WeatherBarTransparentToggle.IsOn = _weatherService.WeatherBarTransparentBackground;
             WeatherBarDesc.Text = GetSafeString("WeatherPage_WeatherBarDesc", "Show a floating weather bar on the taskbar.");
 
             // Source ComboBox
@@ -627,13 +626,6 @@ namespace Task_Flyout.Views
         {
             if (_isInitializing) return;
             App.ToggleWeatherBar(WeatherBarToggle.IsOn);
-        }
-
-        private void WeatherBarTransparentToggle_Toggled(object sender, RoutedEventArgs e)
-        {
-            if (_isInitializing || _weatherService == null) return;
-            _weatherService.WeatherBarTransparentBackground = WeatherBarTransparentToggle.IsOn;
-            App.MyWeatherBar?.ApplyWindowsTheme();
         }
 
         private async void CitySearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)

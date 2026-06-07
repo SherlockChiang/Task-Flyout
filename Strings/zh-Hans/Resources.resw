@@ -1044,9 +1044,6 @@
   <data name="WeatherPage_BarTitle.Header" xml:space="preserve">
     <value>任务栏天气栏</value>
   </data>
-  <data name="WeatherPage_MatchTaskbar.Header" xml:space="preserve">
-    <value>匹配任务栏色</value>
-  </data>
   <data name="SettingsPage_MailPolling.Header" xml:space="preserve">
     <value>定时抓取新邮件并显示 Windows 通知</value>
   </data>

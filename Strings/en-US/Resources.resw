@@ -1044,9 +1044,6 @@
   <data name="WeatherPage_BarTitle.Header" xml:space="preserve">
     <value>Taskbar Weather Bar</value>
   </data>
-  <data name="WeatherPage_MatchTaskbar.Header" xml:space="preserve">
-    <value>Match Taskbar Color</value>
-  </data>
   <data name="SettingsPage_MailPolling.Header" xml:space="preserve">
     <value>Poll new mails periodically and show Windows notifications</value>
   </data>
