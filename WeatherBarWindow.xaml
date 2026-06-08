@@ -9,7 +9,7 @@
         <Border x:Name="MainBorder"
                 Background="Transparent"
                 BorderBrush="Transparent"
-                BorderThickness="1"
+                BorderThickness="0"
                 CornerRadius="8"
                 PointerEntered="MainBorder_PointerEntered"
                 PointerExited="MainBorder_PointerExited">

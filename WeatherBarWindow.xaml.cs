@@ -956,7 +956,7 @@ namespace Task_Flyout
                 if (mainBorder != null)
                 {
                     mainBorder.Background = CreateGlassMaterialBrush(isHovering: false);
-                    mainBorder.BorderBrush = new SolidColorBrush(GetGlassBorderColor(isHovering: false));
+                    mainBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
                 }
                 // No visible top separator — it always looked like an extra strip.
                 if (topBorder != null)
@@ -1077,9 +1077,9 @@ namespace Task_Flyout
             {
                 Color baseColor = GetWeatherBarOuterFillColor();
                 if (_isLightTheme)
-                    return Mix(baseColor, Colors.White, isHovering ? 0.52 : 0.38);
+                    return Mix(baseColor, Colors.White, isHovering ? 0.88 : 0.82);
 
-                return Mix(baseColor, Colors.White, isHovering ? 0.18 : 0.1);
+                return Mix(baseColor, Colors.Black, isHovering ? 0.48 : 0.58);
             }
 
             if (_isTransparentBackground && _usingLayeredTransparency)
@@ -1160,17 +1160,18 @@ namespace Task_Flyout
 
             if (_isLightTheme)
             {
-                brush.GradientStops.Add(new GradientStop { Color = Mix(baseColor, Colors.White, isHovering ? 0.68 : 0.56), Offset = 0 });
-                brush.GradientStops.Add(new GradientStop { Color = Mix(Mix(baseColor, Color.FromArgb(255, 116, 218, 255), 0.34), Colors.White, isHovering ? 0.44 : 0.34), Offset = 0.34 });
-                brush.GradientStops.Add(new GradientStop { Color = Mix(Mix(baseColor, Color.FromArgb(255, 210, 142, 255), 0.24), Colors.White, isHovering ? 0.42 : 0.32), Offset = 0.68 });
-                brush.GradientStops.Add(new GradientStop { Color = Mix(Mix(baseColor, Color.FromArgb(255, 255, 202, 150), 0.18), Colors.White, isHovering ? 0.36 : 0.26), Offset = 1 });
+                brush.GradientStops.Add(new GradientStop { Color = Mix(baseColor, Colors.White, isHovering ? 0.9 : 0.84), Offset = 0 });
+                brush.GradientStops.Add(new GradientStop { Color = Mix(Mix(baseColor, Color.FromArgb(255, 116, 218, 255), 0.07), Colors.White, isHovering ? 0.86 : 0.8), Offset = 0.34 });
+                brush.GradientStops.Add(new GradientStop { Color = Mix(Mix(baseColor, Color.FromArgb(255, 210, 142, 255), 0.05), Colors.White, isHovering ? 0.84 : 0.78), Offset = 0.68 });
+                brush.GradientStops.Add(new GradientStop { Color = Mix(Mix(baseColor, Color.FromArgb(255, 255, 202, 150), 0.04), Colors.White, isHovering ? 0.82 : 0.76), Offset = 1 });
             }
             else
             {
-                brush.GradientStops.Add(new GradientStop { Color = Mix(baseColor, Colors.White, isHovering ? 0.2 : 0.12), Offset = 0 });
-                brush.GradientStops.Add(new GradientStop { Color = Mix(baseColor, Color.FromArgb(255, 42, 178, 218), isHovering ? 0.34 : 0.26), Offset = 0.32 });
-                brush.GradientStops.Add(new GradientStop { Color = Mix(baseColor, Color.FromArgb(255, 154, 88, 218), isHovering ? 0.32 : 0.24), Offset = 0.7 });
-                brush.GradientStops.Add(new GradientStop { Color = Mix(baseColor, Color.FromArgb(255, 206, 132, 88), isHovering ? 0.22 : 0.16), Offset = 1 });
+                Color darkBase = Mix(baseColor, Colors.Black, isHovering ? 0.48 : 0.58);
+                brush.GradientStops.Add(new GradientStop { Color = Mix(darkBase, Colors.White, isHovering ? 0.12 : 0.08), Offset = 0 });
+                brush.GradientStops.Add(new GradientStop { Color = Mix(darkBase, Color.FromArgb(255, 42, 178, 218), isHovering ? 0.12 : 0.08), Offset = 0.32 });
+                brush.GradientStops.Add(new GradientStop { Color = Mix(darkBase, Color.FromArgb(255, 154, 88, 218), isHovering ? 0.1 : 0.07), Offset = 0.7 });
+                brush.GradientStops.Add(new GradientStop { Color = Mix(darkBase, Color.FromArgb(255, 206, 132, 88), isHovering ? 0.08 : 0.05), Offset = 1 });
             }
 
             return brush;
@@ -1264,11 +1265,11 @@ namespace Task_Flyout
         private Brush CreateGlassHighlightBrush(bool isHovering)
         {
             byte topAlpha = _isLightTheme
-                ? (isHovering ? (byte)132 : (byte)104)
-                : (isHovering ? (byte)38 : (byte)30);
+                ? (isHovering ? (byte)42 : (byte)28)
+                : (isHovering ? (byte)16 : (byte)10);
             byte bottomAlpha = _isLightTheme
-                ? (isHovering ? (byte)16 : (byte)10)
-                : (isHovering ? (byte)10 : (byte)6);
+                ? (isHovering ? (byte)6 : (byte)3)
+                : (isHovering ? (byte)4 : (byte)2);
             Color sheen = _isLightTheme ? Colors.White : Color.FromArgb(255, 255, 255, 255);
 
             var brush = new LinearGradientBrush
@@ -1290,7 +1291,7 @@ namespace Task_Flyout
             var topBorder = (this.Content as FrameworkElement)?.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
 
             border.Background = CreateGlassMaterialBrush(isHovering: true);
-            border.BorderBrush = new SolidColorBrush(GetGlassBorderColor(isHovering: true));
+            border.BorderBrush = new SolidColorBrush(Colors.Transparent);
 
             if (topBorder != null)
             {
