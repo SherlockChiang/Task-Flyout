@@ -8,7 +8,9 @@
           Background="Transparent">
         <Border x:Name="MainBorder"
                 Background="Transparent"
-                BorderThickness="0"
+                BorderBrush="Transparent"
+                BorderThickness="1"
+                CornerRadius="8"
                 PointerEntered="MainBorder_PointerEntered"
                 PointerExited="MainBorder_PointerExited">
 
@@ -16,6 +18,7 @@
                     BorderThickness="0"
                     BorderBrush="Transparent"
                     Background="Transparent"
+                    CornerRadius="7"
                     Margin="0">
 
                 <StackPanel x:Name="ContentPanel"

@@ -96,6 +96,15 @@ namespace Task_Flyout
         [DllImport("user32.dll")]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetDC(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+
+        [DllImport("gdi32.dll")]
+        private static extern uint GetPixel(IntPtr hdc, int x, int y);
+
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT { public int Left, Top, Right, Bottom; }
 
@@ -155,6 +164,7 @@ namespace Task_Flyout
         private const uint WM_SETTINGCHANGE = 0x001A;
         private const uint WM_DPICHANGED = 0x02E0;
         private const uint WM_PARENTNOTIFY = 0x0210;
+        private const uint CLR_INVALID = 0xFFFFFFFF;
 
         private SUBCLASSPROC? _subclassProc;
 
@@ -471,8 +481,33 @@ namespace Task_Flyout
                     _lastInsertAfter = insertAfter;
                 }
 
+                bool sampledColorChanged = RefreshTaskbarSampleColor(tbRect, x, y, pillWidth, pillHeight);
+
+                if (UseTaskbarGlassMaterial)
+                {
+                    if (_currentRgn != IntPtr.Zero ||
+                        _lastRegionWidth != int.MinValue ||
+                        _lastRegionHeight != int.MinValue ||
+                        _lastRegionRadius != int.MinValue)
+                    {
+                        SetWindowRgn(hWnd, IntPtr.Zero, true);
+                        _currentRgn = IntPtr.Zero;
+                        _lastRegionWidth = int.MinValue;
+                        _lastRegionHeight = int.MinValue;
+                        _lastRegionRadius = int.MinValue;
+                    }
+
+                    if (sampledColorChanged)
+                        ApplyWindowsTheme();
+
+                    return;
+                }
+
                 // 圆角裁剪窗口外形（Win32 region）
-                int cornerRadius = (int)(8 * scaleFactor);
+                // CreateRoundRectRgn expects the corner ellipse diameter, while XAML
+                // CornerRadius is a radius. Keep both in sync to avoid dark pixels
+                // leaking outside the anti-aliased XAML corner.
+                int cornerRadius = (int)(16 * scaleFactor);
                 if (pillWidth != _lastRegionWidth ||
                     pillHeight != _lastRegionHeight ||
                     cornerRadius != _lastRegionRadius)
@@ -790,6 +825,9 @@ namespace Task_Flyout
         private bool _usingLayeredTransparency;
         private bool _barAlertActive;
         private int _themeRefreshGeneration;
+        private static readonly bool UseTaskbarGlassMaterial = true;
+        private Color? _sampledTaskbarColor;
+        private DateTime _lastTaskbarColorSampleUtc = DateTime.MinValue;
 
         // Collapse a burst of theme/colour change notifications into a single ApplyWindowsTheme
         // call so a sunset light/dark switch doesn't re-theme the bar several times in a row.
@@ -893,8 +931,8 @@ namespace Task_Flyout
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
 
-                _isTransparentBackground = false;
-                _isLightTheme = ResolveWeatherBarLightTheme(matchTaskbar: _isTransparentBackground);
+                _isTransparentBackground = UseTaskbarGlassMaterial;
+                _isLightTheme = ResolveWeatherBarLightTheme(matchTaskbar: UseTaskbarGlassMaterial);
 
                 var root = this.Content as FrameworkElement;
                 if (root == null) return;
@@ -907,27 +945,24 @@ namespace Task_Flyout
                 var mainBorder = root.FindName("MainBorder") as Microsoft.UI.Xaml.Controls.Border;
                 var topBorder = root.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
                 SystemBackdrop = null;
-                _usingLayeredTransparency = ApplyLayeredTransparency(hWnd, _isTransparentBackground);
-                _usingAcrylicBackdrop = _isTransparentBackground &&
-                    !_usingLayeredTransparency &&
-                    DesktopAcrylicController.IsSupported();
-
-                SystemBackdrop = _usingAcrylicBackdrop
-                    ? new DesktopAcrylicBackdrop()
-                    : null;
+                _usingLayeredTransparency = ApplyLayeredTransparency(hWnd, enabled: false);
+                _usingAcrylicBackdrop = false;
 
                 Color barColor = GetWeatherBarBackgroundColor(isHovering: false);
 
                 if (rootGrid != null)
-                    rootGrid.Background = new SolidColorBrush(Colors.Transparent);
+                    rootGrid.Background = new SolidColorBrush(GetWeatherBarOuterFillColor());
 
                 if (mainBorder != null)
-                    mainBorder.Background = new SolidColorBrush(barColor);
+                {
+                    mainBorder.Background = CreateGlassMaterialBrush(isHovering: false);
+                    mainBorder.BorderBrush = new SolidColorBrush(GetGlassBorderColor(isHovering: false));
+                }
                 // No visible top separator — it always looked like an extra strip.
                 if (topBorder != null)
                 {
                     topBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
-                    topBorder.Background = new SolidColorBrush(Colors.Transparent);
+                    topBorder.Background = CreateGlassHighlightBrush(isHovering: false);
                 }
 
                 // Color-emoji glyphs (Segoe UI Emoji) carry their own hues, and many
@@ -937,8 +972,8 @@ namespace Task_Flyout
                 // Invisible in dark theme where contrast is already fine.
                 if (root.FindName("WeatherIconBackdrop") is Microsoft.UI.Xaml.Controls.Border iconBackdrop)
                 {
-                    iconBackdrop.Background = new SolidColorBrush(_isTransparentBackground
-                        ? Colors.Transparent
+                    iconBackdrop.Background = new SolidColorBrush(UseTaskbarGlassMaterial
+                        ? GetGlassIconBackdropColor()
                         : _isLightTheme
                         ? Color.FromArgb(64, 0, 0, 0)
                         : Color.FromArgb(0, 0, 0, 0));
@@ -1038,6 +1073,15 @@ namespace Task_Flyout
 
         private Color GetWeatherBarBackgroundColor(bool isHovering)
         {
+            if (UseTaskbarGlassMaterial)
+            {
+                Color baseColor = GetWeatherBarOuterFillColor();
+                if (_isLightTheme)
+                    return Mix(baseColor, Colors.White, isHovering ? 0.52 : 0.38);
+
+                return Mix(baseColor, Colors.White, isHovering ? 0.18 : 0.1);
+            }
+
             if (_isTransparentBackground && _usingLayeredTransparency)
             {
                 if (_isLightTheme)
@@ -1076,6 +1120,168 @@ namespace Task_Flyout
                 : Color.FromArgb(255, 62, 62, 62);
         }
 
+        private Color GetWeatherBarOuterFillColor()
+        {
+            return _sampledTaskbarColor ?? (_isLightTheme
+                ? Color.FromArgb(255, 235, 238, 242)
+                : Color.FromArgb(255, 38, 40, 44));
+        }
+
+        private Color GetGlassBorderColor(bool isHovering)
+        {
+            if (_isLightTheme)
+                return isHovering
+                    ? Color.FromArgb(255, 255, 255, 255)
+                    : Color.FromArgb(255, 248, 250, 252);
+
+            return isHovering
+                ? Color.FromArgb(255, 95, 98, 106)
+                : Color.FromArgb(255, 68, 70, 76);
+        }
+
+        private Color GetGlassIconBackdropColor()
+        {
+            return _isLightTheme
+                ? Color.FromArgb(44, 0, 0, 0)
+                : Color.FromArgb(72, 255, 255, 255);
+        }
+
+        private Brush CreateGlassMaterialBrush(bool isHovering)
+        {
+            if (!UseTaskbarGlassMaterial)
+                return new SolidColorBrush(GetWeatherBarBackgroundColor(isHovering));
+
+            Color baseColor = GetWeatherBarOuterFillColor();
+            var brush = new LinearGradientBrush
+            {
+                StartPoint = new Windows.Foundation.Point(0, 0),
+                EndPoint = new Windows.Foundation.Point(1, 1)
+            };
+
+            if (_isLightTheme)
+            {
+                brush.GradientStops.Add(new GradientStop { Color = Mix(baseColor, Colors.White, isHovering ? 0.68 : 0.56), Offset = 0 });
+                brush.GradientStops.Add(new GradientStop { Color = Mix(Mix(baseColor, Color.FromArgb(255, 116, 218, 255), 0.34), Colors.White, isHovering ? 0.44 : 0.34), Offset = 0.34 });
+                brush.GradientStops.Add(new GradientStop { Color = Mix(Mix(baseColor, Color.FromArgb(255, 210, 142, 255), 0.24), Colors.White, isHovering ? 0.42 : 0.32), Offset = 0.68 });
+                brush.GradientStops.Add(new GradientStop { Color = Mix(Mix(baseColor, Color.FromArgb(255, 255, 202, 150), 0.18), Colors.White, isHovering ? 0.36 : 0.26), Offset = 1 });
+            }
+            else
+            {
+                brush.GradientStops.Add(new GradientStop { Color = Mix(baseColor, Colors.White, isHovering ? 0.2 : 0.12), Offset = 0 });
+                brush.GradientStops.Add(new GradientStop { Color = Mix(baseColor, Color.FromArgb(255, 42, 178, 218), isHovering ? 0.34 : 0.26), Offset = 0.32 });
+                brush.GradientStops.Add(new GradientStop { Color = Mix(baseColor, Color.FromArgb(255, 154, 88, 218), isHovering ? 0.32 : 0.24), Offset = 0.7 });
+                brush.GradientStops.Add(new GradientStop { Color = Mix(baseColor, Color.FromArgb(255, 206, 132, 88), isHovering ? 0.22 : 0.16), Offset = 1 });
+            }
+
+            return brush;
+        }
+
+        private bool RefreshTaskbarSampleColor(RECT taskbarRect, int barX, int barY, int barWidth, int barHeight)
+        {
+            if (!UseTaskbarGlassMaterial) return false;
+            if ((DateTime.UtcNow - _lastTaskbarColorSampleUtc) < TimeSpan.FromMilliseconds(250)) return false;
+
+            _lastTaskbarColorSampleUtc = DateTime.UtcNow;
+            if (!TrySampleTaskbarColor(taskbarRect, barX, barY, barWidth, barHeight, out Color sampled))
+                return false;
+
+            if (_sampledTaskbarColor.HasValue && ColorDistance(_sampledTaskbarColor.Value, sampled) < 10)
+                return false;
+
+            _sampledTaskbarColor = sampled;
+            return true;
+        }
+
+        private static bool TrySampleTaskbarColor(RECT taskbarRect, int barX, int barY, int barWidth, int barHeight, out Color color)
+        {
+            color = Colors.Transparent;
+
+            int taskbarWidth = taskbarRect.Right - taskbarRect.Left;
+            int taskbarHeight = taskbarRect.Bottom - taskbarRect.Top;
+            if (taskbarWidth <= 8 || taskbarHeight <= 8) return false;
+
+            int centerY = taskbarRect.Top + Math.Clamp(barY + barHeight / 2, 3, taskbarHeight - 4);
+            int upperY = taskbarRect.Top + Math.Clamp(barY + Math.Max(3, barHeight / 4), 3, taskbarHeight - 4);
+            int lowerY = taskbarRect.Top + Math.Clamp(barY + Math.Max(3, barHeight * 3 / 4), 3, taskbarHeight - 4);
+
+            int rightX = taskbarRect.Left + Math.Clamp(barX + barWidth + 10, 3, taskbarWidth - 4);
+            int leftX = taskbarRect.Left + Math.Clamp(barX - 10, 3, taskbarWidth - 4);
+            int farX = taskbarRect.Left + Math.Clamp(barX + barWidth + 28, 3, taskbarWidth - 4);
+
+            IntPtr dc = GetDC(IntPtr.Zero);
+            if (dc == IntPtr.Zero) return false;
+
+            try
+            {
+                int r = 0, g = 0, b = 0, count = 0;
+                SamplePixel(dc, rightX, centerY, ref r, ref g, ref b, ref count);
+                SamplePixel(dc, rightX, upperY, ref r, ref g, ref b, ref count);
+                SamplePixel(dc, rightX, lowerY, ref r, ref g, ref b, ref count);
+                SamplePixel(dc, farX, centerY, ref r, ref g, ref b, ref count);
+                SamplePixel(dc, leftX, centerY, ref r, ref g, ref b, ref count);
+
+                if (count == 0) return false;
+
+                color = Color.FromArgb(255, (byte)(r / count), (byte)(g / count), (byte)(b / count));
+                return true;
+            }
+            finally
+            {
+                ReleaseDC(IntPtr.Zero, dc);
+            }
+        }
+
+        private static void SamplePixel(IntPtr dc, int x, int y, ref int r, ref int g, ref int b, ref int count)
+        {
+            uint pixel = GetPixel(dc, x, y);
+            if (pixel == CLR_INVALID) return;
+
+            r += (int)(pixel & 0xFF);
+            g += (int)((pixel >> 8) & 0xFF);
+            b += (int)((pixel >> 16) & 0xFF);
+            count++;
+        }
+
+        private static double ColorDistance(Color a, Color b)
+        {
+            int dr = a.R - b.R;
+            int dg = a.G - b.G;
+            int db = a.B - b.B;
+            return Math.Sqrt(dr * dr + dg * dg + db * db);
+        }
+
+        private static Color Mix(Color a, Color b, double amount)
+        {
+            amount = Math.Clamp(amount, 0, 1);
+            double keep = 1 - amount;
+            return Color.FromArgb(
+                255,
+                (byte)Math.Clamp((int)Math.Round(a.R * keep + b.R * amount), 0, 255),
+                (byte)Math.Clamp((int)Math.Round(a.G * keep + b.G * amount), 0, 255),
+                (byte)Math.Clamp((int)Math.Round(a.B * keep + b.B * amount), 0, 255));
+        }
+
+        private Brush CreateGlassHighlightBrush(bool isHovering)
+        {
+            byte topAlpha = _isLightTheme
+                ? (isHovering ? (byte)132 : (byte)104)
+                : (isHovering ? (byte)38 : (byte)30);
+            byte bottomAlpha = _isLightTheme
+                ? (isHovering ? (byte)16 : (byte)10)
+                : (isHovering ? (byte)10 : (byte)6);
+            Color sheen = _isLightTheme ? Colors.White : Color.FromArgb(255, 255, 255, 255);
+
+            var brush = new LinearGradientBrush
+            {
+                StartPoint = new Windows.Foundation.Point(0, 0),
+                EndPoint = new Windows.Foundation.Point(0, 1)
+            };
+            brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(topAlpha, sheen.R, sheen.G, sheen.B), Offset = 0 });
+            brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(bottomAlpha, sheen.R, sheen.G, sheen.B), Offset = 0.48 });
+            brush.GradientStops.Add(new GradientStop { Color = Colors.Transparent, Offset = 1 });
+            return brush;
+        }
+
         private void MainBorder_PointerEntered(object sender, PointerRoutedEventArgs e)
         {
             var border = sender as Microsoft.UI.Xaml.Controls.Border;
@@ -1083,10 +1289,14 @@ namespace Task_Flyout
 
             var topBorder = (this.Content as FrameworkElement)?.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
 
-            border.Background = new SolidColorBrush(GetWeatherBarBackgroundColor(isHovering: true));
+            border.Background = CreateGlassMaterialBrush(isHovering: true);
+            border.BorderBrush = new SolidColorBrush(GetGlassBorderColor(isHovering: true));
 
             if (topBorder != null)
+            {
                 topBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
+                topBorder.Background = CreateGlassHighlightBrush(isHovering: true);
+            }
         }
 
         private void MainBorder_PointerExited(object sender, PointerRoutedEventArgs e)
