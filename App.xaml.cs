@@ -37,6 +37,7 @@ namespace Task_Flyout
         private UISettings _uiSettings = null!;
         private ResourceLoader _loader = new();
         private string _trayToolTipText = "Task Flyout";
+        private string? _currentTrayIconName;
         public static FlyoutWindow? MyFlyoutWindow { get; private set; }
         public static MainWindow? MyMainWindow { get; private set; }
         public static WeatherBarWindow? MyWeatherBar { get; private set; }
@@ -234,7 +235,12 @@ namespace Task_Flyout
             bool isDarkTheme = backgroundColor == Windows.UI.Color.FromArgb(255, 0, 0, 0);
             string iconName = isDarkTheme ? "TrayIcon_Dark.ico" : "TrayIcon_Light.ico";
 
-            _trayIcon.IconSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri($"ms-appx:///Assets/{iconName}"));
+            if (!string.Equals(_currentTrayIconName, iconName, StringComparison.Ordinal))
+            {
+                _trayIcon.IconSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri($"ms-appx:///Assets/{iconName}"));
+                _currentTrayIconName = iconName;
+            }
+
             _trayIcon.ToolTipText = _trayToolTipText;
         }
 

@@ -8,6 +8,7 @@ using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -48,6 +49,10 @@ namespace Task_Flyout
         private static readonly TimeSpan NormalReparentInterval = TimeSpan.FromSeconds(8);
         private static readonly TimeSpan FastReparentInterval = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan FastReparentDuration = TimeSpan.FromSeconds(20);
+        private const double MinLogicalWidth = 80;
+        private const double MaxLogicalWidth = 420;
+        private bool _subclassInstalled;
+        private string _lastWeatherLayerKey = "";
 
         #region P/Invoke
 
@@ -114,6 +119,9 @@ namespace Task_Flyout
         private static extern bool SetWindowSubclass(IntPtr hWnd, SUBCLASSPROC pfnSubclass, IntPtr uIdSubclass, IntPtr dwRefData);
 
         [DllImport("comctl32.dll")]
+        private static extern bool RemoveWindowSubclass(IntPtr hWnd, SUBCLASSPROC pfnSubclass, IntPtr uIdSubclass);
+
+        [DllImport("comctl32.dll")]
         private static extern IntPtr DefSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
 
         private const int GWL_STYLE = -16;
@@ -170,7 +178,7 @@ namespace Task_Flyout
 
         #endregion
 
-        // 已知第三方 widget 进程名（小写，不含 .exe）
+        // Known third-party widget process names (lowercase, without .exe)
         private static readonly HashSet<string> KnownWidgetProcesses = new(StringComparer.OrdinalIgnoreCase)
         {
             "fluentflyout",
@@ -180,7 +188,7 @@ namespace Task_Flyout
             "roundedtb",
         };
 
-        // Shell_TrayWnd 内部系统子窗口类名（不是 widget，需要跳过）
+        // System child-window class names inside Shell_TrayWnd (not widgets, skip these)
         private static readonly HashSet<string> SystemTaskbarClasses = new(StringComparer.Ordinal)
         {
             "TrayNotifyWnd",
@@ -226,9 +234,12 @@ namespace Task_Flyout
 
             RootGrid.Loaded += async (s, e) =>
             {
-                _contentPanel = RootGrid.FindName("ContentPanel") as FrameworkElement;
-                if (_contentPanel != null)
-                    _contentPanel.SizeChanged += (s2, e2) => RecomputeBarWidth();
+                if (_contentPanel == null && RootGrid.FindName("ContentPanel") is FrameworkElement contentPanel)
+                {
+                    _contentPanel = contentPanel;
+                    _contentPanel.SizeChanged += ContentPanel_SizeChanged;
+                }
+
                 await RefreshWeatherAsync();
             };
 
@@ -244,11 +255,27 @@ namespace Task_Flyout
                     _mediaSessionManager.CurrentSessionChanged -= MediaCurrentSessionChanged;
                     _mediaSessionManager = null;
                 }
+                DetachContentPanelEvents();
+                UninstallSubclassIfAlive();
                 SystemBackdrop = null;
             };
         }
 
         private FrameworkElement? _contentPanel;
+
+        private void ContentPanel_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            RecomputeBarWidth();
+        }
+
+        private void DetachContentPanelEvents()
+        {
+            if (_contentPanel != null)
+            {
+                _contentPanel.SizeChanged -= ContentPanel_SizeChanged;
+                _contentPanel = null;
+            }
+        }
 
         private void ReparentTimer_Tick(object? sender, object e)
         {
@@ -346,7 +373,22 @@ namespace Task_Flyout
         private void InstallSubclass(IntPtr hWnd)
         {
             _subclassProc = SubclassProc;
-            SetWindowSubclass(hWnd, _subclassProc, IntPtr.Zero, IntPtr.Zero);
+            _subclassInstalled = SetWindowSubclass(hWnd, _subclassProc, IntPtr.Zero, IntPtr.Zero);
+        }
+
+        private void UninstallSubclassIfAlive()
+        {
+            try
+            {
+                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                if (_subclassInstalled && _subclassProc != null && hWnd != IntPtr.Zero && IsWindow(hWnd))
+                    RemoveWindowSubclass(hWnd, _subclassProc, IntPtr.Zero);
+            }
+            catch { }
+            finally
+            {
+                _subclassInstalled = false;
+            }
         }
 
         private IntPtr SubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, IntPtr uIdSubclass, IntPtr dwRefData)
@@ -440,7 +482,9 @@ namespace Task_Flyout
             if (pillHeight < (int)(28 * scaleFactor))
                 pillHeight = (int)(28 * scaleFactor);
             int pillWidth = (int)(_preferredLogicalWidth * scaleFactor);
-            if (pillWidth < (int)(80 * scaleFactor)) pillWidth = (int)(80 * scaleFactor);
+            int minPillWidth = (int)(MinLogicalWidth * scaleFactor);
+            int maxPillWidth = (int)(MaxLogicalWidth * scaleFactor);
+            pillWidth = Math.Clamp(pillWidth, minPillWidth, maxPillWidth);
 
             IntPtr previousFluentFlyout = _fluentFlyoutHwnd;
             int widgetsOffset = GetTaskbarWidgetsOffset(hWnd, tbRect);
@@ -451,7 +495,7 @@ namespace Task_Flyout
             int x = widgetsOffset + (widgetsOffset > 0 ? gap : 0);
             int y = (taskbarHeight - pillHeight) / 2;
 
-                // 如果检测到 FluentFlyout，把自己排在它后面（z-order 更低），避免遮挡
+                // If FluentFlyout is detected, place ourselves behind it (lower z-order) to avoid overlap
                 IntPtr insertAfter = _fluentFlyoutHwnd != IntPtr.Zero ? _fluentFlyoutHwnd : IntPtr.Zero;
                 uint flags = SWP_NOACTIVATE | SWP_SHOWWINDOW;
                 if (_fluentFlyoutHwnd == IntPtr.Zero)
@@ -498,12 +542,12 @@ namespace Task_Flyout
                     }
 
                     if (sampledColorChanged)
-                        ApplyWindowsTheme();
+                        ApplyGlassBrushes();
 
                     return;
                 }
 
-                // 圆角裁剪窗口外形（Win32 region）
+                // Round-rect clip for the window shape (Win32 region)
                 // CreateRoundRectRgn expects the corner ellipse diameter, while XAML
                 // CornerRadius is a radius. Keep both in sync to avoid dark pixels
                 // leaking outside the anti-aliased XAML corner.
@@ -555,13 +599,10 @@ namespace Task_Flyout
         [DllImport("user32.dll")]
         private static extern int GetWindowRgn(IntPtr hWnd, IntPtr hRgn);
 
-        // 把这两个常量也加到 P/Invoke 区域
-        private const int SIMPLEREGION = 2;
-        private const int COMPLEXREGION = 3;
-
         /// <summary>
-        /// 检测任务栏上的 widget。FluentFlyout TaskbarWidget 是横跨屏幕的透明顶层窗口，
-        /// 实际可见区域通过 window region 裁剪 —— 必须用 GetWindowRgn 才能拿到真实矩形。
+        /// Detects taskbar widgets. FluentFlyout TaskbarWidget is a transparent top-level window
+        /// spanning the full screen; its visible area is clipped via a window region — we must
+        /// use GetWindowRgn to obtain the real bounding rectangle.
         /// </summary>
         private bool _isMediaActive;
 
@@ -623,7 +664,7 @@ namespace Task_Flyout
             try
             {
                 var status = session?.GetPlaybackInfo()?.PlaybackStatus;
-                // Playing/Paused 状态下 FluentFlyout 都会显示媒体控件
+                // FluentFlyout shows media controls in both Playing and Paused states
                 _isMediaActive = status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
                               || status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused;
             }
@@ -657,8 +698,8 @@ namespace Task_Flyout
                 int maxRightScreen = taskbarLeft;
                 _fluentFlyoutHwnd = IntPtr.Zero;
 
-                // 枚举 Shell_TrayWnd 的直接子窗口（FluentFlyout TaskbarWindow 通过 SetParent 挂载在这里，
-                // Win11 原生 Widgets 也是 DesktopWindowContentBridge 子窗口）
+                // Enumerate direct children of Shell_TrayWnd (FluentFlyout TaskbarWindow is
+                // attached here via SetParent; native Win11 Widgets are DesktopWindowContentBridge children)
                 if (_taskbarHwnd != IntPtr.Zero)
                 {
                     IntPtr child = IntPtr.Zero;
@@ -683,13 +724,13 @@ namespace Task_Flyout
 
                         if (!isBridge && !isFluentFlyout) continue;
 
-                        // FluentFlyout: 只在有媒体正在播放时才避让
+                        // FluentFlyout: only dodge when media is actively playing
                         if (isFluentFlyout && !_isMediaActive) continue;
 
                         if (!GetWindowRect(child, out RECT rc)) continue;
 
-                        // FluentFlyout TaskbarWindow 覆盖整个任务栏宽度，必须用 window region
-                        // 拿到真实的 widget 可见区域
+                        // FluentFlyout TaskbarWindow spans the full taskbar width; we need
+                        // the window region to determine the actual visible widget area
                         bool hasRegion = TryGetWindowVisibleRect(child, rc, out RECT rgnRc);
                         RECT visibleRc = hasRegion ? rgnRc : rc;
 
@@ -706,7 +747,7 @@ namespace Task_Flyout
                                         $"visibleRc={visibleRc.Left},{visibleRc.Top},{visibleRc.Right},{visibleRc.Bottom} " +
                                         $"hasRegion={hasRegion} mediaPlaying={_isMediaActive}");
 
-                        // 记住 FluentFlyout 的 HWND 用于 z-order 排列
+                        // Remember FluentFlyout's HWND for z-order arrangement
                         if (isFluentFlyout)
                             _fluentFlyoutHwnd = child;
 
@@ -724,8 +765,9 @@ namespace Task_Flyout
         }
 
         /// <summary>
-        /// 获取窗口 region 的边界矩形（屏幕坐标）。
-        /// region 坐标是相对窗口左上角的，需要加上 GetWindowRect 的 offset。
+        /// Gets the bounding rectangle of a window's region in screen coordinates.
+        /// Region coordinates are relative to the window's top-left corner and must be
+        /// offset by the GetWindowRect origin.
         /// </summary>
         private static bool TryGetWindowVisibleRect(IntPtr hWnd, RECT windowRect, out RECT visibleRect)
         {
@@ -734,11 +776,11 @@ namespace Task_Flyout
             try
             {
                 int result = GetWindowRgn(hWnd, hrgn);
-                if (result == 0) return false; // 没有 region，窗口是矩形（即 windowRect）
+                if (result == 0) return false; // No region — the window is rectangular (i.e. windowRect)
 
                 if (GetRgnBox(hrgn, out RECT rgnBox) == 0) return false;
 
-                // region 坐标是客户区/窗口相对坐标，转换为屏幕坐标
+                // Region coordinates are window-relative; convert to screen coordinates
                 visibleRect = new RECT
                 {
                     Left = windowRect.Left + rgnBox.Left,
@@ -754,70 +796,7 @@ namespace Task_Flyout
             }
         }
 
-        private void TryAccumulateWidgetRight(
-            IntPtr hWnd, IntPtr ownHwnd, uint ownPid,
-            int taskbarLeft, int taskbarTop, int taskbarBottom, int taskbarMidX, int taskbarHeight,
-            ref int maxRightScreen)
-        {
-            if (hWnd == ownHwnd) return;
-            if (!IsWindowVisible(hWnd)) return;
 
-            GetWindowThreadProcessId(hWnd, out uint pid);
-            if (pid == ownPid) return;
-
-            var clsBuf = new StringBuilder(256);
-            GetClassName(hWnd, clsBuf, clsBuf.Capacity);
-            string cls = clsBuf.ToString();
-
-            // 跳过 Shell 自身的系统子窗口
-            if (SystemTaskbarClasses.Contains(cls)) return;
-
-            if (!GetWindowRect(hWnd, out RECT rc)) return;
-            int w = rc.Right - rc.Left;
-            int h = rc.Bottom - rc.Top;
-            if (w <= 0 || h <= 0) return;
-
-            // 尺寸护栏：widget 通常 < 600px 宽，高度不超过任务栏 2 倍（动画/阴影时会超出）
-            if (w > 600) return;
-            if (h > taskbarHeight * 2 + 20) return;
-
-            // 必须与任务栏垂直相交
-            if (rc.Bottom <= taskbarTop || rc.Top >= taskbarBottom) return;
-
-            // 必须与任务栏左半边有横向重叠（不要求整体落在左半边 —— FluentFlyout 居中时会横跨中线）
-            if (rc.Left >= taskbarMidX) return;
-
-            // 判断是否是 widget：
-            //   1) 类名是 WinUI bridge (Win11 Widgets)
-            //   2) 类名是 WPF HwndWrapper（FluentFlyout 等）
-            //   3) 进程名在已知列表
-            bool isBridge = cls == "Windows.UI.Composition.DesktopWindowContentBridge";
-            bool isWpf = cls.StartsWith("HwndWrapper[", StringComparison.Ordinal);
-            bool isKnownProc = TryGetProcessName(pid, out string procName) &&
-                               KnownWidgetProcesses.Contains(procName);
-
-            if (!(isBridge || isWpf || isKnownProc)) return;
-
-            // 避让终点不能超过任务栏中线，避免被横跨中线的 widget 推到屏幕中央
-            int effectiveRight = Math.Min(rc.Right, taskbarMidX);
-            if (effectiveRight > maxRightScreen)
-                maxRightScreen = effectiveRight;
-        }
-
-        private static bool TryGetProcessName(uint pid, out string name)
-        {
-            name = string.Empty;
-            try
-            {
-                using var p = Process.GetProcessById((int)pid);
-                name = p.ProcessName;
-                return !string.IsNullOrEmpty(name);
-            }
-            catch
-            {
-                return false;
-            }
-        }
 
         private bool _isLightTheme;
         private bool _isTransparentBackground;
@@ -941,47 +920,53 @@ namespace Task_Flyout
                 // bar's actual background — otherwise text follows the system theme and
                 // ends up white-on-light or black-on-dark when the two disagree.
                 root.RequestedTheme = _isLightTheme ? ElementTheme.Light : ElementTheme.Dark;
-                var rootGrid = root.FindName("RootGrid") as Microsoft.UI.Xaml.Controls.Grid;
-                var mainBorder = root.FindName("MainBorder") as Microsoft.UI.Xaml.Controls.Border;
-                var topBorder = root.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
                 SystemBackdrop = null;
                 _usingLayeredTransparency = ApplyLayeredTransparency(hWnd, enabled: false);
                 _usingAcrylicBackdrop = false;
 
-                Color barColor = GetWeatherBarBackgroundColor(isHovering: false);
-
-                if (rootGrid != null)
-                    rootGrid.Background = new SolidColorBrush(GetWeatherBarOuterFillColor());
-
-                if (mainBorder != null)
-                {
-                    mainBorder.Background = CreateGlassMaterialBrush(isHovering: false);
-                    mainBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
-                }
-                // No visible top separator — it always looked like an extra strip.
-                if (topBorder != null)
-                {
-                    topBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
-                    topBorder.Background = CreateGlassHighlightBrush(isHovering: false);
-                }
-
-                // Color-emoji glyphs (Segoe UI Emoji) carry their own hues, and many
-                // third-party icon packs ship pure-white PNGs designed for the Win11
-                // dark taskbar. Both wash out completely on the light bar shade — paint
-                // a dark chip behind the icon container so light artwork still pops.
-                // Invisible in dark theme where contrast is already fine.
-                if (root.FindName("WeatherIconBackdrop") is Microsoft.UI.Xaml.Controls.Border iconBackdrop)
-                {
-                    iconBackdrop.Background = new SolidColorBrush(UseTaskbarGlassMaterial
-                        ? GetGlassIconBackdropColor()
-                        : _isLightTheme
-                        ? Color.FromArgb(64, 0, 0, 0)
-                        : Color.FromArgb(0, 0, 0, 0));
-                }
-
+                ApplyGlassBrushes(root);
                 ApplyWeatherBarTextBrush(root, includeDescription: !_barAlertActive);
             }
             catch { }
+        }
+
+        private void ApplyGlassBrushes()
+        {
+            if (this.Content is FrameworkElement root)
+                ApplyGlassBrushes(root);
+        }
+
+        private void ApplyGlassBrushes(FrameworkElement root)
+        {
+            var rootGrid = root.FindName("RootGrid") as Microsoft.UI.Xaml.Controls.Grid;
+            var mainBorder = root.FindName("MainBorder") as Microsoft.UI.Xaml.Controls.Border;
+            var topBorder = root.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
+
+            if (rootGrid != null)
+                rootGrid.Background = new SolidColorBrush(GetWeatherBarOuterFillColor());
+
+            if (mainBorder != null)
+            {
+                mainBorder.Background = CreateGlassMaterialBrush(isHovering: false);
+                mainBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
+            }
+
+            if (topBorder != null)
+            {
+                topBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
+                topBorder.Background = CreateGlassHighlightBrush(isHovering: false);
+            }
+
+            // Color-emoji glyphs carry their own hues, and many imported icon packs
+            // ship pure-white PNGs. Give the icon a subtle counter-surface when needed.
+            if (root.FindName("WeatherIconBackdrop") is Microsoft.UI.Xaml.Controls.Border iconBackdrop)
+            {
+                iconBackdrop.Background = new SolidColorBrush(UseTaskbarGlassMaterial
+                    ? GetGlassIconBackdropColor()
+                    : _isLightTheme
+                    ? Color.FromArgb(64, 0, 0, 0)
+                    : Color.FromArgb(0, 0, 0, 0));
+            }
         }
 
         private SolidColorBrush CreateWeatherBarTextBrush()
@@ -1127,18 +1112,6 @@ namespace Task_Flyout
                 : Color.FromArgb(255, 38, 40, 44));
         }
 
-        private Color GetGlassBorderColor(bool isHovering)
-        {
-            if (_isLightTheme)
-                return isHovering
-                    ? Color.FromArgb(255, 255, 255, 255)
-                    : Color.FromArgb(255, 248, 250, 252);
-
-            return isHovering
-                ? Color.FromArgb(255, 95, 98, 106)
-                : Color.FromArgb(255, 68, 70, 76);
-        }
-
         private Color GetGlassIconBackdropColor()
         {
             return _isLightTheme
@@ -1201,29 +1174,53 @@ namespace Task_Flyout
             int taskbarHeight = taskbarRect.Bottom - taskbarRect.Top;
             if (taskbarWidth <= 8 || taskbarHeight <= 8) return false;
 
-            int centerY = taskbarRect.Top + Math.Clamp(barY + barHeight / 2, 3, taskbarHeight - 4);
-            int upperY = taskbarRect.Top + Math.Clamp(barY + Math.Max(3, barHeight / 4), 3, taskbarHeight - 4);
-            int lowerY = taskbarRect.Top + Math.Clamp(barY + Math.Max(3, barHeight * 3 / 4), 3, taskbarHeight - 4);
+            int[] yCandidates =
+            {
+                Math.Clamp(barY + barHeight / 2, 3, taskbarHeight - 4),
+                Math.Clamp(barY + Math.Max(3, barHeight / 4), 3, taskbarHeight - 4),
+                Math.Clamp(barY + Math.Max(3, barHeight * 3 / 4), 3, taskbarHeight - 4)
+            };
 
-            int rightX = taskbarRect.Left + Math.Clamp(barX + barWidth + 10, 3, taskbarWidth - 4);
-            int leftX = taskbarRect.Left + Math.Clamp(barX - 10, 3, taskbarWidth - 4);
-            int farX = taskbarRect.Left + Math.Clamp(barX + barWidth + 28, 3, taskbarWidth - 4);
+            int[] xCandidates =
+            {
+                barX + barWidth + 12,
+                barX + barWidth + 28,
+                barX + barWidth + 48,
+                barX - 12,
+                barX - 28,
+                taskbarWidth / 2
+            };
 
             IntPtr dc = GetDC(IntPtr.Zero);
             if (dc == IntPtr.Zero) return false;
 
             try
             {
-                int r = 0, g = 0, b = 0, count = 0;
-                SamplePixel(dc, rightX, centerY, ref r, ref g, ref b, ref count);
-                SamplePixel(dc, rightX, upperY, ref r, ref g, ref b, ref count);
-                SamplePixel(dc, rightX, lowerY, ref r, ref g, ref b, ref count);
-                SamplePixel(dc, farX, centerY, ref r, ref g, ref b, ref count);
-                SamplePixel(dc, leftX, centerY, ref r, ref g, ref b, ref count);
+                var samples = new List<Color>(12);
+                var seen = new HashSet<long>();
+                foreach (int candidateX in xCandidates)
+                {
+                    if (candidateX >= barX - 2 && candidateX <= barX + barWidth + 2)
+                        continue;
 
-                if (count == 0) return false;
+                    int relX = Math.Clamp(candidateX, 3, taskbarWidth - 4);
+                    if (relX >= barX - 2 && relX <= barX + barWidth + 2)
+                        continue;
 
-                color = Color.FromArgb(255, (byte)(r / count), (byte)(g / count), (byte)(b / count));
+                    foreach (int relY in yCandidates)
+                    {
+                        long key = ((long)relX << 32) | (uint)relY;
+                        if (!seen.Add(key))
+                            continue;
+
+                        if (TrySamplePixel(dc, taskbarRect.Left + relX, taskbarRect.Top + relY, out Color sample))
+                            samples.Add(sample);
+                    }
+                }
+
+                if (samples.Count == 0) return false;
+
+                color = MedianColor(samples);
                 return true;
             }
             finally
@@ -1232,15 +1229,33 @@ namespace Task_Flyout
             }
         }
 
-        private static void SamplePixel(IntPtr dc, int x, int y, ref int r, ref int g, ref int b, ref int count)
+        private static bool TrySamplePixel(IntPtr dc, int x, int y, out Color color)
         {
+            color = Colors.Transparent;
             uint pixel = GetPixel(dc, x, y);
-            if (pixel == CLR_INVALID) return;
+            if (pixel == CLR_INVALID) return false;
 
-            r += (int)(pixel & 0xFF);
-            g += (int)((pixel >> 8) & 0xFF);
-            b += (int)((pixel >> 16) & 0xFF);
-            count++;
+            color = Color.FromArgb(
+                255,
+                (byte)(pixel & 0xFF),
+                (byte)((pixel >> 8) & 0xFF),
+                (byte)((pixel >> 16) & 0xFF));
+            return true;
+        }
+
+        private static Color MedianColor(List<Color> samples)
+        {
+            return Color.FromArgb(
+                255,
+                Median(samples.Select(sample => sample.R)),
+                Median(samples.Select(sample => sample.G)),
+                Median(samples.Select(sample => sample.B)));
+        }
+
+        private static byte Median(IEnumerable<byte> values)
+        {
+            var sorted = values.OrderBy(value => value).ToArray();
+            return sorted[sorted.Length / 2];
         }
 
         private static double ColorDistance(Color a, Color b)
@@ -1302,7 +1317,21 @@ namespace Task_Flyout
 
         private void MainBorder_PointerExited(object sender, PointerRoutedEventArgs e)
         {
-            ApplyWindowsTheme(); // restore resting Mica background + border
+            // Restore resting-state brushes directly instead of re-reading the registry
+            // and recalculating the full theme via ApplyWindowsTheme().
+            var border = sender as Microsoft.UI.Xaml.Controls.Border;
+            if (border == null) return;
+
+            var topBorder = (this.Content as FrameworkElement)?.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
+
+            border.Background = CreateGlassMaterialBrush(isHovering: false);
+            border.BorderBrush = new SolidColorBrush(Colors.Transparent);
+
+            if (topBorder != null)
+            {
+                topBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
+                topBorder.Background = CreateGlassHighlightBrush(isHovering: false);
+            }
         }
 
         private static string FormatBarLocation(string city)
@@ -1399,29 +1428,17 @@ namespace Task_Flyout
                 if (!showIcon)
                 {
                     WeatherIcon.Visibility = Visibility.Collapsed;
-                    foreach (var img in layerImages) img.Visibility = Visibility.Collapsed;
+                    ClearWeatherIconLayerImages(layerImages, clearSources: true);
                 }
                 else if (useBitmap)
                 {
                     WeatherIcon.Visibility = Visibility.Collapsed;
-                    for (int i = 0; i < layerImages.Length; i++)
-                    {
-                        if (i < displayLayers!.Length && !string.IsNullOrEmpty(displayLayers[i]))
-                        {
-                            try
-                            {
-                                layerImages[i].Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(displayLayers[i]));
-                                layerImages[i].Visibility = Visibility.Visible;
-                            }
-                            catch { layerImages[i].Visibility = Visibility.Collapsed; }
-                        }
-                        else layerImages[i].Visibility = Visibility.Collapsed;
-                    }
+                    ApplyWeatherIconLayerImages(displayLayers!, layerImages);
                 }
                 else
                 {
                     WeatherIcon.Visibility = Visibility.Visible;
-                    foreach (var img in layerImages) img.Visibility = Visibility.Collapsed;
+                    ClearWeatherIconLayerImages(layerImages, clearSources: true);
                     WeatherIcon.Text = alert != null ? alert.Icon : info.Icon;
                     WeatherIcon.FontFamily = new FontFamily(info.IconFont);
                 }
@@ -1447,7 +1464,7 @@ namespace Task_Flyout
                     }
                 }
 
-                // 告警激活时隐藏副字段，避免文字挤占
+                // Hide secondary fields when an alert is active to avoid text crowding
                 bool hasAlert = alert != null;
 
                 // Location
@@ -1474,6 +1491,54 @@ namespace Task_Flyout
             });
         }
 
+        private void ApplyWeatherIconLayerImages(string[] displayLayers, Microsoft.UI.Xaml.Controls.Image[] layerImages)
+        {
+            string layerKey = string.Join('\u001f', displayLayers.Take(layerImages.Length));
+            bool sourcesChanged = !string.Equals(_lastWeatherLayerKey, layerKey, StringComparison.Ordinal);
+            _lastWeatherLayerKey = layerKey;
+
+            for (int i = 0; i < layerImages.Length; i++)
+            {
+                var image = layerImages[i];
+                if (i >= displayLayers.Length || string.IsNullOrWhiteSpace(displayLayers[i]))
+                {
+                    image.Visibility = Visibility.Collapsed;
+                    if (sourcesChanged)
+                        image.Source = null;
+                    continue;
+                }
+
+                if (sourcesChanged || image.Source == null)
+                {
+                    try
+                    {
+                        image.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(displayLayers[i]));
+                    }
+                    catch
+                    {
+                        image.Source = null;
+                        image.Visibility = Visibility.Collapsed;
+                        continue;
+                    }
+                }
+
+                image.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void ClearWeatherIconLayerImages(Microsoft.UI.Xaml.Controls.Image[] layerImages, bool clearSources)
+        {
+            if (clearSources)
+                _lastWeatherLayerKey = "";
+
+            foreach (var image in layerImages)
+            {
+                image.Visibility = Visibility.Collapsed;
+                if (clearSources)
+                    image.Source = null;
+            }
+        }
+
         /// <summary>
         /// Measure the content panel and resize the bar accordingly.
         /// </summary>
@@ -1497,7 +1562,7 @@ namespace Task_Flyout
                 // ContentPanel Margin="10,0,10,0" = 20 DIPs. Add small slack for rounding.
                 double logical = contentLogical + 24;
 
-                if (logical < 80) logical = 80;
+                logical = Math.Clamp(logical, MinLogicalWidth, MaxLogicalWidth);
 
                 if (Math.Abs(logical - _preferredLogicalWidth) > 1)
                 {
@@ -1538,6 +1603,8 @@ namespace Task_Flyout
             try { _reparentTimer?.Stop(); } catch { }
             try { _themeRefreshTimer?.Stop(); } catch { }
             try { UnsubscribeMediaSession(); } catch { }
+            try { DetachContentPanelEvents(); } catch { }
+            try { UninstallSubclassIfAlive(); } catch { }
             try
             {
                 if (_mediaSessionManager != null)

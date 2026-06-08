@@ -47,7 +47,9 @@
                                VerticalAlignment="Center"/>
                     <TextBlock x:Name="TxtDesc" Text="" FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                               VerticalAlignment="Center"/>
+                               VerticalAlignment="Center"
+                               MaxWidth="170"
+                               TextTrimming="CharacterEllipsis"/>
                     <TextBlock x:Name="TxtLocation" Text="" FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                VerticalAlignment="Center" Visibility="Collapsed"
