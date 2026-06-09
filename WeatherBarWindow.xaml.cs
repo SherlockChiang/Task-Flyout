@@ -1,5 +1,4 @@
 using Microsoft.UI;
-using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
@@ -32,7 +31,6 @@ namespace Task_Flyout
         private bool _userHidden;
         private double _preferredLogicalWidth = 180;
         private IntPtr _fluentFlyoutHwnd = IntPtr.Zero;
-        private IntPtr _currentRgn = IntPtr.Zero;
         private int _refreshing;
         private int _mediaSessionInitializing;
         private GlobalSystemMediaTransportControlsSessionManager? _mediaSessionManager;
@@ -41,9 +39,6 @@ namespace Task_Flyout
         private int _lastBarY = int.MinValue;
         private int _lastBarWidth = int.MinValue;
         private int _lastBarHeight = int.MinValue;
-        private int _lastRegionWidth = int.MinValue;
-        private int _lastRegionHeight = int.MinValue;
-        private int _lastRegionRadius = int.MinValue;
         private IntPtr _lastInsertAfter = IntPtr.Zero;
         private DateTime _fastReparentPollingUntilUtc = DateTime.MinValue;
         private static readonly TimeSpan NormalReparentInterval = TimeSpan.FromSeconds(8);
@@ -53,6 +48,7 @@ namespace Task_Flyout
         private const double MaxLogicalWidth = 420;
         private bool _subclassInstalled;
         private string _lastWeatherLayerKey = "";
+        private readonly StringBuilder _classNameBuffer = new(256);
 
         #region P/Invoke
 
@@ -133,20 +129,6 @@ namespace Task_Flyout
         private const int WS_CLIPSIBLINGS = 0x04000000;
         private const int WS_EX_TOOLWINDOW = 0x00000080;
         private const int WS_EX_NOACTIVATE = 0x08000000;
-        private const int WS_EX_LAYERED = 0x00080000;
-
-        [DllImport("gdi32.dll")]
-        private static extern IntPtr CreateRoundRectRgn(int x1, int y1, int x2, int y2, int cx, int cy);
-
-        [DllImport("user32.dll")]
-        private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
-
-        [DllImport("user32.dll")]
-        private static extern bool RedrawWindow(IntPtr hWnd, IntPtr lprcUpdate, IntPtr hrgnUpdate, uint flags);
-
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref uint pvAttribute, int cbAttribute);
 
@@ -155,12 +137,6 @@ namespace Task_Flyout
         private const uint SWP_NOACTIVATE = 0x0010;
         private const uint SWP_SHOWWINDOW = 0x0040;
         private const uint SWP_NOZORDER = 0x0004;
-        private const uint SWP_FRAMECHANGED = 0x0020;
-        private const uint LWA_ALPHA = 0x00000002;
-        private const uint RDW_INVALIDATE = 0x0001;
-        private const uint RDW_ERASE = 0x0004;
-        private const uint RDW_ALLCHILDREN = 0x0080;
-        private const uint RDW_UPDATENOW = 0x0100;
         private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
         private const int DWMWA_BORDER_COLOR = 34;
         private const uint DWMWA_COLOR_NONE = 0xFFFFFFFE;
@@ -177,16 +153,6 @@ namespace Task_Flyout
         private SUBCLASSPROC? _subclassProc;
 
         #endregion
-
-        // Known third-party widget process names (lowercase, without .exe)
-        private static readonly HashSet<string> KnownWidgetProcesses = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "fluentflyout",
-            "fluentflyoutwpf",
-            "translucenttb",
-            "taskbarx",
-            "roundedtb",
-        };
 
         // System child-window class names inside Shell_TrayWnd (not widgets, skip these)
         private static readonly HashSet<string> SystemTaskbarClasses = new(StringComparer.Ordinal)
@@ -526,47 +492,8 @@ namespace Task_Flyout
                 }
 
                 bool sampledColorChanged = RefreshTaskbarSampleColor(tbRect, x, y, pillWidth, pillHeight);
-
-                if (UseTaskbarGlassMaterial)
-                {
-                    if (_currentRgn != IntPtr.Zero ||
-                        _lastRegionWidth != int.MinValue ||
-                        _lastRegionHeight != int.MinValue ||
-                        _lastRegionRadius != int.MinValue)
-                    {
-                        SetWindowRgn(hWnd, IntPtr.Zero, true);
-                        _currentRgn = IntPtr.Zero;
-                        _lastRegionWidth = int.MinValue;
-                        _lastRegionHeight = int.MinValue;
-                        _lastRegionRadius = int.MinValue;
-                    }
-
-                    if (sampledColorChanged)
-                        ApplyGlassBrushes();
-
-                    return;
-                }
-
-                // Round-rect clip for the window shape (Win32 region)
-                // CreateRoundRectRgn expects the corner ellipse diameter, while XAML
-                // CornerRadius is a radius. Keep both in sync to avoid dark pixels
-                // leaking outside the anti-aliased XAML corner.
-                int cornerRadius = (int)(16 * scaleFactor);
-                if (pillWidth != _lastRegionWidth ||
-                    pillHeight != _lastRegionHeight ||
-                    cornerRadius != _lastRegionRadius)
-                {
-                    IntPtr rgn = CreateRoundRectRgn(0, 0, pillWidth + 1, pillHeight + 1, cornerRadius, cornerRadius);
-                    if (rgn != IntPtr.Zero)
-                    {
-                        SetWindowRgn(hWnd, rgn, true);
-                        // SetWindowRgn takes ownership — do NOT DeleteObject(rgn).
-                        _currentRgn = rgn;
-                        _lastRegionWidth = pillWidth;
-                        _lastRegionHeight = pillHeight;
-                        _lastRegionRadius = cornerRadius;
-                    }
-                }
+                if (sampledColorChanged)
+                    ApplyGlassBrushes();
             }
             catch
             {
@@ -581,9 +508,6 @@ namespace Task_Flyout
             _lastBarY = int.MinValue;
             _lastBarWidth = int.MinValue;
             _lastBarHeight = int.MinValue;
-            _lastRegionWidth = int.MinValue;
-            _lastRegionHeight = int.MinValue;
-            _lastRegionRadius = int.MinValue;
             _lastInsertAfter = IntPtr.Zero;
         }
 
@@ -690,7 +614,6 @@ namespace Task_Flyout
                 int taskbarLeft = taskbarScreenRect.Left;
                 int taskbarTop = taskbarScreenRect.Top;
                 int taskbarBottom = taskbarScreenRect.Bottom;
-                int taskbarHeight = taskbarBottom - taskbarTop;
                 int taskbarMidX = (taskbarScreenRect.Left + taskbarScreenRect.Right) / 2;
 
                 GetWindowThreadProcessId(ownHwnd, out uint ownPid);
@@ -713,9 +636,9 @@ namespace Task_Flyout
                         GetWindowThreadProcessId(child, out uint pid);
                         if (pid == ownPid) continue;
 
-                        var clsBuf = new StringBuilder(256);
-                        GetClassName(child, clsBuf, clsBuf.Capacity);
-                        string cls = clsBuf.ToString();
+                        _classNameBuffer.Clear();
+                        GetClassName(child, _classNameBuffer, _classNameBuffer.Capacity);
+                        string cls = _classNameBuffer.ToString();
 
                         if (SystemTaskbarClasses.Contains(cls)) continue;
 
@@ -799,14 +722,21 @@ namespace Task_Flyout
 
 
         private bool _isLightTheme;
-        private bool _isTransparentBackground;
-        private bool _usingAcrylicBackdrop;
-        private bool _usingLayeredTransparency;
         private bool _barAlertActive;
         private int _themeRefreshGeneration;
-        private static readonly bool UseTaskbarGlassMaterial = true;
+        private bool _themeApplied;
         private Color? _sampledTaskbarColor;
         private DateTime _lastTaskbarColorSampleUtc = DateTime.MinValue;
+        private bool _glassBrushCacheValid;
+        private bool _glassBrushCacheLightTheme;
+        private Color _glassBrushCacheBaseColor;
+        private SolidColorBrush? _glassOuterBrush;
+        private SolidColorBrush? _glassTransparentBrush;
+        private SolidColorBrush? _glassIconBackdropBrush;
+        private Brush? _glassRestBrush;
+        private Brush? _glassHoverBrush;
+        private Brush? _glassRestHighlightBrush;
+        private Brush? _glassHoverHighlightBrush;
 
         // Collapse a burst of theme/colour change notifications into a single ApplyWindowsTheme
         // call so a sunset light/dark switch doesn't re-theme the bar several times in a row.
@@ -818,7 +748,7 @@ namespace Task_Flyout
                 _themeRefreshTimer.Tick += (_, _) =>
                 {
                     _themeRefreshTimer!.Stop();
-                    ApplyWindowsTheme();
+                    ApplyWindowsTheme(force: false);
                 };
             }
 
@@ -856,7 +786,7 @@ namespace Task_Flyout
             DispatcherQueue.TryEnqueue(() =>
             {
                 if (generation != _themeRefreshGeneration) return;
-                ApplyWindowsTheme();
+                ApplyWindowsTheme(force: false);
             });
         }
 
@@ -899,6 +829,11 @@ namespace Task_Flyout
 
         public void ApplyWindowsTheme()
         {
+            ApplyWindowsTheme(force: true);
+        }
+
+        private void ApplyWindowsTheme(bool force)
+        {
             try
             {
                 // After an Explorer restart this bar (a WS_CHILD of Shell_TrayWnd) has its
@@ -910,19 +845,26 @@ namespace Task_Flyout
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
 
-                _isTransparentBackground = UseTaskbarGlassMaterial;
-                _isLightTheme = ResolveWeatherBarLightTheme(matchTaskbar: UseTaskbarGlassMaterial);
-
                 var root = this.Content as FrameworkElement;
                 if (root == null) return;
+
+                bool resolvedLightTheme = ResolveWeatherBarLightTheme(matchTaskbar: true);
+                bool themeChanged = !_themeApplied || resolvedLightTheme != _isLightTheme;
+                if (!force && !themeChanged) return;
+
+                if (themeChanged)
+                {
+                    _isLightTheme = resolvedLightTheme;
+                    _themeApplied = true;
+                    InvalidateGlassBrushCache();
+                }
+
                 // Push the resolved theme into the XAML tree so ThemeResource brushes
                 // (TextFillColorPrimaryBrush etc.) and inherited Foregrounds match the
                 // bar's actual background — otherwise text follows the system theme and
                 // ends up white-on-light or black-on-dark when the two disagree.
                 root.RequestedTheme = _isLightTheme ? ElementTheme.Light : ElementTheme.Dark;
                 SystemBackdrop = null;
-                _usingLayeredTransparency = ApplyLayeredTransparency(hWnd, enabled: false);
-                _usingAcrylicBackdrop = false;
 
                 ApplyGlassBrushes(root);
                 ApplyWeatherBarTextBrush(root, includeDescription: !_barAlertActive);
@@ -938,34 +880,32 @@ namespace Task_Flyout
 
         private void ApplyGlassBrushes(FrameworkElement root)
         {
+            EnsureGlassBrushCache();
+
             var rootGrid = root.FindName("RootGrid") as Microsoft.UI.Xaml.Controls.Grid;
             var mainBorder = root.FindName("MainBorder") as Microsoft.UI.Xaml.Controls.Border;
             var topBorder = root.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
 
             if (rootGrid != null)
-                rootGrid.Background = new SolidColorBrush(GetWeatherBarOuterFillColor());
+                rootGrid.Background = _glassOuterBrush;
 
             if (mainBorder != null)
             {
-                mainBorder.Background = CreateGlassMaterialBrush(isHovering: false);
-                mainBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
+                mainBorder.Background = _glassRestBrush;
+                mainBorder.BorderBrush = _glassTransparentBrush;
             }
 
             if (topBorder != null)
             {
-                topBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
-                topBorder.Background = CreateGlassHighlightBrush(isHovering: false);
+                topBorder.BorderBrush = _glassTransparentBrush;
+                topBorder.Background = _glassRestHighlightBrush;
             }
 
             // Color-emoji glyphs carry their own hues, and many imported icon packs
             // ship pure-white PNGs. Give the icon a subtle counter-surface when needed.
             if (root.FindName("WeatherIconBackdrop") is Microsoft.UI.Xaml.Controls.Border iconBackdrop)
             {
-                iconBackdrop.Background = new SolidColorBrush(UseTaskbarGlassMaterial
-                    ? GetGlassIconBackdropColor()
-                    : _isLightTheme
-                    ? Color.FromArgb(64, 0, 0, 0)
-                    : Color.FromArgb(0, 0, 0, 0));
+                iconBackdrop.Background = _glassIconBackdropBrush;
             }
         }
 
@@ -988,61 +928,6 @@ namespace Task_Flyout
             }
         }
 
-        private bool ApplyLayeredTransparency(IntPtr hWnd, bool enabled)
-        {
-            try
-            {
-                SuppressDwmBorder(hWnd);
-                int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-
-                if (!enabled)
-                {
-                    if ((exStyle & WS_EX_LAYERED) != 0)
-                    {
-                        SetLayeredWindowAttributes(hWnd, 0, 255, LWA_ALPHA);
-                        SetWindowLong(hWnd, GWL_EXSTYLE, exStyle & ~WS_EX_LAYERED);
-                        SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0,
-                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-                        RedrawWeatherBarWindow(hWnd);
-                    }
-
-                    return false;
-                }
-
-                if ((exStyle & WS_EX_LAYERED) == 0)
-                {
-                    SetWindowLong(hWnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
-                    SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0,
-                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-                }
-
-                byte alpha = _isLightTheme ? (byte)232 : (byte)224;
-                if (!SetLayeredWindowAttributes(hWnd, 0, alpha, LWA_ALPHA))
-                {
-                    Debug.WriteLine($"WeatherBar alpha transparency failed: {Marshal.GetLastWin32Error()}");
-                    return false;
-                }
-
-                RedrawWeatherBarWindow(hWnd);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"WeatherBar layered transparency exception: {ex.Message}");
-                return false;
-            }
-        }
-
-        private static void RedrawWeatherBarWindow(IntPtr hWnd)
-        {
-            try
-            {
-                RedrawWindow(hWnd, IntPtr.Zero, IntPtr.Zero,
-                    RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
-            }
-            catch { }
-        }
-
         private static void SuppressDwmBorder(IntPtr hWnd)
         {
             try
@@ -1054,55 +939,6 @@ namespace Task_Flyout
                 DwmSetWindowAttribute(hWnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref corners, sizeof(uint));
             }
             catch { }
-        }
-
-        private Color GetWeatherBarBackgroundColor(bool isHovering)
-        {
-            if (UseTaskbarGlassMaterial)
-            {
-                Color baseColor = GetWeatherBarOuterFillColor();
-                if (_isLightTheme)
-                    return Mix(baseColor, Colors.White, isHovering ? 0.88 : 0.82);
-
-                return Mix(baseColor, Colors.Black, isHovering ? 0.48 : 0.58);
-            }
-
-            if (_isTransparentBackground && _usingLayeredTransparency)
-            {
-                if (_isLightTheme)
-                    return isHovering
-                        ? Color.FromArgb(255, 255, 255, 255)
-                        : Color.FromArgb(255, 248, 248, 248);
-
-                return isHovering
-                    ? Color.FromArgb(255, 58, 58, 64)
-                    : Color.FromArgb(255, 28, 28, 34);
-            }
-
-            if (_isTransparentBackground && _usingAcrylicBackdrop)
-            {
-                if (_isLightTheme)
-                    return isHovering
-                        ? Color.FromArgb(198, 255, 255, 255)
-                        : Color.FromArgb(148, 250, 250, 250);
-
-                return isHovering
-                    ? Color.FromArgb(184, 56, 56, 64)
-                    : Color.FromArgb(128, 34, 34, 42);
-            }
-
-            if (_isTransparentBackground)
-            {
-                // Fallback for systems where Desktop Acrylic is disabled by policy,
-                // battery saver, accessibility settings, or OS support.
-                return _isLightTheme
-                    ? Color.FromArgb(255, 240, 240, 240)
-                    : Color.FromArgb(255, 46, 46, 46);
-            }
-
-            return _isLightTheme
-                ? Color.FromArgb(255, 252, 252, 252)
-                : Color.FromArgb(255, 62, 62, 62);
         }
 
         private Color GetWeatherBarOuterFillColor()
@@ -1119,11 +955,47 @@ namespace Task_Flyout
                 : Color.FromArgb(72, 255, 255, 255);
         }
 
+        private void EnsureGlassBrushCache()
+        {
+            Color baseColor = GetWeatherBarOuterFillColor();
+            if (_glassBrushCacheValid &&
+                _glassBrushCacheLightTheme == _isLightTheme &&
+                SameColor(_glassBrushCacheBaseColor, baseColor))
+            {
+                return;
+            }
+
+            _glassBrushCacheLightTheme = _isLightTheme;
+            _glassBrushCacheBaseColor = baseColor;
+            _glassOuterBrush = new SolidColorBrush(baseColor);
+            _glassTransparentBrush = new SolidColorBrush(Colors.Transparent);
+            _glassIconBackdropBrush = new SolidColorBrush(GetGlassIconBackdropColor());
+            _glassRestBrush = CreateGlassMaterialBrush(isHovering: false);
+            _glassHoverBrush = CreateGlassMaterialBrush(isHovering: true);
+            _glassRestHighlightBrush = CreateGlassHighlightBrush(isHovering: false);
+            _glassHoverHighlightBrush = CreateGlassHighlightBrush(isHovering: true);
+            _glassBrushCacheValid = true;
+        }
+
+        private void InvalidateGlassBrushCache()
+        {
+            _glassBrushCacheValid = false;
+            _glassOuterBrush = null;
+            _glassTransparentBrush = null;
+            _glassIconBackdropBrush = null;
+            _glassRestBrush = null;
+            _glassHoverBrush = null;
+            _glassRestHighlightBrush = null;
+            _glassHoverHighlightBrush = null;
+        }
+
+        private static bool SameColor(Color left, Color right)
+        {
+            return left.A == right.A && left.R == right.R && left.G == right.G && left.B == right.B;
+        }
+
         private Brush CreateGlassMaterialBrush(bool isHovering)
         {
-            if (!UseTaskbarGlassMaterial)
-                return new SolidColorBrush(GetWeatherBarBackgroundColor(isHovering));
-
             Color baseColor = GetWeatherBarOuterFillColor();
             var brush = new LinearGradientBrush
             {
@@ -1152,7 +1024,6 @@ namespace Task_Flyout
 
         private bool RefreshTaskbarSampleColor(RECT taskbarRect, int barX, int barY, int barWidth, int barHeight)
         {
-            if (!UseTaskbarGlassMaterial) return false;
             if ((DateTime.UtcNow - _lastTaskbarColorSampleUtc) < TimeSpan.FromMilliseconds(250)) return false;
 
             _lastTaskbarColorSampleUtc = DateTime.UtcNow;
@@ -1163,6 +1034,7 @@ namespace Task_Flyout
                 return false;
 
             _sampledTaskbarColor = sampled;
+            InvalidateGlassBrushCache();
             return true;
         }
 
@@ -1304,14 +1176,15 @@ namespace Task_Flyout
             if (border == null) return;
 
             var topBorder = (this.Content as FrameworkElement)?.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
+            EnsureGlassBrushCache();
 
-            border.Background = CreateGlassMaterialBrush(isHovering: true);
-            border.BorderBrush = new SolidColorBrush(Colors.Transparent);
+            border.Background = _glassHoverBrush;
+            border.BorderBrush = _glassTransparentBrush;
 
             if (topBorder != null)
             {
-                topBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
-                topBorder.Background = CreateGlassHighlightBrush(isHovering: true);
+                topBorder.BorderBrush = _glassTransparentBrush;
+                topBorder.Background = _glassHoverHighlightBrush;
             }
         }
 
@@ -1323,14 +1196,15 @@ namespace Task_Flyout
             if (border == null) return;
 
             var topBorder = (this.Content as FrameworkElement)?.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
+            EnsureGlassBrushCache();
 
-            border.Background = CreateGlassMaterialBrush(isHovering: false);
-            border.BorderBrush = new SolidColorBrush(Colors.Transparent);
+            border.Background = _glassRestBrush;
+            border.BorderBrush = _glassTransparentBrush;
 
             if (topBorder != null)
             {
-                topBorder.BorderBrush = new SolidColorBrush(Colors.Transparent);
-                topBorder.Background = CreateGlassHighlightBrush(isHovering: false);
+                topBorder.BorderBrush = _glassTransparentBrush;
+                topBorder.Background = _glassRestHighlightBrush;
             }
         }
 
@@ -1664,9 +1538,6 @@ namespace Task_Flyout
 
                 ShowWindow(hWnd, 0); // SW_HIDE
                 _reparentTimer.Stop();
-                // Clear region — system releases the previous one.
-                SetWindowRgn(hWnd, IntPtr.Zero, true);
-                _currentRgn = IntPtr.Zero;
                 ResetCachedWindowPlacement();
                 SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0,
                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);

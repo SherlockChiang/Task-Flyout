@@ -318,7 +318,7 @@ namespace Task_Flyout
             if (_weatherBarWatchdog != null) return;
 
             _weatherBarWatchdog = MainDispatcherQueue.CreateTimer();
-            _weatherBarWatchdog.Interval = TimeSpan.FromSeconds(5);
+            _weatherBarWatchdog.Interval = TimeSpan.FromSeconds(30);
             _weatherBarWatchdog.Tick += (_, _) => CheckWeatherBarAlive();
             _weatherBarWatchdog.Start();
         }
