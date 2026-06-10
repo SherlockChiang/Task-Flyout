@@ -952,7 +952,7 @@ namespace Task_Flyout
         {
             return _isLightTheme
                 ? Color.FromArgb(44, 0, 0, 0)
-                : Color.FromArgb(72, 255, 255, 255);
+                : Colors.Transparent;
         }
 
         private void EnsureGlassBrushCache()
