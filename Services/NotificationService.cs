@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading.Tasks;
 using Task_Flyout.Models;
 using Microsoft.UI.Xaml;
 using Windows.Storage;
@@ -302,22 +303,35 @@ namespace Task_Flyout.Services
         private static bool IsVerificationCode(string? value)
             => !string.IsNullOrEmpty(value) && value.Length is >= 4 and <= 8 && value.All(char.IsDigit);
 
-        // Copy a verification code straight to the clipboard from the toast button,
-        // without opening the main window. Flush so the value survives even if the app
-        // is later closed.
+        // Copy a verification code straight to the clipboard from the toast button
+        // without opening the main window. Keep it out of clipboard history/roaming when
+        // the platform supports it, and clear it shortly after use if it is still there.
         private static void CopyVerificationCodeToClipboard(string code)
         {
             try
             {
                 var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
                 package.SetText(code);
-                Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
-                try { Windows.ApplicationModel.DataTransfer.Clipboard.Flush(); } catch { }
+                bool copied = false;
+                try
+                {
+                    var options = new Windows.ApplicationModel.DataTransfer.ClipboardContentOptions
+                    {
+                        IsAllowedInHistory = false,
+                        IsRoamable = false
+                    };
+                    copied = Windows.ApplicationModel.DataTransfer.Clipboard.SetContentWithOptions(package, options);
+                }
+                catch { }
+
+                if (!copied)
+                    Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+
+                _ = ClearVerificationCodeFromClipboardLaterAsync(code);
 
                 var loader = new ResourceLoader();
                 var confirm = new AppNotificationBuilder()
                     .AddText(loader.GetStringOrDefault("MailCodeCopied") ?? "Verification code copied")
-                    .AddText(code)
                     .BuildNotification();
                 AppNotificationManager.Default.Show(confirm);
             }
@@ -325,6 +339,32 @@ namespace Task_Flyout.Services
             {
                 System.Diagnostics.Debug.WriteLine($"Copy verification code failed: {ex.Message}");
             }
+        }
+
+        private static async Task ClearVerificationCodeFromClipboardLaterAsync(string code)
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(60));
+                App.MainDispatcherQueue?.TryEnqueue(async () =>
+                {
+                    try
+                    {
+                        var content = Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
+                        if (!content.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.Text))
+                            return;
+
+                        string clipboardText = await content.GetTextAsync();
+                        if (string.Equals(clipboardText, code, StringComparison.Ordinal))
+                            Windows.ApplicationModel.DataTransfer.Clipboard.Clear();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Clear verification code clipboard failed: {ex.Message}");
+                    }
+                });
+            }
+            catch { }
         }
 
         private static bool IsSafeIdToken(string? value)

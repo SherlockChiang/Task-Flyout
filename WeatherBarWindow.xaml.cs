@@ -726,6 +726,9 @@ namespace Task_Flyout
         private Brush? _glassHoverBrush;
         private Brush? _glassRestHighlightBrush;
         private Brush? _glassHoverHighlightBrush;
+        private const int WeatherBarIconDecodePixelWidth = 48;
+        private const int MaxWeatherBarIconImageCacheSize = 32;
+        private readonly Dictionary<string, Microsoft.UI.Xaml.Media.Imaging.BitmapImage> _weatherIconImageCache = new(StringComparer.Ordinal);
 
         // Collapse a burst of theme/colour change notifications into a single ApplyWindowsTheme
         // call so a sunset light/dark switch doesn't re-theme the bar several times in a row.
@@ -1304,7 +1307,7 @@ namespace Task_Flyout
                 {
                     try
                     {
-                        image.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(displayLayers[i]));
+                        image.Source = GetWeatherIconImage(displayLayers[i]);
                     }
                     catch
                     {
@@ -1316,6 +1319,22 @@ namespace Task_Flyout
 
                 image.Visibility = Visibility.Visible;
             }
+        }
+
+        private Microsoft.UI.Xaml.Media.Imaging.BitmapImage GetWeatherIconImage(string uri)
+        {
+            if (_weatherIconImageCache.TryGetValue(uri, out var cached))
+                return cached;
+
+            if (_weatherIconImageCache.Count >= MaxWeatherBarIconImageCacheSize)
+                _weatherIconImageCache.Clear();
+
+            var image = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(uri))
+            {
+                DecodePixelWidth = WeatherBarIconDecodePixelWidth
+            };
+            _weatherIconImageCache[uri] = image;
+            return image;
         }
 
         private void ClearWeatherIconLayerImages(Microsoft.UI.Xaml.Controls.Image[] layerImages, bool clearSources)

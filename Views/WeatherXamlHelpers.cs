@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -12,10 +13,27 @@ namespace Task_Flyout.Views
     /// </summary>
     public static class WeatherXamlHelpers
     {
+        private const int TemplateIconDecodePixelWidth = 64;
+        private const int MaxTemplateIconCacheSize = 128;
+        private static readonly Dictionary<string, BitmapImage> TemplateIconCache = new(StringComparer.Ordinal);
+
         public static ImageSource? UriToImageSource(string uri)
         {
             if (string.IsNullOrEmpty(uri)) return null;
-            try { return new BitmapImage(new Uri(uri)); }
+            if (TemplateIconCache.TryGetValue(uri, out var cached)) return cached;
+
+            try
+            {
+                if (TemplateIconCache.Count >= MaxTemplateIconCacheSize)
+                    TemplateIconCache.Clear();
+
+                var image = new BitmapImage(new Uri(uri))
+                {
+                    DecodePixelWidth = TemplateIconDecodePixelWidth
+                };
+                TemplateIconCache[uri] = image;
+                return image;
+            }
             catch { return null; }
         }
 
