@@ -372,11 +372,17 @@ namespace Task_Flyout
             }
             else if (uMsg == WM_SETTINGCHANGE)
             {
-                // Light/dark theme switches (e.g. the sunset schedule) arrive as a burst of
-                // WM_SETTINGCHANGE. The taskbar hasn't moved, so only refresh the bar colours,
-                // debounced — the previous full reparent re-scan + 20s fast-poll on every one
-                // of these made the colour switch stutter.
-                DispatcherQueue.TryEnqueue(ScheduleThemeRefresh);
+                // WM_SETTINGCHANGE fires for *many* unrelated settings (power, mouse, env,
+                // policy…). A light/dark or accent switch is specifically tagged with the
+                // "ImmersiveColorSet" area string, so only react to that — otherwise every
+                // system setting change would re-theme the bar and spawn settle tasks.
+                // The taskbar hasn't moved, so we only refresh colours (debounced), never
+                // reposition or fast-poll.
+                string? changedArea = lParam != IntPtr.Zero ? Marshal.PtrToStringAuto(lParam) : null;
+                if (string.Equals(changedArea, "ImmersiveColorSet", StringComparison.OrdinalIgnoreCase))
+                {
+                    DispatcherQueue.TryEnqueue(ScheduleThemeRefresh);
+                }
             }
 
             if (uMsg == WM_PARENTNOTIFY)
