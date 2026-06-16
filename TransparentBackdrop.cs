@@ -67,8 +67,23 @@ namespace Task_Flyout
 
         protected override void OnTargetConnected(ICompositionSupportsSystemBackdrop connectedTarget, XamlRoot xamlRoot)
         {
-            base.OnTargetConnected(connectedTarget, xamlRoot);
+            // The base initializes the default SystemBackdropConfiguration. For the weather
+            // bar — whose window is reparented as a WS_CHILD of Shell_TrayWnd — the framework
+            // can reject that target with E_INVALIDARG; guard it so the transparent brush is
+            // still applied regardless.
+            try { base.OnTargetConnected(connectedTarget, xamlRoot); } catch { }
             connectedTarget.SystemBackdrop = Compositor.CreateColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0));
+        }
+
+        protected override void OnDefaultSystemBackdropConfigurationChanged(ICompositionSupportsSystemBackdrop target, XamlRoot xamlRoot)
+        {
+            // A transparent backdrop ignores the default configuration entirely — it always
+            // paints the same fully transparent brush regardless of theme, activation, or
+            // high-contrast state. The base re-evaluates that configuration and throws
+            // E_INVALIDARG ("参数错误") for this reparented taskbar-child window when the
+            // system theme switches (e.g. the sunset schedule). There is nothing to
+            // reconfigure, so swallow it instead of crashing the process.
+            try { base.OnDefaultSystemBackdropConfigurationChanged(target, xamlRoot); } catch { }
         }
 
         protected override void OnTargetDisconnected(ICompositionSupportsSystemBackdrop disconnectedTarget)
@@ -76,7 +91,7 @@ namespace Task_Flyout
             var backdrop = disconnectedTarget.SystemBackdrop;
             disconnectedTarget.SystemBackdrop = null;
             backdrop?.Dispose();
-            base.OnTargetDisconnected(disconnectedTarget);
+            try { base.OnTargetDisconnected(disconnectedTarget); } catch { }
         }
     }
 }
