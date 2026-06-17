@@ -776,10 +776,11 @@ namespace Task_Flyout.Services
             var password = GetImapPassword(account.Id);
             var message = CreateMimeMessage(account, to, subject, body);
 
-            using var client = new MailKit.Net.Smtp.SmtpClient();
+            using var client = new MailKit.Net.Smtp.SmtpClient { Timeout = MailNetworkTimeoutMs };
+            using var cts = new CancellationTokenSource(MailNetworkTimeoutMs);
             var socketOptions = GetSmtpSocketOptions(account);
-            await client.ConnectAsync(account.SmtpHost, account.SmtpPort, socketOptions);
-            await client.AuthenticateAsync(string.IsNullOrWhiteSpace(account.SmtpUserName) ? account.ImapUserName : account.SmtpUserName, password);
+            await client.ConnectAsync(account.SmtpHost, account.SmtpPort, socketOptions, cts.Token);
+            await client.AuthenticateAsync(string.IsNullOrWhiteSpace(account.SmtpUserName) ? account.ImapUserName : account.SmtpUserName, password, cts.Token);
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
         }
@@ -900,7 +901,10 @@ namespace Task_Flyout.Services
                 {
                     try
                     {
-                        await existing.NoOpAsync();
+                        // Bound the liveness probe too: on a dropped network the cached
+                        // connection's NoOp would otherwise block until MailKit's 2-min timeout.
+                        using var noopCts = new CancellationTokenSource(MailNetworkTimeoutMs);
+                        await existing.NoOpAsync(noopCts.Token);
                         return existing;
                     }
                     catch
@@ -1166,6 +1170,13 @@ namespace Task_Flyout.Services
             }
         }
 
+        // MailKit's default Timeout is 2 minutes and ConnectAsync/AuthenticateAsync take no
+        // cancellation by default — so with no network the startup poll's connect (and DNS
+        // resolution) hangs for minutes, which looks like the app freezing on launch offline.
+        // Cap connect/auth with a short timeout + token so an offline attempt fails fast and
+        // hands off to the per-account poll backoff.
+        private const int MailNetworkTimeoutMs = 10000;
+
         private static async Task ConnectImapAsync(ImapClient client, MailAccount account, string password)
         {
             if (string.IsNullOrWhiteSpace(account.ImapHost))
@@ -1175,9 +1186,11 @@ namespace Task_Flyout.Services
             if (string.IsNullOrWhiteSpace(password))
                 throw new InvalidOperationException("IMAP password is required.");
 
+            client.Timeout = MailNetworkTimeoutMs;
+            using var cts = new CancellationTokenSource(MailNetworkTimeoutMs);
             var socketOptions = account.ImapUseSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
-            await client.ConnectAsync(account.ImapHost, account.ImapPort, socketOptions);
-            await client.AuthenticateAsync(account.ImapUserName, password);
+            await client.ConnectAsync(account.ImapHost, account.ImapPort, socketOptions, cts.Token);
+            await client.AuthenticateAsync(account.ImapUserName, password, cts.Token);
         }
 
         private static async Task<bool> GetImapReadStateAsync(IMailFolder folder, UniqueId id, Dictionary<uint, MessageFlags?> flagsById)
