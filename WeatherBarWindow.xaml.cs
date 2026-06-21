@@ -348,7 +348,7 @@ namespace Task_Flyout
                 if (_subclassInstalled && _subclassProc != null && hWnd != IntPtr.Zero && IsWindow(hWnd))
                     RemoveWindowSubclass(hWnd, _subclassProc, IntPtr.Zero);
             }
-            catch { }
+            catch (Exception ex) { Debug.WriteLine($"Weather bar subclass removal failed: {ex.Message}"); }
             finally
             {
                 _subclassInstalled = false;
@@ -763,7 +763,7 @@ namespace Task_Flyout
                 if (!IsAlive()) return;
                 ScheduleThemeRefresh();
             }
-            catch { }
+            catch (Exception ex) { Debug.WriteLine($"RefreshAfterSystemThemeChanged failed: {ex.Message}"); }
         }
 
         private async Task ApplyThemeAfterSystemSettlesAsync(int generation)
@@ -776,7 +776,7 @@ namespace Task_Flyout
                 await Task.Delay(1700);
                 QueueThemeRefreshIfCurrent(generation);
             }
-            catch { }
+            catch (Exception ex) { Debug.WriteLine($"ApplyThemeAfterSystemSettles failed: {ex.Message}"); }
         }
 
         private void QueueThemeRefreshIfCurrent(int generation)
@@ -820,7 +820,7 @@ namespace Task_Flyout
                     return true;
                 }
             }
-            catch { }
+            catch (Exception ex) { Debug.WriteLine($"Reading Windows light theme failed: {ex.Message}"); }
 
             return false;
         }
@@ -867,7 +867,7 @@ namespace Task_Flyout
                 ApplyWeatherBarTextBrush(root, includeDescription: !_barAlertActive);
                 UpdateWeatherIconGlow();
             }
-            catch { }
+            catch (Exception ex) { Debug.WriteLine($"ApplyWindowsTheme failed: {ex.Message}"); }
         }
 
         private void ApplyGlassBrushes()
@@ -931,7 +931,7 @@ namespace Task_Flyout
                 uint corners = DWMWCP_DONOTROUND;
                 DwmSetWindowAttribute(hWnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref corners, sizeof(uint));
             }
-            catch { }
+            catch (Exception ex) { Debug.WriteLine($"SuppressDwmBorder failed: {ex.Message}"); }
         }
 
         private Microsoft.UI.Composition.ContainerVisual? _iconGlowContainer;
@@ -1011,7 +1011,7 @@ namespace Task_Flyout
                         AddGlow(image, image.GetAlphaMask());
                 }
             }
-            catch { }
+            catch (Exception ex) { Debug.WriteLine($"Weather icon glow update failed: {ex.Message}"); }
         }
 
         private void EnsureGlassBrushCache()
@@ -1387,7 +1387,7 @@ namespace Task_Flyout
                     PositionOnTaskbar();
                 }
             }
-            catch { }
+            catch (Exception ex) { Debug.WriteLine($"RecomputeBarWidth failed: {ex.Message}"); }
         }
 
         private void ContentPanel_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
@@ -1485,7 +1485,7 @@ namespace Task_Flyout
                 SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0,
                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
             }
-            catch { }
+            catch (Exception ex) { Debug.WriteLine($"HideBar failed: {ex.Message}"); }
         }
     }
 }
