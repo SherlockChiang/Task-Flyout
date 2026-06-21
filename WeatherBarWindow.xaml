@@ -11,6 +11,7 @@
                 BorderBrush="Transparent"
                 BorderThickness="0"
                 CornerRadius="8"
+                Tapped="ContentPanel_Tapped"
                 PointerEntered="MainBorder_PointerEntered"
                 PointerExited="MainBorder_PointerExited">
 
@@ -27,7 +28,6 @@
                             VerticalAlignment="Center"
                             HorizontalAlignment="Left"
                             Margin="10,0,10,0"
-                            Tapped="ContentPanel_Tapped"
                             Background="Transparent">
                     <Grid Width="24" Height="24" VerticalAlignment="Center">
                         <!-- Composition host for the icon edge glow; must sit below the icon elements. -->
