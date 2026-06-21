@@ -623,9 +623,9 @@ namespace Task_Flyout.Services
             }
         }
 
-        // Lazily hydrate the in-memory cache from disk on first use.
-        // Only adopts the persisted entry when it matches the current location and is
-        // still within the cache window — otherwise it's left for the network fetch.
+        // Lazily hydrate the in-memory cache from disk on first use. Adopts the persisted
+        // entry whenever it matches the current location (regardless of age) so there is
+        // always something to show offline; the freshness check elsewhere drives refresh.
         private async Task TryLoadPersistentWeatherAsync(string currentKey)
         {
             lock (_weatherLock)
@@ -649,8 +649,11 @@ namespace Task_Flyout.Services
                 if (envelope?.Info == null || envelope.Key != currentKey) return;
 
                 var fetchedAt = new DateTime(envelope.FetchedTicks, DateTimeKind.Local);
-                if (DateTime.Now - fetchedAt >= _cacheExpiry) return;
 
+                // Always adopt the saved entry as a baseline so the bar shows the last-known
+                // weather even when offline. Staleness is handled downstream: GetWeatherAsync's
+                // freshness check uses _lastFetchTime and still triggers a network refresh when
+                // the entry is old; the fresh result replaces it once a connection is available.
                 lock (_weatherLock)
                 {
                     if (currentKey != CurrentWeatherKey || _cachedWeather != null) return;
