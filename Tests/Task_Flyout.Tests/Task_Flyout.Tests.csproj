@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Windows TFM so source under test that touches WinRT (Windows.System in
+         SafeUriLauncher) compiles. The logic exercised here is otherwise pure. -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <UseWinUI>false</UseWinUI>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!-- Compile the pure-logic sources directly rather than referencing the WinUI app
+       project, which would drag in WinUI/MSIX tooling and the app entry point. -->
+  <ItemGroup>
+    <Compile Include="..\..\Services\VerificationCodeDetector.cs" Link="Source\VerificationCodeDetector.cs" />
+    <Compile Include="..\..\Services\SafeUriLauncher.cs" Link="Source\SafeUriLauncher.cs" />
+  </ItemGroup>
+
+</Project>
