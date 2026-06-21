@@ -35,28 +35,10 @@ namespace Task_Flyout.Views
         private const int PageStep = 25;
 
         // Pre-compiled regex patterns for mail HTML sanitization
-        private static readonly Regex RxPairedDangerousTags = new(@"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*>.*?<\s*/\s*\1\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxSelfClosingDangerousTags = new(@"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*/?\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxEventHandlerQuoted = new(@"\s+on\w+\s*=\s*(['""]).*?\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxEventHandlerUnquoted = new(@"\s+on\w+\s*=\s*[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RxScriptUriQuoted = new(@"(href|src|action|formaction|data)\s*=\s*(['""])\s*(javascript|vbscript):.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxScriptUriUnquoted = new(@"(href|src|action|formaction|data)\s*=\s*(javascript|vbscript):[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RxDataUriNavigationQuoted = new(@"(href|action|formaction|data)\s*=\s*(['""])\s*data:.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxDataUriNavigationUnquoted = new(@"(href|action|formaction|data)\s*=\s*data:[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RxDangerousCssStyle = new(@"style\s*=\s*(['""])[^'""]*\b(expression|-moz-binding|behavior)\b[^'""]*\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxUntrustedRemoteResourceQuoted = new(@"\s+(src|srcset|poster|background)\s*=\s*(['""])\s*(?:https?:)?//.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxUntrustedRemoteResourceUnquoted = new(@"\s+(src|srcset|poster|background)\s*=\s*(?:https?:)?//[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RxUntrustedRemoteCssStyle = new(@"\s+style\s*=\s*(['""])[^'""]*(?:@import|url\s*\(\s*['""]?\s*(?:https?:)?//)[^'""]*\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxUntrustedRemoteStyleBlock = new(@"<\s*style\b[^>]*>.*?(?:@import|url\s*\(\s*['""]?\s*(?:https?:)?//).*?<\s*/\s*style\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxUntrustedExternalLinkTag = new(@"<\s*link\b[^>]*\bhref\s*=\s*(['""])\s*(?:https?:)?//.*?\1[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxUntrustedMetaRefreshTag = new(@"<\s*meta\b[^>]*\bhttp-equiv\s*=\s*(['""]?)refresh\1[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxHtmlContentTags = new(@"<\s*(html|head|body|style|table|div|p|span|br|img|a|meta)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxHtmlTag = new(@"<\s*html\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxHeadClose = new(@"<\s*/\s*head\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxHtmlOpenTag = new(@"<\s*html\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RxTrustedScriptUriQuoted = new(@"(href|action|formaction)\s*=\s*(['""])\s*(javascript|vbscript):.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxTrustedScriptUriUnquoted = new(@"(href|action|formaction)\s*=\s*(javascript|vbscript):[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RxTrustedDangerousCss = new(@"style\s*=\s*(['""])[^'""]*\b(expression|-moz-binding|behavior)\b[^'""]*\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxNonContentTags = new(@"<\s*(head|style|script|meta|link)\b[^>]*>.*?<\s*/\s*\1\s*>|<\s*(meta|link)\b[^>]*/?\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxHtmlTagsOnly = new("<.*?>", RegexOptions.Compiled);
         private static readonly Regex RxLocalImgSrc = new(@"<\s*img\b[^>]+\bsrc\s*=\s*(['""])(?!https?://|cid:|data:)[^'""]+\1", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -914,8 +896,8 @@ namespace Task_Flyout.Views
             {
                 var trusted = _mailTrustStore.IsTrusted(item);
                 var html = trusted
-                    ? SanitizeTrustedMailHtml(item.HtmlBody)
-                    : SanitizeMailHtml(item.HtmlBody);
+                    ? MailHtmlSanitizer.SanitizeTrusted(item.HtmlBody)
+                    : MailHtmlSanitizer.SanitizeUntrusted(item.HtmlBody);
 
                 if (trusted || HasRenderableHtml(html))
                 {
@@ -1087,7 +1069,7 @@ namespace Task_Flyout.Views
 
         private static string BuildMailHtmlDocument(string html, bool isDarkTheme, bool alreadySanitized = false)
         {
-            var safeHtml = alreadySanitized ? html : SanitizeMailHtml(html);
+            var safeHtml = alreadySanitized ? html : MailHtmlSanitizer.SanitizeUntrusted(html);
             var background = isDarkTheme ? "#1f1f1f" : "#ffffff";
             var text = isDarkTheme ? "#f3f3f3" : "#202020";
             var muted = isDarkTheme ? "#d7d7d7" : "#4b5563";
@@ -1175,87 +1157,6 @@ body { background-color: {{background}} !important; }
 
         private static void OpenSafeExternalUri(string uriText)
             => _ = SafeUriLauncher.TryLaunchExternalHttpUriAsync(uriText);
-
-        private static string SanitizeMailHtml(string html)
-        {
-            if (string.IsNullOrWhiteSpace(html)) return "";
-
-            try
-            {
-                return SanitizeMailHtmlCore(html);
-            }
-            catch (RegexMatchTimeoutException)
-            {
-                // Malicious/pathological markup tripped ReDoS protection — fall back to
-                // a fully-escaped plain-text view, which can never execute anything.
-                return $"<pre>{WebUtility.HtmlEncode(StripAllTagsSafe(html))}</pre>";
-            }
-        }
-
-        private static string StripAllTagsSafe(string html)
-        {
-            try { return RxHtmlTagsOnly.Replace(html, " "); }
-            catch (RegexMatchTimeoutException) { return html; }
-        }
-
-        private static string SanitizeMailHtmlCore(string html)
-        {
-            var value = html;
-            value = RxPairedDangerousTags.Replace(value, "");
-            value = RxSelfClosingDangerousTags.Replace(value, "");
-            value = RxEventHandlerQuoted.Replace(value, "");
-            value = RxEventHandlerUnquoted.Replace(value, "");
-            value = RxScriptUriQuoted.Replace(value, "$1=\"#\"");
-            value = RxScriptUriUnquoted.Replace(value, "$1=\"#\"");
-            value = RxDataUriNavigationQuoted.Replace(value, "$1=\"#\"");
-            value = RxDataUriNavigationUnquoted.Replace(value, "$1=\"#\"");
-            value = RxDangerousCssStyle.Replace(value, "");
-            value = StripUntrustedRemoteResources(value);
-
-            if (!RxHtmlContentTags.IsMatch(value))
-                value = $"<pre>{WebUtility.HtmlEncode(RemoveCssNoise(value))}</pre>";
-
-            return value;
-        }
-
-        private static string SanitizeTrustedMailHtml(string html)
-        {
-            if (string.IsNullOrWhiteSpace(html)) return "";
-
-            try
-            {
-                var value = html;
-                value = RxPairedDangerousTags.Replace(value, "");
-                value = RxSelfClosingDangerousTags.Replace(value, "");
-                value = RxEventHandlerQuoted.Replace(value, "");
-                value = RxEventHandlerUnquoted.Replace(value, "");
-                value = RxTrustedScriptUriQuoted.Replace(value, "$1=\"#\"");
-                value = RxTrustedScriptUriUnquoted.Replace(value, "$1=\"#\"");
-                value = RxDataUriNavigationQuoted.Replace(value, "$1=\"#\"");
-                value = RxDataUriNavigationUnquoted.Replace(value, "$1=\"#\"");
-                value = RxTrustedDangerousCss.Replace(value, "");
-
-                if (!RxHtmlContentTags.IsMatch(value))
-                    value = $"<pre>{WebUtility.HtmlEncode(RemoveCssNoise(value))}</pre>";
-
-                return value;
-            }
-            catch (RegexMatchTimeoutException)
-            {
-                return $"<pre>{WebUtility.HtmlEncode(StripAllTagsSafe(html))}</pre>";
-            }
-        }
-
-        private static string StripUntrustedRemoteResources(string html)
-        {
-            html = RxUntrustedExternalLinkTag.Replace(html, "");
-            html = RxUntrustedMetaRefreshTag.Replace(html, "");
-            html = RxUntrustedRemoteStyleBlock.Replace(html, "");
-            html = RxUntrustedRemoteCssStyle.Replace(html, "");
-            html = RxUntrustedRemoteResourceQuoted.Replace(html, "");
-            html = RxUntrustedRemoteResourceUnquoted.Replace(html, "");
-            return html;
-        }
 
         private static bool HasVisibleHtmlContent(string html)
         {
