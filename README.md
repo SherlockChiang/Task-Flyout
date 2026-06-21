@@ -71,6 +71,23 @@ downloaded code.
 - Visual Studio 2022 with the **Windows App SDK** and **.NET desktop** workloads, or the .NET 10 SDK
 - A supported platform: `x86`, `x64`, or `ARM64`
 
+**Google OAuth credentials**
+
+Google Calendar/Tasks/Gmail sync needs your own Google OAuth client. The real
+`credentials.json` is gitignored and never committed — copy the template and fill
+in a Desktop (installed) OAuth client from the
+[Google Cloud Console](https://console.cloud.google.com/apis/credentials):
+
+```powershell
+Copy-Item credentials.example.json credentials.json
+# then edit credentials.json with your client_id / client_secret / project_id
+```
+
+It's embedded into the package at build time. A Desktop OAuth client secret is not
+a true secret (the flow relies on PKCE/redirect), but for a public release rotate
+the client and inject `credentials.json` from your build/CI rather than relying on
+a long-lived checked-out value.
+
 **Build**
 
 ```powershell
@@ -82,7 +99,7 @@ project.
 
 ## Tech stack
 
-- WinUI 3 / Windows App SDK 1.8
+- WinUI 3 / Windows App SDK 2.1
 - .NET 10 (`net10.0-windows10.0.19041.0`), C#
 - SQLite for the local cache
 
