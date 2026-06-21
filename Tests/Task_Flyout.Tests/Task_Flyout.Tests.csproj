@@ -27,6 +27,7 @@
   <ItemGroup>
     <Compile Include="..\..\Services\VerificationCodeDetector.cs" Link="Source\VerificationCodeDetector.cs" />
     <Compile Include="..\..\Services\SafeUriLauncher.cs" Link="Source\SafeUriLauncher.cs" />
+    <Compile Include="..\..\Services\NetworkSafety.cs" Link="Source\NetworkSafety.cs" />
   </ItemGroup>
 
 </Project>

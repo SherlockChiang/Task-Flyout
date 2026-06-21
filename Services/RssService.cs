@@ -608,7 +608,7 @@ namespace Task_Flyout.Services
                 try
                 {
                     var addresses = await Dns.GetHostAddressesAsync(uri.Host);
-                    return addresses.All(addr => IsPublicIpAddress(addr));
+                    return addresses.All(addr => NetworkSafety.IsPublicIpAddress(addr));
                 }
                 catch
                 {
@@ -617,7 +617,7 @@ namespace Task_Flyout.Services
             }
 
             if (IPAddress.TryParse(uri.Host, out var parsed))
-                return IsPublicIpAddress(parsed);
+                return NetworkSafety.IsPublicIpAddress(parsed);
 
             return false;
         }
@@ -635,7 +635,7 @@ namespace Task_Flyout.Services
                 : await Dns.GetHostAddressesAsync(host, cancellationToken);
 
             return addresses
-                .Select(NormalizeIpAddress)
+                .Select(NetworkSafety.Normalize)
                 .Distinct()
                 .ToList();
         }
@@ -650,68 +650,16 @@ namespace Task_Flyout.Services
             else
             {
                 addresses = await Dns.GetHostAddressesAsync(host, cancellationToken);
-                if (addresses.Any(address => !IsPublicIpAddress(address)))
+                if (addresses.Any(address => !NetworkSafety.IsPublicIpAddress(address)))
                     return new List<IPAddress>();
             }
 
             return addresses
-                .Select(NormalizeIpAddress)
-                .Where(IsPublicIpAddress)
+                .Select(NetworkSafety.Normalize)
+                .Where(NetworkSafety.IsPublicIpAddress)
                 .Distinct()
                 .ToList();
         }
-
-        private static bool IsPublicIpAddress(IPAddress address)
-        {
-            address = NormalizeIpAddress(address);
-
-            if (IPAddress.IsLoopback(address) ||
-                address.Equals(IPAddress.Any) ||
-                address.Equals(IPAddress.Broadcast) ||
-                address.Equals(IPAddress.None) ||
-                address.Equals(IPAddress.IPv6Any) ||
-                address.Equals(IPAddress.IPv6None))
-                return false;
-
-            if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-            {
-                var bytes = address.GetAddressBytes();
-                return bytes[0] switch
-                {
-                    0 => false,
-                    10 => false,
-                    127 => false,
-                    100 when bytes[1] >= 64 && bytes[1] <= 127 => false,
-                    169 when bytes[1] == 254 => false,
-                    172 when bytes[1] >= 16 && bytes[1] <= 31 => false,
-                    192 when bytes[1] == 0 => false,
-                    192 when bytes[1] == 0 && bytes[2] == 2 => false,
-                    192 when bytes[1] == 88 && bytes[2] == 99 => false,
-                    192 when bytes[1] == 168 => false,
-                    198 when bytes[1] == 18 || bytes[1] == 19 => false,
-                    198 when bytes[1] == 51 && bytes[2] == 100 => false,
-                    203 when bytes[1] == 0 && bytes[2] == 113 => false,
-                    >= 224 => false,
-                    _ => true
-                };
-            }
-
-            if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
-            {
-                var bytes = address.GetAddressBytes();
-                if (address.IsIPv6LinkLocal || address.IsIPv6Multicast || address.IsIPv6SiteLocal)
-                    return false;
-                if ((bytes[0] & 0xfe) == 0xfc)
-                    return false;
-                if (bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0x0d && bytes[3] == 0xb8)
-                    return false;
-            }
-
-            return true;
-        }
-
-        private static IPAddress NormalizeIpAddress(IPAddress address)
-            => address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address;
 
         private static bool IsRedirect(HttpStatusCode code)
             => code is HttpStatusCode.Moved or HttpStatusCode.Found or HttpStatusCode.SeeOther
