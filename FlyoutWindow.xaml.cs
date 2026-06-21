@@ -1086,6 +1086,29 @@ namespace Task_Flyout
             });
         }
 
+        private const int FlyoutWeatherIconDecodePixelWidth = 48;
+        private const int MaxFlyoutWeatherIconCacheSize = 32;
+        private readonly Dictionary<string, Microsoft.UI.Xaml.Media.Imaging.BitmapImage> _flyoutWeatherIconCache = new(StringComparer.Ordinal);
+
+        // Decode weather icon-pack PNGs down to the ~48px display size and reuse them by URI,
+        // mirroring the weather bar. Without this the flyout decoded full-size (often 256px)
+        // bitmaps and rebuilt them on every open.
+        private Microsoft.UI.Xaml.Media.Imaging.BitmapImage GetWeatherIconImage(string uri)
+        {
+            if (_flyoutWeatherIconCache.TryGetValue(uri, out var cached))
+                return cached;
+
+            if (_flyoutWeatherIconCache.Count >= MaxFlyoutWeatherIconCacheSize)
+                _flyoutWeatherIconCache.Clear();
+
+            var image = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(uri))
+            {
+                DecodePixelWidth = FlyoutWeatherIconDecodePixelWidth
+            };
+            _flyoutWeatherIconCache[uri] = image;
+            return image;
+        }
+
         private void ApplyWeatherIconLayers(string[] layers)
         {
             var images = new[] { WeatherIconImage, WeatherIconImage1, WeatherIconImage2, WeatherIconImage3 };
@@ -1097,7 +1120,7 @@ namespace Task_Flyout
                 {
                     try
                     {
-                        images[i].Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(layers[i]));
+                        images[i].Source = GetWeatherIconImage(layers[i]);
                         images[i].Visibility = Visibility.Visible;
                     }
                     catch
