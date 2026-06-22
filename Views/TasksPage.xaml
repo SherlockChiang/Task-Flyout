@@ -36,7 +36,7 @@
                 <Button HorizontalAlignment="Right" Width="32" Height="32" Padding="0"
                         Background="Transparent" BorderThickness="0"
                         Click="ToggleAccountPane_Click"
-                        ToolTipService.ToolTip="折叠账户">
+                        AutomationProperties.Name="折叠账户" ToolTipService.ToolTip="折叠账户">
                     <FontIcon Glyph="&#xE76B;" FontSize="12"/>
                 </Button>
             </Grid>
@@ -85,7 +85,7 @@
                                                 BorderThickness="0"
                                                 Tag="{Binding ProviderName}"
                                                 Click="BtnRemoveAccount_Click"
-                                                ToolTipService.ToolTip="移除账户"
+                                                AutomationProperties.Name="移除账户" ToolTipService.ToolTip="移除账户"
                                                 VerticalAlignment="Center">
                                             <FontIcon Glyph="&#xE711;" FontSize="12"
                                                       Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
@@ -149,7 +149,7 @@
                             Background="Transparent"
                             BorderThickness="0"
                             Click="ToggleAccountPane_Click"
-                            ToolTipService.ToolTip="展开账户">
+                            AutomationProperties.Name="展开账户" ToolTipService.ToolTip="展开账户">
                         <FontIcon x:Name="ToggleAccountPaneIcon" Glyph="&#xE76C;" FontSize="14"/>
                     </Button>
                     <StackPanel Spacing="2">
@@ -242,7 +242,7 @@
                                                 Background="Transparent"
                                                 BorderThickness="0"
                                                 Click="DeleteTaskButton_Click"
-                                                ToolTipService.ToolTip="删除任务">
+                                                AutomationProperties.Name="删除任务" ToolTipService.ToolTip="删除任务">
                                             <FontIcon Glyph="&#xE74D;" FontSize="14"/>
                                         </Button>
                                     </Grid>
@@ -325,7 +325,7 @@
                                                 Background="Transparent"
                                                 BorderThickness="0"
                                                 Click="DeleteTaskButton_Click"
-                                                ToolTipService.ToolTip="删除任务">
+                                                AutomationProperties.Name="删除任务" ToolTipService.ToolTip="删除任务">
                                             <FontIcon Glyph="&#xE74D;" FontSize="14"/>
                                         </Button>
                                     </Grid>

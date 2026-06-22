@@ -72,7 +72,7 @@
                                     Background="Transparent"
                                     BorderThickness="0"
                                     Click="AddFolderButton_Click"
-                                    ToolTipService.ToolTip="添加文件夹">
+                                    AutomationProperties.Name="添加文件夹" ToolTipService.ToolTip="添加文件夹">
                                 <FontIcon Glyph="&#xE710;" FontSize="13"/>
                             </Button>
                         </Grid>
@@ -208,7 +208,7 @@
                                     Height="32"
                                     Padding="0"
                                     Click="BackToArticleListButton_Click"
-                                    ToolTipService.ToolTip="返回列表">
+                                    AutomationProperties.Name="返回列表" ToolTipService.ToolTip="返回列表">
                                 <FontIcon Glyph="&#xE72B;" FontSize="14"/>
                             </Button>
                             <StackPanel Grid.Column="1" Spacing="2">
