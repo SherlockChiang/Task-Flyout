@@ -14,6 +14,8 @@ using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Microsoft.Windows.ApplicationModel.Resources;
 using Windows.System;
+using Windows.Storage.Streams;
+using System.Runtime.InteropServices.WindowsRuntime;
 
 namespace Task_Flyout.Views
 {
@@ -814,11 +816,53 @@ namespace Task_Flyout.Views
             OpenSafeExternalUri(args.Uri);
         }
 
-        private void RssArticle_WebResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs args)
+        private async void RssArticle_WebResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs args)
         {
-            if (sender is CoreWebView2 coreWebView)
-                WebView2RuntimeService.BlockUnsafeRssEmbeddedResource(coreWebView, args);
+            if (sender is not CoreWebView2 coreWebView) return;
+            var uri = args.Request?.Uri;
+
+            // about:/data: resources need no network and pass through unchanged.
+            if (WebView2RuntimeService.IsAllowedRssNonRemoteResource(uri))
+                return;
+
+            // Enabled remote images: fetch through the app's IP-pinned HTTP client and serve
+            // the bytes, so the WebView never connects to the (possibly rebinding) host itself.
+            if (WebView2RuntimeService.ShouldProxyRssRemoteResource(uri))
+            {
+                var deferral = args.GetDeferral();
+                try
+                {
+                    var fetched = await _rssService.FetchRemoteImageSafelyAsync(uri!);
+                    if (fetched != null)
+                    {
+                        var stream = new InMemoryRandomAccessStream();
+                        await stream.WriteAsync(fetched.Value.Bytes.AsBuffer());
+                        stream.Seek(0);
+                        args.Response = coreWebView.Environment.CreateWebResourceResponse(
+                            stream, 200, "OK", $"Content-Type: {fetched.Value.ContentType}");
+                    }
+                    else
+                    {
+                        args.Response = BlockedRssResponse(coreWebView);
+                    }
+                }
+                catch
+                {
+                    args.Response = BlockedRssResponse(coreWebView);
+                }
+                finally
+                {
+                    deferral.Complete();
+                }
+                return;
+            }
+
+            args.Response = BlockedRssResponse(coreWebView);
         }
+
+        private static CoreWebView2WebResourceResponse BlockedRssResponse(CoreWebView2 coreWebView)
+            => coreWebView.Environment.CreateWebResourceResponse(
+                new InMemoryRandomAccessStream(), 403, "Blocked", "Content-Type: text/plain");
 
         private void BackToArticleListButton_Click(object sender, RoutedEventArgs e)
         {

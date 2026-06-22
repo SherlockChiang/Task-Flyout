@@ -56,18 +56,6 @@ namespace Task_Flyout.Services
                 "Content-Type: text/plain");
         }
 
-        public static void BlockUnsafeRssEmbeddedResource(CoreWebView2 coreWebView, CoreWebView2WebResourceRequestedEventArgs args)
-        {
-            if (IsAllowedRssEmbeddedResource(args.Request?.Uri))
-                return;
-
-            args.Response = coreWebView.Environment.CreateWebResourceResponse(
-                new InMemoryRandomAccessStream(),
-                403,
-                "Blocked",
-                "Content-Type: text/plain");
-        }
-
         public static bool IsAllowedEmbeddedResource(string? uriText)
         {
             if (string.IsNullOrWhiteSpace(uriText))
@@ -88,13 +76,11 @@ namespace Task_Flyout.Services
                     uriText.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase));
         }
 
-        public static bool IsAllowedRssEmbeddedResource(string? uriText)
+        // about:/data: RSS resources need no network and pass through unchanged.
+        public static bool IsAllowedRssNonRemoteResource(string? uriText)
         {
-            if (string.IsNullOrWhiteSpace(uriText))
-                return false;
-
-            if (!Uri.TryCreate(uriText, UriKind.Absolute, out var uri))
-                return false;
+            if (string.IsNullOrWhiteSpace(uriText)) return false;
+            if (!Uri.TryCreate(uriText, UriKind.Absolute, out var uri)) return false;
 
             if (uri.Scheme.Equals("about", StringComparison.OrdinalIgnoreCase))
                 return true;
@@ -103,10 +89,20 @@ namespace Task_Flyout.Services
                 return uriText.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase) ||
                        uriText.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase);
 
-            if (ApplicationData.Current.LocalSettings.Values["AllowRssRemoteResources"] as bool? ?? false)
-                return IsAllowedRssRemoteResource(uri);
-
             return false;
+        }
+
+        // A remote https resource the user has enabled, whose host isn't obviously private.
+        // The caller must fetch it through the app's IP-pinned HTTP client rather than letting
+        // the WebView connect directly (the host-string check alone can't stop DNS rebinding).
+        public static bool ShouldProxyRssRemoteResource(string? uriText)
+        {
+            if (string.IsNullOrWhiteSpace(uriText)) return false;
+            if (!Uri.TryCreate(uriText, UriKind.Absolute, out var uri)) return false;
+            if (!(ApplicationData.Current.LocalSettings.Values["AllowRssRemoteResources"] as bool? ?? false))
+                return false;
+
+            return IsAllowedRssRemoteResource(uri);
         }
 
         private static bool IsAllowedRssRemoteResource(Uri uri)

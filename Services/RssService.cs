@@ -661,6 +661,51 @@ namespace Task_Flyout.Services
                 .ToList();
         }
 
+        private const long MaxRemoteImageBytes = 10L * 1024 * 1024;
+
+        /// <summary>
+        /// Downloads a remote RSS article image through the app's SSRF-guarded HTTP client
+        /// (each connection is DNS-pinned to a public IP), so the WebView never connects to the
+        /// host directly — closing the DNS-rebinding gap a host-string check can't. Returns null
+        /// (caller should block) on any failure, redirect to a non-public host, non-image
+        /// content type, or oversize payload.
+        /// </summary>
+        public async Task<(byte[] Bytes, string ContentType)?> FetchRemoteImageSafelyAsync(string url)
+        {
+            try
+            {
+                if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+                    !uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+                    return null;
+
+                using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+                using var response = await SendWithRedirectsAsync(request);
+                if (!response.IsSuccessStatusCode) return null;
+
+                var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
+                if (!contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return null;
+                if (response.Content.Headers.ContentLength is long declared && declared > MaxRemoteImageBytes) return null;
+
+                await using var stream = await response.Content.ReadAsStreamAsync();
+                using var buffer = new MemoryStream();
+                var chunk = new byte[81920];
+                long total = 0;
+                int read;
+                while ((read = await stream.ReadAsync(chunk)) > 0)
+                {
+                    total += read;
+                    if (total > MaxRemoteImageBytes) return null;
+                    buffer.Write(chunk, 0, read);
+                }
+
+                return (buffer.ToArray(), contentType);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private static bool IsRedirect(HttpStatusCode code)
             => code is HttpStatusCode.Moved or HttpStatusCode.Found or HttpStatusCode.SeeOther
                 or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect
