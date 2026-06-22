@@ -1050,6 +1050,9 @@
   <data name="SettingsPage_MailInterval.Header" xml:space="preserve">
     <value>新邮件检查间隔</value>
   </data>
+  <data name="SettingsPage_BlockRemoteImages.Header" xml:space="preserve">
+    <value>默认阻止未信任发件人的远程图片（防追踪像素）</value>
+  </data>
   <data name="SettingsPage_InsecureWebview.Header" xml:space="preserve">
     <value>允许邮件加载 HTTP 图片资源</value>
   </data>
@@ -1142,6 +1145,12 @@
   </data>
   <data name="MailPage_LoadMore.Text" xml:space="preserve">
     <value>加载更多邮件</value>
+  </data>
+  <data name="MailPage_RemoteImagesBlocked.Text" xml:space="preserve">
+    <value>已阻止远程图片以保护隐私。</value>
+  </data>
+  <data name="MailPage_BtnShowImages.Text" xml:space="preserve">
+    <value>显示图片</value>
   </data>
   <data name="MailPage_SelectFolderPrompt.Text" xml:space="preserve">
     <value>请选择左侧文件夹</value>

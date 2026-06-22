@@ -793,6 +793,7 @@ namespace Task_Flyout.Views
             }
 
             _selectedItem = item;
+            _showRemoteImagesForCurrentMessage = false; // reset the per-message image override
             AddAccountPanel.Visibility = Visibility.Collapsed;
             ComposePanel.Visibility = Visibility.Collapsed;
             EmptyDetailPanel.Visibility = Visibility.Collapsed;
@@ -890,16 +891,31 @@ namespace Task_Flyout.Views
         private bool _isInternalMailHtmlNavigation;
         private WebView2? _detailHtmlView;
 
+        // Per-message "show images this once" override for the remote-image privacy block.
+        private bool _showRemoteImagesForCurrentMessage;
+
+        // When on (default), remote images/tracking pixels are blocked for senders the user
+        // hasn't trusted; a banner offers a per-message "show images" without trusting them.
+        private static bool BlockRemoteImagesByDefault =>
+            Windows.Storage.ApplicationData.Current.LocalSettings.Values["BlockRemoteImagesByDefault"] as bool? ?? true;
+
         private async Task RenderMailBodyAsync(MailItem item)
         {
+            RemoteImageBanner.Visibility = Visibility.Collapsed;
+
             if (!string.IsNullOrWhiteSpace(item.HtmlBody))
             {
-                var trusted = _mailTrustStore.IsTrusted(item);
-                var html = trusted
+                var senderTrusted = _mailTrustStore.IsTrusted(item);
+                // Remote images load only for trusted senders, when the user shows them for this
+                // message, or when the default-block setting is off — otherwise they're stripped.
+                bool allowRemote = senderTrusted || _showRemoteImagesForCurrentMessage || !BlockRemoteImagesByDefault;
+                var html = allowRemote
                     ? MailHtmlSanitizer.SanitizeTrusted(item.HtmlBody)
                     : MailHtmlSanitizer.SanitizeUntrusted(item.HtmlBody);
 
-                if (trusted || HasRenderableHtml(html))
+                bool remoteBlocked = !allowRemote && MailHtmlSanitizer.HasRemoteResources(item.HtmlBody);
+
+                if (allowRemote || HasRenderableHtml(html))
                 {
                     var htmlDocument = BuildMailHtmlDocument(html, IsDarkThemeActive(), alreadySanitized: true);
                     try
@@ -908,6 +924,7 @@ namespace Task_Flyout.Views
                         DetailPreview.Text = "";
                         DetailTextScrollViewer.Visibility = Visibility.Collapsed;
                         DetailHtmlViewHost.Visibility = Visibility.Visible;
+                        RemoteImageBanner.Visibility = remoteBlocked ? Visibility.Visible : Visibility.Collapsed;
                         var htmlView = EnsureDetailHtmlView();
                         await htmlView.EnsureCoreWebView2Async();
                         if (!_webView2Configured)
@@ -945,6 +962,14 @@ namespace Task_Flyout.Views
             }
 
             ShowPlainTextMailBody(item);
+        }
+
+        private async void ShowRemoteImagesButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedItem == null) return;
+            _showRemoteImagesForCurrentMessage = true;
+            RemoteImageBanner.Visibility = Visibility.Collapsed;
+            await RenderMailBodyAsync(_selectedItem);
         }
 
         private void MailHtml_NavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)

@@ -57,6 +57,7 @@ namespace Task_Flyout.Views
             EfficiencyModeToggle.IsOn = settings.Values["EfficiencyModeEnabled"] as bool? ?? true;
             NotifyToggle.IsOn = settings.Values["NotifyEnabled"] as bool? ?? true;
             MailPollingToggle.IsOn = settings.Values["MailPollingEnabled"] as bool? ?? true;
+            BlockRemoteImagesToggle.IsOn = settings.Values["BlockRemoteImagesByDefault"] as bool? ?? true;
             AllowInsecureWebViewResourcesToggle.IsOn = settings.Values["AllowInsecureWebViewResources"] as bool? ?? false;
             AllowRssRemoteResourcesToggle.IsOn = settings.Values["AllowRssRemoteResources"] as bool? ?? false;
             AllowRssLocalNetworkAccessToggle.IsOn = settings.Values["AllowRssLocalNetworkAccess"] as bool? ?? false;
@@ -454,6 +455,12 @@ namespace Task_Flyout.Views
         {
             if (_isInitializing) return;
             ApplicationData.Current.LocalSettings.Values["AllowInsecureWebViewResources"] = AllowInsecureWebViewResourcesToggle.IsOn;
+        }
+
+        private void BlockRemoteImagesToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            ApplicationData.Current.LocalSettings.Values["BlockRemoteImagesByDefault"] = BlockRemoteImagesToggle.IsOn;
         }
 
         private void AllowRssRemoteResourcesToggle_Toggled(object sender, RoutedEventArgs e)

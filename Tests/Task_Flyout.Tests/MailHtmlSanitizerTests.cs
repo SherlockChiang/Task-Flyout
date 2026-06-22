@@ -75,4 +75,26 @@ public class MailHtmlSanitizerTests
         Assert.Contains("Hello", result);
         Assert.Contains("<b>", result);
     }
+
+    [Theory]
+    [InlineData("<img src=\"https://tracker.example/p.gif\">")]
+    [InlineData("<img src=\"//cdn.example/x.png\">")]           // protocol-relative
+    [InlineData("<td background=\"http://x/bg.png\">")]
+    [InlineData("<div style=\"background:url(https://x/a.png)\">")]
+    [InlineData("<style>@import 'https://x/s.css';</style>")]
+    public void HasRemoteResources_true(string html)
+    {
+        Assert.True(MailHtmlSanitizer.HasRemoteResources(html));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("<p>plain text</p>")]
+    [InlineData("<img src=\"cid:logo\">")]                       // inline attachment
+    [InlineData("<img src=\"data:image/png;base64,AAAA\">")]    // data URI
+    public void HasRemoteResources_false(string? html)
+    {
+        Assert.False(MailHtmlSanitizer.HasRemoteResources(html));
+    }
 }

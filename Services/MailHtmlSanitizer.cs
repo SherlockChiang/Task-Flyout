@@ -37,6 +37,14 @@ namespace Task_Flyout.Services
         private static readonly Regex RxCssSelector = new(@"^[.#][\w\-#.:\s,>+~\[\]=""']+\{?$", RegexOptions.Compiled);
         private static readonly Regex RxCssProperty = new(@"^[a-zA-Z\-]+\s*:\s*[^。！？；，、]*;?$", RegexOptions.Compiled);
         private static readonly Regex RxCssRuleStart = new(@"^[a-zA-Z][\w\-#.\s,>+~\[\]=""']+\s*\{", RegexOptions.Compiled);
+        private static readonly Regex RxRemoteResource = new(@"\s(?:src|srcset|poster|background)\s*=\s*['""]?\s*(?:https?:)?//|url\s*\(\s*['""]?\s*(?:https?:)?//|@import\s+['""]?\s*(?:https?:)?//", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        /// <summary>
+        /// True if the HTML references any remote (http/https or protocol-relative) resource —
+        /// used to decide whether to surface a "remote images blocked" banner to the user.
+        /// </summary>
+        public static bool HasRemoteResources(string? html)
+            => !string.IsNullOrEmpty(html) && RxRemoteResource.IsMatch(html);
 
         /// <summary>Sanitize HTML from an untrusted sender (strips scripts AND remote resources).</summary>
         public static string SanitizeUntrusted(string html)

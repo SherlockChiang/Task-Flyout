@@ -1050,6 +1050,9 @@
   <data name="SettingsPage_MailInterval.Header" xml:space="preserve">
     <value>New mail check interval</value>
   </data>
+  <data name="SettingsPage_BlockRemoteImages.Header" xml:space="preserve">
+    <value>Block remote images from untrusted senders by default (anti tracking-pixel)</value>
+  </data>
   <data name="SettingsPage_InsecureWebview.Header" xml:space="preserve">
     <value>Allow emails to load HTTP image resources</value>
   </data>
@@ -1142,6 +1145,12 @@
   </data>
   <data name="MailPage_LoadMore.Text" xml:space="preserve">
     <value>Load more</value>
+  </data>
+  <data name="MailPage_RemoteImagesBlocked.Text" xml:space="preserve">
+    <value>Remote images were blocked to protect your privacy.</value>
+  </data>
+  <data name="MailPage_BtnShowImages.Text" xml:space="preserve">
+    <value>Show images</value>
   </data>
   <data name="MailPage_SelectFolderPrompt.Text" xml:space="preserve">
     <value>Please select a folder on the left</value>
