@@ -14,8 +14,8 @@
 
     <Grid Background="#01000000">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="AccountColumn" Width="260"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition x:Name="AccountColumn" Width="2*" MinWidth="200" MaxWidth="280"/>
+            <ColumnDefinition Width="5*" MinWidth="360"/>
         </Grid.ColumnDefinitions>
 
         <Grid x:Name="AccountPane" Grid.Column="0"

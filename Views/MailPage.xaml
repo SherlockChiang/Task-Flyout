@@ -42,9 +42,11 @@
 
         <Grid Grid.Row="1" ColumnSpacing="12" MinHeight="520">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="240"/>
-                <ColumnDefinition Width="360"/>
-                <ColumnDefinition Width="*"/>
+                <!-- Proportional so nothing is squeezed unreadable on small screens; the
+                     side panes cap on wide screens and the message body keeps a readable floor. -->
+                <ColumnDefinition Width="2*" MinWidth="190" MaxWidth="250"/>
+                <ColumnDefinition Width="3*" MinWidth="280" MaxWidth="380"/>
+                <ColumnDefinition Width="5*" MinWidth="340"/>
             </Grid.ColumnDefinitions>
 
             <Grid Grid.Column="0" RowSpacing="10">

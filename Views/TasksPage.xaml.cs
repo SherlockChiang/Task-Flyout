@@ -401,7 +401,8 @@ namespace Task_Flyout.Views
         private void ToggleAccountPane_Click(object sender, RoutedEventArgs e)
         {
             _isAccountPaneCollapsed = !_isAccountPaneCollapsed;
-            AccountColumn.Width = _isAccountPaneCollapsed ? new GridLength(0) : new GridLength(260);
+            AccountColumn.MinWidth = _isAccountPaneCollapsed ? 0 : 200;
+            AccountColumn.Width = _isAccountPaneCollapsed ? new GridLength(0) : new GridLength(2, GridUnitType.Star);
             AccountPane.Visibility = _isAccountPaneCollapsed ? Visibility.Collapsed : Visibility.Visible;
             ToggleAccountPaneIcon.Glyph = _isAccountPaneCollapsed ? "\uE76C" : "\uE76B";
         }

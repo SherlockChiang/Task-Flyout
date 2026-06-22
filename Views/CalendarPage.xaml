@@ -17,9 +17,11 @@
 
     <Grid Background="#01000000">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="AccountColumn" Width="260"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition x:Name="TimelineColumn" Width="340"/>
+            <!-- Proportional layout: side panes scale with the window and cap on wide
+                 screens; the calendar keeps a readable floor (MinWidth) on small laptops. -->
+            <ColumnDefinition x:Name="AccountColumn" Width="2*" MinWidth="200" MaxWidth="280"/>
+            <ColumnDefinition Width="5*" MinWidth="380"/>
+            <ColumnDefinition x:Name="TimelineColumn" Width="3*" MinWidth="280" MaxWidth="360"/>
         </Grid.ColumnDefinitions>
 
         <Grid x:Name="AccountPane" Grid.Column="0" Background="{ThemeResource LayerFillColorAltBrush}" BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Padding="16,32,16,24" RowSpacing="12">

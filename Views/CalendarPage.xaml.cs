@@ -299,7 +299,8 @@ namespace Task_Flyout.Views
         private void ToggleAccountPane_Click(object sender, RoutedEventArgs e)
         {
             _isAccountPaneCollapsed = !_isAccountPaneCollapsed;
-            AccountColumn.Width = _isAccountPaneCollapsed ? new GridLength(0) : new GridLength(260);
+            AccountColumn.MinWidth = _isAccountPaneCollapsed ? 0 : 200;
+            AccountColumn.Width = _isAccountPaneCollapsed ? new GridLength(0) : new GridLength(2, GridUnitType.Star);
             AccountPane.Visibility = _isAccountPaneCollapsed ? Visibility.Collapsed : Visibility.Visible;
             ToggleAccountPaneIcon.Glyph = _isAccountPaneCollapsed ? "\uE76C" : "\uE76B";
         }
@@ -307,7 +308,8 @@ namespace Task_Flyout.Views
         private void ToggleTimelinePane_Click(object sender, RoutedEventArgs e)
         {
             _isTimelinePaneCollapsed = !_isTimelinePaneCollapsed;
-            TimelineColumn.Width = _isTimelinePaneCollapsed ? new GridLength(0) : new GridLength(340);
+            TimelineColumn.MinWidth = _isTimelinePaneCollapsed ? 0 : 280;
+            TimelineColumn.Width = _isTimelinePaneCollapsed ? new GridLength(0) : new GridLength(3, GridUnitType.Star);
             TimelinePane.Visibility = _isTimelinePaneCollapsed ? Visibility.Collapsed : Visibility.Visible;
             ToggleTimelinePaneIcon.Glyph = _isTimelinePaneCollapsed ? "\uE76B" : "\uE76C";
         }
