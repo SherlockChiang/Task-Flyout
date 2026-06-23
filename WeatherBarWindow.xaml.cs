@@ -1061,17 +1061,14 @@ namespace Task_Flyout
             }
             else
             {
-                // Dark mode: keep the veil barely-there so the bar reads as part of the
-                // taskbar rather than a distinct pill — just a whisper of dark tint at rest,
-                // lifting a little on hover for feedback. (Was 56/46/36 rest, 92/80/68 hover,
-                // which sat too heavily and looked like an opaque box over the dark taskbar.)
-                byte topAlpha = isHovering ? (byte)64 : (byte)30;
-                byte midAlpha = isHovering ? (byte)52 : (byte)22;
-                byte bottomAlpha = isHovering ? (byte)42 : (byte)15;
-                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(topAlpha, 18, 20, 26), Offset = 0 });
-                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(midAlpha, 14, 32, 40), Offset = 0.32 });
-                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(bottomAlpha, 30, 20, 44), Offset = 0.7 });
-                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(bottomAlpha, 42, 30, 20), Offset = 1 });
+                // Dark mode: a flat, uniform frosted veil. Every stop shares the same alpha so
+                // there is no top-lit-to-dark ramp — that ramp (plus the top sheen) is what made
+                // the pill read as a convex, raised chip. Equal alpha + only a faint diagonal
+                // hue drift keeps it a flush, even film over the taskbar.
+                byte alpha = isHovering ? (byte)52 : (byte)24;
+                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(alpha, 18, 22, 28), Offset = 0 });
+                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(alpha, 16, 26, 34), Offset = 0.5 });
+                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(alpha, 26, 22, 36), Offset = 1 });
             }
 
             return brush;
@@ -1079,12 +1076,15 @@ namespace Task_Flyout
 
         private Brush CreateGlassHighlightBrush(bool isHovering)
         {
+            // Dark mode: no top sheen at rest. That bright top rim is what made the pill
+            // look like a glossy, raised button; drop it so the bar sits flush, and let only
+            // a whisper return on hover. Light mode keeps its gentle sheen (it blends well).
             byte topAlpha = _isLightTheme
                 ? (isHovering ? (byte)42 : (byte)28)
-                : (isHovering ? (byte)10 : (byte)5);
+                : (isHovering ? (byte)6 : (byte)0);
             byte bottomAlpha = _isLightTheme
                 ? (isHovering ? (byte)6 : (byte)3)
-                : (isHovering ? (byte)2 : (byte)1);
+                : (byte)0;
             Color sheen = _isLightTheme ? Colors.White : Color.FromArgb(255, 255, 255, 255);
 
             var brush = new LinearGradientBrush
