@@ -518,9 +518,59 @@ namespace Task_Flyout.Services
             CityLon = longitude;
         }
 
-        /// <summary>Resolve coordinates to a human-readable place name in the app's language
-        /// (BigDataCloud keyless reverse geocoder). Returns null on failure.</summary>
+        /// <summary>Resolve coordinates to a human-readable place name in the app's language.
+        /// Uses OpenStreetMap Nominatim for street-level detail, falling back to the
+        /// city-level BigDataCloud geocoder if Nominatim is unavailable. Returns null on failure.</summary>
         public async Task<string?> ReverseGeocodeAsync(double latitude, double longitude)
+        {
+            return await ReverseGeocodeStreetAsync(latitude, longitude)
+                   ?? await ReverseGeocodeCityAsync(latitude, longitude);
+        }
+
+        /// <summary>Street-level reverse geocode via OpenStreetMap Nominatim (localized).
+        /// Returns a "street · district" style label, or just the locality when no road is found.</summary>
+        private async Task<string?> ReverseGeocodeStreetAsync(double latitude, double longitude)
+        {
+            try
+            {
+                string lang = GetCurrentLanguage() == "zh" ? "zh" : "en";
+                string url = "https://nominatim.openstreetmap.org/reverse" +
+                             $"?lat={latitude.ToString(CultureInfo.InvariantCulture)}" +
+                             $"&lon={longitude.ToString(CultureInfo.InvariantCulture)}" +
+                             "&format=jsonv2&zoom=18&addressdetails=1" +
+                             $"&accept-language={lang}";
+
+                // Nominatim's usage policy requires an identifying User-Agent.
+                var json = await GetStringWithAgentAsync(url, "TaskFlyout/1.0 (weather location)");
+                using var doc = JsonDocument.Parse(json);
+                if (!doc.RootElement.TryGetProperty("address", out var addr) ||
+                    addr.ValueKind != JsonValueKind.Object)
+                    return null;
+
+                string? Pick(string prop) =>
+                    addr.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String
+                        ? v.GetString()?.Trim() : null;
+
+                string? street = Pick("road") ?? Pick("pedestrian") ?? Pick("residential")
+                                 ?? Pick("footway") ?? Pick("path");
+                string? context = Pick("neighbourhood") ?? Pick("suburb") ?? Pick("quarter")
+                                  ?? Pick("city_district") ?? Pick("city") ?? Pick("town")
+                                  ?? Pick("village") ?? Pick("county");
+
+                if (!string.IsNullOrWhiteSpace(street))
+                    return string.IsNullOrWhiteSpace(context) ? street : $"{street} · {context}";
+
+                // No road resolved here — return the most specific locality we found.
+                return string.IsNullOrWhiteSpace(context) ? null : context;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>City-level reverse geocode via the keyless BigDataCloud client (fallback).</summary>
+        private async Task<string?> ReverseGeocodeCityAsync(double latitude, double longitude)
         {
             try
             {
@@ -571,10 +621,11 @@ namespace Task_Flyout.Services
                 var access = await Geolocator.RequestAccessAsync();
                 if (access != GeolocationAccessStatus.Allowed) return false;
 
-                // Only react to meaningful movement so we don't refetch constantly.
+                // High accuracy so the followed position resolves to a street; the 3km
+                // movement threshold still keeps us from refetching weather constantly.
                 _trackingGeolocator = new Geolocator
                 {
-                    DesiredAccuracyInMeters = 3000,
+                    DesiredAccuracy = PositionAccuracy.High,
                     MovementThreshold = 3000
                 };
                 _trackingGeolocator.PositionChanged += OnTrackedPositionChanged;

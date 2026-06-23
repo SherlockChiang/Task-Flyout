@@ -689,7 +689,7 @@ namespace Task_Flyout.Views
                     return;
                 }
 
-                var geolocator = new Geolocator { DesiredAccuracyInMeters = 2000 };
+                var geolocator = new Geolocator { DesiredAccuracy = PositionAccuracy.High };
                 var position = await geolocator.GetGeopositionAsync();
                 var point = position.Coordinate.Point.Position;
 
