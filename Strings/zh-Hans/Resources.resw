@@ -534,6 +534,18 @@
   <data name="WeatherPage_BtnRefresh.Content" xml:space="preserve">
     <value>刷新</value>
   </data>
+  <data name="WeatherPage_BtnUseLocation.Text" xml:space="preserve">
+    <value>当前位置</value>
+  </data>
+  <data name="WeatherCurrentLocation" xml:space="preserve">
+    <value>当前位置</value>
+  </data>
+  <data name="WeatherLocationDenied" xml:space="preserve">
+    <value>定位已关闭。请在 Windows 设置 › 隐私和安全性 › 定位 中开启。</value>
+  </data>
+  <data name="WeatherLocationFailed" xml:space="preserve">
+    <value>无法获取当前位置，请重试。</value>
+  </data>
   <data name="WeatherPage_IconFontHeader.Header" xml:space="preserve">
     <value>图标风格</value>
   </data>

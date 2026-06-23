@@ -508,6 +508,15 @@ namespace Task_Flyout.Services
             }
         }
 
+        /// <summary>Set the weather location directly from coordinates (e.g. device GPS),
+        /// with a display label. Open-Meteo uses the coordinates directly.</summary>
+        public void SetCoordinates(double latitude, double longitude, string displayName)
+        {
+            City = displayName;
+            CityLat = latitude;
+            CityLon = longitude;
+        }
+
         public async Task<List<string>> SearchCityAsync(string query)
         {
             if (string.IsNullOrWhiteSpace(query)) return new List<string>();

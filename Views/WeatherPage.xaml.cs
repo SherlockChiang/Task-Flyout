@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Microsoft.Windows.ApplicationModel.Resources;
+using Windows.Devices.Geolocation;
 
 namespace Task_Flyout.Views
 {
@@ -668,6 +669,47 @@ namespace Task_Flyout.Views
         private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
             await LoadWeatherDataAsync(forceRefresh: true);
+        }
+
+        private async void UseCurrentLocationButton_Click(object sender, RoutedEventArgs e)
+        {
+            UseCurrentLocationButton.IsEnabled = false;
+            LocationStatusText.Visibility = Visibility.Collapsed;
+            try
+            {
+                var access = await Geolocator.RequestAccessAsync();
+                if (access != GeolocationAccessStatus.Allowed)
+                {
+                    ShowLocationStatus(_loader.GetStringOrDefault("WeatherLocationDenied")
+                        ?? "Location is off. Turn it on in Windows Settings › Privacy & security › Location.");
+                    return;
+                }
+
+                var geolocator = new Geolocator { DesiredAccuracyInMeters = 2000 };
+                var position = await geolocator.GetGeopositionAsync();
+                var point = position.Coordinate.Point.Position;
+
+                string label = _loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location";
+                _weatherService.SetCoordinates(point.Latitude, point.Longitude, label);
+                CitySearchBox.Text = label;
+                await LoadWeatherDataAsync(forceRefresh: true);
+            }
+            catch (Exception ex)
+            {
+                ShowLocationStatus(_loader.GetStringOrDefault("WeatherLocationFailed")
+                    ?? "Could not get your current location. Please try again.");
+                System.Diagnostics.Debug.WriteLine($"Use current location failed: {ex.Message}");
+            }
+            finally
+            {
+                UseCurrentLocationButton.IsEnabled = true;
+            }
+        }
+
+        private void ShowLocationStatus(string message)
+        {
+            LocationStatusText.Text = message;
+            LocationStatusText.Visibility = Visibility.Visible;
         }
 
         #endregion

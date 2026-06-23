@@ -199,14 +199,26 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
                         <AutoSuggestBox Grid.Column="0" x:Uid="WeatherPage_CitySearchBox" x:Name="CitySearchBox"
                                         TextChanged="CitySearchBox_TextChanged" QuerySubmitted="CitySearchBox_QuerySubmitted"
                                         SuggestionChosen="CitySearchBox_SuggestionChosen" VerticalAlignment="Center"/>
 
-                        <Button x:Uid="WeatherPage_BtnRefresh" Grid.Column="1" Click="BtnRefresh_Click" VerticalAlignment="Center"/>
+                        <Button x:Name="UseCurrentLocationButton" Grid.Column="1" Click="UseCurrentLocationButton_Click"
+                                VerticalAlignment="Center" AutomationProperties.Name="使用当前位置">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE81D;" FontSize="14"/>
+                                <TextBlock x:Uid="WeatherPage_BtnUseLocation" Text="当前位置"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button x:Uid="WeatherPage_BtnRefresh" Grid.Column="2" Click="BtnRefresh_Click" VerticalAlignment="Center"/>
                     </Grid>
+
+                    <TextBlock x:Name="LocationStatusText" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
                 </StackPanel>
 
                 <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4"/>

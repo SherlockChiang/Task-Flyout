@@ -534,6 +534,18 @@
   <data name="WeatherPage_BtnRefresh.Content" xml:space="preserve">
     <value>Refresh</value>
   </data>
+  <data name="WeatherPage_BtnUseLocation.Text" xml:space="preserve">
+    <value>Current location</value>
+  </data>
+  <data name="WeatherCurrentLocation" xml:space="preserve">
+    <value>Current location</value>
+  </data>
+  <data name="WeatherLocationDenied" xml:space="preserve">
+    <value>Location is off. Turn it on in Windows Settings › Privacy &amp; security › Location.</value>
+  </data>
+  <data name="WeatherLocationFailed" xml:space="preserve">
+    <value>Could not get your current location. Please try again.</value>
+  </data>
   <data name="WeatherPage_IconFontHeader.Header" xml:space="preserve">
     <value>Icon Style</value>
   </data>
