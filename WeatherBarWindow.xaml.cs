@@ -1061,13 +1061,13 @@ namespace Task_Flyout
             }
             else
             {
-                // Dark mode: a faint *dark* tinted veil. The light/white stops below were
-                // washing the pill whitish over the dark taskbar; dark tints with the same
-                // cyan/violet/amber drift deepen it subtly instead, matching how light mode
-                // blends in. Slightly higher alpha because dark-on-dark needs more to read.
-                byte topAlpha = isHovering ? (byte)92 : (byte)56;
-                byte midAlpha = isHovering ? (byte)80 : (byte)46;
-                byte bottomAlpha = isHovering ? (byte)68 : (byte)36;
+                // Dark mode: keep the veil barely-there so the bar reads as part of the
+                // taskbar rather than a distinct pill — just a whisper of dark tint at rest,
+                // lifting a little on hover for feedback. (Was 56/46/36 rest, 92/80/68 hover,
+                // which sat too heavily and looked like an opaque box over the dark taskbar.)
+                byte topAlpha = isHovering ? (byte)64 : (byte)30;
+                byte midAlpha = isHovering ? (byte)52 : (byte)22;
+                byte bottomAlpha = isHovering ? (byte)42 : (byte)15;
                 brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(topAlpha, 18, 20, 26), Offset = 0 });
                 brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(midAlpha, 14, 32, 40), Offset = 0.32 });
                 brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(bottomAlpha, 30, 20, 44), Offset = 0.7 });
@@ -1081,10 +1081,10 @@ namespace Task_Flyout
         {
             byte topAlpha = _isLightTheme
                 ? (isHovering ? (byte)42 : (byte)28)
-                : (isHovering ? (byte)16 : (byte)10);
+                : (isHovering ? (byte)10 : (byte)5);
             byte bottomAlpha = _isLightTheme
                 ? (isHovering ? (byte)6 : (byte)3)
-                : (isHovering ? (byte)4 : (byte)2);
+                : (isHovering ? (byte)2 : (byte)1);
             Color sheen = _isLightTheme ? Colors.White : Color.FromArgb(255, 255, 255, 255);
 
             var brush = new LinearGradientBrush
