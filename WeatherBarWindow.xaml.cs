@@ -1061,13 +1061,17 @@ namespace Task_Flyout
             }
             else
             {
-                byte topAlpha = isHovering ? (byte)44 : (byte)22;
-                byte midAlpha = isHovering ? (byte)36 : (byte)18;
-                byte bottomAlpha = isHovering ? (byte)28 : (byte)13;
-                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(topAlpha, 255, 255, 255), Offset = 0 });
-                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(midAlpha, 196, 236, 248), Offset = 0.32 });
-                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(bottomAlpha, 216, 198, 240), Offset = 0.7 });
-                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(bottomAlpha, 240, 216, 196), Offset = 1 });
+                // Dark mode: a faint *dark* tinted veil. The light/white stops below were
+                // washing the pill whitish over the dark taskbar; dark tints with the same
+                // cyan/violet/amber drift deepen it subtly instead, matching how light mode
+                // blends in. Slightly higher alpha because dark-on-dark needs more to read.
+                byte topAlpha = isHovering ? (byte)92 : (byte)56;
+                byte midAlpha = isHovering ? (byte)80 : (byte)46;
+                byte bottomAlpha = isHovering ? (byte)68 : (byte)36;
+                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(topAlpha, 18, 20, 26), Offset = 0 });
+                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(midAlpha, 14, 32, 40), Offset = 0.32 });
+                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(bottomAlpha, 30, 20, 44), Offset = 0.7 });
+                brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(bottomAlpha, 42, 30, 20), Offset = 1 });
             }
 
             return brush;
