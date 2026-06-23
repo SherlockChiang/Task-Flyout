@@ -537,6 +537,9 @@
   <data name="WeatherPage_BtnUseLocation.Text" xml:space="preserve">
     <value>Current location</value>
   </data>
+  <data name="WeatherPage_AutoFollowLocation.Header" xml:space="preserve">
+    <value>Follow my location automatically</value>
+  </data>
   <data name="WeatherCurrentLocation" xml:space="preserve">
     <value>Current location</value>
   </data>

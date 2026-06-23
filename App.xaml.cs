@@ -103,6 +103,11 @@ namespace Task_Flyout
             InitWeatherBar();
             StartWeatherBarWatchdog();
 
+            // Resume following the device location (and refresh weather UI when it moves).
+            WeatherService.LocationUpdated += OnWeatherLocationUpdated;
+            if (WeatherService.AutoFollowLocation)
+                _ = WeatherService.StartLocationTrackingAsync();
+
             _trayIcon.DoubleClickCommand = new RelayCommand(() => OpenMainWindowInternal());
 
             if (_trayIcon.ContextFlyout is MenuFlyout menu)
@@ -297,6 +302,15 @@ namespace Task_Flyout
             }
 
             return MyFlyoutWindow;
+        }
+
+        private void OnWeatherLocationUpdated(object? sender, EventArgs e)
+        {
+            MainDispatcherQueue?.TryEnqueue(() =>
+            {
+                RefreshWeatherBar();
+                _ = MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: true);
+            });
         }
 
         private void InitWeatherBar()

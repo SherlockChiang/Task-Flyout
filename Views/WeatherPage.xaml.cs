@@ -31,6 +31,7 @@ namespace Task_Flyout.Views
             this.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
             _loader = new ResourceLoader();
             this.Loaded += WeatherPage_Loaded;
+            this.Unloaded += WeatherPage_Unloaded;
         }
 
         private string GetSafeString(string key, string fallbackText)
@@ -53,6 +54,9 @@ namespace Task_Flyout.Views
 
             WeatherToggle.IsOn = _weatherService.IsEnabled;
             CitySearchBox.Text = _weatherService.City;
+            AutoFollowLocationToggle.IsOn = _weatherService.AutoFollowLocation;
+            _weatherService.LocationUpdated -= OnWeatherLocationUpdated;
+            _weatherService.LocationUpdated += OnWeatherLocationUpdated;
 
             // Weather bar toggle
             bool weatherBarEnabled = Windows.Storage.ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false;
@@ -689,7 +693,10 @@ namespace Task_Flyout.Views
                 var position = await geolocator.GetGeopositionAsync();
                 var point = position.Coordinate.Point.Position;
 
-                string label = _loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location";
+                string? place = await _weatherService.ReverseGeocodeAsync(point.Latitude, point.Longitude);
+                string label = !string.IsNullOrWhiteSpace(place)
+                    ? place!
+                    : (_loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location");
                 _weatherService.SetCoordinates(point.Latitude, point.Longitude, label);
                 CitySearchBox.Text = label;
                 await LoadWeatherDataAsync(forceRefresh: true);
@@ -710,6 +717,44 @@ namespace Task_Flyout.Views
         {
             LocationStatusText.Text = message;
             LocationStatusText.Visibility = Visibility.Visible;
+        }
+
+        private async void AutoFollowLocationToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing || _weatherService == null) return;
+
+            if (AutoFollowLocationToggle.IsOn)
+            {
+                bool started = await _weatherService.StartLocationTrackingAsync();
+                _weatherService.AutoFollowLocation = started;
+                if (!started)
+                {
+                    AutoFollowLocationToggle.IsOn = false; // re-enters the off branch (harmless)
+                    ShowLocationStatus(_loader.GetStringOrDefault("WeatherLocationDenied")
+                        ?? "Location is off. Turn it on in Windows Settings › Privacy & security › Location.");
+                }
+            }
+            else
+            {
+                _weatherService.StopLocationTracking();
+                _weatherService.AutoFollowLocation = false;
+            }
+        }
+
+        private void OnWeatherLocationUpdated(object? sender, EventArgs e)
+        {
+            DispatcherQueue.TryEnqueue(async () =>
+            {
+                if (_weatherService == null) return;
+                CitySearchBox.Text = _weatherService.City;
+                await LoadWeatherDataAsync(forceRefresh: true);
+            });
+        }
+
+        private void WeatherPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (_weatherService != null)
+                _weatherService.LocationUpdated -= OnWeatherLocationUpdated;
         }
 
         #endregion

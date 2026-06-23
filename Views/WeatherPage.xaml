@@ -219,6 +219,10 @@
 
                     <TextBlock x:Name="LocationStatusText" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed"
                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+
+                    <ToggleSwitch x:Uid="WeatherPage_AutoFollowLocation" x:Name="AutoFollowLocationToggle"
+                                  Header="自动跟随定位" OnContent="On" OffContent="Off"
+                                  Toggled="AutoFollowLocationToggle_Toggled"/>
                 </StackPanel>
 
                 <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4"/>

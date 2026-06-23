@@ -8,6 +8,7 @@ using System.Threading;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Windows.Storage;
+using Windows.Devices.Geolocation;
 using Microsoft.Windows.ApplicationModel.Resources;
 
 namespace Task_Flyout.Services
@@ -515,6 +516,104 @@ namespace Task_Flyout.Services
             City = displayName;
             CityLat = latitude;
             CityLon = longitude;
+        }
+
+        /// <summary>Resolve coordinates to a human-readable place name in the app's language
+        /// (BigDataCloud keyless reverse geocoder). Returns null on failure.</summary>
+        public async Task<string?> ReverseGeocodeAsync(double latitude, double longitude)
+        {
+            try
+            {
+                string lang = GetCurrentLanguage() == "zh" ? "zh" : "en";
+                string url = "https://api.bigdatacloud.net/data/reverse-geocode-client" +
+                             $"?latitude={latitude.ToString(CultureInfo.InvariantCulture)}" +
+                             $"&longitude={longitude.ToString(CultureInfo.InvariantCulture)}" +
+                             $"&localityLanguage={lang}";
+
+                var json = await GetStringWithAgentAsync(url, "TaskFlyout/1.0");
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                string? Pick(string prop) =>
+                    root.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String
+                        ? v.GetString() : null;
+
+                var name = Pick("city");
+                if (string.IsNullOrWhiteSpace(name)) name = Pick("locality");
+                if (string.IsNullOrWhiteSpace(name)) name = Pick("principalSubdivision");
+                return string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public bool AutoFollowLocation
+        {
+            get => ApplicationData.Current.LocalSettings.Values["WeatherAutoFollowLocation"] as bool? ?? false;
+            set => ApplicationData.Current.LocalSettings.Values["WeatherAutoFollowLocation"] = value;
+        }
+
+        private Geolocator? _trackingGeolocator;
+
+        /// <summary>Raised (on a background thread) after the followed location changed and
+        /// the weather coordinates were updated — subscribers should refresh on the UI thread.</summary>
+        public event EventHandler? LocationUpdated;
+
+        /// <summary>Begin following the device location. Returns false if access was denied.</summary>
+        public async Task<bool> StartLocationTrackingAsync()
+        {
+            try
+            {
+                if (_trackingGeolocator != null) return true;
+
+                var access = await Geolocator.RequestAccessAsync();
+                if (access != GeolocationAccessStatus.Allowed) return false;
+
+                // Only react to meaningful movement so we don't refetch constantly.
+                _trackingGeolocator = new Geolocator
+                {
+                    DesiredAccuracyInMeters = 3000,
+                    MovementThreshold = 3000
+                };
+                _trackingGeolocator.PositionChanged += OnTrackedPositionChanged;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"StartLocationTracking failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        public void StopLocationTracking()
+        {
+            if (_trackingGeolocator != null)
+            {
+                _trackingGeolocator.PositionChanged -= OnTrackedPositionChanged;
+                _trackingGeolocator = null;
+            }
+        }
+
+        private async void OnTrackedPositionChanged(Geolocator sender, PositionChangedEventArgs args)
+        {
+            try
+            {
+                var p = args.Position.Coordinate.Point.Position;
+                string? place = await ReverseGeocodeAsync(p.Latitude, p.Longitude);
+                string label = !string.IsNullOrWhiteSpace(place)
+                    ? place!
+                    : (_loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location");
+
+                SetCoordinates(p.Latitude, p.Longitude, label);
+                // Coordinates are part of the cache key, so the next fetch is a miss and refetches.
+                LocationUpdated?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Tracked position change failed: {ex.Message}");
+            }
         }
 
         public async Task<List<string>> SearchCityAsync(string query)
