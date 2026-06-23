@@ -692,13 +692,19 @@ namespace Task_Flyout.Views
                 var geolocator = new Geolocator { DesiredAccuracy = PositionAccuracy.High };
                 var position = await geolocator.GetGeopositionAsync();
                 var point = position.Coordinate.Point.Position;
+                double accuracyM = position.Coordinate.Accuracy;
 
-                string? place = await _weatherService.ReverseGeocodeAsync(point.Latitude, point.Longitude);
-                string label = !string.IsNullOrWhiteSpace(place)
-                    ? place!
+                var geo = await _weatherService.ReverseGeocodeDetailedAsync(point.Latitude, point.Longitude);
+                string label = !string.IsNullOrWhiteSpace(geo.Name)
+                    ? geo.Name!
                     : (_loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location");
                 _weatherService.SetCoordinates(point.Latitude, point.Longitude, label);
                 CitySearchBox.Text = label;
+
+                // Diagnostic line: raw fix + accuracy + which geocoder answered.
+                // osm-road = street resolved; osm-area = OSM reachable but no road; bigdatacloud = OSM unreachable (China-network fallback).
+                ShowLocationStatus($"[诊断] {point.Latitude:F5}, {point.Longitude:F5} · 精度≈{accuracyM:F0}m · 来源 {geo.Source} · {geo.Name ?? "—"}");
+
                 await LoadWeatherDataAsync(forceRefresh: true);
             }
             catch (Exception ex)

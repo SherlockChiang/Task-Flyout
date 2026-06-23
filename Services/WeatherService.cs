@@ -518,18 +518,36 @@ namespace Task_Flyout.Services
             CityLon = longitude;
         }
 
-        /// <summary>Resolve coordinates to a human-readable place name in the app's language.
-        /// Uses OpenStreetMap Nominatim for street-level detail, falling back to the
-        /// city-level BigDataCloud geocoder if Nominatim is unavailable. Returns null on failure.</summary>
-        public async Task<string?> ReverseGeocodeAsync(double latitude, double longitude)
+        /// <summary>Outcome of a reverse-geocode, including which provider answered (for diagnostics).</summary>
+        public sealed class ReverseGeocodeResult
         {
-            return await ReverseGeocodeStreetAsync(latitude, longitude)
-                   ?? await ReverseGeocodeCityAsync(latitude, longitude);
+            public string? Name { get; init; }
+            /// <summary>osm-road | osm-area | osm-empty | osm-error | bigdatacloud | none.</summary>
+            public string Source { get; init; } = "none";
         }
 
-        /// <summary>Street-level reverse geocode via OpenStreetMap Nominatim (localized).
-        /// Returns a "street · district" style label, or just the locality when no road is found.</summary>
-        private async Task<string?> ReverseGeocodeStreetAsync(double latitude, double longitude)
+        /// <summary>Resolve coordinates to a localized place name. Street-level via Nominatim,
+        /// falling back to the city-level BigDataCloud geocoder. Returns null on failure.</summary>
+        public async Task<string?> ReverseGeocodeAsync(double latitude, double longitude)
+            => (await ReverseGeocodeDetailedAsync(latitude, longitude)).Name;
+
+        /// <summary>Like <see cref="ReverseGeocodeAsync"/> but also reports which provider answered,
+        /// so callers can tell a Nominatim-unreachable city fallback from a coarse fix.</summary>
+        public async Task<ReverseGeocodeResult> ReverseGeocodeDetailedAsync(double latitude, double longitude)
+        {
+            var street = await ReverseGeocodeStreetAsync(latitude, longitude);
+            if (!string.IsNullOrWhiteSpace(street.Name)) return street;
+
+            // Nominatim gave nothing usable (often unreachable from mainland China) — try city level.
+            var city = await ReverseGeocodeCityAsync(latitude, longitude);
+            if (!string.IsNullOrWhiteSpace(city))
+                return new ReverseGeocodeResult { Name = city, Source = "bigdatacloud" };
+
+            return new ReverseGeocodeResult { Name = null, Source = street.Source };
+        }
+
+        /// <summary>Street-level reverse geocode via OpenStreetMap Nominatim (localized).</summary>
+        private async Task<ReverseGeocodeResult> ReverseGeocodeStreetAsync(double latitude, double longitude)
         {
             try
             {
@@ -545,7 +563,7 @@ namespace Task_Flyout.Services
                 using var doc = JsonDocument.Parse(json);
                 if (!doc.RootElement.TryGetProperty("address", out var addr) ||
                     addr.ValueKind != JsonValueKind.Object)
-                    return null;
+                    return new ReverseGeocodeResult { Source = "osm-empty" };
 
                 string? Pick(string prop) =>
                     addr.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String
@@ -558,14 +576,21 @@ namespace Task_Flyout.Services
                                   ?? Pick("village") ?? Pick("county");
 
                 if (!string.IsNullOrWhiteSpace(street))
-                    return string.IsNullOrWhiteSpace(context) ? street : $"{street} · {context}";
+                    return new ReverseGeocodeResult
+                    {
+                        Name = string.IsNullOrWhiteSpace(context) ? street : $"{street} · {context}",
+                        Source = "osm-road"
+                    };
 
-                // No road resolved here — return the most specific locality we found.
-                return string.IsNullOrWhiteSpace(context) ? null : context;
+                // Reachable, but OSM had no road at this point — return the locality we found.
+                return string.IsNullOrWhiteSpace(context)
+                    ? new ReverseGeocodeResult { Source = "osm-empty" }
+                    : new ReverseGeocodeResult { Name = context, Source = "osm-area" };
             }
-            catch
+            catch (Exception ex)
             {
-                return null;
+                System.Diagnostics.Debug.WriteLine($"Nominatim reverse geocode failed: {ex.Message}");
+                return new ReverseGeocodeResult { Source = "osm-error" };
             }
         }
 
