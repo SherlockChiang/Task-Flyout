@@ -940,10 +940,8 @@ namespace Task_Flyout
         {
             // Color-emoji glyphs carry their own hues, and many imported icon packs
             // ship pure-white PNGs: in light theme the glow doubles as a soft dark
-            // halo for contrast; in dark theme it is a bright luminous rim.
-            return _isLightTheme
-                ? Color.FromArgb(130, 0, 0, 0)
-                : Color.FromArgb(160, 255, 255, 255);
+            // halo for contrast. Dark theme intentionally has no glow.
+            return Color.FromArgb(130, 0, 0, 0);
         }
 
         private void HookIconGlowInvalidation()
@@ -969,6 +967,13 @@ namespace Task_Flyout
             {
                 if (this.Content is not FrameworkElement root) return;
                 if (root.FindName("WeatherIconGlowHost") is not FrameworkElement glowHost) return;
+
+                if (!_isLightTheme)
+                {
+                    _iconGlowContainer?.Children.RemoveAll();
+                    return;
+                }
+
                 if (glowHost.ActualWidth <= 0 || glowHost.ActualHeight <= 0) return;
 
                 var compositor = ElementCompositionPreview.GetElementVisual(glowHost).Compositor;
