@@ -273,6 +273,7 @@ namespace Task_Flyout
                 if (_mediaSessionManager == null)
                     _ = InitializeMediaSessionManagerAsync();
                 PositionOnTaskbar();
+                RefreshThemeIfTaskbarThemeChanged();
 
                 if ((needsAttach || !IsWindowVisible(hWnd)) && IsWindow(hWnd))
                     ShowWindow(hWnd, SW_SHOWNOACTIVATE);
@@ -786,6 +787,17 @@ namespace Task_Flyout
                 if (generation != _themeRefreshGeneration) return;
                 ApplyWindowsTheme(force: false);
             });
+        }
+
+        private void RefreshThemeIfTaskbarThemeChanged()
+        {
+            try
+            {
+                bool resolvedLightTheme = ResolveWeatherBarLightTheme(matchTaskbar: true);
+                if (!_themeApplied || resolvedLightTheme != _isLightTheme)
+                    ApplyWindowsTheme();
+            }
+            catch (Exception ex) { Debug.WriteLine($"Weather bar taskbar theme fallback failed: {ex.Message}"); }
         }
 
         private static bool ResolveWeatherBarLightTheme(bool matchTaskbar)
