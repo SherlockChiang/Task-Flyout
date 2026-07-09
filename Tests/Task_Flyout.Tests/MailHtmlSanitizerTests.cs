@@ -140,6 +140,19 @@ public class MailHtmlSanitizerTests
         Assert.Contains("&lt;", result); // angle brackets escaped, not left as a tag
     }
 
+    [Fact]
+    public void Very_large_input_falls_back_to_encoded_plain_text()
+    {
+        var html = "<img src=\"https://tracker.example/p.gif\" onerror=\"steal()\">" + new string('a', 2 * 1024 * 1024 + 1);
+
+        var result = MailHtmlSanitizer.SanitizeUntrusted(html);
+
+        Assert.StartsWith("<pre>", result);
+        Assert.DoesNotContain("<img", result, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onerror", result, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("tracker.example", result, System.StringComparison.OrdinalIgnoreCase);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

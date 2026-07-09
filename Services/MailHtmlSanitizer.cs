@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Task_Flyout.Services
@@ -43,6 +44,7 @@ namespace Task_Flyout.Services
         private static readonly Regex RxCssProperty = new(@"^[a-zA-Z\-]+\s*:\s*[^。！？；，、]*;?$", RegexOptions.Compiled);
         private static readonly Regex RxCssRuleStart = new(@"^[a-zA-Z][\w\-#.\s,>+~\[\]=""']+\s*\{", RegexOptions.Compiled);
         private static readonly Regex RxRemoteResource = new(@"\s(?:src|srcset|poster|background)\s*=\s*['""]?\s*(?:https?:)?//|url\s*\(\s*['""]?\s*(?:https?:)?//|@import\s+['""]?\s*(?:https?:)?//", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private const int MaxSanitizerInputLength = 2 * 1024 * 1024;
 
         /// <summary>
         /// True if the HTML references any remote (http/https or protocol-relative) resource —
@@ -55,6 +57,8 @@ namespace Task_Flyout.Services
         public static string SanitizeUntrusted(string html)
         {
             if (string.IsNullOrWhiteSpace(html)) return "";
+            if (html.Length > MaxSanitizerInputLength)
+                return $"<pre>{WebUtility.HtmlEncode(StripAllTagsLinear(html))}</pre>";
 
             try
             {
@@ -72,6 +76,8 @@ namespace Task_Flyout.Services
         public static string SanitizeTrusted(string html)
         {
             if (string.IsNullOrWhiteSpace(html)) return "";
+            if (html.Length > MaxSanitizerInputLength)
+                return $"<pre>{WebUtility.HtmlEncode(StripAllTagsLinear(html))}</pre>";
 
             try
             {
@@ -243,6 +249,32 @@ namespace Task_Flyout.Services
         {
             try { return RxHtmlTagsOnly.Replace(html, " "); }
             catch (RegexMatchTimeoutException) { return html; }
+        }
+
+        private static string StripAllTagsLinear(string html)
+        {
+            var builder = new StringBuilder(html.Length);
+            var insideTag = false;
+            foreach (var c in html)
+            {
+                if (c == '<')
+                {
+                    insideTag = true;
+                    builder.Append(' ');
+                    continue;
+                }
+
+                if (c == '>')
+                {
+                    insideTag = false;
+                    continue;
+                }
+
+                if (!insideTag)
+                    builder.Append(c);
+            }
+
+            return builder.ToString().Trim();
         }
 
         private static string RemoveCssNoise(string value)
