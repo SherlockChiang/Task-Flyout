@@ -346,23 +346,40 @@ namespace Task_Flyout.Services
                             if (recurrenceKind == "None" && !string.IsNullOrWhiteSpace(recurringEventId))
                                 recurrenceKind = await GetGoogleMasterRecurrenceKindAsync(cal.Id, recurringEventId, recurrenceKinds);
 
+                            var mapped = SyncItemMappingPolicy.MapEvent(
+                                ev.Id,
+                                ev.Summary,
+                                ev.Location,
+                                ev.Description,
+                                ProviderName,
+                                cal.Id,
+                                cal.Name,
+                                date.Value,
+                                ev.Start?.DateTimeDateTimeOffset?.DateTime,
+                                endDate2,
+                                ev.Start?.DateTimeDateTimeOffset == null,
+                                _loader.GetStringOrDefault("TextAllDay") ?? "All Day",
+                                recurringEventId,
+                                ev.Recurrence?.Count > 0,
+                                recurrenceKind);
+
                             items.Add(new AgendaItem
                             {
-                                Id = ev.Id ?? "",
-                                Title = ev.Summary ?? "",
-                                Subtitle = ev.Start?.DateTimeDateTimeOffset == null ? (_loader.GetStringOrDefault("TextAllDay") ?? "All Day") : ev.Start.DateTimeDateTimeOffset.Value.ToString("HH:mm"),
-                                Location = ev.Location ?? "",
-                                Description = ev.Description ?? "",
+                                Id = mapped.Id,
+                                Title = mapped.Title,
+                                Subtitle = mapped.Subtitle,
+                                Location = mapped.Location,
+                                Description = mapped.Description,
                                 IsEvent = true,
-                                Provider = ProviderName,
-                                CalendarId = cal.Id,
-                                CalendarName = cal.Name,
-                                DateKey = date.Value.ToString("yyyy-MM-dd"),
-                                StartDateTime = ev.Start?.DateTimeDateTimeOffset?.DateTime,
-                                EndDateTime = endDate2,
-                                IsRecurring = !string.IsNullOrWhiteSpace(recurringEventId) || ev.Recurrence?.Count > 0,
-                                RecurringEventId = recurringEventId,
-                                RecurrenceKind = recurrenceKind
+                                Provider = mapped.Provider,
+                                CalendarId = mapped.CalendarId,
+                                CalendarName = mapped.CalendarName,
+                                DateKey = mapped.DateKey,
+                                StartDateTime = mapped.StartDateTime,
+                                EndDateTime = mapped.EndDateTime,
+                                IsRecurring = mapped.IsRecurring,
+                                RecurringEventId = mapped.RecurringEventId,
+                                RecurrenceKind = mapped.RecurrenceKind
                             });
                         }
                     }
