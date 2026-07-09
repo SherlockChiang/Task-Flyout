@@ -53,9 +53,9 @@
 | --- | --- | --- | --- |
 | P0 | 本地敏感文件 | 工作区存在 `credentials.json`、`Secrets.cs` 和 `Task_Flyout_TemporaryKey.pfx`。`.gitignore` 已忽略它们，本次扫描中 `git ls-files` 未显示这些文件被跟踪。 | 保持未跟踪状态。如这些文件曾被共享或发布，轮换发布凭据/证书。优先通过本地开发配置或 CI secret 注入 `credentials.json`，不要发布私有签名密钥。 |
 | P0 | Manifest capability | `Package.appxmanifest` 声明 `runFullTrust` 和 `location`。 | 保持 README/privacy 文档与实际用途一致。重新确认天气位置关闭时是否仍必须声明 `location`，并确保只在用户动作后请求位置。 |
-| P1 | WebView2 远程资源 | 邮件在信任或手动允许后可加载 HTTPS 嵌入资源；RSS 启用后通过 SSRF-safe client 代理 HTTPS 资源。 | 为 `WebView2RuntimeService.IsAllowedEmbeddedResource` 和 RSS 远程资源策略补测试。若邮件目标只是远程图片，考虑阻止非图片资源类型。 |
-| P1 | HTML 清洗 | 邮件 sanitizer 基于正则，已有超时保护和测试。正则 sanitizer 天然较脆弱。 | 扩展测试：畸形标签、SVG namespace、CSS escape、协议混淆、`srcset`、`meta refresh`、大型恶意输入。若维护成本升高，考虑基于 HTML parser 的 sanitizer。 |
-| P1 | RSS 解析 | RSS fetcher 有最大字节数、重定向限制、DNS pin 到公网 IP 和 XML 解析。 | 确认所有 feed 解析路径都禁用 DTD/外部实体。增加测试或公共 helper 来强制安全 XML 设置。 |
+| P1 | WebView2 远程资源 | 邮件嵌入资源策略已阻止本机、私网和 `.local` HTTPS/HTTP host；RSS 启用后通过 SSRF-safe client 代理 HTTPS 资源。WebView2/RSS 资源策略已有单元测试。 | 若邮件目标只是远程图片，考虑阻止非图片资源类型。 |
+| P1 | HTML 清洗 | 邮件 sanitizer 基于正则，已有超时保护和测试，覆盖 entity 编码危险 URL、`srcset` 远程候选和 trusted `meta refresh`。正则 sanitizer 天然较脆弱。 | 继续扩展畸形标签、SVG namespace、CSS escape、协议混淆和大型恶意输入。若维护成本升高，考虑基于 HTML parser 的 sanitizer。 |
+| P1 | RSS 解析 | RSS fetcher 有最大字节数、重定向限制、DNS pin 到公网 IP 和 XML 解析；所有 feed 解析路径使用 `RssXmlSecurity` 禁用 DTD/外部实体并已有测试。 | 继续覆盖 malformed feed 和 redirect 边界。 |
 | P1 | 外部 URI 打开 | Safe URI launching 已有测试，通知 ID 也有校验。 | 覆盖所有从邮件/RSS/Toast 打开浏览器链接的调用点，确认只有 `http`/`https` 和预期 app 协议能离开应用。 |
 | P1 | OAuth scope | Google/Microsoft 已拆分日历/任务与邮件 scope，邮件读取、标记已读、发送也按能力延迟授权；设置和写邮件界面已补充额外 consent 说明。 | 手工验证既有 broad-scope token 与新 least-privilege 授权路径。 |
 | P1 | Token 和密码存储 | 本地 token/password 使用 DPAPI 和 PasswordVault，Google legacy token 有迁移。 | 增加按 provider 登出/移除本地 token 的设置项。确认删除账号时清除 token、消息正文和相关本地缓存。 |
@@ -67,7 +67,7 @@
 
 | 优先级 | 区域 | 建议 |
 | --- | --- | --- |
-| P1 | 安全测试 | 增加 `NetworkSafety`、WebView2 资源策略、邮件 sanitizer 边界、RSS URL/redirect 策略、通知激活解析测试。 |
+| P1 | 安全测试 | `NetworkSafety`、WebView2/RSS 资源策略、RSS XML 安全和部分邮件 sanitizer 边界已有测试；继续增加 RSS URL/redirect 策略、通知激活解析和 sanitizer 畸形输入测试。 |
 | P1 | 缓存测试 | 将可从 WinUI 解耦的缓存淘汰/排序逻辑提取为纯逻辑并测试。 |
 | P1 | 同步测试 | 将 Google/Microsoft provider 中的日期范围和模型映射逻辑提取为纯 helper，测试 recurrence、全天事件、已完成任务、分页。 |
 | P2 | 性能基线 | 增加手工 benchmark 说明或轻量日志，记录启动和首次打开路径。优化前后结果写入 docs。 |
