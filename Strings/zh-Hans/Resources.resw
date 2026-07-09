@@ -1437,4 +1437,22 @@
   <data name="RssPage_BtnBackToList.ToolTipService.ToolTip" xml:space="preserve">
     <value>返回列表</value>
   </data>
+  <data name="SettingsPage_AutoMarkMailAsRead.Header" xml:space="preserve">
+    <value>打开邮件时自动标记为已读</value>
+  </data>
+  <data name="SettingsPage_AutoMarkMailAsReadDesc.Text" xml:space="preserve">
+    <value>Gmail/Outlook 需要额外写入权限才能同步已读状态；关闭后，阅读邮件仅使用只读权限。</value>
+  </data>
+  <data name="SettingsPage_BackgroundDesc.Text" xml:space="preserve">
+    <value>开启后关闭主窗口仍会保留托盘、同步、提醒和邮件轮询；关闭后会退出应用。</value>
+  </data>
+  <data name="MailPage_ComposeConsentHint.Text" xml:space="preserve">
+    <value>Gmail/Outlook 首次发送邮件时可能会要求额外授权发送权限。</value>
+  </data>
+  <data name="WeatherPage_LocationPrivacyDesc.Text" xml:space="preserve">
+    <value>使用当前位置或自动跟随定位会调用 Windows 位置权限；坐标仅保存在本机，并只用于向所选天气源请求天气。</value>
+  </data>
+  <data name="WeatherLocationUpdated" xml:space="preserve">
+    <value>位置已更新：{0}</value>
+  </data>
 </root>
