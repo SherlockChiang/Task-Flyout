@@ -487,7 +487,7 @@ namespace Task_Flyout.Services
             }
 
             if (recurrence != EventRecurrenceKind.None)
-                newEvent.Recurrence = new List<string> { $"RRULE:FREQ={ToGoogleFrequency(recurrence)}" };
+                newEvent.Recurrence = new List<string> { $"RRULE:FREQ={RecurrencePolicy.ToGoogleFrequency(recurrence.ToString())}" };
 
             await EnsureAuthorizedAsync();
             await CalendarSvc!.Events.Insert(newEvent, "primary").ExecuteAsync();
@@ -534,15 +534,6 @@ namespace Task_Flyout.Services
             }
         }
 
-        private static string ToGoogleFrequency(EventRecurrenceKind recurrence) => recurrence switch
-        {
-            EventRecurrenceKind.Daily => "DAILY",
-            EventRecurrenceKind.Weekly => "WEEKLY",
-            EventRecurrenceKind.Monthly => "MONTHLY",
-            EventRecurrenceKind.Yearly => "YEARLY",
-            _ => "DAILY"
-        };
-
         private async Task<string> GetGoogleMasterRecurrenceKindAsync(string calendarId, string eventId, Dictionary<string, string> cache)
         {
             string cacheKey = $"{calendarId}|{eventId}";
@@ -566,14 +557,7 @@ namespace Task_Flyout.Services
 
         private static string GetGoogleRecurrenceKind(IList<string>? recurrence)
         {
-            var rule = recurrence?.FirstOrDefault(item => item.StartsWith("RRULE:", StringComparison.OrdinalIgnoreCase));
-            if (string.IsNullOrWhiteSpace(rule)) return "None";
-
-            if (rule.Contains("FREQ=DAILY", StringComparison.OrdinalIgnoreCase)) return "Daily";
-            if (rule.Contains("FREQ=WEEKLY", StringComparison.OrdinalIgnoreCase)) return "Weekly";
-            if (rule.Contains("FREQ=MONTHLY", StringComparison.OrdinalIgnoreCase)) return "Monthly";
-            if (rule.Contains("FREQ=YEARLY", StringComparison.OrdinalIgnoreCase)) return "Yearly";
-            return "None";
+            return RecurrencePolicy.ToDisplayKindFromGoogleRRules(recurrence);
         }
 
         private static List<string> ClampGoogleRecurrence(IList<string>? recurrence, DateTime untilDate)

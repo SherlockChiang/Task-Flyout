@@ -629,14 +629,7 @@ namespace Task_Flyout.Services
 
         private static string GetMicrosoftRecurrenceKind(PatternedRecurrence? recurrence)
         {
-            return recurrence?.Pattern?.Type switch
-            {
-                RecurrencePatternType.Daily => "Daily",
-                RecurrencePatternType.Weekly => "Weekly",
-                RecurrencePatternType.AbsoluteMonthly or RecurrencePatternType.RelativeMonthly => "Monthly",
-                RecurrencePatternType.AbsoluteYearly or RecurrencePatternType.RelativeYearly => "Yearly",
-                _ => "None"
-            };
+            return RecurrencePolicy.ToDisplayKindFromMicrosoftPattern(recurrence?.Pattern?.Type?.ToString());
         }
 
         private static async Task SaveAuthRecordAsync(string path, AuthenticationRecord record)
