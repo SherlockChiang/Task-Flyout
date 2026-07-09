@@ -176,8 +176,13 @@ namespace Task_Flyout.Services
         private CancellationTokenSource? _persistentCacheSaveCts;
         private readonly object _accountSaveQueueLock = new();
         private Task _accountSaveQueue = Task.CompletedTask;
+        private readonly object _bodyCacheLock = new();
+        private readonly Dictionary<string, WeakReference<MailItem>> _bodyCacheItems = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, long> _bodyCacheAccessTicks = new(StringComparer.Ordinal);
         private const int MaxBodyTextChars = 80_000;
         private const int MaxHtmlBodyChars = 160_000;
+        private const int MaxVolatileBodyCacheChars = 1_000_000;
+        private const int TargetVolatileBodyCacheChars = 750_000;
         private const int MaxConcurrentGoogleMessageMetadataRequests = 6;
         private const int PersistentCacheSaveDebounceMs = 1500;
         public event EventHandler<NewMailNotificationEventArgs>? NewMailArrived;
@@ -662,7 +667,10 @@ namespace Task_Flyout.Services
         public async Task FetchMessageBodyAsync(MailAccount account, MailItem item)
         {
             if (!string.IsNullOrWhiteSpace(item.BodyText) || !string.IsNullOrWhiteSpace(item.HtmlBody))
+            {
+                TouchVolatileMessageBody(item);
                 return;
+            }
 
             if (account.Kind == MailAccountKind.Outlook)
             {
@@ -725,6 +733,8 @@ namespace Task_Flyout.Services
             }
 
             LimitMailBody(item);
+            TouchVolatileMessageBody(item);
+            PruneVolatileMessageBodies(GetBodyCacheKey(item));
             UpdatePersistentMessageBody(item);
         }
 
@@ -732,7 +742,107 @@ namespace Task_Flyout.Services
         {
             foreach (var key in _messageCache.Keys.ToList())
                 _messageCache[key].Value = StripBodies(_messageCache[key].Value);
+
+            lock (_bodyCacheLock)
+            {
+                foreach (var reference in _bodyCacheItems.Values)
+                {
+                    if (reference.TryGetTarget(out var item))
+                    {
+                        item.BodyText = "";
+                        item.HtmlBody = "";
+                    }
+                }
+
+                _bodyCacheItems.Clear();
+                _bodyCacheAccessTicks.Clear();
+            }
         }
+
+        public (int MessageCount, int CharacterCount) GetVolatileBodyCacheStats()
+        {
+            lock (_bodyCacheLock)
+            {
+                int count = 0;
+                int chars = 0;
+                foreach (var key in _bodyCacheItems.Keys.ToList())
+                {
+                    if (!_bodyCacheItems[key].TryGetTarget(out var item) || GetBodyCharCount(item) == 0)
+                    {
+                        _bodyCacheItems.Remove(key);
+                        _bodyCacheAccessTicks.Remove(key);
+                        continue;
+                    }
+
+                    count++;
+                    chars += GetBodyCharCount(item);
+                }
+
+                return (count, chars);
+            }
+        }
+
+        private void TouchVolatileMessageBody(MailItem item)
+        {
+            if (GetBodyCharCount(item) == 0) return;
+
+            var key = GetBodyCacheKey(item);
+            lock (_bodyCacheLock)
+            {
+                _bodyCacheItems[key] = new WeakReference<MailItem>(item);
+                _bodyCacheAccessTicks[key] = DateTimeOffset.UtcNow.UtcTicks;
+            }
+        }
+
+        private void PruneVolatileMessageBodies(string currentKey)
+        {
+            lock (_bodyCacheLock)
+            {
+                var live = new List<(string Key, MailItem Item, int Chars, long AccessTicks)>();
+                int totalChars = 0;
+
+                foreach (var key in _bodyCacheItems.Keys.ToList())
+                {
+                    if (!_bodyCacheItems[key].TryGetTarget(out var item))
+                    {
+                        _bodyCacheItems.Remove(key);
+                        _bodyCacheAccessTicks.Remove(key);
+                        continue;
+                    }
+
+                    int chars = GetBodyCharCount(item);
+                    if (chars == 0)
+                    {
+                        _bodyCacheItems.Remove(key);
+                        _bodyCacheAccessTicks.Remove(key);
+                        continue;
+                    }
+
+                    totalChars += chars;
+                    live.Add((key, item, chars, _bodyCacheAccessTicks.TryGetValue(key, out var ticks) ? ticks : 0));
+                }
+
+                if (totalChars <= MaxVolatileBodyCacheChars) return;
+
+                foreach (var entry in live.OrderBy(entry => entry.AccessTicks))
+                {
+                    if (entry.Key == currentKey) continue;
+
+                    entry.Item.BodyText = "";
+                    entry.Item.HtmlBody = "";
+                    _bodyCacheItems.Remove(entry.Key);
+                    _bodyCacheAccessTicks.Remove(entry.Key);
+                    totalChars -= entry.Chars;
+                    if (totalChars <= TargetVolatileBodyCacheChars) break;
+                }
+            }
+        }
+
+        private static string GetBodyCacheKey(MailItem item)
+            => $"{item.AccountId}|{item.FolderId}|{item.Id}";
+
+        private static int GetBodyCharCount(MailItem item)
+            => (item.BodyText?.Length ?? 0) + (item.HtmlBody?.Length ?? 0);
 
         private async Task SendOutlookMailAsync(MailAccount account, string to, string subject, string body)
         {
