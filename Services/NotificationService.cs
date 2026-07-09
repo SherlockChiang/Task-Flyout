@@ -264,21 +264,15 @@ namespace Task_Flyout.Services
             OpenFromActivationArguments(args.Argument);
         }
 
-        // Toast activation arguments can in theory come from anything that managed to
-        // raise a notification under our AUMID; cap parse cost and only accept ID-shaped
-        // values before handing them to navigation code.
-        private const int MaxActivationArgumentLength = 4096;
-        private const int MaxActivationIdLength = 256;
-
         public static void OpenFromActivationArguments(string argument)
         {
-            var arguments = ParseArguments(argument);
+            var arguments = NotificationActivationParser.ParseArguments(argument);
             App.MainDispatcherQueue?.TryEnqueue(() =>
             {
                 if (arguments.TryGetValue("action", out var copyAction) &&
                     copyAction == "copyCode" &&
                     arguments.TryGetValue("code", out var code) &&
-                    IsVerificationCode(code))
+                    NotificationActivationParser.IsVerificationCode(code))
                 {
                     CopyVerificationCodeToClipboard(code);
                     return;
@@ -289,7 +283,9 @@ namespace Task_Flyout.Services
                     arguments.TryGetValue("accountId", out var accountId) &&
                     arguments.TryGetValue("folderId", out var folderId) &&
                     arguments.TryGetValue("messageId", out var messageId) &&
-                    IsSafeIdToken(accountId) && IsSafeIdToken(folderId) && IsSafeIdToken(messageId))
+                    NotificationActivationParser.IsSafeIdToken(accountId) &&
+                    NotificationActivationParser.IsSafeIdToken(folderId) &&
+                    NotificationActivationParser.IsSafeIdToken(messageId))
                 {
                     App.OpenMainWindowInternal(window => window.NavigateToMailMessage(accountId, folderId, messageId));
                 }
@@ -299,9 +295,6 @@ namespace Task_Flyout.Services
                 }
             });
         }
-
-        private static bool IsVerificationCode(string? value)
-            => !string.IsNullOrEmpty(value) && value.Length is >= 4 and <= 8 && value.All(char.IsDigit);
 
         // Copy a verification code straight to the clipboard from the toast button
         // without opening the main window. Keep it out of clipboard history/roaming when
@@ -365,39 +358,6 @@ namespace Task_Flyout.Services
                 });
             }
             catch { }
-        }
-
-        private static bool IsSafeIdToken(string? value)
-        {
-            if (string.IsNullOrEmpty(value) || value.Length > MaxActivationIdLength) return false;
-            foreach (var c in value)
-            {
-                if (!(char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '.' || c == '@' || c == '/' || c == '+' || c == '='))
-                    return false;
-            }
-            return true;
-        }
-
-        private static Dictionary<string, string> ParseArguments(string argument)
-        {
-            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            if (string.IsNullOrWhiteSpace(argument)) return result;
-            if (argument.Length > MaxActivationArgumentLength) return result;
-
-            argument = WebUtility.HtmlDecode(argument).Trim().Trim('"');
-            const string activationPrefix = "----AppNotificationActivated:";
-            var prefixIndex = argument.IndexOf(activationPrefix, StringComparison.OrdinalIgnoreCase);
-            if (prefixIndex >= 0)
-                argument = argument[(prefixIndex + activationPrefix.Length)..].Trim().Trim('"');
-
-            foreach (var pair in argument.Split(new[] { '&', ';' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                var parts = pair.Split('=', 2);
-                if (parts.Length != 2) continue;
-                result[WebUtility.UrlDecode(parts[0])] = WebUtility.UrlDecode(parts[1]);
-            }
-
-            return result;
         }
 
     }

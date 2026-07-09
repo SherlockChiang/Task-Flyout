@@ -32,6 +32,7 @@
     <Compile Include="..\..\Services\RssXmlSecurity.cs" Link="Source\RssXmlSecurity.cs" />
     <Compile Include="..\..\Services\RssFetchPolicy.cs" Link="Source\RssFetchPolicy.cs" />
     <Compile Include="..\..\Services\DiagnosticsRedactor.cs" Link="Source\DiagnosticsRedactor.cs" />
+    <Compile Include="..\..\Services\NotificationActivationParser.cs" Link="Source\NotificationActivationParser.cs" />
     <Compile Include="..\..\Services\WebResourcePolicy.cs" Link="Source\WebResourcePolicy.cs" />
     <Compile Include="..\..\Services\StatusMessageFormatter.cs" Link="Source\StatusMessageFormatter.cs" />
     <Compile Include="..\..\Services\ProviderAuthCleanup.cs" Link="Source\ProviderAuthCleanup.cs" />
