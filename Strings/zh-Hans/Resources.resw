@@ -1455,4 +1455,10 @@
   <data name="WeatherLocationUpdated" xml:space="preserve">
     <value>位置已更新：{0}</value>
   </data>
+  <data name="SettingsPage_NotifyDesc.Text" xml:space="preserve">
+    <value>日程提醒只影响日历/任务开始前的提醒通知；天气警报在天气页单独设置。</value>
+  </data>
+  <data name="SettingsPage_MailPollingDesc.Text" xml:space="preserve">
+    <value>新邮件通知只影响邮件轮询；不会改变日程提醒或天气警报设置。</value>
+  </data>
 </root>

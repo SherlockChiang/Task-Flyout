@@ -1455,4 +1455,10 @@
   <data name="WeatherLocationUpdated" xml:space="preserve">
     <value>Location updated: {0}</value>
   </data>
+  <data name="SettingsPage_NotifyDesc.Text" xml:space="preserve">
+    <value>Schedule reminders only affect calendar/task notifications before start time. Weather alerts are configured on the Weather page.</value>
+  </data>
+  <data name="SettingsPage_MailPollingDesc.Text" xml:space="preserve">
+    <value>New mail notifications only affect mail polling. They do not change schedule reminders or weather alert settings.</value>
+  </data>
 </root>
