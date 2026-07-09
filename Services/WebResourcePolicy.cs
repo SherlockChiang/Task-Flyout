@@ -13,11 +13,16 @@ namespace Task_Flyout.Services
                 return false;
 
             if (uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase) ||
-                uri.Scheme.Equals("about", StringComparison.OrdinalIgnoreCase))
-                return true;
+                uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase))
+            {
+                if (NetworkSafety.IsUnsafeHost(uri))
+                    return false;
 
-            if (uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase))
-                return allowInsecureHttp;
+                return uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase) || allowInsecureHttp;
+            }
+
+            if (uri.Scheme.Equals("about", StringComparison.OrdinalIgnoreCase))
+                return true;
 
             return uri.Scheme.Equals("data", StringComparison.OrdinalIgnoreCase) &&
                    (uriText.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase) ||

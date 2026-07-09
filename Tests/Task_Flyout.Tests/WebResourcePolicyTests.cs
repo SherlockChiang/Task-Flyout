@@ -25,6 +25,17 @@ public class WebResourcePolicyTests
         Assert.False(WebResourcePolicy.IsAllowedEmbeddedResource(uri, allowInsecureHttp: false));
     }
 
+    [Theory]
+    [InlineData("https://localhost/a.png")]
+    [InlineData("https://127.0.0.1/a.png")]
+    [InlineData("https://10.0.0.1/a.png")]
+    [InlineData("https://printer.local/a.png")]
+    [InlineData("http://localhost/a.png")]
+    public void Embedded_policy_blocks_private_and_local_remote_hosts(string uri)
+    {
+        Assert.False(WebResourcePolicy.IsAllowedEmbeddedResource(uri, allowInsecureHttp: true));
+    }
+
     [Fact]
     public void Embedded_policy_allows_http_only_when_setting_enabled()
     {
