@@ -34,6 +34,7 @@ Local cleanup on account removal:
 - Removes the connected account entry.
 - Removes cached calendar/task ranges for the provider.
 - Deletes the DPAPI-protected Microsoft authentication record file `ms_auth_record.bin`.
+- Azure Identity also owns the platform token cache created with `TokenCachePersistenceOptions { Name = "TaskFlyout_MSAL_Cache" }`. The current Azure Identity API used here does not expose a targeted delete operation for that cache, so the app clears its local authentication record and forces re-authentication on the next connection. If a supported targeted cache removal API becomes available, wire it into `MicrosoftSyncProvider.ClearLocalAuthorizationAsync()`.
 
 ## Mail Accounts
 
