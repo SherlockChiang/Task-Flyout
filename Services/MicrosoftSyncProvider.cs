@@ -20,14 +20,20 @@ namespace Task_Flyout.Services
 
         private string _defaultTodoListId = "";
 
-        private readonly string[] _scopes = new[]
+        private static readonly string[] AgendaScopes = new[]
         {
             "Calendars.ReadWrite",
             "Tasks.ReadWrite",
-            "Mail.ReadWrite",
-            "Mail.Send",
             "User.Read"
         };
+
+        private static readonly string[] MailScopes = new[]
+        {
+            "Mail.ReadWrite",
+            "Mail.Send"
+        };
+
+        private static readonly string[] AllScopes = AgendaScopes.Concat(MailScopes).ToArray();
 
         public GraphServiceClient? GraphClient => _graphClient;
 
@@ -53,6 +59,18 @@ namespace Task_Flyout.Services
         public async Task EnsureAuthorizedAsync()
         {
             if (_graphClient != null) return;
+
+            _graphClient = await CreateAuthorizedGraphClientAsync(AgendaScopes);
+        }
+
+        public async Task<GraphServiceClient> EnsureMailAuthorizedAsync()
+        {
+            _graphClient = await CreateAuthorizedGraphClientAsync(AllScopes);
+            return _graphClient;
+        }
+
+        private async Task<GraphServiceClient> CreateAuthorizedGraphClientAsync(string[] scopes)
+        {
 
             string authRecordPath = GetAuthRecordPath();
 
@@ -84,7 +102,7 @@ namespace Task_Flyout.Services
 
             try
             {
-                var tokenContext = new TokenRequestContext(_scopes);
+                var tokenContext = new TokenRequestContext(scopes);
 
                 if (authRecord == null)
                 {
@@ -101,11 +119,11 @@ namespace Task_Flyout.Services
                 if (File.Exists(authRecordPath)) File.Delete(authRecordPath);
                 options.AuthenticationRecord = null;
 
-                authRecord = await credential.AuthenticateAsync(new TokenRequestContext(_scopes));
+                authRecord = await credential.AuthenticateAsync(new TokenRequestContext(scopes));
                 await SaveAuthRecordAsync(authRecordPath, authRecord);
             }
 
-            _graphClient = new GraphServiceClient(credential, _scopes);
+            return new GraphServiceClient(credential, scopes);
         }
 
         private static string GetAuthRecordPath()

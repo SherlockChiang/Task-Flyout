@@ -25,9 +25,9 @@ Requested scopes:
 
 - `Calendars.ReadWrite`: required for creating, editing, deleting, and reading Outlook calendar events.
 - `Tasks.ReadWrite`: required for creating, editing, completing, and reading Microsoft To Do tasks.
-- `Mail.ReadWrite`: required for reading mail and marking messages as read.
-- `Mail.Send`: required for sending Outlook replies/new messages from Task Flyout.
 - `User.Read`: required by Microsoft Graph sign-in/profile bootstrap.
+- `Mail.ReadWrite`: requested when Outlook mail is used; required for reading mail and marking messages as read.
+- `Mail.Send`: requested when Outlook mail is used; required for sending Outlook replies/new messages from Task Flyout.
 
 Local cleanup on account removal:
 
@@ -51,6 +51,7 @@ Local cleanup on mail account removal:
 - OAuth tokens and local mail/calendar/task caches are stored only on the device.
 - Google and Microsoft mail send/modify/write scopes are intentionally broad because the app supports in-app send, mark-read, create, edit, and delete operations.
 - Google Calendar/Tasks setup now requests only Calendar and Tasks scopes. Gmail scopes are requested when the user enables or uses Gmail mail features.
+- Microsoft Calendar/To Do setup now requests only Calendar, Tasks, and User scopes. Outlook mail scopes are requested when the user enables or uses Outlook mail features.
 - If a future release splits read-only and write features further, scopes should be revisited for incremental consent.
 
 ## Incremental Consent Follow-Up

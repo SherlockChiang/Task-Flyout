@@ -1465,8 +1465,7 @@ namespace Task_Flyout.Services
             if (App.Current is App app &&
                 app.SyncManager.GetProvider("Microsoft") is MicrosoftSyncProvider microsoftProvider)
             {
-                await microsoftProvider.EnsureAuthorizedAsync();
-                _outlookClient = microsoftProvider.GraphClient;
+                _outlookClient = await microsoftProvider.EnsureMailAuthorizedAsync();
             }
 
             if (_outlookClient == null)
