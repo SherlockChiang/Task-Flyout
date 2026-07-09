@@ -18,6 +18,7 @@ namespace Task_Flyout.Views
     {
         private ResourceLoader _loader;
         private bool _isInitializing = true;
+        private bool _isClearingWebViewCache;
 
         public SettingsPage()
         {
@@ -484,6 +485,9 @@ namespace Task_Flyout.Views
 
         private async void ClearWebViewCacheButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isClearingWebViewCache) return;
+
+            _isClearingWebViewCache = true;
             ClearWebViewCacheButton.IsEnabled = false;
             WebViewCacheStatusText.Text = GetSafeString("TextCleaning", "Cleaning...");
             try
@@ -497,6 +501,7 @@ namespace Task_Flyout.Views
             }
             finally
             {
+                _isClearingWebViewCache = false;
                 ClearWebViewCacheButton.IsEnabled = true;
             }
         }
