@@ -34,6 +34,7 @@ namespace Task_Flyout.Services
         private static readonly Regex RxTrustedScriptUriQuoted = new(@"(href|action|formaction)\s*=\s*(['""])\s*(javascript|vbscript):.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxTrustedScriptUriUnquoted = new(@"(href|action|formaction)\s*=\s*(javascript|vbscript):[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxTrustedDangerousCss = new(@"style\s*=\s*(['""])[^'""]*\b(expression|-moz-binding|behavior)\b[^'""]*\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxStyleAttributeQuoted = new(@"\s+style\s*=\s*(['""])(.*?)\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxUrlAttributeQuoted = new(@"\b(href|src|action|formaction|data)\s*=\s*(['""])(.*?)\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxUrlAttributeUnquoted = new(@"\b(href|src|action|formaction|data)\s*=\s*([^\s>]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxHtmlContentTags = new(@"<\s*(html|head|body|style|table|div|p|span|br|img|a|meta)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -85,6 +86,7 @@ namespace Task_Flyout.Services
                 value = RxDataUriNavigationUnquoted.Replace(value, "$1=\"#\"");
                 value = NeutralizeDangerousUrlAttributes(value);
                 value = RxTrustedDangerousCss.Replace(value, "");
+                value = StripDangerousCssStyles(value);
                 value = RxUntrustedMetaRefreshTag.Replace(value, "");
 
                 if (!RxHtmlContentTags.IsMatch(value))
@@ -111,6 +113,7 @@ namespace Task_Flyout.Services
             value = RxDataUriNavigationUnquoted.Replace(value, "$1=\"#\"");
             value = NeutralizeDangerousUrlAttributes(value);
             value = RxDangerousCssStyle.Replace(value, "");
+            value = StripDangerousCssStyles(value);
             value = StripRemoteResources(value);
 
             if (!RxHtmlContentTags.IsMatch(value))
@@ -131,6 +134,58 @@ namespace Task_Flyout.Services
             html = RxUntrustedRemoteResourceUnquoted.Replace(html, "");
             return html;
         }
+
+        private static string StripDangerousCssStyles(string html)
+            => RxStyleAttributeQuoted.Replace(html, match => IsDangerousCss(match.Groups[2].Value) ? "" : match.Value);
+
+        private static bool IsDangerousCss(string style)
+        {
+            var decoded = DecodeCssEscapes(WebUtility.HtmlDecode(style) ?? "");
+            return decoded.Contains("expression", StringComparison.OrdinalIgnoreCase) ||
+                   decoded.Contains("-moz-binding", StringComparison.OrdinalIgnoreCase) ||
+                   decoded.Contains("behavior", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string DecodeCssEscapes(string value)
+        {
+            if (value.IndexOf('\\') < 0) return value;
+
+            var result = new char[value.Length];
+            var length = 0;
+            for (var i = 0; i < value.Length; i++)
+            {
+                if (value[i] != '\\' || i + 1 >= value.Length)
+                {
+                    result[length++] = value[i];
+                    continue;
+                }
+
+                var start = i + 1;
+                var end = start;
+                while (end < value.Length && end - start < 6 && IsHexDigit(value[end]))
+                    end++;
+
+                if (end == start)
+                {
+                    i++;
+                    result[length++] = value[i];
+                    continue;
+                }
+
+                var hex = value.Substring(start, end - start);
+                if (int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var codePoint))
+                    result[length++] = codePoint <= char.MaxValue ? (char)codePoint : ' ';
+
+                i = end - 1;
+                if (i + 1 < value.Length && char.IsWhiteSpace(value[i + 1]))
+                    i++;
+            }
+
+            return new string(result, 0, length);
+        }
+
+        private static bool IsHexDigit(char c)
+            => c is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
 
         private static string NeutralizeDangerousUrlAttributes(string html)
         {

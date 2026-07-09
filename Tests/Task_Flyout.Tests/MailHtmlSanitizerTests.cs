@@ -90,6 +90,19 @@ public class MailHtmlSanitizerTests
         Assert.DoesNotContain("tracker.example", result, System.StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("<div style=\"width:e\\78 pression(alert(1))\">x</div>")]
+    [InlineData("<div style='-moz-\\62 inding:url(http://evil/x.xml)'>x</div>")]
+    [InlineData("<div style=\"behavior:url(#default#time2)\">x</div>")]
+    public void Strips_css_escape_obfuscated_dangerous_styles(string html)
+    {
+        var untrusted = MailHtmlSanitizer.SanitizeUntrusted(html);
+        var trusted = MailHtmlSanitizer.SanitizeTrusted(html);
+
+        Assert.DoesNotContain("style=", untrusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("style=", trusted, System.StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void Trusted_keeps_remote_images_but_still_drops_scripts()
     {
