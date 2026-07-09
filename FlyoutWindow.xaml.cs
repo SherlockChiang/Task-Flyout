@@ -172,8 +172,8 @@ namespace Task_Flyout
             _ = RefreshWeatherAsync();
         }
 
-        private void OnScrollViewerViewChanging(object? sender, ScrollViewerViewChangingEventArgs e) => RequestDotRefresh();
-        private void OnScrollViewerViewChanged(object? sender, ScrollViewerViewChangedEventArgs e) => RequestDotRefresh();
+        private void OnScrollViewerViewChanging(object? sender, ScrollViewerViewChangingEventArgs e) => ScheduleDotRefresh(TimeSpan.FromMilliseconds(80));
+        private void OnScrollViewerViewChanged(object? sender, ScrollViewerViewChangedEventArgs e) => ScheduleDotRefresh(TimeSpan.FromMilliseconds(80));
 
         private void HookActiveScrollViewer()
         {
@@ -348,15 +348,22 @@ namespace Task_Flyout
 
         private void DayItem_Loaded(object sender, RoutedEventArgs e)
         {
+            ScheduleDotRefresh(TimeSpan.FromMilliseconds(200));
+        }
+
+        private void ScheduleDotRefresh(TimeSpan delay)
+        {
             if (_dotRefreshTimer == null)
             {
-                _dotRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+                _dotRefreshTimer = new DispatcherTimer();
                 _dotRefreshTimer.Tick += (s, args) =>
                 {
                     _dotRefreshTimer.Stop();
                     RequestDotRefresh();
                 };
             }
+
+            _dotRefreshTimer.Interval = delay;
             _dotRefreshTimer.Stop();
             _dotRefreshTimer.Start();
         }
