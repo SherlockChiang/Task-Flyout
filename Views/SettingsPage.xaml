@@ -75,6 +75,7 @@
                 
                 <ToggleSwitch x:Uid="SettingsPage_Startup" x:Name="StartupToggle" Header="开机时自动启动" IsOn="False" Toggled="StartupToggle_Toggled"/>
                 <ToggleSwitch x:Uid="SettingsPage_Background" x:Name="BackgroundToggle" Header="关闭主窗口时最小化到托盘 (后台运行)" IsOn="True" Toggled="BackgroundToggle_Toggled"/>
+                <TextBlock x:Uid="SettingsPage_BackgroundDesc" Text="开启后关闭主窗口仍会保留托盘、同步、提醒和邮件轮询；关闭后会退出应用。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                 <ToggleSwitch x:Uid="SettingsPage_EfficiencyMode" x:Name="EfficiencyModeToggle" Header="收起到托盘时启用效能模式 (省电)" IsOn="True" Toggled="EfficiencyModeToggle_Toggled"/>
             </StackPanel>
 
