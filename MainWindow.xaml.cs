@@ -40,7 +40,20 @@ namespace Task_Flyout
 
             var calendarItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault();
             if (calendarItem != null) MainNav.SelectedItem = calendarItem;
-            ContentFrame.Navigate(typeof(Views.CalendarPage));
+            ContentFrame.Navigate(ShouldShowOnboardingOnLaunch() ? typeof(Views.AddAccountPage) : typeof(Views.CalendarPage));
+        }
+
+        private bool ShouldShowOnboardingOnLaunch()
+        {
+            if (ApplicationData.Current.LocalSettings.Values["OnboardingChecklistCompleted"] as bool? == true)
+                return false;
+
+            if (App.Current is not App app) return false;
+
+            bool hasCalendarAccounts = app.SyncManager.AccountManager.Accounts.Count > 0;
+            bool hasMailAccounts = app.MailService.HasSetupCompleteAccounts();
+            bool hasWeather = app.WeatherService.IsEnabled;
+            return !hasCalendarAccounts && !hasMailAccounts && !hasWeather;
         }
 
         private string GetSafeString(string key, string fallbackText)
