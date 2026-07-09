@@ -48,6 +48,8 @@ namespace Task_Flyout
         private static readonly TimeSpan FastReparentDuration = TimeSpan.FromSeconds(20);
         private const double MinLogicalWidth = 80;
         private const double MaxLogicalWidth = 420;
+        private const double NormalDescriptionMaxWidth = 170;
+        private const double AlertDescriptionMaxWidth = 260;
         private bool _subclassInstalled;
         private string _lastWeatherLayerKey = "";
         private readonly StringBuilder _classNameBuffer = new(256);
@@ -226,10 +228,22 @@ namespace Task_Flyout
         }
 
         private FrameworkElement? _contentPanel;
+        private int _barWidthRecomputeQueued;
 
         private void ContentPanel_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             RecomputeBarWidth();
+        }
+
+        private void QueueBarWidthRecompute()
+        {
+            if (Interlocked.Exchange(ref _barWidthRecomputeQueued, 1) != 0) return;
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                Interlocked.Exchange(ref _barWidthRecomputeQueued, 0);
+                RecomputeBarWidth();
+            });
         }
 
         private void DetachContentPanelEvents()
@@ -726,6 +740,8 @@ namespace Task_Flyout
         private bool _barAlertActive;
         private int _themeRefreshGeneration;
         private bool _themeApplied;
+        private int _themeApplyInProgress;
+        private DateTime _lastThemeApplyUtc = DateTime.MinValue;
         private bool _glassBrushCacheValid;
         private bool _glassBrushCacheLightTheme;
         private SolidColorBrush? _glassTransparentBrush;
@@ -735,6 +751,8 @@ namespace Task_Flyout
         private Brush? _glassHoverHighlightBrush;
         private const int WeatherBarIconDecodePixelWidth = 48;
         private const int MaxWeatherBarIconImageCacheSize = 32;
+        private static readonly TimeSpan MinThemeApplyInterval = TimeSpan.FromMilliseconds(250);
+        private static readonly object ThemeDiagnosticsLogLock = new();
         private readonly Dictionary<string, Microsoft.UI.Xaml.Media.Imaging.BitmapImage> _weatherIconImageCache = new(StringComparer.Ordinal);
 
         // Collapse a burst of theme/colour change notifications into a single ApplyWindowsTheme
@@ -795,7 +813,7 @@ namespace Task_Flyout
             {
                 bool resolvedLightTheme = ResolveWeatherBarLightTheme(matchTaskbar: true);
                 if (!_themeApplied || resolvedLightTheme != _isLightTheme)
-                    ApplyWindowsTheme();
+                    ApplyWindowsTheme(force: false, reason: "taskbar-theme-fallback");
             }
             catch (Exception ex) { Debug.WriteLine($"Weather bar taskbar theme fallback failed: {ex.Message}"); }
         }
@@ -837,15 +855,144 @@ namespace Task_Flyout
             return false;
         }
 
+        private static int? TryReadThemeRegistryInt(string subKeyPath, string valueName)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(subKeyPath);
+                var value = key?.GetValue(valueName);
+                return value is int intValue ? intValue : null;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Reading theme registry value failed: {subKeyPath}\\{valueName}: {ex.Message}");
+                return null;
+            }
+        }
+
+        private void LogThemeRefresh(
+            string reason,
+            bool force,
+            bool resolvedLightTheme,
+            bool themeChanged,
+            bool applied,
+            string outcome,
+            long elapsedMs)
+        {
+            try
+            {
+                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                IntPtr parent = hWnd != IntPtr.Zero && IsWindow(hWnd) ? GetParent(hWnd) : IntPtr.Zero;
+                string personalizeKey = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
+                string dwmKey = @"Software\Microsoft\Windows\DWM";
+                string line = string.Join(',',
+                    DateTimeOffset.Now.ToString("O"),
+                    Csv(reason),
+                    Csv(outcome),
+                    Bool(force),
+                    Bool(applied),
+                    Bool(themeChanged),
+                    Bool(resolvedLightTheme),
+                    Bool(_isLightTheme),
+                    elapsedMs.ToString(),
+                    Reg(TryReadThemeRegistryInt(personalizeKey, "AppsUseLightTheme")),
+                    Reg(TryReadThemeRegistryInt(personalizeKey, "SystemUsesLightTheme")),
+                    Reg(TryReadThemeRegistryInt(personalizeKey, "EnableTransparency")),
+                    Reg(TryReadThemeRegistryInt(personalizeKey, "ColorPrevalence")),
+                    RegHex(TryReadThemeRegistryInt(dwmKey, "AccentColor")),
+                    RegHex(TryReadThemeRegistryInt(dwmKey, "ColorizationColor")),
+                    RegHex(TryReadThemeRegistryInt(dwmKey, "ColorizationAfterglow")),
+                    Bool(hWnd != IntPtr.Zero && IsWindow(hWnd)),
+                    Bool(_isParented),
+                    Handle(hWnd),
+                    Handle(parent),
+                    Handle(_taskbarHwnd));
+
+                _ = Task.Run(() => AppendThemeDiagnosticsLog(line));
+                if (elapsedMs >= 500)
+                    Debug.WriteLine($"Weather bar theme refresh was slow: {elapsedMs}ms, {reason}, {outcome}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Weather bar theme diagnostics failed: {ex.Message}");
+            }
+        }
+
+        private static void AppendThemeDiagnosticsLog(string line)
+        {
+            try
+            {
+                var path = AppDataPathHelper.ResolveRoaming("Logs", "weatherbar-theme.csv");
+                var dir = System.IO.Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(dir))
+                    AppDataPathHelper.EnsureDirectory(dir);
+
+                lock (ThemeDiagnosticsLogLock)
+                {
+                    bool writeHeader = !System.IO.File.Exists(path);
+                    using var writer = new System.IO.StreamWriter(path, append: true, Encoding.UTF8);
+                    if (writeHeader)
+                    {
+                        writer.WriteLine("timestamp,reason,outcome,force,applied,themeChanged,resolvedLight,currentLight,elapsedMs,appsUseLight,systemUsesLight,enableTransparency,personalizeColorPrevalence,dwmAccentColor,dwmColorizationColor,dwmColorizationAfterglow,hwndAlive,isParented,hwnd,parentHwnd,taskbarHwnd");
+                    }
+
+                    writer.WriteLine(line);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Writing weather bar theme diagnostics failed: {ex.Message}");
+            }
+        }
+
+        private static string Bool(bool value) => value ? "1" : "0";
+        private static string Reg(int? value) => value?.ToString() ?? "";
+        private static string RegHex(int? value) => value.HasValue ? $"0x{unchecked((uint)value.Value):X8}" : "";
+        private static string Handle(IntPtr handle) => $"0x{handle.ToInt64():X}";
+
+        private static string Csv(string value)
+        {
+            value ??= "";
+            return "\"" + value.Replace("\"", "\"\"") + "\"";
+        }
+
         public void ApplyWindowsTheme()
         {
-            ApplyWindowsTheme(force: true);
+            ApplyWindowsTheme(force: true, reason: "explicit");
         }
 
         private void ApplyWindowsTheme(bool force)
         {
+            ApplyWindowsTheme(force, reason: force ? "explicit" : "scheduled");
+        }
+
+        private void ApplyWindowsTheme(bool force, string reason)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            bool started = false;
+            bool applied = false;
+            bool resolvedLightTheme = _isLightTheme;
+            bool themeChanged = false;
+            string outcome = "unknown";
+
             try
             {
+                if (Interlocked.Exchange(ref _themeApplyInProgress, 1) != 0)
+                {
+                    outcome = "skipped:busy";
+                    return;
+                }
+
+                started = true;
+                var now = DateTime.UtcNow;
+                if (!force && (now - _lastThemeApplyUtc) < MinThemeApplyInterval)
+                {
+                    outcome = "skipped:debounced";
+                    return;
+                }
+
+                _lastThemeApplyUtc = now;
+
                 // After an Explorer restart this bar (a WS_CHILD of Shell_TrayWnd) has its
                 // HWND destroyed together with the taskbar, but the managed Window object
                 // lingers. Touching its XAML/composition (RequestedTheme, brushes) now
@@ -853,14 +1000,26 @@ namespace Task_Flyout
                 // crashes the process. Bail out while the window handle is dead — the
                 // `root == null` check below is not enough because Content stays non-null.
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-                if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
+                if (hWnd == IntPtr.Zero || !IsWindow(hWnd))
+                {
+                    outcome = "skipped:dead-hwnd";
+                    return;
+                }
 
                 var root = this.Content as FrameworkElement;
-                if (root == null) return;
+                if (root == null)
+                {
+                    outcome = "skipped:no-root";
+                    return;
+                }
 
-                bool resolvedLightTheme = ResolveWeatherBarLightTheme(matchTaskbar: true);
-                bool themeChanged = !_themeApplied || resolvedLightTheme != _isLightTheme;
-                if (!force && !themeChanged) return;
+                resolvedLightTheme = ResolveWeatherBarLightTheme(matchTaskbar: true);
+                themeChanged = !_themeApplied || resolvedLightTheme != _isLightTheme;
+                if (!force && !themeChanged)
+                {
+                    outcome = "skipped:unchanged";
+                    return;
+                }
 
                 if (themeChanged)
                 {
@@ -878,8 +1037,18 @@ namespace Task_Flyout
                 ApplyGlassBrushes(root);
                 ApplyWeatherBarTextBrush(root, includeDescription: !_barAlertActive);
                 UpdateWeatherIconGlow();
+                applied = true;
+                outcome = themeChanged ? "applied:changed" : "applied:forced";
             }
             catch (Exception ex) { Debug.WriteLine($"ApplyWindowsTheme failed: {ex.Message}"); }
+            finally
+            {
+                stopwatch.Stop();
+                if (started)
+                    Interlocked.Exchange(ref _themeApplyInProgress, 0);
+
+                LogThemeRefresh(reason, force, resolvedLightTheme, themeChanged, applied, outcome, stopwatch.ElapsedMilliseconds);
+            }
         }
 
         private void ApplyGlassBrushes()
@@ -1272,6 +1441,7 @@ namespace Task_Flyout
                 // Description (alert message replaces description text when active)
                 bool showDesc = enabledFields.Contains("description") || alert != null;
                 TxtDesc.Visibility = showDesc ? Visibility.Visible : Visibility.Collapsed;
+                ApplyDescriptionLayout(alert != null);
                 if (showDesc)
                 {
                     TxtDesc.Text = alert != null ? alert.Message : (info.Description ?? "");
@@ -1309,8 +1479,17 @@ namespace Task_Flyout
                 if (showWind) TxtWind.Text = info.WindSpeed;
 
                 RecomputeBarWidth();
+                QueueBarWidthRecompute();
                 UpdateWeatherIconGlow();
             });
+        }
+
+        private void ApplyDescriptionLayout(bool isAlert)
+        {
+            TxtDesc.MaxWidth = isAlert ? AlertDescriptionMaxWidth : NormalDescriptionMaxWidth;
+            TxtDesc.MaxLines = 1;
+            TxtDesc.TextWrapping = TextWrapping.NoWrap;
+            TxtDesc.TextTrimming = TextTrimming.CharacterEllipsis;
         }
 
         private void ApplyWeatherIconLayerImages(string[] displayLayers, Microsoft.UI.Xaml.Controls.Image[] layerImages)
@@ -1387,14 +1566,11 @@ namespace Task_Flyout
                 var panel = _contentPanel;
                 if (panel == null) return;
 
-                // Prefer ActualWidth (post-layout) over Measure+DesiredSize so we reflect the
-                // real laid-out size including all item spacing.
-                double contentLogical = panel.ActualWidth;
-                if (contentLogical <= 0)
-                {
-                    panel.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
-                    contentLogical = panel.DesiredSize.Width;
-                }
+                // Measure after text changes so a newly longer alert description does not
+                // reuse the previous frame's smaller ActualWidth and draw past the pill.
+                panel.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+                double desiredLogical = panel.DesiredSize.Width;
+                double contentLogical = desiredLogical > 0 ? desiredLogical : panel.ActualWidth;
                 if (contentLogical <= 0) return;
 
                 // ContentPanel Margin="10,0,10,0" = 20 DIPs. Add small slack for rounding.

@@ -46,6 +46,8 @@
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                VerticalAlignment="Center"
                                MaxWidth="170"
+                               MaxLines="1"
+                               TextWrapping="NoWrap"
                                TextTrimming="CharacterEllipsis"/>
                     <TextBlock x:Name="TxtLocation" Text="" FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
