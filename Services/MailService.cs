@@ -2026,20 +2026,7 @@ namespace Task_Flyout.Services
             EnsurePersistentCacheLoaded();
             var accountList = accounts.ToList();
             var order = _persistentCache?.AccountOrder;
-            if (order == null || order.Count == 0) return accountList;
-
-            var orderIndex = order
-                .Where(id => !string.IsNullOrWhiteSpace(id))
-                .Select((id, index) => new { id, index })
-                .GroupBy(item => item.id, StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => group.First().index, StringComparer.Ordinal);
-
-            return accountList
-                .Select((account, originalIndex) => new { account, originalIndex })
-                .OrderBy(item => orderIndex.TryGetValue(item.account.Id, out var index) ? index : int.MaxValue)
-                .ThenBy(item => item.originalIndex)
-                .Select(item => item.account)
-                .ToList();
+            return PersistedOrderPolicy.Apply(accountList, order, account => account.Id);
         }
 
         private List<MailFolder> ApplyFolderOrder(string accountId, IEnumerable<MailFolder> folders)
@@ -2052,18 +2039,7 @@ namespace Task_Flyout.Services
                 order.Count == 0)
                 return folderList;
 
-            var orderIndex = order
-                .Where(id => !string.IsNullOrWhiteSpace(id))
-                .Select((id, index) => new { id, index })
-                .GroupBy(item => item.id, StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => group.First().index, StringComparer.Ordinal);
-
-            return folderList
-                .Select((folder, originalIndex) => new { folder, originalIndex })
-                .OrderBy(item => orderIndex.TryGetValue(item.folder.Id, out var index) ? index : int.MaxValue)
-                .ThenBy(item => item.originalIndex)
-                .Select(item => item.folder)
-                .ToList();
+            return PersistedOrderPolicy.Apply(folderList, order, folder => folder.Id);
         }
 
         private void UpdatePersistentMessages(string key, List<MailItem> messages)

@@ -38,6 +38,7 @@
     <Compile Include="..\..\Services\StatusMessageFormatter.cs" Link="Source\StatusMessageFormatter.cs" />
     <Compile Include="..\..\Services\ProviderAuthCleanup.cs" Link="Source\ProviderAuthCleanup.cs" />
     <Compile Include="..\..\Services\CachePrunePolicy.cs" Link="Source\CachePrunePolicy.cs" />
+    <Compile Include="..\..\Services\PersistedOrderPolicy.cs" Link="Source\PersistedOrderPolicy.cs" />
   </ItemGroup>
 
 </Project>
