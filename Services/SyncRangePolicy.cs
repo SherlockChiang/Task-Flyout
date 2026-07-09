@@ -22,5 +22,8 @@ namespace Task_Flyout.Services
             var day = date.Date;
             return day >= range.StartDate && day < range.EndDate;
         }
+
+        public static bool ShouldIncludeTask(DateTime taskDate, bool isCompleted, DateTime start, DateTime end)
+            => isCompleted || IsInHalfOpenDateRange(taskDate, start, end);
     }
 }

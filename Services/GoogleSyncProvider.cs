@@ -396,7 +396,7 @@ namespace Task_Flyout.Services
                         if (!string.IsNullOrEmpty(t.Due) && DateTime.TryParse(t.Due, out var dueTime)) taskDate = dueTime.Date;
                         else if (isDone && !string.IsNullOrEmpty(t.Completed) && DateTime.TryParse(t.Completed, out var compTime)) taskDate = compTime.Date;
 
-                        if (!isDone && !SyncRangePolicy.IsInHalfOpenDateRange(taskDate, range.StartDate, range.EndDate))
+                        if (!SyncRangePolicy.ShouldIncludeTask(taskDate, isDone, range.StartDate, range.EndDate))
                             continue;
 
                         items.Add(new AgendaItem

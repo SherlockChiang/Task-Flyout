@@ -410,7 +410,7 @@ namespace Task_Flyout.Services
                                 targetDate = targetDate.ToLocalTime();
                             }
 
-                            if (!isCompleted && !SyncRangePolicy.IsInHalfOpenDateRange(targetDate, range.StartDate, range.EndDate))
+                            if (!SyncRangePolicy.ShouldIncludeTask(targetDate, isCompleted, range.StartDate, range.EndDate))
                                 continue;
 
                             results.Add(new AgendaItem

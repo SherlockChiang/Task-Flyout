@@ -43,4 +43,34 @@ public class SyncRangePolicyTests
 
         Assert.Equal(expected, result);
     }
+
+    [Fact]
+    public void ShouldIncludeTask_includes_incomplete_tasks_inside_range()
+    {
+        Assert.True(SyncRangePolicy.ShouldIncludeTask(
+            new DateTime(2026, 7, 10),
+            isCompleted: false,
+            new DateTime(2026, 7, 9),
+            new DateTime(2026, 7, 12)));
+    }
+
+    [Fact]
+    public void ShouldIncludeTask_excludes_incomplete_tasks_outside_range()
+    {
+        Assert.False(SyncRangePolicy.ShouldIncludeTask(
+            new DateTime(2026, 7, 12),
+            isCompleted: false,
+            new DateTime(2026, 7, 9),
+            new DateTime(2026, 7, 12)));
+    }
+
+    [Fact]
+    public void ShouldIncludeTask_includes_completed_tasks_outside_range()
+    {
+        Assert.True(SyncRangePolicy.ShouldIncludeTask(
+            new DateTime(2026, 8, 1),
+            isCompleted: true,
+            new DateTime(2026, 7, 9),
+            new DateTime(2026, 7, 12)));
+    }
 }
