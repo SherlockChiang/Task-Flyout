@@ -91,6 +91,7 @@ namespace Task_Flyout.Views
         private ResourceLoader _loader;
         private bool _isAccountPaneCollapsed;
         private bool _isTimelinePaneCollapsed;
+        private DateTimeOffset? _lastCalendarSyncSucceededAt;
 
         private void TaskCheckBox_Tapped(object sender, TappedRoutedEventArgs e)
         {
@@ -193,6 +194,7 @@ namespace Task_Flyout.Views
             var token = _syncCts.Token;
 
             SyncProgress.IsActive = true;
+            SetCalendarStatus(_loader.GetStringOrDefault("TextLoading") ?? "Loading");
 
             try
             {
@@ -235,10 +237,14 @@ namespace Task_Flyout.Views
 
                 if (CalendarGrid.SelectedItem is DayCellViewModel selectedCell)
                     UpdateSideBar(selectedCell);
+
+                _lastCalendarSyncSucceededAt = DateTimeOffset.Now;
+                SetCalendarStatus(string.Format(_loader.GetStringOrDefault("TextLastSync") ?? "Last sync: {0}", _lastCalendarSyncSucceededAt.Value.LocalDateTime.ToString("g")));
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Sync error: {ex.Message}");
+                SetCalendarStatus(StatusMessageFormatter.Format(_loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed", _lastCalendarSyncSucceededAt, includeLastSuccess: true), isError: true);
             }
             finally
             {
@@ -515,18 +521,35 @@ namespace Task_Flyout.Views
             if (_syncManager == null || SyncProgress == null) return;
 
             SyncProgress.IsActive = true;
+            SetCalendarStatus(_loader.GetStringOrDefault("TextLoading") ?? "Loading");
             try
             {
                 var min = DateTime.Today.AddYears(-1);
                 var max = DateTime.Today.AddYears(3);
                 await _syncManager.GetAllDataAsync(min, max, forceRefresh: true);
+                _lastCalendarSyncSucceededAt = DateTimeOffset.Now;
                 LoadCache(_viewDate);
                 LoadCalendar(_viewDate);
+                SetCalendarStatus(string.Format(_loader.GetStringOrDefault("TextLastSync") ?? "Last sync: {0}", _lastCalendarSyncSucceededAt.Value.LocalDateTime.ToString("g")));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Force sync error: {ex.Message}");
+                SetCalendarStatus(StatusMessageFormatter.Format(_loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed", _lastCalendarSyncSucceededAt, includeLastSuccess: true), isError: true);
             }
             finally
             {
                 SyncProgress.IsActive = false;
             }
+        }
+
+        private void SetCalendarStatus(string message, bool isError = false)
+        {
+            if (CalendarStatusText == null) return;
+            CalendarStatusText.Text = message;
+            CalendarStatusText.Foreground = isError
+                ? new SolidColorBrush(Microsoft.UI.Colors.IndianRed)
+                : (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
         }
 
         private void EditRadioType_Changed(object? sender, RoutedEventArgs? e)
