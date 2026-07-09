@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,6 +11,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
@@ -662,6 +664,8 @@ namespace Task_Flyout.Services
         }
 
         private const long MaxRemoteImageBytes = 10L * 1024 * 1024;
+        private const int MaxRemoteImageFetchesPerHost = 2;
+        private static readonly ConcurrentDictionary<string, SemaphoreSlim> RemoteImageHostGates = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Downloads a remote RSS article image through the app's SSRF-guarded HTTP client
@@ -670,7 +674,7 @@ namespace Task_Flyout.Services
         /// (caller should block) on any failure, redirect to a non-public host, non-image
         /// content type, or oversize payload.
         /// </summary>
-        public async Task<(byte[] Bytes, string ContentType)?> FetchRemoteImageSafelyAsync(string url)
+        public async Task<(byte[] Bytes, string ContentType)?> FetchRemoteImageSafelyAsync(string url, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -678,27 +682,36 @@ namespace Task_Flyout.Services
                     !uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
                     return null;
 
-                using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-                using var response = await SendWithRedirectsAsync(request);
-                if (!response.IsSuccessStatusCode) return null;
-
-                var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
-                if (!contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return null;
-                if (response.Content.Headers.ContentLength is long declared && declared > MaxRemoteImageBytes) return null;
-
-                await using var stream = await response.Content.ReadAsStreamAsync();
-                using var buffer = new MemoryStream();
-                var chunk = new byte[81920];
-                long total = 0;
-                int read;
-                while ((read = await stream.ReadAsync(chunk)) > 0)
+                var gate = RemoteImageHostGates.GetOrAdd(uri.IdnHost, _ => new SemaphoreSlim(MaxRemoteImageFetchesPerHost, MaxRemoteImageFetchesPerHost));
+                await gate.WaitAsync(cancellationToken);
+                try
                 {
-                    total += read;
-                    if (total > MaxRemoteImageBytes) return null;
-                    buffer.Write(chunk, 0, read);
-                }
+                    using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+                    using var response = await SendWithRedirectsAsync(request, cancellationToken);
+                    if (!response.IsSuccessStatusCode) return null;
 
-                return (buffer.ToArray(), contentType);
+                    var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
+                    if (!contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return null;
+                    if (response.Content.Headers.ContentLength is long declared && declared > MaxRemoteImageBytes) return null;
+
+                    await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    using var buffer = new MemoryStream();
+                    var chunk = new byte[81920];
+                    long total = 0;
+                    int read;
+                    while ((read = await stream.ReadAsync(chunk.AsMemory(0, chunk.Length), cancellationToken)) > 0)
+                    {
+                        total += read;
+                        if (total > MaxRemoteImageBytes) return null;
+                        buffer.Write(chunk, 0, read);
+                    }
+
+                    return (buffer.ToArray(), contentType);
+                }
+                finally
+                {
+                    gate.Release();
+                }
             }
             catch
             {
@@ -711,7 +724,7 @@ namespace Task_Flyout.Services
                 or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect
                 or (HttpStatusCode)308;
 
-        private static async Task<HttpResponseMessage> SendWithRedirectsAsync(HttpRequestMessage request)
+        private static async Task<HttpResponseMessage> SendWithRedirectsAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
         {
             var currentUri = request.RequestUri!;
             var requestHeaders = request.Headers
@@ -723,7 +736,7 @@ namespace Task_Flyout.Services
             HttpResponseMessage response;
             for (var hop = 0; ; hop++)
             {
-                response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
                 if (!IsRedirect(response.StatusCode) || hop >= MaxRedirects)
                     return response;

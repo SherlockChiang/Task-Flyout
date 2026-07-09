@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Microsoft.Windows.ApplicationModel.Resources;
@@ -42,6 +43,7 @@ namespace Task_Flyout.Views
         private bool _rssWebViewConfigured;
         private bool _isInternalArticleNavigation;
         private WebView2? _rssArticleWebView;
+        private CancellationTokenSource? _rssResourceCts;
 
         public RssPage()
         {
@@ -55,6 +57,7 @@ namespace Task_Flyout.Views
         public void DisposeLikeCleanup()
         {
             _selectedArticle = null;
+            CancelRssResourceRequests();
             _selectedSubscriptionId = null;
             _selectedFolderId = null;
             _loadedCount = 0;
@@ -708,6 +711,8 @@ namespace Task_Flyout.Views
 
         private async Task OpenArticleReaderAsync(RssArticle article)
         {
+            CancelRssResourceRequests();
+            _rssResourceCts = new CancellationTokenSource();
             _selectedArticle = article;
             ArticleListHeader.Visibility = Visibility.Collapsed;
             ArticleList.Visibility = Visibility.Collapsed;
@@ -832,7 +837,14 @@ namespace Task_Flyout.Views
                 var deferral = args.GetDeferral();
                 try
                 {
-                    var fetched = await _rssService.FetchRemoteImageSafelyAsync(uri!);
+                    var cts = _rssResourceCts;
+                    if (cts == null || cts.IsCancellationRequested)
+                    {
+                        args.Response = BlockedRssResponse(coreWebView);
+                        return;
+                    }
+
+                    var fetched = await _rssService.FetchRemoteImageSafelyAsync(uri!, cts.Token);
                     if (fetched != null)
                     {
                         var stream = new InMemoryRandomAccessStream();
@@ -871,11 +883,20 @@ namespace Task_Flyout.Views
 
         private void ShowArticleList()
         {
+            CancelRssResourceRequests();
             ArticleReaderPanel.Visibility = Visibility.Collapsed;
             ArticleListHeader.Visibility = Visibility.Visible;
             ArticleList.Visibility = Visibility.Visible;
             _selectedArticle = null;
             _isInternalArticleNavigation = false;
+        }
+
+        private void CancelRssResourceRequests()
+        {
+            try { _rssResourceCts?.Cancel(); }
+            catch { }
+            _rssResourceCts?.Dispose();
+            _rssResourceCts = null;
         }
 
         private void OpenArticleInBrowserButton_Click(object sender, RoutedEventArgs e)
