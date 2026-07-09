@@ -26,6 +26,21 @@ public class SafeUriLauncherTests
     }
 
     [Theory]
+    [InlineData("https://localhost/admin")]
+    [InlineData("https://app.localhost/callback")]
+    [InlineData("https://printer.local/status")]
+    [InlineData("http://127.0.0.1:8080/")]
+    [InlineData("http://10.0.0.1/")]
+    [InlineData("http://172.16.0.1/")]
+    [InlineData("http://192.168.1.1/")]
+    [InlineData("http://[::1]/")]
+    [InlineData("http://[fc00::1]/")]
+    public void Rejects_local_or_private_hosts(string input)
+    {
+        Assert.False(SafeUriLauncher.TryCreateExternalHttpUri(input, out _));
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]

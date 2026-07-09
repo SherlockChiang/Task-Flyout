@@ -25,6 +25,7 @@ namespace Task_Flyout.Services
             if (!string.Equals(parsed.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
                 return false;
+            if (NetworkSafety.IsUnsafeHost(parsed)) return false;
 
             uri = parsed;
             return true;
