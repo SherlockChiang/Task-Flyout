@@ -68,7 +68,7 @@
 | 优先级 | 区域 | 建议 |
 | --- | --- | --- |
 | P1 | 安全测试 | `NetworkSafety`、WebView2/RSS 资源策略、RSS XML 安全、RSS URL/redirect scheme/hop 上限、RSS malformed XML fallback、RSS resolved-address private host policy、Safe URI launcher、通知 activation parser 和邮件 sanitizer 边界已有测试。 | 后续主要是需要真实网络/凭据/系统环境的集成验证。 |
-| P1 | 缓存测试 | 将可从 WinUI 解耦的缓存淘汰/排序逻辑提取为纯逻辑并测试。 |
+| P1 | 缓存测试 | WebView2 cache prune policy 已提取为纯逻辑并测试，覆盖低于上限不删除、按最后写入时间删除到目标大小、忽略 0 字节项。继续提取邮件正文 LRU/持久缓存排序等可解耦逻辑。 |
 | P1 | 同步测试 | 将 Google/Microsoft provider 中的日期范围和模型映射逻辑提取为纯 helper，测试 recurrence、全天事件、已完成任务、分页。 |
 | P2 | 性能基线 | 增加手工 benchmark 说明或轻量日志，记录启动和首次打开路径。优化前后结果写入 docs。 |
 | P2 | 错误处理 | 将捕获异常统一转换为用户安全消息和脱敏诊断。测试 malformed RSS、OAuth 过期、IMAP 认证失败、WebView2 runtime 缺失等 fallback。 |
