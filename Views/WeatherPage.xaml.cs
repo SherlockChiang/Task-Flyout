@@ -18,6 +18,7 @@ namespace Task_Flyout.Views
         private ResourceLoader _loader;
         private WeatherInfo? _currentWeatherInfo;
         private DateTimeOffset? _lastWeatherLoadSucceededAt;
+        private bool _isIconPackOperation;
 
         private readonly string[] _commonFonts = new[]
         {
@@ -550,14 +551,27 @@ namespace Task_Flyout.Views
             IconFontComboBox.SelectedItem = target ?? IconFontComboBox.Items.FirstOrDefault();
 
             IconFontComboBox.SelectionChanged += IconFontComboBox_SelectionChanged;
-            BtnDeleteIconPack.IsEnabled = !IconPackService.Instance.IsBuiltInActive;
+            BtnDeleteIconPack.IsEnabled = !_isIconPackOperation && !IconPackService.Instance.IsBuiltInActive;
+            BtnImportIconPack.IsEnabled = !_isIconPackOperation;
+            IconFontComboBox.IsEnabled = !_isIconPackOperation;
             if (IconPackStatusText != null) IconPackStatusText.Text = "";
+        }
+
+        private void SetIconPackOperation(bool isRunning)
+        {
+            _isIconPackOperation = isRunning;
+            BtnImportIconPack.IsEnabled = !isRunning;
+            BtnDeleteIconPack.IsEnabled = !isRunning && !IconPackService.Instance.IsBuiltInActive;
+            IconFontComboBox.IsEnabled = !isRunning;
         }
 
         private async void BtnImportIconPack_Click(object sender, RoutedEventArgs e)
         {
+            if (_isIconPackOperation) return;
+
             try
             {
+                SetIconPackOperation(true);
                 var picker = new Windows.Storage.Pickers.FileOpenPicker();
                 picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads;
                 picker.FileTypeFilter.Add(".zip");
@@ -590,15 +604,29 @@ namespace Task_Flyout.Views
             {
                 IconPackStatusText.Text = "Error: " + ex.Message;
             }
+            finally
+            {
+                SetIconPackOperation(false);
+            }
         }
 
         private async void BtnDeleteIconPack_Click(object sender, RoutedEventArgs e)
         {
+            if (_isIconPackOperation) return;
+
             var active = IconPackService.Instance.ActivePackId;
             if (active == IconPackService.BuiltInEmojiId) return;
-            IconPackService.Instance.DeletePack(active);
-            RefreshIconSourceComboBox();
-            if (_weatherService != null) await LoadWeatherDataAsync(forceRefresh: true);
+            try
+            {
+                SetIconPackOperation(true);
+                IconPackService.Instance.DeletePack(active);
+                RefreshIconSourceComboBox();
+                if (_weatherService != null) await LoadWeatherDataAsync(forceRefresh: true);
+            }
+            finally
+            {
+                SetIconPackOperation(false);
+            }
         }
 
         #endregion
