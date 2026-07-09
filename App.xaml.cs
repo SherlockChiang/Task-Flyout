@@ -80,8 +80,10 @@ namespace Task_Flyout
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
+            var startup = StartupDiagnostics.Start();
             MainDispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
             ApplyConfiguredThemeToOpenWindows();
+            startup.Mark("dispatcher-theme");
 
             NotificationService = new NotificationService(SyncManager);
             NotificationService.Initialize();
@@ -89,6 +91,7 @@ namespace Task_Flyout
                 NotificationService.StartPeriodicCheck();
             MailService.NewMailArrived += MailService_NewMailArrived;
             MemoryDiagnostics.StartIfEnabled();
+            startup.Mark("services");
 
             _trayIcon = (H.NotifyIcon.TaskbarIcon)Resources["MyTrayIcon"];
             _uiSettings = new UISettings();
@@ -96,12 +99,14 @@ namespace Task_Flyout
             UpdateTrayIconTheme();
             _trayIcon.ForceCreate(enablesEfficiencyMode: EfficiencyModeEnabledSetting);
             MailService.StartMailPolling();
+            startup.Mark("tray-mail");
 
             _trayIcon.LeftClickCommand = new RelayCommand(() => EnsureFlyoutWindow().ToggleFlyout());
 
             // Initialize weather bar if enabled
             InitWeatherBar();
             StartWeatherBarWatchdog();
+            startup.Mark("weatherbar");
 
             // Resume following the device location (and refresh weather UI when it moves).
             WeatherService.LocationUpdated += OnWeatherLocationUpdated;
@@ -127,9 +132,12 @@ namespace Task_Flyout
 
             HandleLaunchActivation(args);
             QueueFlyoutPrewarmIfEnabled();
+            startup.Mark("activation");
 
             // Launched into the tray with no window on screen — start throttled.
             UpdateEfficiencyMode();
+            startup.Mark("efficiency-mode");
+            _ = startup.FlushAsync();
         }
 
         public static bool EfficiencyModeEnabledSetting =>
