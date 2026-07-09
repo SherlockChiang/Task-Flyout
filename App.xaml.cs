@@ -61,7 +61,7 @@ namespace Task_Flyout
             this.UnhandledException += (sender, e) =>
             {
                 e.Handled = true;
-                string errorMsg = $"Fatal Error! Please contact us! \nTime：{DateTime.Now:yyyy-MM-dd HH:mm:ss}\nError：{e.Exception.Message}\n\nStack:\n{e.Exception.StackTrace}\n";
+                string errorMsg = DiagnosticsRedactor.Redact($"Fatal Error! Please contact us! \nTime：{DateTime.Now:yyyy-MM-dd HH:mm:ss}\nError：{e.Exception.Message}\n\nStack:\n{e.Exception.StackTrace}\n");
 
                 try
                 {
