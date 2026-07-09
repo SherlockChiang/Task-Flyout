@@ -408,9 +408,10 @@ namespace Task_Flyout.Services
                 try
                 {
                     string? json = LocalSqliteStore.ReadProtectedText(StoreScope, CacheKey);
-                    loaded = !string.IsNullOrWhiteSpace(json)
-                        ? JsonSerializer.Deserialize(json, AppJsonContext.Default.AppCache) ?? new AppCache()
-                        : new AppCache();
+                    loaded = JsonFallbackPolicy.DeserializeOrDefault(
+                        json,
+                        value => JsonSerializer.Deserialize(value, AppJsonContext.Default.AppCache),
+                        () => new AppCache());
                 }
                 catch
                 {

@@ -1542,8 +1542,10 @@ namespace Task_Flyout.Services
             try
             {
                 string? json = LocalSqliteStore.ReadProtectedText("mail", "accounts");
-                if (!string.IsNullOrWhiteSpace(json))
-                    _accounts = JsonSerializer.Deserialize(json, AppJsonContext.Default.ListMailAccount) ?? new List<MailAccount>();
+                _accounts = JsonFallbackPolicy.DeserializeOrDefault(
+                    json,
+                    value => JsonSerializer.Deserialize(value, AppJsonContext.Default.ListMailAccount),
+                    () => new List<MailAccount>());
             }
             catch
             {
@@ -1932,8 +1934,10 @@ namespace Task_Flyout.Services
             try
             {
                 var json = LocalSqliteStore.ReadProtectedText("mail", "cache");
-                if (!string.IsNullOrWhiteSpace(json))
-                    _persistentCache = JsonSerializer.Deserialize(json, AppJsonContext.Default.MailPersistentCache);
+                _persistentCache = JsonFallbackPolicy.DeserializeOrDefault(
+                    json,
+                    value => JsonSerializer.Deserialize(value, AppJsonContext.Default.MailPersistentCache),
+                    () => new MailPersistentCache());
             }
             catch (Exception ex)
             {

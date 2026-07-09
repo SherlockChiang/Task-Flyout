@@ -33,6 +33,7 @@
     <Compile Include="..\..\Services\RssFeedXml.cs" Link="Source\RssFeedXml.cs" />
     <Compile Include="..\..\Services\RssFetchPolicy.cs" Link="Source\RssFetchPolicy.cs" />
     <Compile Include="..\..\Services\DiagnosticsRedactor.cs" Link="Source\DiagnosticsRedactor.cs" />
+    <Compile Include="..\..\Services\JsonFallbackPolicy.cs" Link="Source\JsonFallbackPolicy.cs" />
     <Compile Include="..\..\Services\NotificationActivationParser.cs" Link="Source\NotificationActivationParser.cs" />
     <Compile Include="..\..\Services\WebResourcePolicy.cs" Link="Source\WebResourcePolicy.cs" />
     <Compile Include="..\..\Services\StatusMessageFormatter.cs" Link="Source\StatusMessageFormatter.cs" />

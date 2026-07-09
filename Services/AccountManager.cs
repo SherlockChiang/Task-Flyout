@@ -26,16 +26,11 @@ namespace Task_Flyout.Services
             var json = LocalSqliteStore.ReadProtectedText(StoreScope, AccountsKey);
             if (!string.IsNullOrWhiteSpace(json))
             {
-                try
-                {
-                    var list = JsonSerializer.Deserialize(json, AppJsonContext.Default.ListConnectedAccountInfo);
-                    if (list != null)
-                        foreach (var a in list) Accounts.Add(a);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Account load failed: {ex.Message}");
-                }
+                var list = JsonFallbackPolicy.DeserializeOrDefault(
+                    json,
+                    value => JsonSerializer.Deserialize(value, AppJsonContext.Default.ListConnectedAccountInfo),
+                    () => new List<ConnectedAccountInfo>());
+                foreach (var a in list) Accounts.Add(a);
             }
             else
             {
