@@ -42,6 +42,7 @@
     <Compile Include="..\..\Services\SyncRangePolicy.cs" Link="Source\SyncRangePolicy.cs" />
     <Compile Include="..\..\Services\SyncEventTimePolicy.cs" Link="Source\SyncEventTimePolicy.cs" />
     <Compile Include="..\..\Services\SyncItemMappingPolicy.cs" Link="Source\SyncItemMappingPolicy.cs" />
+    <Compile Include="..\..\Services\SyncPaginationPolicy.cs" Link="Source\SyncPaginationPolicy.cs" />
     <Compile Include="..\..\Services\RecurrencePolicy.cs" Link="Source\RecurrencePolicy.cs" />
   </ItemGroup>
 

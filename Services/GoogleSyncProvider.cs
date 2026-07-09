@@ -250,6 +250,7 @@ namespace Task_Flyout.Services
             try
             {
                 string? pageToken = null;
+                var seenPageTokens = new HashSet<string>(StringComparer.Ordinal);
                 do
                 {
                     var listRequest = CalendarSvc.CalendarList.List();
@@ -268,7 +269,7 @@ namespace Task_Flyout.Services
                         }
                     }
 
-                    pageToken = calendarList?.NextPageToken;
+                    pageToken = SyncPaginationPolicy.GetNextPageToken(pageToken, calendarList?.NextPageToken, seenPageTokens);
                 } while (!string.IsNullOrEmpty(pageToken));
             }
             catch (Exception ex)
@@ -322,6 +323,7 @@ namespace Task_Flyout.Services
             var items = new List<AgendaItem>();
             var recurrenceKinds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             string? pageToken = null;
+            var seenPageTokens = new HashSet<string>(StringComparer.Ordinal);
             do
             {
                 try
@@ -383,7 +385,7 @@ namespace Task_Flyout.Services
                             });
                         }
                     }
-                    pageToken = events?.NextPageToken;
+                    pageToken = SyncPaginationPolicy.GetNextPageToken(pageToken, events?.NextPageToken, seenPageTokens);
                 }
                 catch (Exception ex)
                 {
@@ -399,6 +401,7 @@ namespace Task_Flyout.Services
             var items = new List<AgendaItem>();
             var range = SyncRangePolicy.NormalizeHalfOpenDateRange(min, max);
             string? taskPageToken = null;
+            var seenTaskPageTokens = new HashSet<string>(StringComparer.Ordinal);
             do
             {
                 var tasksReq = tasksSvc.Tasks.List("@default");
@@ -443,7 +446,7 @@ namespace Task_Flyout.Services
                         });
                     }
                 }
-                taskPageToken = tasks?.NextPageToken;
+                taskPageToken = SyncPaginationPolicy.GetNextPageToken(taskPageToken, tasks?.NextPageToken, seenTaskPageTokens);
             } while (taskPageToken != null);
             return items;
         }
