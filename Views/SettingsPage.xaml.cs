@@ -57,6 +57,7 @@ namespace Task_Flyout.Views
             EfficiencyModeToggle.IsOn = settings.Values["EfficiencyModeEnabled"] as bool? ?? true;
             NotifyToggle.IsOn = settings.Values["NotifyEnabled"] as bool? ?? true;
             MailPollingToggle.IsOn = settings.Values["MailPollingEnabled"] as bool? ?? true;
+            AutoMarkMailAsReadToggle.IsOn = settings.Values["AutoMarkMailAsRead"] as bool? ?? true;
             BlockRemoteImagesToggle.IsOn = settings.Values["BlockRemoteImagesByDefault"] as bool? ?? true;
             AllowInsecureWebViewResourcesToggle.IsOn = settings.Values["AllowInsecureWebViewResources"] as bool? ?? false;
             AllowRssRemoteResourcesToggle.IsOn = settings.Values["AllowRssRemoteResources"] as bool? ?? false;
@@ -449,6 +450,12 @@ namespace Task_Flyout.Views
                 if (App.Current is App app)
                     app.MailService.UpdateMailPollingSettings();
             }
+        }
+
+        private void AutoMarkMailAsReadToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            ApplicationData.Current.LocalSettings.Values["AutoMarkMailAsRead"] = AutoMarkMailAsReadToggle.IsOn;
         }
 
         private void AllowInsecureWebViewResourcesToggle_Toggled(object sender, RoutedEventArgs e)
