@@ -856,7 +856,7 @@ namespace Task_Flyout.Views
 
         private Task? MarkSelectedMailReadOptimistically(MailItem item)
         {
-            if (_mailService == null || _selectedAccount == null || item.IsRead)
+            if (_mailService == null || _selectedAccount == null || item.IsRead || !_mailService.AutoMarkMailAsRead)
                 return null;
 
             _mailService.MarkCachedRead(item);

@@ -217,6 +217,12 @@ namespace Task_Flyout.Services
             set => ApplicationData.Current.LocalSettings.Values["MailPollingIntervalMinutes"] = Math.Clamp(value, 1, 240);
         }
 
+        public bool AutoMarkMailAsRead
+        {
+            get => ApplicationData.Current.LocalSettings.Values["AutoMarkMailAsRead"] as bool? ?? true;
+            set => ApplicationData.Current.LocalSettings.Values["AutoMarkMailAsRead"] = value;
+        }
+
         public IReadOnlyList<MailAccount> GetAccounts()
         {
             EnsureAccountsLoaded();
