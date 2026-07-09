@@ -50,8 +50,12 @@ namespace Task_Flyout.Views
             var weather = App.Current is App app2 && app2.WeatherService.IsEnabled
                 ? "Ready"
                 : "Enable weather and choose a city from the Weather page.";
+            bool allReady = google == "Ready" && microsoft == "Ready" && mail == "Ready" && weather == "Ready";
+            if (allReady)
+                Windows.Storage.ApplicationData.Current.LocalSettings.Values["OnboardingChecklistCompleted"] = true;
 
-            ChecklistText.Text = $"Google: {google}\nMicrosoft: {microsoft}\nMail: {mail}\nWeather: {weather}";
+            var completeText = allReady ? "\nSetup complete." : "";
+            ChecklistText.Text = $"Google: {google}\nMicrosoft: {microsoft}\nMail: {mail}\nWeather: {weather}{completeText}";
             OpenMailSetupButton.Visibility = mail == "Ready" ? Visibility.Collapsed : Visibility.Visible;
             OpenWeatherSetupButton.Visibility = weather == "Ready" ? Visibility.Collapsed : Visibility.Visible;
         }
