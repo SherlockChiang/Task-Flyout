@@ -31,13 +31,30 @@ namespace Task_Flyout.Services
 
         public GraphServiceClient? GraphClient => _graphClient;
 
+        public Task ClearLocalAuthorizationAsync()
+        {
+            _graphClient = null!;
+            _defaultTodoListId = "";
+
+            try
+            {
+                var authRecordPath = GetAuthRecordPath();
+                if (File.Exists(authRecordPath))
+                    File.Delete(authRecordPath);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Microsoft auth record cleanup failed: {ex.Message}");
+            }
+
+            return Task.CompletedTask;
+        }
+
         public async Task EnsureAuthorizedAsync()
         {
             if (_graphClient != null) return;
 
-            string appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TaskFlyout");
-            Directory.CreateDirectory(appDataPath);
-            string authRecordPath = Path.Combine(appDataPath, "ms_auth_record.bin");
+            string authRecordPath = GetAuthRecordPath();
 
             AuthenticationRecord? authRecord = null;
 
@@ -89,6 +106,13 @@ namespace Task_Flyout.Services
             }
 
             _graphClient = new GraphServiceClient(credential, _scopes);
+        }
+
+        private static string GetAuthRecordPath()
+        {
+            string appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TaskFlyout");
+            Directory.CreateDirectory(appDataPath);
+            return Path.Combine(appDataPath, "ms_auth_record.bin");
         }
 
         public async Task<List<SubscribedCalendarInfo>> FetchCalendarListAsync()

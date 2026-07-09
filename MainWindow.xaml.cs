@@ -289,8 +289,8 @@ namespace Task_Flyout
                 var result = await dialog.ShowAsync();
                 if (result == ContentDialogResult.Primary)
                 {
-                    var mgr = GetAccountManager();
-                    mgr?.RemoveAccount(providerName);
+                    if (App.Current is App app)
+                        await app.SyncManager.RemoveAccountAsync(providerName);
                     _ = RefreshAccountListAsync();
 
                     if (ContentFrame.Content is CalendarPage page) page.ForceSync();

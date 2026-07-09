@@ -37,6 +37,28 @@ namespace Task_Flyout.Services
             GmailService.Scope.GmailModify
         };
 
+        public async Task ClearLocalAuthorizationAsync()
+        {
+            CalendarSvc = null;
+            TasksSvc = null;
+            GmailSvc = null;
+            _cachedCalendarList = null;
+            _calendarListCacheExpiresAt = DateTimeOffset.MinValue;
+
+            await new ProtectedGoogleDataStore().ClearAsync();
+
+            string legacyTokenPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TaskFlyout", "GoogleToken");
+            try
+            {
+                if (Directory.Exists(legacyTokenPath))
+                    Directory.Delete(legacyTokenPath, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Google token cleanup failed: {ex.Message}");
+            }
+        }
+
         public async Task EnsureAuthorizedAsync()
         {
             if (CalendarSvc != null && TasksSvc != null && GmailSvc != null) return;

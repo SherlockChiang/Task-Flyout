@@ -370,7 +370,24 @@ namespace Task_Flyout.Services
         {
             AccountManager.RemoveAccount(providerName);
             RemoveProviderFromCache(providerName);
+            await ClearProviderAuthorizationAsync(providerName);
             await SaveCacheAsync();
+        }
+
+        private async Task ClearProviderAuthorizationAsync(string providerName)
+        {
+            var provider = _providers.FirstOrDefault(p => p.ProviderName == providerName);
+            try
+            {
+                if (provider is GoogleSyncProvider google)
+                    await google.ClearLocalAuthorizationAsync();
+                else if (provider is MicrosoftSyncProvider microsoft)
+                    await microsoft.ClearLocalAuthorizationAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Provider auth cleanup failed for {providerName}: {ex.Message}");
+            }
         }
 
         public ISyncProvider? GetProvider(string providerName)
