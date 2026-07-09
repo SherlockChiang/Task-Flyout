@@ -54,8 +54,8 @@
 | P0 | 本地敏感文件 | 工作区存在 `credentials.json`、`Secrets.cs` 和 `Task_Flyout_TemporaryKey.pfx`。`.gitignore` 已忽略它们，本次扫描中 `git ls-files` 未显示这些文件被跟踪。 | 保持未跟踪状态。如这些文件曾被共享或发布，轮换发布凭据/证书。优先通过本地开发配置或 CI secret 注入 `credentials.json`，不要发布私有签名密钥。 |
 | P0 | Manifest capability | `Package.appxmanifest` 声明 `runFullTrust` 和 `location`。`location` 仍被当前位置和自动跟随天气功能使用；启动路径已避免自动请求位置权限。 | 保持 README/privacy 文档与实际用途一致，并手工验证启动、拒绝/允许权限、自动跟随开关路径。 |
 | P1 | WebView2 远程资源 | 邮件嵌入资源策略已阻止本机、私网和 `.local` HTTPS/HTTP host；RSS 启用后通过 SSRF-safe client 代理 HTTPS 资源。WebView2/RSS 资源策略已有单元测试。 | 若邮件目标只是远程图片，考虑阻止非图片资源类型。 |
-| P1 | HTML 清洗 | 邮件 sanitizer 基于正则，已有超时保护和测试，覆盖 entity 编码危险 URL、`srcset` 远程候选和 trusted `meta refresh`。正则 sanitizer 天然较脆弱。 | 继续扩展畸形标签、SVG namespace、CSS escape、协议混淆和大型恶意输入。若维护成本升高，考虑基于 HTML parser 的 sanitizer。 |
-| P1 | RSS 解析 | RSS fetcher 有最大字节数、重定向限制、DNS pin 到公网 IP 和 XML 解析；feed scheme、redirect scheme 和 XML 安全设置已有测试。 | 继续覆盖 malformed feed、redirect hop 上限和 DNS/private-host integration 边界。 |
+| P1 | HTML 清洗 | 邮件 sanitizer 基于正则，已有超时保护和测试，覆盖 entity 编码危险 URL、空白/控制字符协议混淆、`srcset` 远程候选和 trusted `meta refresh`。正则 sanitizer 天然较脆弱。 | 继续扩展畸形标签、SVG namespace、CSS escape 和大型恶意输入。若维护成本升高，考虑基于 HTML parser 的 sanitizer。 |
+| P1 | RSS 解析 | RSS fetcher 有最大字节数、重定向限制、DNS pin 到公网 IP 和 XML 解析；feed scheme、redirect scheme、redirect hop 上限和 XML 安全设置已有测试。 | 继续覆盖 malformed feed 和 DNS/private-host integration 边界。 |
 | P1 | 外部 URI 打开 | Safe URI launching 已有测试，通知 activation parser 也有校验。 | 覆盖所有从邮件/RSS/Toast 打开浏览器链接的调用点，确认只有 `http`/`https` 和预期 app 协议能离开应用。 |
 | P1 | OAuth scope | Google/Microsoft 已拆分日历/任务与邮件 scope，邮件读取、标记已读、发送也按能力延迟授权；设置和写邮件界面已补充额外 consent 说明。 | 手工验证既有 broad-scope token 与新 least-privilege 授权路径。 |
 | P1 | Token 和密码存储 | 本地 token/password 使用 DPAPI 和 PasswordVault，Google legacy token 有迁移。 | 增加按 provider 登出/移除本地 token 的设置项。确认删除账号时清除 token、消息正文和相关本地缓存。 |
@@ -67,7 +67,7 @@
 
 | 优先级 | 区域 | 建议 |
 | --- | --- | --- |
-| P1 | 安全测试 | `NetworkSafety`、WebView2/RSS 资源策略、RSS XML 安全、RSS URL/redirect scheme、通知 activation parser 和部分邮件 sanitizer 边界已有测试；继续增加 sanitizer 畸形输入、redirect hop 上限和集成型 private-host 测试。 |
+| P1 | 安全测试 | `NetworkSafety`、WebView2/RSS 资源策略、RSS XML 安全、RSS URL/redirect scheme/hop 上限、通知 activation parser 和更多邮件 sanitizer 边界已有测试；继续增加 sanitizer 畸形输入、大型恶意输入和集成型 private-host 测试。 |
 | P1 | 缓存测试 | 将可从 WinUI 解耦的缓存淘汰/排序逻辑提取为纯逻辑并测试。 |
 | P1 | 同步测试 | 将 Google/Microsoft provider 中的日期范围和模型映射逻辑提取为纯 helper，测试 recurrence、全天事件、已完成任务、分页。 |
 | P2 | 性能基线 | 增加手工 benchmark 说明或轻量日志，记录启动和首次打开路径。优化前后结果写入 docs。 |
