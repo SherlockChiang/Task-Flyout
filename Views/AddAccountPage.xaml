@@ -9,6 +9,13 @@
             <TextBlock x:Uid="AddAccount_Title" Text="添加账户" FontSize="28" FontWeight="SemiBold"/>
             <TextBlock x:Uid="AddAccount_Subtitle" Text="选择要连接的账户类型" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="14"/>
 
+            <Border Padding="16" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Setup checklist" FontSize="14" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="ChecklistText" Text="" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/>
+                </StackPanel>
+            </Border>
+
             <!-- Google -->
             <Button x:Name="BtnGoogle" HorizontalAlignment="Stretch" Padding="16" Click="BtnGoogle_Click"
                     HorizontalContentAlignment="Left">

@@ -16,6 +16,7 @@ namespace Task_Flyout.Views
         {
             this.InitializeComponent();
             UpdateButtonStates();
+            UpdateChecklist();
         }
 
         private void UpdateButtonStates()
@@ -32,6 +33,25 @@ namespace Task_Flyout.Views
             if (!BtnMicrosoft.IsEnabled)
                 BtnMicrosoft.Content = CreateDisabledContent("Microsoft", "#0078D4",
                     _loader.GetStringOrDefault("AddAccount_AlreadyConnected") ?? "Already connected");
+
+            UpdateChecklist();
+        }
+
+        private void UpdateChecklist()
+        {
+            var mgr = GetAccountManager();
+            if (mgr == null || ChecklistText == null) return;
+
+            var google = mgr.IsConnected("Google") ? "Ready" : "Connect Google for Calendar, Tasks, and Gmail.";
+            var microsoft = mgr.IsConnected("Microsoft") ? "Ready" : "Connect Microsoft for Outlook Calendar and To Do.";
+            var mail = App.Current is App app && app.MailService.HasSetupCompleteAccounts()
+                ? "Ready"
+                : "Add Gmail, Outlook, or IMAP from the Mail page.";
+            var weather = App.Current is App app2 && app2.WeatherService.IsEnabled
+                ? "Ready"
+                : "Enable weather and choose a city from the Weather page.";
+
+            ChecklistText.Text = $"Google: {google}\nMicrosoft: {microsoft}\nMail: {mail}\nWeather: {weather}";
         }
 
         private StackPanel CreateDisabledContent(string name, string color, string status)
