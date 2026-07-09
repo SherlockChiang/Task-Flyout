@@ -57,6 +57,24 @@ public class MailHtmlSanitizerTests
         Assert.DoesNotContain("tracker.example", result);
     }
 
+    [Theory]
+    [InlineData("<img srcset=\"cid:logo 1x, https://tracker.example/logo.png 2x\" src=\"cid:logo\">")]
+    [InlineData("<img srcset=cid:logo,https://tracker.example/logo.png src=cid:logo>")]
+    public void Untrusted_strips_srcset_when_any_candidate_is_remote(string html)
+    {
+        var result = MailHtmlSanitizer.SanitizeUntrusted(html);
+        Assert.DoesNotContain("srcset", result, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("tracker.example", result, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Trusted_strips_meta_refresh_redirects()
+    {
+        var result = MailHtmlSanitizer.SanitizeTrusted("<meta http-equiv=\"refresh\" content=\"0; url=https://tracker.example\"><p>Hi</p>");
+        Assert.DoesNotContain("http-equiv", result, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("tracker.example", result, System.StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void Trusted_keeps_remote_images_but_still_drops_scripts()
     {

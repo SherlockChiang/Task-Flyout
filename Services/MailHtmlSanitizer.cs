@@ -25,6 +25,8 @@ namespace Task_Flyout.Services
         private static readonly Regex RxDangerousCssStyle = new(@"style\s*=\s*(['""])[^'""]*\b(expression|-moz-binding|behavior)\b[^'""]*\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxUntrustedRemoteResourceQuoted = new(@"\s+(src|srcset|poster|background)\s*=\s*(['""])\s*(?:https?:)?//.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxUntrustedRemoteResourceUnquoted = new(@"\s+(src|srcset|poster|background)\s*=\s*(?:https?:)?//[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RxUntrustedRemoteSrcSetQuoted = new(@"\s+srcset\s*=\s*(['""])[^'"">]*(?:https?:)?//[^'"">]*\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxUntrustedRemoteSrcSetUnquoted = new(@"\s+srcset\s*=\s*[^\s>]*(?:https?:)?//[^\s>]*", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxUntrustedRemoteCssStyle = new(@"\s+style\s*=\s*(['""])[^'""]*(?:@import|url\s*\(\s*['""]?\s*(?:https?:)?//)[^'""]*\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxUntrustedRemoteStyleBlock = new(@"<\s*style\b[^>]*>.*?(?:@import|url\s*\(\s*['""]?\s*(?:https?:)?//).*?<\s*/\s*style\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxUntrustedExternalLinkTag = new(@"<\s*link\b[^>]*\bhref\s*=\s*(['""])\s*(?:https?:)?//.*?\1[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
@@ -83,6 +85,7 @@ namespace Task_Flyout.Services
                 value = RxDataUriNavigationUnquoted.Replace(value, "$1=\"#\"");
                 value = NeutralizeDangerousUrlAttributes(value);
                 value = RxTrustedDangerousCss.Replace(value, "");
+                value = RxUntrustedMetaRefreshTag.Replace(value, "");
 
                 if (!RxHtmlContentTags.IsMatch(value))
                     value = $"<pre>{WebUtility.HtmlEncode(RemoveCssNoise(value))}</pre>";
@@ -122,6 +125,8 @@ namespace Task_Flyout.Services
             html = RxUntrustedMetaRefreshTag.Replace(html, "");
             html = RxUntrustedRemoteStyleBlock.Replace(html, "");
             html = RxUntrustedRemoteCssStyle.Replace(html, "");
+            html = RxUntrustedRemoteSrcSetQuoted.Replace(html, "");
+            html = RxUntrustedRemoteSrcSetUnquoted.Replace(html, "");
             html = RxUntrustedRemoteResourceQuoted.Replace(html, "");
             html = RxUntrustedRemoteResourceUnquoted.Replace(html, "");
             return html;
