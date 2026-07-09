@@ -41,6 +41,15 @@ public class SafeUriLauncherTests
     }
 
     [Theory]
+    [InlineData("https://trusted.example@evil.example/path")]
+    [InlineData("https://user:password@example.com/path")]
+    [InlineData("http://example.com:80@127.0.0.1/")]
+    public void Rejects_userinfo_urls(string input)
+    {
+        Assert.False(SafeUriLauncher.TryCreateExternalHttpUri(input, out _));
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
