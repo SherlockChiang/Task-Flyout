@@ -55,7 +55,7 @@
 | P0 | Manifest capability | `Package.appxmanifest` 声明 `runFullTrust` 和 `location`。`location` 仍被当前位置和自动跟随天气功能使用；启动路径已避免自动请求位置权限。 | 保持 README/privacy 文档与实际用途一致，并手工验证启动、拒绝/允许权限、自动跟随开关路径。 |
 | P1 | WebView2 远程资源 | 邮件嵌入资源策略已阻止本机、私网和 `.local` HTTPS/HTTP host；RSS 启用后通过 SSRF-safe client 代理 HTTPS 资源。WebView2/RSS 资源策略已有单元测试。 | 若邮件目标只是远程图片，考虑阻止非图片资源类型。 |
 | P1 | HTML 清洗 | 邮件 sanitizer 基于正则，已有超时保护和测试，覆盖 entity 编码危险 URL、空白/控制字符协议混淆、CSS escape dangerous style、namespaced dangerous tags、oversized input fallback、malformed dangerous tags、`srcset` 远程候选和 trusted `meta refresh`。正则 sanitizer 天然较脆弱。 | 若维护成本升高，考虑基于 HTML parser 的 sanitizer。 |
-| P1 | RSS 解析 | RSS fetcher 有最大字节数、重定向限制、DNS pin 到公网 IP 和 XML 解析；feed scheme、redirect scheme、redirect hop 上限和 XML 安全设置已有测试。 | 继续覆盖 malformed feed 和 DNS/private-host integration 边界。 |
+| P1 | RSS 解析 | RSS fetcher 有最大字节数、重定向限制、DNS pin 到公网 IP 和 XML 解析；feed scheme、redirect scheme、redirect hop 上限、malformed XML fallback 和 XML 安全设置已有测试。 | 继续覆盖 DNS/private-host integration 边界。 |
 | P1 | 外部 URI 打开 | 邮件/RSS WebView 导航和打开浏览器动作走 `SafeUriLauncher`；Safe URI tests 覆盖 scheme、本机/私网 host、超长 URL 和 userinfo 欺骗链接；通知 activation parser 也有校验。 | 继续在手工验证中覆盖邮件/RSS/Toast 的实际点击路径。 |
 | P1 | OAuth scope | Google/Microsoft 已拆分日历/任务与邮件 scope，邮件读取、标记已读、发送也按能力延迟授权；设置和写邮件界面已补充额外 consent 说明。 | 手工验证既有 broad-scope token 与新 least-privilege 授权路径。 |
 | P1 | Token 和密码存储 | 本地 token/password 使用 DPAPI 和 PasswordVault，Google legacy token 有迁移。 | 增加按 provider 登出/移除本地 token 的设置项。确认删除账号时清除 token、消息正文和相关本地缓存。 |
@@ -67,7 +67,7 @@
 
 | 优先级 | 区域 | 建议 |
 | --- | --- | --- |
-| P1 | 安全测试 | `NetworkSafety`、WebView2/RSS 资源策略、RSS XML 安全、RSS URL/redirect scheme/hop 上限、Safe URI launcher、通知 activation parser 和邮件 sanitizer 边界已有测试；继续增加 RSS malformed feed 和集成型 private-host 测试。 |
+| P1 | 安全测试 | `NetworkSafety`、WebView2/RSS 资源策略、RSS XML 安全、RSS URL/redirect scheme/hop 上限、RSS malformed XML fallback、Safe URI launcher、通知 activation parser 和邮件 sanitizer 边界已有测试；继续增加 RSS 集成型 private-host 测试。 |
 | P1 | 缓存测试 | 将可从 WinUI 解耦的缓存淘汰/排序逻辑提取为纯逻辑并测试。 |
 | P1 | 同步测试 | 将 Google/Microsoft provider 中的日期范围和模型映射逻辑提取为纯 helper，测试 recurrence、全天事件、已完成任务、分页。 |
 | P2 | 性能基线 | 增加手工 benchmark 说明或轻量日志，记录启动和首次打开路径。优化前后结果写入 docs。 |
