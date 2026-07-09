@@ -30,6 +30,7 @@
     <Compile Include="..\..\Services\NetworkSafety.cs" Link="Source\NetworkSafety.cs" />
     <Compile Include="..\..\Services\MailHtmlSanitizer.cs" Link="Source\MailHtmlSanitizer.cs" />
     <Compile Include="..\..\Services\RssXmlSecurity.cs" Link="Source\RssXmlSecurity.cs" />
+    <Compile Include="..\..\Services\RssFetchPolicy.cs" Link="Source\RssFetchPolicy.cs" />
     <Compile Include="..\..\Services\DiagnosticsRedactor.cs" Link="Source\DiagnosticsRedactor.cs" />
     <Compile Include="..\..\Services\WebResourcePolicy.cs" Link="Source\WebResourcePolicy.cs" />
     <Compile Include="..\..\Services\StatusMessageFormatter.cs" Link="Source\StatusMessageFormatter.cs" />

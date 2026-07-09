@@ -741,14 +741,11 @@ namespace Task_Flyout.Services
                 if (!IsRedirect(response.StatusCode) || hop >= MaxRedirects)
                     return response;
 
-                var location = response.Headers.Location;
-                if (location == null)
+                var headerLocation = response.Headers.Location;
+                if (headerLocation == null)
                     return response;
 
-                if (!location.IsAbsoluteUri)
-                    location = new Uri(currentUri, location);
-
-                if (location.Scheme != "http" && location.Scheme != "https")
+                if (!RssFetchPolicy.TryResolveHttpRedirect(currentUri, headerLocation, out var location))
                 {
                     response.Dispose();
                     throw new InvalidOperationException("Redirect to non-HTTP(S) scheme.");
@@ -772,7 +769,7 @@ namespace Task_Flyout.Services
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
                 throw new InvalidOperationException("Invalid feed URL.");
-            if (uri.Scheme != "http" && uri.Scheme != "https")
+            if (!RssFetchPolicy.IsAllowedFetchScheme(uri))
                 throw new InvalidOperationException("Feed URL must use HTTP or HTTPS.");
 
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
