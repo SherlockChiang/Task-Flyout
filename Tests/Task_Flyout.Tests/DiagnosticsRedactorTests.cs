@@ -13,6 +13,36 @@ public class DiagnosticsRedactorTests
         Assert.DoesNotContain("abc.def.ghi", result);
     }
 
+    [Fact]
+    public void Redacts_basic_auth_tokens()
+    {
+        var result = DiagnosticsRedactor.Redact("Authorization: Basic dXNlcjpwYXNz");
+
+        Assert.Contains("Basic [redacted]", result);
+        Assert.DoesNotContain("dXNlcjpwYXNz", result);
+    }
+
+    [Theory]
+    [InlineData("Cookie: session=abc; theme=dark")]
+    [InlineData("Set-Cookie: refresh=secret; HttpOnly")]
+    public void Redacts_cookie_headers(string input)
+    {
+        var result = DiagnosticsRedactor.Redact(input);
+
+        Assert.Contains(": [redacted]", result);
+        Assert.DoesNotContain("session=abc", result);
+        Assert.DoesNotContain("refresh=secret", result);
+    }
+
+    [Fact]
+    public void Redacts_url_userinfo()
+    {
+        var result = DiagnosticsRedactor.Redact("GET https://user:password@example.com/path?x=1 failed");
+
+        Assert.Contains("https://[redacted]@example.com/path", result);
+        Assert.DoesNotContain("user:password", result);
+    }
+
     [Theory]
     [InlineData("https://example.com/callback?code=secret-code&state=ok")]
     [InlineData("https://example.com/callback?access_token=secret-token#frag")]

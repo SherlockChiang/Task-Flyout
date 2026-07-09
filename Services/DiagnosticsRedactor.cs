@@ -15,6 +15,15 @@ namespace Task_Flyout.Services
         private static readonly Regex BearerRegex = new(
             @"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+",
             RegexOptions.Compiled);
+        private static readonly Regex BasicAuthRegex = new(
+            @"(?i)\bBasic\s+[A-Za-z0-9+/=]+",
+            RegexOptions.Compiled);
+        private static readonly Regex CookieHeaderRegex = new(
+            @"(?im)^\s*(Set-Cookie|Cookie)\s*:\s*.*$",
+            RegexOptions.Compiled);
+        private static readonly Regex UrlUserInfoRegex = new(
+            @"(?i)\b(https?://)([^\s/@?#]+)@([^\s/?#]+)",
+            RegexOptions.Compiled);
 
         public static string Redact(string? value)
         {
@@ -23,6 +32,9 @@ namespace Task_Flyout.Services
             try
             {
                 var redacted = BearerRegex.Replace(value, "Bearer " + Redacted);
+                redacted = BasicAuthRegex.Replace(redacted, "Basic " + Redacted);
+                redacted = CookieHeaderRegex.Replace(redacted, match => match.Groups[1].Value + ": " + Redacted);
+                redacted = UrlUserInfoRegex.Replace(redacted, match => match.Groups[1].Value + Redacted + "@" + match.Groups[3].Value);
                 redacted = SensitiveQueryRegex.Replace(redacted, match => match.Groups[1].Value + Redacted);
                 redacted = SensitivePairRegex.Replace(redacted, match =>
                     match.Groups[1].Value + match.Groups[2].Value + Redacted);
