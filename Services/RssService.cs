@@ -719,11 +719,6 @@ namespace Task_Flyout.Services
             }
         }
 
-        private static bool IsRedirect(HttpStatusCode code)
-            => code is HttpStatusCode.Moved or HttpStatusCode.Found or HttpStatusCode.SeeOther
-                or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect
-                or (HttpStatusCode)308;
-
         private static async Task<HttpResponseMessage> SendWithRedirectsAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
         {
             var currentUri = request.RequestUri!;
@@ -738,7 +733,7 @@ namespace Task_Flyout.Services
             {
                 response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
-                if (!IsRedirect(response.StatusCode) || hop >= MaxRedirects)
+                if (!RssFetchPolicy.ShouldFollowRedirect(response.StatusCode, hop, MaxRedirects))
                     return response;
 
                 var headerLocation = response.Headers.Location;

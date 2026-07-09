@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 
 namespace Task_Flyout.Services
 {
@@ -7,6 +8,14 @@ namespace Task_Flyout.Services
         public static bool IsAllowedFetchScheme(Uri uri)
             => uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
                uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+
+        public static bool IsRedirectStatus(HttpStatusCode code)
+            => code is HttpStatusCode.Moved or HttpStatusCode.Found or HttpStatusCode.SeeOther
+                or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect
+                or (HttpStatusCode)308;
+
+        public static bool ShouldFollowRedirect(HttpStatusCode code, int hop, int maxRedirects)
+            => IsRedirectStatus(code) && hop < maxRedirects;
 
         public static bool TryResolveHttpRedirect(Uri currentUri, Uri? location, out Uri redirectUri)
         {

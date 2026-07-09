@@ -58,4 +58,23 @@ public class RssServiceTests
     {
         Assert.False(RssFetchPolicy.TryResolveHttpRedirect(new Uri("https://example.com/feed.xml"), new Uri(location, UriKind.RelativeOrAbsolute), out _));
     }
+
+    [Theory]
+    [InlineData(301)]
+    [InlineData(302)]
+    [InlineData(303)]
+    [InlineData(307)]
+    [InlineData(308)]
+    public void Redirect_policy_identifies_redirect_status_codes(int statusCode)
+    {
+        Assert.True(RssFetchPolicy.IsRedirectStatus((System.Net.HttpStatusCode)statusCode));
+    }
+
+    [Fact]
+    public void Redirect_policy_stops_at_max_redirect_hops()
+    {
+        Assert.True(RssFetchPolicy.ShouldFollowRedirect(System.Net.HttpStatusCode.Found, hop: 4, maxRedirects: 5));
+        Assert.False(RssFetchPolicy.ShouldFollowRedirect(System.Net.HttpStatusCode.Found, hop: 5, maxRedirects: 5));
+        Assert.False(RssFetchPolicy.ShouldFollowRedirect(System.Net.HttpStatusCode.OK, hop: 0, maxRedirects: 5));
+    }
 }
