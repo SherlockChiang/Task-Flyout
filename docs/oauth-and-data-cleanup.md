@@ -8,9 +8,9 @@ Requested scopes:
 
 - `CalendarService.Scope.Calendar`: required for creating, editing, deleting, and reading calendar events.
 - `TasksService.Scope.Tasks`: required for creating, editing, completing, and reading Google Tasks.
-- `GmailService.Scope.GmailReadonly`: required for listing and reading Gmail messages.
-- `GmailService.Scope.GmailSend`: required for sending Gmail replies/new messages from Task Flyout.
-- `GmailService.Scope.GmailModify`: required for marking Gmail messages as read.
+- `GmailService.Scope.GmailReadonly`: requested when Gmail mail is used; required for listing and reading Gmail messages.
+- `GmailService.Scope.GmailModify`: requested only when marking Gmail messages as read.
+- `GmailService.Scope.GmailSend`: requested only when sending Gmail replies/new messages from Task Flyout.
 
 Local cleanup on account removal:
 
@@ -26,8 +26,9 @@ Requested scopes:
 - `Calendars.ReadWrite`: required for creating, editing, deleting, and reading Outlook calendar events.
 - `Tasks.ReadWrite`: required for creating, editing, completing, and reading Microsoft To Do tasks.
 - `User.Read`: required by Microsoft Graph sign-in/profile bootstrap.
-- `Mail.ReadWrite`: requested when Outlook mail is used; required for reading mail and marking messages as read.
-- `Mail.Send`: requested when Outlook mail is used; required for sending Outlook replies/new messages from Task Flyout.
+- `Mail.Read`: requested when Outlook mail is used; required for listing and reading Outlook messages.
+- `Mail.ReadWrite`: requested only when marking Outlook messages as read.
+- `Mail.Send`: requested only when sending Outlook replies/new messages from Task Flyout.
 
 Local cleanup on account removal:
 
@@ -49,37 +50,36 @@ Local cleanup on mail account removal:
 ## Notes
 
 - OAuth tokens and local mail/calendar/task caches are stored only on the device.
-- Google and Microsoft mail send/modify/write scopes are intentionally broad because the app supports in-app send, mark-read, create, edit, and delete operations.
-- Google Calendar/Tasks setup now requests only Calendar and Tasks scopes. Gmail scopes are requested when the user enables or uses Gmail mail features.
-- Microsoft Calendar/To Do setup now requests only Calendar, Tasks, and User scopes. Outlook mail scopes are requested when the user enables or uses Outlook mail features.
-- If a future release splits read-only and write features further, scopes should be revisited for incremental consent.
+- Google Calendar/Tasks setup now requests only Calendar and Tasks scopes. Gmail read, modify, and send scopes are requested from the mail feature path that needs each capability.
+- Microsoft Calendar/To Do setup now requests only Calendar, Tasks, and User scopes. Outlook read, write, and send scopes are requested from the mail feature path that needs each capability.
+- Existing broad-scope tokens remain valid; account removal is still the supported way to force a fresh least-privilege OAuth grant.
 
 ## Incremental Consent Follow-Up
 
-The app now separates Google Calendar/Tasks setup from Gmail mail scopes. A future incremental-consent design can split the remaining mail/action scopes further into feature toggles:
+The app now separates Google Calendar/Tasks setup from Gmail mail scopes and splits mail action scopes by capability:
 
 - Calendar only: request calendar read/write and no mail scopes.
 - Tasks only: request task read/write and no mail scopes.
-- Mail read: request read access only.
-- Mail actions: request send/modify scopes only when the user enables send or mark-read actions.
+- Mail read: request read access only for folder/message/body loading.
+- Mail mark-read: request Gmail modify or Microsoft read/write only when a message is marked read.
+- Mail send: request Gmail send or Microsoft send only when sending a message.
 
-Before implementing this, update the setup UI to explain which features each toggle enables, and add migration logic for existing users whose stored tokens already contain the broader scopes.
+Existing users whose stored tokens already contain broader scopes keep working without forced re-authentication.
 
 ## Mail Scope Split Risk Notes
 
-Mail read/action split is not just a constants change because the current UX performs write-like actions during normal reading:
+Mail read/action split is tied to UX because automatic mark-read is a write-like action during normal reading:
 
 - Selecting a message marks it as read, which needs Gmail `GmailModify` or Microsoft `Mail.ReadWrite`.
 - Reply/compose needs Gmail `GmailSend` or Microsoft `Mail.Send`.
-- Folder/message listing and body fetch can use read-only scopes, but the current mail detail flow can immediately transition from read to mark-read.
+- Folder/message listing and body fetch now use read-only scopes.
 
-Safe implementation plan:
+Current behavior:
 
 1. `AutoMarkMailAsRead` now exists and defaults to the current behavior for existing users.
-2. Next step: expose that setting in the UI, then use read-only mail scopes for folder/message/body loading when auto-mark-read is off.
-3. Request modify scope only when the user marks a message as read or enables auto-mark-read.
-4. Request send scope only when the user opens compose/reply for the first time.
-5. Store a per-provider scope capability flag so the UI can explain why an extra consent prompt appears.
-6. Keep existing broad-scope tokens valid; do not force reauth unless a requested action fails for missing scope.
+2. Settings exposes `AutoMarkMailAsRead`; disabling it lets message reading stay read-only.
+3. Remote mark-read requests modify/write scope only when the app actually marks a message as read.
+4. Sending requests send scope only when the user sends a composed/reply message.
+5. Keep existing broad-scope tokens valid; do not force reauth unless a requested action fails for missing scope.
 
-Until the mail UX is split this way, requesting mail action scopes on first mail use preserves current behavior without surprising users with a consent prompt when they merely click a message and it is auto-marked read.
+Remaining UX follow-up: add copy around compose/auto-mark-read explaining that those actions may trigger an additional consent prompt.

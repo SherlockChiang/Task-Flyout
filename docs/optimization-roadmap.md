@@ -57,7 +57,7 @@
 | P1 | HTML 清洗 | 邮件 sanitizer 基于正则，已有超时保护和测试。正则 sanitizer 天然较脆弱。 | 扩展测试：畸形标签、SVG namespace、CSS escape、协议混淆、`srcset`、`meta refresh`、大型恶意输入。若维护成本升高，考虑基于 HTML parser 的 sanitizer。 |
 | P1 | RSS 解析 | RSS fetcher 有最大字节数、重定向限制、DNS pin 到公网 IP 和 XML 解析。 | 确认所有 feed 解析路径都禁用 DTD/外部实体。增加测试或公共 helper 来强制安全 XML 设置。 |
 | P1 | 外部 URI 打开 | Safe URI launching 已有测试，通知 ID 也有校验。 | 覆盖所有从邮件/RSS/Toast 打开浏览器链接的调用点，确认只有 `http`/`https` 和预期 app 协议能离开应用。 |
-| P1 | OAuth scope | Google 请求 Calendar、Tasks、Gmail readonly/send/modify；Microsoft 通过 Azure Identity 使用 Graph scope。 | 复核 Gmail modify/send 是否对所有用户都必要。可行时改为增量授权，或在隐私文档中解释宽 scope 用途。 |
+| P1 | OAuth scope | Google/Microsoft 已拆分日历/任务与邮件 scope，邮件读取、标记已读、发送也按能力延迟授权。 | 继续补充额外 consent 的 UI 说明，并手工验证既有 broad-scope token 与新 least-privilege 授权路径。 |
 | P1 | Token 和密码存储 | 本地 token/password 使用 DPAPI 和 PasswordVault，Google legacy token 有迁移。 | 增加按 provider 登出/移除本地 token 的设置项。确认删除账号时清除 token、消息正文和相关本地缓存。 |
 | P1 | 日志 | 崩溃日志会将异常消息和 stack trace 写入本地 roaming logs。 | 避免记录 token、邮件正文、OAuth 响应或带敏感 query 的完整 URL。新增诊断前先增加日志脱敏 helper。 |
 | P2 | 依赖审计 | `Task_Flyout.csproj` 对 SQLite advisory GHSA-2m69-gcr7-jv3q 做了有理由的 suppress。 | 每次依赖更新时复查；一旦 SQLitePCLRaw/Microsoft.Data.Sqlite 链路提供修复版本，移除 suppress 并升级。 |
