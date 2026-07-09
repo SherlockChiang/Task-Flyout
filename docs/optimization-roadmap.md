@@ -59,7 +59,7 @@
 | P1 | 外部 URI 打开 | 邮件/RSS WebView 导航和打开浏览器动作走 `SafeUriLauncher`；Safe URI tests 覆盖 scheme、本机/私网 host、超长 URL 和 userinfo 欺骗链接；通知 activation parser 也有校验。 | 继续在手工验证中覆盖邮件/RSS/Toast 的实际点击路径。 |
 | P1 | OAuth scope | Google/Microsoft 已拆分日历/任务与邮件 scope，邮件读取、标记已读、发送也按能力延迟授权；设置和写邮件界面已补充额外 consent 说明。 | 手工验证既有 broad-scope token 与新 least-privilege 授权路径。 |
 | P1 | Token 和密码存储 | 本地 token/password 使用 DPAPI 和 PasswordVault，Google legacy token 有迁移。 | 增加按 provider 登出/移除本地 token 的设置项。确认删除账号时清除 token、消息正文和相关本地缓存。 |
-| P1 | 日志 | 崩溃日志会将异常消息和 stack trace 写入本地 roaming logs。 | 避免记录 token、邮件正文、OAuth 响应或带敏感 query 的完整 URL。新增诊断前先增加日志脱敏 helper。 |
+| P1 | 日志 | 崩溃日志会将异常消息和 stack trace 写入本地 roaming logs；写入前已通过 `DiagnosticsRedactor` 脱敏 bearer/basic auth、cookie、URL userinfo、敏感 query 和常见 key/value secret。 | 继续避免主动记录邮件正文、OAuth 响应正文或完整外部 URL；新增诊断应复用日志脱敏 helper。 |
 | P2 | 依赖审计 | `Task_Flyout.csproj` 对 SQLite advisory GHSA-2m69-gcr7-jv3q 做了有理由的 suppress。 | 每次依赖更新时复查；一旦 SQLitePCLRaw/Microsoft.Data.Sqlite 链路提供修复版本，移除 suppress 并升级。 |
 | P2 | 网络超时 | 邮件、RSS、天气设置了 timeout；Google/Microsoft SDK 请求更多依赖 SDK 默认行为。 | 为用户触发的同步刷新增加显式取消路径，避免 OAuth/sync 流程出现无限等待感。 |
 
@@ -71,7 +71,7 @@
 | P1 | 缓存测试 | WebView2 cache prune、邮件正文 volatile LRU、邮件持久账号/文件夹排序 policy 已提取为纯逻辑并测试，覆盖低于上限不删除、按时间删除到目标大小、忽略 0 字节项、跳过当前邮件、持久顺序去重和未知项保序。 | 后续可继续覆盖更复杂的缓存迁移/损坏恢复场景。 |
 | P1 | 同步测试 | Google/Microsoft task 日期半开区间、已完成任务包含规则、recurrence 映射、事件时间窗口和 item 模型映射 policy 已提取为纯逻辑并测试，覆盖去除时间部分、起止边界、反向区间、Google RRULE、Microsoft pattern type、创建事件频率映射、全天事件、跨午夜事件、事件/任务字段规范化和 Google page token 去重/终止。Microsoft Graph 分页仍依赖 SDK PageIterator，后续需要 mock/integration 覆盖。 |
 | P2 | 性能基线 | 增加手工 benchmark 说明或轻量日志，记录启动和首次打开路径。优化前后结果写入 docs。 |
-| P2 | 错误处理 | 将捕获异常统一转换为用户安全消息和脱敏诊断。测试 malformed RSS、OAuth 过期、IMAP 认证失败、WebView2 runtime 缺失等 fallback。 |
+| P2 | 错误处理 | 日志脱敏 helper 已测试 bearer/basic auth、cookie、URL userinfo、敏感 query 和常见 key/value secret。继续将捕获异常统一转换为用户安全消息和脱敏诊断。测试 malformed RSS、OAuth 过期、IMAP 认证失败、WebView2 runtime 缺失等 fallback。 |
 
 ## 建议执行顺序
 
