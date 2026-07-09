@@ -29,17 +29,19 @@ namespace Task_Flyout.Services
 
         private static readonly string[] MailScopes = new[]
         {
-            "Mail.ReadWrite",
-            "Mail.Send"
+            "Mail.Read"
         };
 
-        private static readonly string[] AllScopes = AgendaScopes.Concat(MailScopes).ToArray();
+        private static readonly string[] MailWriteScopes = new[] { "Mail.ReadWrite" };
+        private static readonly string[] MailSendScopes = new[] { "Mail.Send" };
+        private string[] _graphClientScopes = Array.Empty<string>();
 
         public GraphServiceClient? GraphClient => _graphClient;
 
         public Task ClearLocalAuthorizationAsync()
         {
             _graphClient = null!;
+            _graphClientScopes = Array.Empty<string>();
             _defaultTodoListId = "";
 
             try
@@ -58,15 +60,48 @@ namespace Task_Flyout.Services
 
         public async Task EnsureAuthorizedAsync()
         {
-            if (_graphClient != null) return;
+            if (_graphClient != null && HasScopes(_graphClientScopes, AgendaScopes)) return;
 
-            _graphClient = await CreateAuthorizedGraphClientAsync(AgendaScopes);
+            var scopes = MergeScopes(AgendaScopes, _graphClientScopes);
+            _graphClient = await CreateAuthorizedGraphClientAsync(scopes);
+            _graphClientScopes = scopes;
         }
 
-        public async Task<GraphServiceClient> EnsureMailAuthorizedAsync()
+        public async Task<GraphServiceClient> EnsureMailAuthorizedAsync(bool requireWrite = false, bool requireSend = false)
         {
-            _graphClient = await CreateAuthorizedGraphClientAsync(AllScopes);
+            var scopes = MergeScopes(BuildMailScopes(requireWrite, requireSend), _graphClientScopes);
+            if (_graphClient == null || !HasScopes(_graphClientScopes, scopes))
+            {
+                _graphClient = await CreateAuthorizedGraphClientAsync(scopes);
+                _graphClientScopes = scopes;
+            }
+
             return _graphClient;
+        }
+
+        private static string[] BuildMailScopes(bool requireWrite, bool requireSend)
+        {
+            var scopes = new List<string> { "User.Read" };
+            scopes.AddRange(requireWrite ? MailWriteScopes : MailScopes);
+            if (requireSend) scopes.AddRange(MailSendScopes);
+            return scopes.ToArray();
+        }
+
+        private static bool HasScopes(IEnumerable<string> grantedScopes, IEnumerable<string> requiredScopes)
+        {
+            var granted = grantedScopes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return requiredScopes.All(scope =>
+                granted.Contains(scope) ||
+                (string.Equals(scope, "Mail.Read", StringComparison.OrdinalIgnoreCase) && granted.Contains("Mail.ReadWrite")));
+        }
+
+        private static string[] MergeScopes(params IEnumerable<string>[] scopeGroups)
+        {
+            return scopeGroups
+                .SelectMany(scope => scope)
+                .Where(scope => !string.IsNullOrWhiteSpace(scope))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
 
         private async Task<GraphServiceClient> CreateAuthorizedGraphClientAsync(string[] scopes)

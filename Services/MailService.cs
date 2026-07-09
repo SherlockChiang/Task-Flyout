@@ -363,7 +363,7 @@ namespace Task_Flyout.Services
         public async Task<MailAccount> AddOutlookAccountAsync()
         {
             EnsureAccountsLoaded();
-            await EnsureOutlookAuthorizedAsync();
+            await EnsureOutlookMailReadAuthorizedAsync();
             if (_outlookClient == null)
                 throw new InvalidOperationException("Outlook authorization failed.");
 
@@ -476,7 +476,7 @@ namespace Task_Flyout.Services
         public async Task<MailAccount> AddGoogleAccountAsync()
         {
             EnsureAccountsLoaded();
-            var gmail = await EnsureGoogleMailAuthorizedAsync();
+            var gmail = await EnsureGoogleMailReadAuthorizedAsync();
             var profile = await gmail.Users.GetProfile("me").ExecuteAsync();
             var address = profile?.EmailAddress ?? "";
 
@@ -530,7 +530,7 @@ namespace Task_Flyout.Services
             }
             else
             {
-                await EnsureOutlookAuthorizedAsync();
+                await EnsureOutlookMailReadAuthorizedAsync();
                 if (_outlookClient == null) return new List<MailFolder>();
 
                 var response = await _outlookClient.Me.MailFolders.GetAsync(request =>
@@ -580,7 +580,7 @@ namespace Task_Flyout.Services
             }
             else
             {
-                await EnsureOutlookAuthorizedAsync();
+                await EnsureOutlookMailReadAuthorizedAsync();
                 if (_outlookClient == null) return new List<MailItem>();
 
                 int top = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
@@ -643,13 +643,13 @@ namespace Task_Flyout.Services
 
             if (account.Kind == MailAccountKind.Outlook)
             {
-                await EnsureOutlookAuthorizedAsync();
+                await EnsureOutlookMailWriteAuthorizedAsync();
                 if (_outlookClient != null)
                     await _outlookClient.Me.Messages[item.Id].PatchAsync(new GraphMessage { IsRead = true });
             }
             else if (account.Kind == MailAccountKind.Google)
             {
-                var gmail = await EnsureGoogleMailAuthorizedAsync();
+                var gmail = await EnsureGoogleMailModifyAuthorizedAsync();
                 await gmail.Users.Messages.Modify(new ModifyMessageRequest
                 {
                     RemoveLabelIds = new List<string> { "UNREAD" }
@@ -680,7 +680,7 @@ namespace Task_Flyout.Services
 
             if (account.Kind == MailAccountKind.Outlook)
             {
-                await EnsureOutlookAuthorizedAsync();
+                await EnsureOutlookMailReadAuthorizedAsync();
                 if (_outlookClient == null) return;
 
                 var message = await _outlookClient.Me.Messages[item.Id].GetAsync(request =>
@@ -697,7 +697,7 @@ namespace Task_Flyout.Services
             }
             else if (account.Kind == MailAccountKind.Google)
             {
-                var gmail = await EnsureGoogleMailAuthorizedAsync();
+                var gmail = await EnsureGoogleMailReadAuthorizedAsync();
                 var get = gmail.Users.Messages.Get("me", item.Id);
                 get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Full;
                 var full = await get.ExecuteAsync();
@@ -852,7 +852,7 @@ namespace Task_Flyout.Services
 
         private async Task SendOutlookMailAsync(MailAccount account, string to, string subject, string body)
         {
-            await EnsureOutlookAuthorizedAsync();
+            await EnsureOutlookMailSendAuthorizedAsync();
             if (_outlookClient == null) return;
 
             var message = new GraphMessage
@@ -873,7 +873,7 @@ namespace Task_Flyout.Services
 
         private async Task SendGoogleMailAsync(MailAccount account, string to, string subject, string body)
         {
-            var gmail = await EnsureGoogleMailAuthorizedAsync();
+            var gmail = await EnsureGoogleMailSendAuthorizedAsync();
             var mime = CreateMimeMessage(account, to, subject, body);
             using var stream = new MemoryStream();
             await mime.WriteToAsync(stream);
@@ -1080,14 +1080,29 @@ namespace Task_Flyout.Services
             return CloneMailItems(messages, includeBodies: false);
         }
 
-        private async Task<GmailService> EnsureGoogleMailAuthorizedAsync()
+        private async Task<GmailService> EnsureGoogleMailReadAuthorizedAsync()
+        {
+            return await EnsureGoogleMailAuthorizedAsync(requireModify: false, requireSend: false);
+        }
+
+        private async Task<GmailService> EnsureGoogleMailModifyAuthorizedAsync()
+        {
+            return await EnsureGoogleMailAuthorizedAsync(requireModify: true, requireSend: false);
+        }
+
+        private async Task<GmailService> EnsureGoogleMailSendAuthorizedAsync()
+        {
+            return await EnsureGoogleMailAuthorizedAsync(requireModify: false, requireSend: true);
+        }
+
+        private async Task<GmailService> EnsureGoogleMailAuthorizedAsync(bool requireModify, bool requireSend)
         {
             EnsureAccountsLoaded();
 
             if (App.Current is App app &&
                 app.SyncManager.GetProvider("Google") is GoogleSyncProvider googleProvider)
             {
-                return await googleProvider.EnsureGmailAuthorizedAsync();
+                return await googleProvider.EnsureGmailAuthorizedAsync(requireModify, requireSend);
             }
 
             throw new InvalidOperationException("Google provider is not available.");
@@ -1327,7 +1342,7 @@ namespace Task_Flyout.Services
 
         private async Task<List<MailFolder>> FetchGoogleFoldersAsync(MailAccount account)
         {
-            var gmail = await EnsureGoogleMailAuthorizedAsync();
+            var gmail = await EnsureGoogleMailReadAuthorizedAsync();
             var labels = await gmail.Users.Labels.List("me").ExecuteAsync();
 
             return labels?.Labels?
@@ -1350,7 +1365,7 @@ namespace Task_Flyout.Services
             if (!account.IsSetupComplete || folder.IsPlaceholder)
                 return new List<MailItem>();
 
-            var gmail = await EnsureGoogleMailAuthorizedAsync();
+            var gmail = await EnsureGoogleMailReadAuthorizedAsync();
             int top = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
 
             var listRequest = gmail.Users.Messages.List("me");
@@ -1465,13 +1480,27 @@ namespace Task_Flyout.Services
                 .ToList();
         }
 
-        private async Task EnsureOutlookAuthorizedAsync()
+        private async Task EnsureOutlookMailReadAuthorizedAsync()
         {
-            if (_outlookClient != null) return;
+            await EnsureOutlookMailAuthorizedAsync(requireWrite: false, requireSend: false);
+        }
+
+        private async Task EnsureOutlookMailWriteAuthorizedAsync()
+        {
+            await EnsureOutlookMailAuthorizedAsync(requireWrite: true, requireSend: false);
+        }
+
+        private async Task EnsureOutlookMailSendAuthorizedAsync()
+        {
+            await EnsureOutlookMailAuthorizedAsync(requireWrite: false, requireSend: true);
+        }
+
+        private async Task EnsureOutlookMailAuthorizedAsync(bool requireWrite, bool requireSend)
+        {
             if (App.Current is App app &&
                 app.SyncManager.GetProvider("Microsoft") is MicrosoftSyncProvider microsoftProvider)
             {
-                _outlookClient = await microsoftProvider.EnsureMailAuthorizedAsync();
+                _outlookClient = await microsoftProvider.EnsureMailAuthorizedAsync(requireWrite, requireSend);
             }
 
             if (_outlookClient == null)
