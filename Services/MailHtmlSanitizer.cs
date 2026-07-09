@@ -14,8 +14,8 @@ namespace Task_Flyout.Services
     /// </summary>
     internal static class MailHtmlSanitizer
     {
-        private static readonly Regex RxPairedDangerousTags = new(@"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*>.*?<\s*/\s*\1\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
-        private static readonly Regex RxSelfClosingDangerousTags = new(@"<\s*(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*/?\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxPairedDangerousTags = new(@"<\s*(?:[\w.-]+:)?(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*>.*?<\s*/\s*(?:[\w.-]+:)?\1\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxSelfClosingDangerousTags = new(@"<\s*(?:[\w.-]+:)?(script|iframe|object|embed|form|input|button|textarea|select|svg|noscript|template|base)\b[^>]*/?\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxEventHandlerQuoted = new(@"\s+on\w+\s*=\s*(['""]).*?\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxEventHandlerUnquoted = new(@"\s+on\w+\s*=\s*[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxScriptUriQuoted = new(@"(href|src|action|formaction|data)\s*=\s*(['""])\s*(javascript|vbscript):.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);

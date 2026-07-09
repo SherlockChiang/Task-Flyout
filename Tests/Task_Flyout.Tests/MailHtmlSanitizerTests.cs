@@ -15,6 +15,25 @@ public class MailHtmlSanitizerTests
         Assert.DoesNotContain("<iframe", result, System.StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("<svg:svg onload=\"steal()\"><svg:script>steal()</svg:script></svg:svg><p>Hi</p>")]
+    [InlineData("<x:iframe src=\"https://evil.example\"></x:iframe><p>Hi</p>")]
+    [InlineData("<math:form action=\"https://evil.example\"><math:input></math:input></math:form><p>Hi</p>")]
+    public void Strips_namespaced_dangerous_tags(string html)
+    {
+        var untrusted = MailHtmlSanitizer.SanitizeUntrusted(html);
+        var trusted = MailHtmlSanitizer.SanitizeTrusted(html);
+
+        Assert.DoesNotContain(":svg", untrusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(":script", untrusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(":iframe", untrusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(":form", untrusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(":svg", trusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(":script", trusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(":iframe", trusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(":form", trusted, System.StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void Untrusted_strips_inline_event_handlers()
     {
