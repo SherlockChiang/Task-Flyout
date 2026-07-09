@@ -32,6 +32,8 @@ namespace Task_Flyout.Services
         private static readonly Regex RxTrustedScriptUriQuoted = new(@"(href|action|formaction)\s*=\s*(['""])\s*(javascript|vbscript):.*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex RxTrustedScriptUriUnquoted = new(@"(href|action|formaction)\s*=\s*(javascript|vbscript):[^\s>]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxTrustedDangerousCss = new(@"style\s*=\s*(['""])[^'""]*\b(expression|-moz-binding|behavior)\b[^'""]*\1", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxUrlAttributeQuoted = new(@"\b(href|src|action|formaction|data)\s*=\s*(['""])(.*?)\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex RxUrlAttributeUnquoted = new(@"\b(href|src|action|formaction|data)\s*=\s*([^\s>]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxHtmlContentTags = new(@"<\s*(html|head|body|style|table|div|p|span|br|img|a|meta)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxHtmlTagsOnly = new("<.*?>", RegexOptions.Compiled);
         private static readonly Regex RxCssSelector = new(@"^[.#][\w\-#.:\s,>+~\[\]=""']+\{?$", RegexOptions.Compiled);
@@ -79,6 +81,7 @@ namespace Task_Flyout.Services
                 value = RxTrustedScriptUriUnquoted.Replace(value, "$1=\"#\"");
                 value = RxDataUriNavigationQuoted.Replace(value, "$1=\"#\"");
                 value = RxDataUriNavigationUnquoted.Replace(value, "$1=\"#\"");
+                value = NeutralizeDangerousUrlAttributes(value);
                 value = RxTrustedDangerousCss.Replace(value, "");
 
                 if (!RxHtmlContentTags.IsMatch(value))
@@ -103,6 +106,7 @@ namespace Task_Flyout.Services
             value = RxScriptUriUnquoted.Replace(value, "$1=\"#\"");
             value = RxDataUriNavigationQuoted.Replace(value, "$1=\"#\"");
             value = RxDataUriNavigationUnquoted.Replace(value, "$1=\"#\"");
+            value = NeutralizeDangerousUrlAttributes(value);
             value = RxDangerousCssStyle.Replace(value, "");
             value = StripRemoteResources(value);
 
@@ -122,6 +126,40 @@ namespace Task_Flyout.Services
             html = RxUntrustedRemoteResourceUnquoted.Replace(html, "");
             return html;
         }
+
+        private static string NeutralizeDangerousUrlAttributes(string html)
+        {
+            html = RxUrlAttributeQuoted.Replace(html, match =>
+            {
+                var attribute = match.Groups[1].Value;
+                var quote = match.Groups[2].Value;
+                var value = match.Groups[3].Value;
+                return IsDangerousUrlAttribute(attribute, value) ? $"{attribute}={quote}#{quote}" : match.Value;
+            });
+
+            return RxUrlAttributeUnquoted.Replace(html, match =>
+            {
+                var attribute = match.Groups[1].Value;
+                var value = match.Groups[2].Value;
+                return IsDangerousUrlAttribute(attribute, value) ? $"{attribute}=\"#\"" : match.Value;
+            });
+        }
+
+        private static bool IsDangerousUrlAttribute(string attribute, string value)
+        {
+            var decoded = WebUtility.HtmlDecode(value)?.TrimStart() ?? "";
+            if (decoded.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase) ||
+                decoded.StartsWith("vbscript:", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            return IsNavigationAttribute(attribute) && decoded.StartsWith("data:", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsNavigationAttribute(string attribute)
+            => attribute.Equals("href", StringComparison.OrdinalIgnoreCase) ||
+               attribute.Equals("action", StringComparison.OrdinalIgnoreCase) ||
+               attribute.Equals("formaction", StringComparison.OrdinalIgnoreCase) ||
+               attribute.Equals("data", StringComparison.OrdinalIgnoreCase);
 
         private static string StripAllTagsSafe(string html)
         {

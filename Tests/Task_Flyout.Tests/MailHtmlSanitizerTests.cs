@@ -32,6 +32,24 @@ public class MailHtmlSanitizerTests
         Assert.DoesNotContain("vbscript:", result, System.StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("<a href=\"jav&#x61;script:steal()\">x</a>")]
+    [InlineData("<a href='java&#115;cript:steal()'>x</a>")]
+    [InlineData("<img src=jav&#x61;script:steal()>")]
+    [InlineData("<form action=\"dat&#x61;:text/html,<script>x</script>\"></form>")]
+    public void Neutralizes_entity_encoded_dangerous_urls(string html)
+    {
+        var untrusted = MailHtmlSanitizer.SanitizeUntrusted(html);
+        var trusted = MailHtmlSanitizer.SanitizeTrusted(html);
+
+        Assert.DoesNotContain("jav&#", untrusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("java&#", untrusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("dat&#", untrusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("jav&#", trusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("java&#", trusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("dat&#", trusted, System.StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void Untrusted_strips_remote_image_tracking_pixels()
     {
