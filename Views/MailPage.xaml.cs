@@ -452,6 +452,7 @@ namespace Task_Flyout.Views
             LoadingRing.IsActive = true;
             RefreshButton.IsEnabled = false;
             LoadMoreButton.IsEnabled = false;
+            UnreadOnlyToggle.IsEnabled = false;
             MessageListTitle.Text = _selectedFolder.DisplayName;
             SetMessageListStatus($"{_selectedAccount.DisplayTitle} · {(_loader.GetStringOrDefault("TextLoading") ?? "Loading")}");
 
@@ -495,6 +496,7 @@ namespace Task_Flyout.Views
                 LoadingRing.IsActive = false;
                 RefreshButton.IsEnabled = true;
                 LoadMoreButton.IsEnabled = true;
+                UnreadOnlyToggle.IsEnabled = true;
             }
         }
 
@@ -566,6 +568,8 @@ namespace Task_Flyout.Views
 
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isLoadingMessages || _refreshAccountsTask != null) return;
+
             if (_selectedFolder == null)
             {
                 await RefreshAccountsAsync();
