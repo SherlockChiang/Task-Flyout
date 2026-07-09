@@ -208,14 +208,15 @@
                                         SuggestionChosen="CitySearchBox_SuggestionChosen" VerticalAlignment="Center"/>
 
                         <Button x:Name="UseCurrentLocationButton" Grid.Column="1" Click="UseCurrentLocationButton_Click"
-                                VerticalAlignment="Center" AutomationProperties.Name="使用当前位置">
+                                VerticalAlignment="Center" AutomationProperties.Name="使用当前位置" ToolTipService.ToolTip="使用当前位置">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE81D;" FontSize="14"/>
                                 <TextBlock x:Uid="WeatherPage_BtnUseLocation" Text="当前位置"/>
                             </StackPanel>
                         </Button>
 
-                        <Button x:Uid="WeatherPage_BtnRefresh" x:Name="BtnRefresh" Grid.Column="2" Click="BtnRefresh_Click" VerticalAlignment="Center"/>
+                        <Button x:Uid="WeatherPage_BtnRefresh" x:Name="BtnRefresh" Grid.Column="2" Click="BtnRefresh_Click" VerticalAlignment="Center"
+                                AutomationProperties.Name="刷新天气" ToolTipService.ToolTip="刷新天气"/>
                     </Grid>
 
                     <TextBlock x:Uid="WeatherPage_LocationPrivacyDesc" Text="使用当前位置或自动跟随定位会调用 Windows 位置权限；坐标仅保存在本机，并只用于向所选天气源请求天气。" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
@@ -252,8 +253,10 @@
                                     SuggestionChosen="CustomFontBox_SuggestionChosen"/>
 
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button x:Uid="WeatherPage_BtnImportIconPack" x:Name="BtnImportIconPack" Click="BtnImportIconPack_Click"/>
-                        <Button x:Uid="WeatherPage_BtnDeleteIconPack" x:Name="BtnDeleteIconPack" Click="BtnDeleteIconPack_Click"/>
+                        <Button x:Uid="WeatherPage_BtnImportIconPack" x:Name="BtnImportIconPack" Click="BtnImportIconPack_Click"
+                                AutomationProperties.Name="导入天气图标包" ToolTipService.ToolTip="导入天气图标包"/>
+                        <Button x:Uid="WeatherPage_BtnDeleteIconPack" x:Name="BtnDeleteIconPack" Click="BtnDeleteIconPack_Click"
+                                AutomationProperties.Name="删除当前天气图标包" ToolTipService.ToolTip="删除当前天气图标包"/>
                     </StackPanel>
                     <TextBlock x:Uid="WeatherPage_IconPackDesc" FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
