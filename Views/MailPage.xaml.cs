@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.Web.WebView2.Core;
 using System;
 using System.Collections.Generic;
@@ -500,12 +501,44 @@ namespace Task_Flyout.Views
             if (_isLoadingMessages || _mailService == null) return;
 
             int previousCount = _items.Count;
+            var listScrollViewer = FindVisualChild<ScrollViewer>(MailListView);
+            double? previousVerticalOffset = listScrollViewer?.VerticalOffset;
+
             _loadedCount = Math.Min(_loadedCount + PageStep, MailService.MaxPageSize);
             await LoadMessagesAsync(loadMore: true, selectFirstWhenNoMatch: false);
+            await RestoreMailListScrollPositionAsync(listScrollViewer, previousVerticalOffset);
 
             // Nothing new came back — we've reached the end of the folder.
             if (_items.Count <= previousCount)
                 LoadMoreButton.Visibility = Visibility.Collapsed;
+        }
+
+        private async Task RestoreMailListScrollPositionAsync(ScrollViewer? scrollViewer, double? verticalOffset)
+        {
+            if (scrollViewer == null || verticalOffset == null) return;
+
+            await Task.Yield();
+            MailListView.UpdateLayout();
+
+            double targetOffset = Math.Min(verticalOffset.Value, scrollViewer.ScrollableHeight);
+            scrollViewer.ChangeView(null, targetOffset, null, disableAnimation: true);
+        }
+
+        private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            int childCount = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < childCount; i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T match)
+                    return match;
+
+                var descendant = FindVisualChild<T>(child);
+                if (descendant != null)
+                    return descendant;
+            }
+
+            return null;
         }
 
         private async void UnreadOnlyToggle_Toggled(object sender, RoutedEventArgs e)
