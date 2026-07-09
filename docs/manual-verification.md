@@ -52,6 +52,17 @@ Use this checklist for flows that require real Windows credentials, DPAPI, Passw
 3. Confirm visible error states include the last successful load/sync/refresh time where implemented.
 4. Re-enable network and confirm refresh recovers without restarting the app.
 
+## Weather Location Permission
+
+1. Start the app with weather enabled but without opening the Weather page.
+2. Confirm Windows does not show a location permission prompt during startup.
+3. Open Weather and confirm the auto-follow toggle is off unless it was turned on in the current session.
+4. Click `Use current location` and confirm this is the first point where Windows may ask for location permission.
+5. Deny permission and confirm the Weather page shows the denied-permission status without enabling auto-follow.
+6. Allow permission, click `Use current location`, and confirm the city/coordinates update and weather refreshes.
+7. Turn on auto-follow and confirm tracking starts only after the toggle action.
+8. Turn off auto-follow, restart the app, and confirm startup does not request location permission.
+
 ## Integration Test Environment Notes
 
 These checks require a dedicated Windows user profile or disposable VM because they touch system credential stores and provider OAuth state.

@@ -40,7 +40,7 @@
 | P1 | 离线/错误状态 | 邮件、RSS、天气、同步、OAuth 都可能独立失败。 | 统一各页面的空状态、加载状态和错误状态，提供重试按钮和最后成功时间。 |
 | P1 | 邮件隐私 | 未信任发件人的远程图片默认阻止，并提供单次显示和信任发件人。 | 在 banner 中更明确说明：已阻止远程内容、当前发件人信任状态、操作是单次还是永久。 |
 | P1 | RSS 阅读器 | RSS 远程资源默认阻止，启用后通过安全代理抓取。 | 在阅读器头部展示每个 feed 的图片/隐私控制，并在图片被阻止时给出可见提示。 |
-| P2 | 天气权限 | manifest 声明 `location`，天气支持当前位置和自动跟随；天气设置页已说明会调用 Windows 位置权限，坐标仅保存在本机并用于请求所选天气源。 | 手工验证 Windows 权限拒绝/允许路径和自动跟随关闭路径。 |
+| P2 | 天气权限 | manifest 仍需声明 `location`，因为天气页提供“使用当前位置”和“自动跟随位置”。启动路径已不再恢复定位监听或请求权限，只有用户点击当前位置或手动打开自动跟随才会调用 Windows 位置权限。 | 手工验证 Windows 权限拒绝/允许路径、启动不弹位置权限和自动跟随关闭路径。 |
 | P2 | 长耗时操作 | 同步、邮件拉取、RSS 刷新、图标包导入、WebView2 缓存清理都可能耗时；邮件拉取、RSS 刷新/添加订阅/添加文件夹、天气刷新、天气图标包导入/删除、WebView2 缓存清理已在运行中禁用重复入口。 | 继续统一其它耗时操作的进度、重复触发防护和可取消路径。 |
 | P2 | 通知设置 | 邮件和提醒通知会路由到应用页面；Settings 已说明日程提醒、新邮件轮询通知和天气警报分别生效，天气警报在天气页设置。 | 后续如需更细控制，可继续拆分提醒、新邮件、天气警报的独立设置和状态验证。 |
 | P2 | 本地化 | README 声明支持英文和简体中文。 | 审计新增和现有硬编码 UI 字符串，尤其是异常 fallback 和状态消息，确保两种语言完整。 |
@@ -52,7 +52,7 @@
 | 优先级 | 区域 | 观察 | 建议 |
 | --- | --- | --- | --- |
 | P0 | 本地敏感文件 | 工作区存在 `credentials.json`、`Secrets.cs` 和 `Task_Flyout_TemporaryKey.pfx`。`.gitignore` 已忽略它们，本次扫描中 `git ls-files` 未显示这些文件被跟踪。 | 保持未跟踪状态。如这些文件曾被共享或发布，轮换发布凭据/证书。优先通过本地开发配置或 CI secret 注入 `credentials.json`，不要发布私有签名密钥。 |
-| P0 | Manifest capability | `Package.appxmanifest` 声明 `runFullTrust` 和 `location`。 | 保持 README/privacy 文档与实际用途一致。重新确认天气位置关闭时是否仍必须声明 `location`，并确保只在用户动作后请求位置。 |
+| P0 | Manifest capability | `Package.appxmanifest` 声明 `runFullTrust` 和 `location`。`location` 仍被当前位置和自动跟随天气功能使用；启动路径已避免自动请求位置权限。 | 保持 README/privacy 文档与实际用途一致，并手工验证启动、拒绝/允许权限、自动跟随开关路径。 |
 | P1 | WebView2 远程资源 | 邮件嵌入资源策略已阻止本机、私网和 `.local` HTTPS/HTTP host；RSS 启用后通过 SSRF-safe client 代理 HTTPS 资源。WebView2/RSS 资源策略已有单元测试。 | 若邮件目标只是远程图片，考虑阻止非图片资源类型。 |
 | P1 | HTML 清洗 | 邮件 sanitizer 基于正则，已有超时保护和测试，覆盖 entity 编码危险 URL、`srcset` 远程候选和 trusted `meta refresh`。正则 sanitizer 天然较脆弱。 | 继续扩展畸形标签、SVG namespace、CSS escape、协议混淆和大型恶意输入。若维护成本升高，考虑基于 HTML parser 的 sanitizer。 |
 | P1 | RSS 解析 | RSS fetcher 有最大字节数、重定向限制、DNS pin 到公网 IP 和 XML 解析；feed scheme、redirect scheme 和 XML 安全设置已有测试。 | 继续覆盖 malformed feed、redirect hop 上限和 DNS/private-host integration 边界。 |
