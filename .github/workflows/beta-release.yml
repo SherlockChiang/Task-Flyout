@@ -1,0 +1,172 @@
+name: Beta Release
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: beta-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  beta-release:
+    name: Build and publish beta
+    runs-on: windows-latest
+
+    env:
+      CONFIGURATION: Release
+      PLATFORM: x64
+      PROJECT_FILE: Task_Flyout.csproj
+      TEST_PROJECT_FILE: Tests\Task_Flyout.Tests\Task_Flyout.Tests.csproj
+      CERTIFICATE_PATH: ${{ github.workspace }}\ci-signing-certificate.pfx
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Prepare build secrets
+        shell: pwsh
+        env:
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.TASK_FLYOUT_GOOGLE_CREDENTIALS_JSON }}
+          CERTIFICATE_BASE64: ${{ secrets.TASK_FLYOUT_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.TASK_FLYOUT_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:GOOGLE_CREDENTIALS_JSON)) {
+            throw "Missing secret: TASK_FLYOUT_GOOGLE_CREDENTIALS_JSON"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_BASE64)) {
+            throw "Missing secret: TASK_FLYOUT_CERTIFICATE_BASE64"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_PASSWORD)) {
+            throw "Missing secret: TASK_FLYOUT_CERTIFICATE_PASSWORD"
+          }
+
+          [System.IO.File]::WriteAllText((Join-Path $env:GITHUB_WORKSPACE "credentials.json"), $env:GOOGLE_CREDENTIALS_JSON)
+          [System.IO.File]::WriteAllBytes($env:CERTIFICATE_PATH, [Convert]::FromBase64String($env:CERTIFICATE_BASE64))
+
+          $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
+            $env:CERTIFICATE_PATH,
+            $env:CERTIFICATE_PASSWORD,
+            [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable -bor
+              [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet)
+
+          $store = [System.Security.Cryptography.X509Certificates.X509Store]::new("My", "CurrentUser")
+          $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+          $store.Add($certificate)
+          $store.Close()
+
+          "PACKAGE_CERTIFICATE_THUMBPRINT=$($certificate.Thumbprint)" >> $env:GITHUB_ENV
+
+      - name: Compute beta version
+        shell: pwsh
+        run: |
+          [xml]$manifest = Get-Content -LiteralPath "Package.appxmanifest"
+          $version = $manifest.Package.Identity.Version
+          $shortSha = $env:GITHUB_SHA.Substring(0, 7)
+          $tag = "beta-v$version-$env:GITHUB_RUN_NUMBER.$env:GITHUB_RUN_ATTEMPT"
+
+          "PACKAGE_VERSION=$version" >> $env:GITHUB_ENV
+          "SHORT_SHA=$shortSha" >> $env:GITHUB_ENV
+          "BETA_TAG=$tag" >> $env:GITHUB_ENV
+
+      - name: Restore dependencies
+        shell: pwsh
+        run: |
+          dotnet restore $env:PROJECT_FILE
+          dotnet restore $env:TEST_PROJECT_FILE
+
+      - name: Run tests
+        shell: pwsh
+        run: dotnet test $env:TEST_PROJECT_FILE -c Debug --no-restore
+
+      - name: Build MSIX package
+        shell: pwsh
+        env:
+          CERTIFICATE_PASSWORD: ${{ secrets.TASK_FLYOUT_CERTIFICATE_PASSWORD }}
+        run: |
+          $packageDir = Join-Path $env:GITHUB_WORKSPACE "AppPackages"
+          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+
+          msbuild $env:PROJECT_FILE `
+            /restore `
+            /m `
+            /p:Configuration=$env:CONFIGURATION `
+            /p:Platform=$env:PLATFORM `
+            /p:RuntimeIdentifier=win-x64 `
+            /p:SelfContained=true `
+            /p:GenerateAppxPackageOnBuild=true `
+            /p:AppxBundle=Never `
+            /p:AppxPackageDir="$packageDir\" `
+            /p:AppxPackageSigningEnabled=true `
+            /p:PackageCertificateKeyFile="$env:CERTIFICATE_PATH" `
+            /p:PackageCertificatePassword="$env:CERTIFICATE_PASSWORD" `
+            /p:PackageCertificateThumbprint="$env:PACKAGE_CERTIFICATE_THUMBPRINT"
+
+      - name: Collect release assets
+        shell: pwsh
+        run: |
+          $artifactDir = Join-Path $env:GITHUB_WORKSPACE "release-artifacts"
+          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+          $packageFiles = @()
+          foreach ($root in @("AppPackages", "bin")) {
+            if (Test-Path -LiteralPath $root) {
+              $packageFiles += Get-ChildItem -LiteralPath $root -Recurse -File |
+                Where-Object { $_.Extension -in @(".msix", ".msixbundle", ".appinstaller", ".cer", ".ps1", ".bat") }
+            }
+          }
+
+          if ($packageFiles.Count -eq 0) {
+            throw "No release package files were produced."
+          }
+
+          $stagingDir = Join-Path $artifactDir "TaskFlyout-beta-$env:PACKAGE_VERSION-$env:GITHUB_RUN_NUMBER"
+          New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
+          foreach ($file in $packageFiles) {
+            Copy-Item -LiteralPath $file.FullName -Destination $stagingDir -Force
+          }
+
+          $zipPath = Join-Path $artifactDir "TaskFlyout-beta-$env:PACKAGE_VERSION-$env:GITHUB_RUN_NUMBER-win-x64.zip"
+          Compress-Archive -Path (Join-Path $stagingDir "*") -DestinationPath $zipPath -Force
+
+          $notes = @(
+            "Automated beta build for Task Flyout.",
+            "",
+            "Version: $env:PACKAGE_VERSION",
+            "Commit: $env:GITHUB_SHA",
+            "Build: $env:GITHUB_RUN_NUMBER.$env:GITHUB_RUN_ATTEMPT",
+            "Platform: win-x64"
+          ) -join "`n"
+          Set-Content -LiteralPath (Join-Path $artifactDir "release-notes.md") -Value $notes -Encoding UTF8
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TaskFlyout-beta-${{ github.run_number }}-win-x64
+          path: release-artifacts/*.zip
+          if-no-files-found: error
+
+      - name: Create GitHub beta release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:BETA_TAG `
+            "release-artifacts\TaskFlyout-beta-$env:PACKAGE_VERSION-$env:GITHUB_RUN_NUMBER-win-x64.zip" `
+            --title "Task Flyout Beta $env:PACKAGE_VERSION ($env:SHORT_SHA)" `
+            --notes-file "release-artifacts\release-notes.md" `
+            --target "$env:GITHUB_SHA" `
+            --prerelease
