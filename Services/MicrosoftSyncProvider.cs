@@ -110,9 +110,7 @@ namespace Task_Flyout.Services
 
         private static string GetAuthRecordPath()
         {
-            string appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TaskFlyout");
-            Directory.CreateDirectory(appDataPath);
-            return Path.Combine(appDataPath, "ms_auth_record.bin");
+            return ProviderAuthCleanup.MicrosoftAuthRecordPath;
         }
 
         public async Task<List<SubscribedCalendarInfo>> FetchCalendarListAsync()

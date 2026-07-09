@@ -47,7 +47,7 @@ namespace Task_Flyout.Services
 
             await new ProtectedGoogleDataStore().ClearAsync();
 
-            string legacyTokenPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TaskFlyout", "GoogleToken");
+            string legacyTokenPath = ProviderAuthCleanup.GoogleLegacyTokenPath;
             try
             {
                 if (Directory.Exists(legacyTokenPath))
