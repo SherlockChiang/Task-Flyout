@@ -57,40 +57,13 @@ namespace Task_Flyout.Services
         }
 
         public static bool IsAllowedEmbeddedResource(string? uriText)
-        {
-            if (string.IsNullOrWhiteSpace(uriText))
-                return false;
-
-            if (!Uri.TryCreate(uriText, UriKind.Absolute, out var uri))
-                return false;
-
-            if (uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase) ||
-                uri.Scheme.Equals("about", StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            if (uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase))
-                return ApplicationData.Current.LocalSettings.Values["AllowInsecureWebViewResources"] as bool? ?? false;
-
-            return uri.Scheme.Equals("data", StringComparison.OrdinalIgnoreCase) &&
-                   (uriText.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase) ||
-                    uriText.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase));
-        }
+            => WebResourcePolicy.IsAllowedEmbeddedResource(
+                uriText,
+                ApplicationData.Current.LocalSettings.Values["AllowInsecureWebViewResources"] as bool? ?? false);
 
         // about:/data: RSS resources need no network and pass through unchanged.
         public static bool IsAllowedRssNonRemoteResource(string? uriText)
-        {
-            if (string.IsNullOrWhiteSpace(uriText)) return false;
-            if (!Uri.TryCreate(uriText, UriKind.Absolute, out var uri)) return false;
-
-            if (uri.Scheme.Equals("about", StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            if (uri.Scheme.Equals("data", StringComparison.OrdinalIgnoreCase))
-                return uriText.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase) ||
-                       uriText.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase);
-
-            return false;
-        }
+            => WebResourcePolicy.IsAllowedRssNonRemoteResource(uriText);
 
         // A remote https resource the user has enabled, whose host isn't obviously private.
         // The caller must fetch it through the app's IP-pinned HTTP client rather than letting
@@ -102,18 +75,7 @@ namespace Task_Flyout.Services
             if (!(ApplicationData.Current.LocalSettings.Values["AllowRssRemoteResources"] as bool? ?? false))
                 return false;
 
-            return IsAllowedRssRemoteResource(uri);
-        }
-
-        private static bool IsAllowedRssRemoteResource(Uri uri)
-        {
-            if (!uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            if (NetworkSafety.IsUnsafeHost(uri))
-                return false;
-
-            return true;
+            return WebResourcePolicy.IsAllowedRssRemoteResource(uriText);
         }
 
         private static void PruneCacheIfNeeded(string path)
