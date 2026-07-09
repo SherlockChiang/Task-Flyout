@@ -69,7 +69,7 @@
 | --- | --- | --- |
 | P1 | 安全测试 | `NetworkSafety`、WebView2/RSS 资源策略、RSS XML 安全、RSS URL/redirect scheme/hop 上限、RSS malformed XML fallback、RSS resolved-address private host policy、Safe URI launcher、通知 activation parser 和邮件 sanitizer 边界已有测试。 | 后续主要是需要真实网络/凭据/系统环境的集成验证。 |
 | P1 | 缓存测试 | WebView2 cache prune、邮件正文 volatile LRU、邮件持久账号/文件夹排序 policy 已提取为纯逻辑并测试，覆盖低于上限不删除、按时间删除到目标大小、忽略 0 字节项、跳过当前邮件、持久顺序去重和未知项保序。 | 后续可继续覆盖更复杂的缓存迁移/损坏恢复场景。 |
-| P1 | 同步测试 | Google/Microsoft task 日期半开区间、已完成任务包含规则、recurrence 映射和事件时间窗口 policy 已提取为纯逻辑并测试，覆盖去除时间部分、起止边界、反向区间、Google RRULE、Microsoft pattern type、创建事件频率映射、全天事件和跨午夜事件。继续提取模型映射逻辑，测试分页。 |
+| P1 | 同步测试 | Google/Microsoft task 日期半开区间、已完成任务包含规则、recurrence 映射、事件时间窗口和事件模型映射 policy 已提取为纯逻辑并测试，覆盖去除时间部分、起止边界、反向区间、Google RRULE、Microsoft pattern type、创建事件频率映射、全天事件、跨午夜事件和事件字段规范化。继续提取 task 模型映射逻辑，测试分页。 |
 | P2 | 性能基线 | 增加手工 benchmark 说明或轻量日志，记录启动和首次打开路径。优化前后结果写入 docs。 |
 | P2 | 错误处理 | 将捕获异常统一转换为用户安全消息和脱敏诊断。测试 malformed RSS、OAuth 过期、IMAP 认证失败、WebView2 runtime 缺失等 fallback。 |
 
