@@ -37,6 +37,7 @@ namespace Task_Flyout.Views
         private string? _selectedFolderId;
         private int _loadedCount;
         private bool _isLoading;
+        private bool _isRefreshing;
         private bool _hasMore = true;
         private ScrollViewer? _articleScrollViewer;
         private RssArticle? _selectedArticle;
@@ -254,6 +255,9 @@ namespace Task_Flyout.Views
         {
             LoadingRing.IsActive = isLoading;
             LoadingRing.Visibility = isLoading ? Visibility.Visible : Visibility.Collapsed;
+            if (RefreshButton != null) RefreshButton.IsEnabled = !isLoading;
+            if (AddSubscriptionButton != null) AddSubscriptionButton.IsEnabled = !isLoading;
+            if (AddFolderButton != null) AddFolderButton.IsEnabled = !isLoading;
         }
 
         private async void RssTree_ItemInvoked(TreeView sender, TreeViewItemInvokedEventArgs args)
@@ -637,8 +641,11 @@ namespace Task_Flyout.Views
 
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isRefreshing || _isLoading) return;
+
             try
             {
+                _isRefreshing = true;
                 SetLoading(true);
                 if (_selectedSubscriptionId == null)
                 {
@@ -667,6 +674,7 @@ namespace Task_Flyout.Views
             finally
             {
                 SetLoading(false);
+                _isRefreshing = false;
             }
         }
 
