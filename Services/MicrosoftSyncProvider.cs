@@ -456,22 +456,10 @@ namespace Task_Flyout.Services
                     Body = new ItemBody { Content = description, ContentType = BodyType.Text }
                 };
 
-                if (startTime.HasValue)
-                {
-                    DateTime exactStart = targetDate.Add(startTime.Value);
-                    DateTime exactEnd = endTime.HasValue ? targetDate.Add(endTime.Value) : exactStart.AddHours(1);
-                    if (exactEnd < exactStart) exactEnd = exactEnd.AddDays(1);
-
-                    updateEvent.Start = new DateTimeTimeZone { DateTime = exactStart.ToString("s"), TimeZone = "UTC" };
-                    updateEvent.End = new DateTimeTimeZone { DateTime = exactEnd.ToString("s"), TimeZone = "UTC" };
-                    updateEvent.IsAllDay = false;
-                }
-                else
-                {
-                    updateEvent.Start = new DateTimeTimeZone { DateTime = targetDate.ToString("yyyy-MM-ddT00:00:00"), TimeZone = "UTC" };
-                    updateEvent.End = new DateTimeTimeZone { DateTime = targetDate.AddDays(1).ToString("yyyy-MM-ddT00:00:00"), TimeZone = "UTC" };
-                    updateEvent.IsAllDay = true;
-                }
+                var window = SyncEventTimePolicy.Create(targetDate, startTime, endTime);
+                updateEvent.Start = new DateTimeTimeZone { DateTime = window.Start.ToString("s"), TimeZone = "UTC" };
+                updateEvent.End = new DateTimeTimeZone { DateTime = window.End.ToString("s"), TimeZone = "UTC" };
+                updateEvent.IsAllDay = window.IsAllDay;
 
                 await _graphClient.Me.Events[itemId].PatchAsync(updateEvent);
             }
@@ -510,20 +498,10 @@ namespace Task_Flyout.Services
                 Location = string.IsNullOrWhiteSpace(location) ? null : new Location { DisplayName = location }
             };
 
-            if (isAllDay)
-            {
-                newEvent.Start = new DateTimeTimeZone { DateTime = targetDate.ToString("yyyy-MM-ddT00:00:00"), TimeZone = "UTC" };
-                newEvent.End = new DateTimeTimeZone { DateTime = targetDate.AddDays(1).ToString("yyyy-MM-ddT00:00:00"), TimeZone = "UTC" };
-                newEvent.IsAllDay = true;
-            }
-            else
-            {
-                DateTime exactStart = targetDate.Add(startTime);
-                DateTime exactEnd = targetDate.Add(endTime);
-                newEvent.Start = new DateTimeTimeZone { DateTime = exactStart.ToString("s"), TimeZone = "UTC" };
-                newEvent.End = new DateTimeTimeZone { DateTime = exactEnd.ToString("s"), TimeZone = "UTC" };
-                newEvent.IsAllDay = false;
-            }
+            var window = SyncEventTimePolicy.Create(targetDate, isAllDay ? null : startTime, endTime);
+            newEvent.Start = new DateTimeTimeZone { DateTime = window.Start.ToString("s"), TimeZone = "UTC" };
+            newEvent.End = new DateTimeTimeZone { DateTime = window.End.ToString("s"), TimeZone = "UTC" };
+            newEvent.IsAllDay = window.IsAllDay;
 
             if (recurrence != EventRecurrenceKind.None)
                 newEvent.Recurrence = CreateMicrosoftRecurrence(recurrence, targetDate);

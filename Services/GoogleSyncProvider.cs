@@ -428,19 +428,16 @@ namespace Task_Flyout.Services
                 ev.Location = location;
                 ev.Description = description;
 
-                if (startTime.HasValue)
+                var window = SyncEventTimePolicy.Create(targetDate, startTime, endTime);
+                if (window.IsAllDay)
                 {
-                    DateTime exactStart = targetDate.Add(startTime.Value);
-                    DateTime exactEnd = endTime.HasValue ? targetDate.Add(endTime.Value) : exactStart.AddHours(1);
-                    if (exactEnd < exactStart) exactEnd = exactEnd.AddDays(1);
-
-                    ev.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = exactStart };
-                    ev.End = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = exactEnd };
+                    ev.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { Date = window.Start.ToString("yyyy-MM-dd") };
+                    ev.End = new Google.Apis.Calendar.v3.Data.EventDateTime { Date = window.End.ToString("yyyy-MM-dd") };
                 }
                 else
                 {
-                    ev.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { Date = targetDate.ToString("yyyy-MM-dd") };
-                    ev.End = new Google.Apis.Calendar.v3.Data.EventDateTime { Date = targetDate.AddDays(1).ToString("yyyy-MM-dd") };
+                    ev.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = window.Start };
+                    ev.End = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = window.End };
                 }
                 await calendarSvc.Events.Update(ev, "primary", itemId).ExecuteAsync();
             }
@@ -472,18 +469,16 @@ namespace Task_Flyout.Services
                 Location = string.IsNullOrWhiteSpace(location) ? null : location
             };
 
-            if (isAllDay)
+            var window = SyncEventTimePolicy.Create(targetDate, isAllDay ? null : startTime, endTime);
+            if (window.IsAllDay)
             {
-                newEvent.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { Date = targetDate.ToString("yyyy-MM-dd") };
-                newEvent.End = new Google.Apis.Calendar.v3.Data.EventDateTime { Date = targetDate.AddDays(1).ToString("yyyy-MM-dd") };
+                newEvent.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { Date = window.Start.ToString("yyyy-MM-dd") };
+                newEvent.End = new Google.Apis.Calendar.v3.Data.EventDateTime { Date = window.End.ToString("yyyy-MM-dd") };
             }
             else
             {
-                DateTime exactStart = targetDate.Add(startTime);
-                DateTime exactEnd = targetDate.Add(endTime);
-
-                newEvent.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = exactStart };
-                newEvent.End = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = exactEnd };
+                newEvent.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = window.Start };
+                newEvent.End = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = window.End };
             }
 
             if (recurrence != EventRecurrenceKind.None)
