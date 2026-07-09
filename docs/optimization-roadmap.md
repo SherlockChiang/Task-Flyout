@@ -36,7 +36,7 @@
 | 优先级 | 区域 | 观察 | 建议 |
 | --- | --- | --- | --- |
 | P1 | 首次使用 | Google OAuth 凭据和 provider 初始化失败时可能暴露偏技术化的错误。 | 增加首次使用 checklist 或账号设置状态面板，展示 Google/Microsoft/邮件/天气的准备状态和下一步操作。 |
-| P1 | 后台行为 | 关闭窗口可能最小化到托盘，也可能退出，行为由设置决定并带确认流程。 | 在 Settings 和托盘菜单中明确展示当前行为，在 `RunInBackground` 附近增加短说明。 |
+| P1 | 后台行为 | 关闭窗口可能最小化到托盘，也可能退出，行为由设置决定并带确认流程；Settings 已在 `RunInBackground` 附近说明后台保留的托盘、同步、提醒和邮件轮询行为。 | 后续如托盘菜单也显示该状态，可同步复用同一说明。 |
 | P1 | 离线/错误状态 | 邮件、RSS、天气、同步、OAuth 都可能独立失败。 | 统一各页面的空状态、加载状态和错误状态，提供重试按钮和最后成功时间。 |
 | P1 | 邮件隐私 | 未信任发件人的远程图片默认阻止，并提供单次显示和信任发件人。 | 在 banner 中更明确说明：已阻止远程内容、当前发件人信任状态、操作是单次还是永久。 |
 | P1 | RSS 阅读器 | RSS 远程资源默认阻止，启用后通过安全代理抓取。 | 在阅读器头部展示每个 feed 的图片/隐私控制，并在图片被阻止时给出可见提示。 |
@@ -57,7 +57,7 @@
 | P1 | HTML 清洗 | 邮件 sanitizer 基于正则，已有超时保护和测试。正则 sanitizer 天然较脆弱。 | 扩展测试：畸形标签、SVG namespace、CSS escape、协议混淆、`srcset`、`meta refresh`、大型恶意输入。若维护成本升高，考虑基于 HTML parser 的 sanitizer。 |
 | P1 | RSS 解析 | RSS fetcher 有最大字节数、重定向限制、DNS pin 到公网 IP 和 XML 解析。 | 确认所有 feed 解析路径都禁用 DTD/外部实体。增加测试或公共 helper 来强制安全 XML 设置。 |
 | P1 | 外部 URI 打开 | Safe URI launching 已有测试，通知 ID 也有校验。 | 覆盖所有从邮件/RSS/Toast 打开浏览器链接的调用点，确认只有 `http`/`https` 和预期 app 协议能离开应用。 |
-| P1 | OAuth scope | Google/Microsoft 已拆分日历/任务与邮件 scope，邮件读取、标记已读、发送也按能力延迟授权。 | 继续补充额外 consent 的 UI 说明，并手工验证既有 broad-scope token 与新 least-privilege 授权路径。 |
+| P1 | OAuth scope | Google/Microsoft 已拆分日历/任务与邮件 scope，邮件读取、标记已读、发送也按能力延迟授权；设置和写邮件界面已补充额外 consent 说明。 | 手工验证既有 broad-scope token 与新 least-privilege 授权路径。 |
 | P1 | Token 和密码存储 | 本地 token/password 使用 DPAPI 和 PasswordVault，Google legacy token 有迁移。 | 增加按 provider 登出/移除本地 token 的设置项。确认删除账号时清除 token、消息正文和相关本地缓存。 |
 | P1 | 日志 | 崩溃日志会将异常消息和 stack trace 写入本地 roaming logs。 | 避免记录 token、邮件正文、OAuth 响应或带敏感 query 的完整 URL。新增诊断前先增加日志脱敏 helper。 |
 | P2 | 依赖审计 | `Task_Flyout.csproj` 对 SQLite advisory GHSA-2m69-gcr7-jv3q 做了有理由的 suppress。 | 每次依赖更新时复查；一旦 SQLitePCLRaw/Microsoft.Data.Sqlite 链路提供修复版本，移除 suppress 并升级。 |
