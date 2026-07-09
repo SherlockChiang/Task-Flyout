@@ -89,6 +89,8 @@ namespace Task_Flyout
         private bool _isDotRefreshPending = false;
 
         private ScrollViewer? _activeScrollViewer;
+        private List<CalendarViewDayItem>? _visibleDayItemCache;
+        private bool _visibleDayItemCacheDirty = true;
         private readonly List<DotSpec> _dotSpecs = new();
         private readonly Dictionary<uint, SolidColorBrush> _dotBrushCache = new();
 
@@ -167,7 +169,11 @@ namespace Task_Flyout
             LoadCacheForDate(_selectedDay);
             ShowDataForDate(_selectedDay);
 
-            MainCalendar.RegisterPropertyChangedCallback(CalendarView.DisplayModeProperty, (s, args) => RequestDotRefresh());
+            MainCalendar.RegisterPropertyChangedCallback(CalendarView.DisplayModeProperty, (s, args) =>
+            {
+                InvalidateVisibleDayItemCache();
+                RequestDotRefresh();
+            });
 
             _ = RefreshWeatherAsync();
         }
@@ -177,7 +183,7 @@ namespace Task_Flyout
 
         private void HookActiveScrollViewer()
         {
-            var dayItems = FindAllDayItems(MainCalendar);
+            var dayItems = GetVisibleDayItems();
             if (dayItems.Count == 0) return;
 
             DependencyObject current = dayItems[0];
@@ -348,6 +354,7 @@ namespace Task_Flyout
 
         private void DayItem_Loaded(object sender, RoutedEventArgs e)
         {
+            InvalidateVisibleDayItemCache();
             ScheduleDotRefresh(TimeSpan.FromMilliseconds(200));
         }
 
@@ -401,7 +408,7 @@ namespace Task_Flyout
 
             var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
 
-            var dayItems = FindAllDayItems(MainCalendar);
+            var dayItems = GetVisibleDayItems();
             foreach (var item in dayItems)
             {
                 var dateStr = item.Date.Date.ToString("yyyy-MM-dd");
@@ -509,6 +516,22 @@ namespace Task_Flyout
             brush = new SolidColorBrush(color);
             _dotBrushCache[key] = brush;
             return brush;
+        }
+
+        private List<CalendarViewDayItem> GetVisibleDayItems()
+        {
+            if (!_visibleDayItemCacheDirty && _visibleDayItemCache != null)
+                return _visibleDayItemCache;
+
+            _visibleDayItemCache = FindAllDayItems(MainCalendar);
+            _visibleDayItemCacheDirty = false;
+            return _visibleDayItemCache;
+        }
+
+        private void InvalidateVisibleDayItemCache()
+        {
+            _visibleDayItemCacheDirty = true;
+            _visibleDayItemCache = null;
         }
 
         private List<CalendarViewDayItem> FindAllDayItems(DependencyObject parent)
