@@ -105,6 +105,7 @@ namespace Task_Flyout
         private const int VisibleCacheFutureDays = 45;
         private static readonly SemaphoreSlim _syncLock = new(1, 1);
         private bool _backgroundRefreshQueued;
+        private DateTimeOffset? _lastSyncSucceededAt;
 
         private readonly record struct DotSpec(double Left, double Top, SolidColorBrush Fill);
 
@@ -761,6 +762,7 @@ namespace Task_Flyout
                 }
 
                 if (App.Current is App app) app.NotificationService?.CheckUpcomingEvents();
+                _lastSyncSucceededAt = DateTimeOffset.Now;
             }
             catch (Exception ex)
             {
@@ -770,7 +772,7 @@ namespace Task_Flyout
                     AgendaItems.Add(new AgendaItem
                     {
                         Title = _loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed",
-                        Subtitle = ex.Message,
+                        Subtitle = StatusMessageFormatter.Format(ex.Message, _lastSyncSucceededAt, includeLastSuccess: true),
                         IsEvent = false,
                         IsTask = false
                     });
