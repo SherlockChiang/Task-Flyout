@@ -57,7 +57,9 @@ namespace Task_Flyout.Views
 
             WeatherToggle.IsOn = _weatherService.IsEnabled;
             CitySearchBox.Text = _weatherService.City;
-            AutoFollowLocationToggle.IsOn = _weatherService.AutoFollowLocation;
+            if (_weatherService.AutoFollowLocation && !_weatherService.IsLocationTrackingActive)
+                _weatherService.AutoFollowLocation = false;
+            AutoFollowLocationToggle.IsOn = _weatherService.IsLocationTrackingActive;
             _weatherService.LocationUpdated -= OnWeatherLocationUpdated;
             _weatherService.LocationUpdated += OnWeatherLocationUpdated;
 

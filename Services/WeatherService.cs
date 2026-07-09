@@ -636,6 +636,8 @@ namespace Task_Flyout.Services
 
         private Geolocator? _trackingGeolocator;
 
+        public bool IsLocationTrackingActive => _trackingGeolocator != null;
+
         /// <summary>Raised (on a background thread) after the followed location changed and
         /// the weather coordinates were updated — subscribers should refresh on the UI thread.</summary>
         public event EventHandler? LocationUpdated;

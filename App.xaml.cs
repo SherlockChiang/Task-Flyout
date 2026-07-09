@@ -109,10 +109,9 @@ namespace Task_Flyout
                 StartWeatherBarWatchdog();
             startup.Mark("weatherbar");
 
-            // Resume following the device location (and refresh weather UI when it moves).
+            // Subscribe for user-started location tracking updates. Do not request location
+            // permission during app startup; only WeatherPage user actions may start tracking.
             WeatherService.LocationUpdated += OnWeatherLocationUpdated;
-            if (WeatherService.AutoFollowLocation)
-                _ = WeatherService.StartLocationTrackingAsync();
 
             _trayIcon.DoubleClickCommand = new RelayCommand(() => OpenMainWindowInternal());
 
