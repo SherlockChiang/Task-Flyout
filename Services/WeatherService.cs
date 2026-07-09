@@ -153,8 +153,12 @@ namespace Task_Flyout.Services
         private readonly object _weatherLock = new();
         private Task<WeatherInfo?>? _inFlightWeatherFetch;
         private string? _inFlightWeatherKey;
+        private string? _lastFailureWeatherKey;
+        private DateTimeOffset _lastFailureUtc = DateTimeOffset.MinValue;
+        private int _consecutiveFailures;
         private bool _persistentWeatherLoaded;
         private static string PersistentWeatherPath => AppDataPathHelper.ResolveLocal("WeatherCache.json");
+        private static readonly TimeSpan MaxFailureBackoff = TimeSpan.FromMinutes(30);
 
         private string CurrentWeatherKey =>
             $"{WeatherSource}|{City}|{CityLat.ToString(CultureInfo.InvariantCulture)}|{CityLon.ToString(CultureInfo.InvariantCulture)}";
@@ -738,6 +742,9 @@ namespace Task_Flyout.Services
                     && (DateTime.Now - _lastFetchTime) < _cacheExpiry)
                     return _cachedWeather;
 
+                if (!forceRefresh && _cachedWeather != null && _cachedWeatherKey == key && IsWeatherFetchBackedOff(key))
+                    return _cachedWeather;
+
                 // Join an in-flight fetch only if it targets the same location/source;
                 // a city change starts its own fetch so callers never get stale data.
                 if (_inFlightWeatherFetch != null && _inFlightWeatherKey == key)
@@ -775,6 +782,9 @@ namespace Task_Flyout.Services
                             _cachedWeather = info;
                             _cachedWeatherKey = key;
                             _lastFetchTime = DateTime.Now;
+                            _lastFailureWeatherKey = null;
+                            _lastFailureUtc = DateTimeOffset.MinValue;
+                            _consecutiveFailures = 0;
                             _persistentWeatherLoaded = true;
                             persistJson = SerializePersistentWeather(key, _lastFetchTime, info);
                         }
@@ -787,6 +797,7 @@ namespace Task_Flyout.Services
             }
             catch (Exception ex)
             {
+                RecordWeatherFetchFailure(key);
                 System.Diagnostics.Debug.WriteLine($"Weather fetch failed: {ex.Message}");
             }
             finally
@@ -804,6 +815,31 @@ namespace Task_Flyout.Services
             lock (_weatherLock)
             {
                 return _cachedWeather;
+            }
+        }
+
+        private bool IsWeatherFetchBackedOff(string key)
+        {
+            if (_lastFailureWeatherKey != key || _consecutiveFailures <= 0) return false;
+
+            var multiplier = Math.Min(1 << Math.Min(_consecutiveFailures - 1, 4), 16);
+            var delay = TimeSpan.FromMinutes(Math.Min(MaxFailureBackoff.TotalMinutes, 5 * multiplier));
+            return DateTimeOffset.UtcNow - _lastFailureUtc < delay;
+        }
+
+        private void RecordWeatherFetchFailure(string key)
+        {
+            lock (_weatherLock)
+            {
+                if (_lastFailureWeatherKey == key)
+                    _consecutiveFailures = Math.Min(_consecutiveFailures + 1, 5);
+                else
+                {
+                    _lastFailureWeatherKey = key;
+                    _consecutiveFailures = 1;
+                }
+
+                _lastFailureUtc = DateTimeOffset.UtcNow;
             }
         }
 
