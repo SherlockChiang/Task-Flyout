@@ -683,10 +683,7 @@ namespace Task_Flyout.Views
         {
             if (ArticleListSubtitle == null) return;
 
-            var suffix = _lastArticleLoadSucceededAt.HasValue
-                ? $" · Last success: {_lastArticleLoadSucceededAt.Value.LocalDateTime:g}"
-                : "";
-            ArticleListSubtitle.Text = isError ? $"{message}{suffix}" : message;
+            ArticleListSubtitle.Text = StatusMessageFormatter.Format(message, _lastArticleLoadSucceededAt, isError);
         }
 
         private void AttachArticleScrollViewer()
