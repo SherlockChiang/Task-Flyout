@@ -75,8 +75,8 @@ Mail read/action split is not just a constants change because the current UX per
 
 Safe implementation plan:
 
-1. Add a setting such as `AutoMarkMailAsRead` and default it to the current behavior for existing users.
-2. If auto-mark-read is off, use read-only mail scopes for folder/message/body loading.
+1. `AutoMarkMailAsRead` now exists and defaults to the current behavior for existing users.
+2. Next step: expose that setting in the UI, then use read-only mail scopes for folder/message/body loading when auto-mark-read is off.
 3. Request modify scope only when the user marks a message as read or enables auto-mark-read.
 4. Request send scope only when the user opens compose/reply for the first time.
 5. Store a per-provider scope capability flag so the UI can explain why an extra consent prompt appears.
