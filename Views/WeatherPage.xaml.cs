@@ -17,6 +17,7 @@ namespace Task_Flyout.Views
         private WeatherService _weatherService = null!;
         private ResourceLoader _loader;
         private WeatherInfo? _currentWeatherInfo;
+        private DateTimeOffset? _lastWeatherLoadSucceededAt;
 
         private readonly string[] _commonFonts = new[]
         {
@@ -856,6 +857,7 @@ namespace Task_Flyout.Views
             LoadingRing.IsActive = true;
             ForecastPanel.Visibility = Visibility.Collapsed;
             DailyForecastPanel.Visibility = Visibility.Collapsed;
+            SetWeatherStatus(GetSafeString("TextLoading", "Loading"));
 
             var info = await _weatherService.GetWeatherAsync(forceRefresh);
             _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh);
@@ -865,9 +867,13 @@ namespace Task_Flyout.Views
             if (info == null)
             {
                 UpdateCurrentWeatherCard(null);
+                SetWeatherStatus(GetSafeString("WeatherPage_LoadFailed", "Weather is unavailable. Check network, city, and provider settings."), isError: true);
+                LoadingRing.IsActive = false;
                 return;
             }
 
+            _lastWeatherLoadSucceededAt = DateTimeOffset.Now;
+            SetWeatherStatus(string.Format(GetSafeString("WeatherPage_Updated", "Updated: {0}"), _lastWeatherLoadSucceededAt.Value.LocalDateTime.ToString("g")));
             UpdateCurrentWeatherCard(info);
             UpdateDailyForecast(info);
 
@@ -895,6 +901,12 @@ namespace Task_Flyout.Views
             }
 
             LoadingRing.IsActive = false;
+        }
+
+        private void SetWeatherStatus(string message, bool isError = false)
+        {
+            if (WeatherStatusText == null) return;
+            WeatherStatusText.Text = StatusMessageFormatter.Format(message, _lastWeatherLoadSucceededAt, isError);
         }
 
         #endregion
