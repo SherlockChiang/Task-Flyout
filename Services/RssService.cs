@@ -381,7 +381,7 @@ namespace Task_Flyout.Services
 
         private (string FeedTitle, string FeedImageUrl, List<RssArticle> Articles) ParseFeed(RssSubscription subscription, string xml)
         {
-            using var reader = XmlReader.Create(new StringReader(xml), new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit });
+            using var reader = XmlReader.Create(new StringReader(xml), RssXmlSecurity.CreateReaderSettings(MaxFeedBytes * 2));
             var doc = XDocument.Load(reader);
             var root = doc.Root;
             if (root == null) return ("", "", new List<RssArticle>());

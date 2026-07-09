@@ -29,6 +29,7 @@
     <Compile Include="..\..\Services\SafeUriLauncher.cs" Link="Source\SafeUriLauncher.cs" />
     <Compile Include="..\..\Services\NetworkSafety.cs" Link="Source\NetworkSafety.cs" />
     <Compile Include="..\..\Services\MailHtmlSanitizer.cs" Link="Source\MailHtmlSanitizer.cs" />
+    <Compile Include="..\..\Services\RssXmlSecurity.cs" Link="Source\RssXmlSecurity.cs" />
   </ItemGroup>
 
 </Project>
