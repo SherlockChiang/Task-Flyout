@@ -611,7 +611,7 @@ namespace Task_Flyout.Services
                 try
                 {
                     var addresses = await Dns.GetHostAddressesAsync(uri.Host);
-                    return addresses.All(addr => NetworkSafety.IsPublicIpAddress(addr));
+                    return RssFetchPolicy.AreResolvedAddressesSafe(addresses);
                 }
                 catch
                 {
@@ -653,7 +653,7 @@ namespace Task_Flyout.Services
             else
             {
                 addresses = await Dns.GetHostAddressesAsync(host, cancellationToken);
-                if (addresses.Any(address => !NetworkSafety.IsPublicIpAddress(address)))
+                if (!RssFetchPolicy.AreResolvedAddressesSafe(addresses))
                     return new List<IPAddress>();
             }
 

@@ -96,4 +96,32 @@ public class RssServiceTests
         Assert.False(RssFetchPolicy.ShouldFollowRedirect(System.Net.HttpStatusCode.Found, hop: 5, maxRedirects: 5));
         Assert.False(RssFetchPolicy.ShouldFollowRedirect(System.Net.HttpStatusCode.OK, hop: 0, maxRedirects: 5));
     }
+
+    [Fact]
+    public void Dns_policy_allows_only_non_empty_public_address_sets()
+    {
+        Assert.True(RssFetchPolicy.AreResolvedAddressesSafe(new[]
+        {
+            System.Net.IPAddress.Parse("8.8.8.8"),
+            System.Net.IPAddress.Parse("2606:4700:4700::1111")
+        }));
+
+        Assert.False(RssFetchPolicy.AreResolvedAddressesSafe(Array.Empty<System.Net.IPAddress>()));
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1")]
+    [InlineData("10.0.0.5")]
+    [InlineData("172.16.0.5")]
+    [InlineData("192.168.1.5")]
+    [InlineData("169.254.1.5")]
+    [InlineData("fc00::1")]
+    public void Dns_policy_rejects_any_private_or_special_address(string unsafeAddress)
+    {
+        Assert.False(RssFetchPolicy.AreResolvedAddressesSafe(new[]
+        {
+            System.Net.IPAddress.Parse("8.8.8.8"),
+            System.Net.IPAddress.Parse(unsafeAddress)
+        }));
+    }
 }

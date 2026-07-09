@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 
 namespace Task_Flyout.Services
@@ -16,6 +18,12 @@ namespace Task_Flyout.Services
 
         public static bool ShouldFollowRedirect(HttpStatusCode code, int hop, int maxRedirects)
             => IsRedirectStatus(code) && hop < maxRedirects;
+
+        public static bool AreResolvedAddressesSafe(IEnumerable<IPAddress> addresses)
+        {
+            var normalized = addresses.Select(NetworkSafety.Normalize).ToList();
+            return normalized.Count > 0 && normalized.All(NetworkSafety.IsPublicIpAddress);
+        }
 
         public static bool TryResolveHttpRedirect(Uri currentUri, Uri? location, out Uri redirectUri)
         {
