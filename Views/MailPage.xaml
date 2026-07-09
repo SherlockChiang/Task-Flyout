@@ -218,7 +218,7 @@
                                 </Grid.ColumnDefinitions>
                                 <FontIcon Grid.Column="0" Glyph="&#xE72E;" FontSize="14" VerticalAlignment="Center"
                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                <TextBlock Grid.Column="1" x:Uid="MailPage_RemoteImagesBlocked" Text="已阻止远程图片以保护隐私"
+                                <TextBlock Grid.Column="1" x:Uid="MailPage_RemoteImagesBlocked" Text="已阻止远程图片和跟踪像素。显示图片仅本次生效；信任此来源会持续允许远程内容。"
                                            FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                 <Button Grid.Column="2" x:Name="ShowRemoteImagesButton" Click="ShowRemoteImagesButton_Click" Padding="10,4">

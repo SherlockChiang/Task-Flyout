@@ -44,6 +44,7 @@ namespace Task_Flyout.Views
         private bool _isInternalArticleNavigation;
         private WebView2? _rssArticleWebView;
         private CancellationTokenSource? _rssResourceCts;
+        private DateTimeOffset? _lastArticleLoadSucceededAt;
 
         public RssPage()
         {
@@ -207,14 +208,14 @@ namespace Task_Flyout.Views
 
                 _loadedCount = items.Count;
                 _hasMore = items.Count == PageSize;
-                ArticleListSubtitle.Text = Articles.Count == 0
+                SetArticleListStatus(Articles.Count == 0
                     ? (_loader.GetStringOrDefault("TextNoCachedArticles") ?? "No cached articles, click refresh to fetch")
-                    : _hasMore ? string.Format(_loader.GetStringOrDefault("TextNArticlesScroll") ?? "{0} articles, scroll down to load more", Articles.Count) : string.Format(_loader.GetStringOrDefault("TextNArticles") ?? "{0} articles", Articles.Count);
+                    : _hasMore ? string.Format(_loader.GetStringOrDefault("TextNArticlesScroll") ?? "{0} articles, scroll down to load more", Articles.Count) : string.Format(_loader.GetStringOrDefault("TextNArticles") ?? "{0} articles", Articles.Count));
             }
             catch (Exception ex)
             {
                 LogRssError(ex);
-                ArticleListSubtitle.Text = string.Format(_loader.GetStringOrDefault("TextCacheLoadFailed") ?? "Cache load failed: {0}", ex.Message);
+                SetArticleListStatus(string.Format(_loader.GetStringOrDefault("TextCacheLoadFailed") ?? "Cache load failed: {0}", ex.Message), isError: true);
             }
         }
 
@@ -232,14 +233,15 @@ namespace Task_Flyout.Views
 
                 _loadedCount += items.Count;
                 _hasMore = items.Count == PageSize;
-                ArticleListSubtitle.Text = Articles.Count == 0
+                _lastArticleLoadSucceededAt = DateTimeOffset.Now;
+                SetArticleListStatus(Articles.Count == 0
                     ? (_loader.GetStringOrDefault("TextNoArticles") ?? "No articles")
-                    : _hasMore ? string.Format(_loader.GetStringOrDefault("TextNArticlesClickLoad") ?? "{0} articles, click to load more", Articles.Count) : string.Format(_loader.GetStringOrDefault("TextNArticles") ?? "{0} articles", Articles.Count);
+                    : _hasMore ? string.Format(_loader.GetStringOrDefault("TextNArticlesClickLoad") ?? "{0} articles, click to load more", Articles.Count) : string.Format(_loader.GetStringOrDefault("TextNArticles") ?? "{0} articles", Articles.Count));
             }
             catch (Exception ex)
             {
                 LogRssError(ex);
-                ArticleListSubtitle.Text = string.Format(_loader.GetStringOrDefault("TextLoadFailed") ?? "Load failed: {0}", ex.Message);
+                SetArticleListStatus(string.Format(_loader.GetStringOrDefault("TextLoadFailed") ?? "Load failed: {0}", ex.Message), isError: true);
             }
             finally
             {
@@ -654,11 +656,13 @@ namespace Task_Flyout.Views
 
                 LoadSubscriptions();
                 ResetAndLoadCachedArticles();
+                _lastArticleLoadSucceededAt = DateTimeOffset.Now;
+                SetArticleListStatus(ArticleListSubtitle.Text);
             }
             catch (Exception ex)
             {
                 LogRssError(ex);
-                ArticleListSubtitle.Text = FormatRssRefreshError(ex);
+                SetArticleListStatus(FormatRssRefreshError(ex), isError: true);
             }
             finally
             {
@@ -673,6 +677,16 @@ namespace Task_Flyout.Views
                 return "刷新被安全策略拦截：RSS 地址或重定向解析到了非公网 IP。若正在使用 TUN/本地代理，可在设置中开启 RSS 本地网络访问。";
 
             return $"刷新失败：{message}";
+        }
+
+        private void SetArticleListStatus(string message, bool isError = false)
+        {
+            if (ArticleListSubtitle == null) return;
+
+            var suffix = _lastArticleLoadSucceededAt.HasValue
+                ? $" · Last success: {_lastArticleLoadSucceededAt.Value.LocalDateTime:g}"
+                : "";
+            ArticleListSubtitle.Text = isError ? $"{message}{suffix}" : message;
         }
 
         private void AttachArticleScrollViewer()
@@ -719,6 +733,9 @@ namespace Task_Flyout.Views
             ArticleReaderPanel.Visibility = Visibility.Visible;
             ReaderTitleText.Text = article.Title;
             ReaderMetaText.Text = $"{article.FeedTitle} · {article.PublishedText}";
+            ReaderPrivacyText.Text = Windows.Storage.ApplicationData.Current.LocalSettings.Values["AllowRssRemoteResources"] as bool? ?? false
+                ? "Remote images are proxied through Task Flyout and blocked if they resolve to private networks."
+                : "Remote images are blocked for privacy. Enable RSS remote resources in Settings to load them through the safe proxy.";
             await RenderArticleAsync(article);
         }
 

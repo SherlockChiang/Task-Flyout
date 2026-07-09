@@ -214,6 +214,7 @@
                             <StackPanel Grid.Column="1" Spacing="2">
                                 <TextBlock x:Name="ReaderTitleText" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/>
                                 <TextBlock x:Name="ReaderMetaText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                <TextBlock x:Name="ReaderPrivacyText" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap"/>
                             </StackPanel>
                             <Button Grid.Column="2" Click="OpenArticleInBrowserButton_Click">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
