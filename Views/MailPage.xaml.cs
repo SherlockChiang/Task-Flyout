@@ -53,6 +53,7 @@ namespace Task_Flyout.Views
         private bool _isLoadingMessages;
         private bool _suppressSelectionClear;
         private bool _suppressUnreadToggle;
+        private DateTimeOffset? _lastMessageLoadSucceededAt;
         private Task? _refreshAccountsTask;
         internal bool IsOpeningFromNotification { get; set; }
 
@@ -166,7 +167,7 @@ namespace Task_Flyout.Views
             bool hasAccounts = accounts.Count > 0;
             AddAccountPanel.Visibility = hasAccounts ? Visibility.Collapsed : Visibility.Visible;
             EmptyDetailPanel.Visibility = hasAccounts ? EmptyDetailPanel.Visibility : Visibility.Collapsed;
-            MessageListSubtitle.Text = hasAccounts ? (_loader.GetStringOrDefault("TextSelectFolder") ?? "Select a folder on the left") : (_loader.GetStringOrDefault("TextAddMailAccountFirst") ?? "Add an email account first");
+            SetMessageListStatus(hasAccounts ? (_loader.GetStringOrDefault("TextSelectFolder") ?? "Select a folder on the left") : (_loader.GetStringOrDefault("TextAddMailAccountFirst") ?? "Add an email account first"));
             if (!hasAccounts)
             {
                 _items.Clear();
@@ -319,7 +320,7 @@ namespace Task_Flyout.Views
                 if (target != null)
                 {
                     _items.Insert(0, target);
-                    MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}";
+                    SetMessageListStatus($"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}");
                 }
             }
 
@@ -336,7 +337,7 @@ namespace Task_Flyout.Views
             }
             else
             {
-                MessageListSubtitle.Text = _loader.GetStringOrDefault("TextMailNotFound") ?? "This message was not found in the local cache or current folder.";
+                SetMessageListStatus(_loader.GetStringOrDefault("TextMailNotFound") ?? "This message was not found in the local cache or current folder.", isError: true);
                 ClearDetail();
             }
         }
@@ -452,7 +453,7 @@ namespace Task_Flyout.Views
             RefreshButton.IsEnabled = false;
             LoadMoreButton.IsEnabled = false;
             MessageListTitle.Text = _selectedFolder.DisplayName;
-            MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {(_loader.GetStringOrDefault("TextLoading") ?? "Loading")}";
+            SetMessageListStatus($"{_selectedAccount.DisplayTitle} · {(_loader.GetStringOrDefault("TextLoading") ?? "Loading")}");
 
             try
             {
@@ -462,7 +463,8 @@ namespace Task_Flyout.Views
                 foreach (var item in messages.OrderByDescending(item => item.RawReceivedTime))
                     _items.Add(item);
 
-                MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}";
+                _lastMessageLoadSucceededAt = DateTimeOffset.Now;
+                SetMessageListStatus($"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}");
 
                 // Offer "Load more" only while the server filled the whole window (so older
                 // messages likely remain) and we haven't hit the fetch ceiling.
@@ -485,7 +487,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Load messages failed: {ex.Message}");
-                MessageListSubtitle.Text = _loader.GetStringOrDefault("TextLoadMailFailed") ?? "Failed to load messages, please try again later.";
+                SetMessageListStatus(_loader.GetStringOrDefault("TextLoadMailFailed") ?? "Failed to load messages, please try again later.", isError: true);
             }
             finally
             {
@@ -872,7 +874,7 @@ namespace Task_Flyout.Views
                     _suppressSelectionClear = false;
                 }
 
-                MessageListSubtitle.Text = $"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}";
+                SetMessageListStatus($"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}");
             }
 
             return remoteSyncTask;
@@ -887,8 +889,14 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Mark as read failed: {ex.Message}");
-                MessageListSubtitle.Text = _loader.GetStringOrDefault("TextReadSyncFailed") ?? "Failed to sync read status.";
+                SetMessageListStatus(_loader.GetStringOrDefault("TextReadSyncFailed") ?? "Failed to sync read status.", isError: true);
             }
+        }
+
+        private void SetMessageListStatus(string message, bool isError = false)
+        {
+            if (MessageListSubtitle == null) return;
+            MessageListSubtitle.Text = StatusMessageFormatter.Format(message, _lastMessageLoadSucceededAt, isError);
         }
 
         private void ClearDetail()
