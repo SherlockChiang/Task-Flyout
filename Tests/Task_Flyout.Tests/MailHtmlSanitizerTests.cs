@@ -50,6 +50,21 @@ public class MailHtmlSanitizerTests
         Assert.DoesNotContain("dat&#", trusted, System.StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("<a href=\"java&#x0A;script:steal()\">x</a>")]
+    [InlineData("<a href='vb&#x09;script:msgbox()'>x</a>")]
+    [InlineData("<a href=\"da&#x0D;ta:text/html,<script>x</script>\">x</a>")]
+    public void Neutralizes_whitespace_obfuscated_dangerous_url_schemes(string html)
+    {
+        var untrusted = MailHtmlSanitizer.SanitizeUntrusted(html);
+        var trusted = MailHtmlSanitizer.SanitizeTrusted(html);
+
+        Assert.DoesNotContain("script:", untrusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data:", untrusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("script:", trusted, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data:", trusted, System.StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void Untrusted_strips_remote_image_tracking_pixels()
     {

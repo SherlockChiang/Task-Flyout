@@ -153,11 +153,29 @@ namespace Task_Flyout.Services
         private static bool IsDangerousUrlAttribute(string attribute, string value)
         {
             var decoded = WebUtility.HtmlDecode(value)?.TrimStart() ?? "";
-            if (decoded.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase) ||
-                decoded.StartsWith("vbscript:", StringComparison.OrdinalIgnoreCase))
+            var scheme = GetNormalizedScheme(decoded);
+            if (scheme.Equals("javascript", StringComparison.OrdinalIgnoreCase) ||
+                scheme.Equals("vbscript", StringComparison.OrdinalIgnoreCase))
                 return true;
 
-            return IsNavigationAttribute(attribute) && decoded.StartsWith("data:", StringComparison.OrdinalIgnoreCase);
+            return IsNavigationAttribute(attribute) && scheme.Equals("data", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetNormalizedScheme(string value)
+        {
+            var colon = value.IndexOf(':');
+            if (colon < 0) return "";
+
+            Span<char> buffer = stackalloc char[Math.Min(colon, 64)];
+            var length = 0;
+            for (var i = 0; i < colon && length < buffer.Length; i++)
+            {
+                var c = value[i];
+                if (!char.IsWhiteSpace(c) && !char.IsControl(c))
+                    buffer[length++] = c;
+            }
+
+            return new string(buffer[..length]);
         }
 
         private static bool IsNavigationAttribute(string attribute)
