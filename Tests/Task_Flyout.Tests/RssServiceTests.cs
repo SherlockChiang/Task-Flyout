@@ -29,6 +29,25 @@ public class RssServiceTests
         });
     }
 
+    [Fact]
+    public void Feed_xml_loader_returns_false_for_malformed_xml()
+    {
+        const string xml = "<rss><channel><title>Broken</title><item></channel></rss>";
+
+        Assert.False(RssFeedXml.TryLoadDocument(xml, 4096, out var document));
+        Assert.Null(document);
+    }
+
+    [Fact]
+    public void Feed_xml_loader_accepts_well_formed_xml()
+    {
+        const string xml = "<rss><channel><title>Ok</title></channel></rss>";
+
+        Assert.True(RssFeedXml.TryLoadDocument(xml, 4096, out var document));
+        Assert.NotNull(document);
+        Assert.Equal("rss", document!.Root!.Name.LocalName);
+    }
+
     [Theory]
     [InlineData("https://example.com/feed.xml", true)]
     [InlineData("http://example.com/feed.xml", true)]
