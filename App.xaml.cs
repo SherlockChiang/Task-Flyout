@@ -105,7 +105,8 @@ namespace Task_Flyout
 
             // Initialize weather bar if enabled
             InitWeatherBar();
-            StartWeatherBarWatchdog();
+            if (ShouldWeatherBarBeEnabled())
+                StartWeatherBarWatchdog();
             startup.Mark("weatherbar");
 
             // Resume following the device location (and refresh weather UI when it moves).
@@ -323,13 +324,16 @@ namespace Task_Flyout
 
         private void InitWeatherBar()
         {
-            bool weatherBarEnabled = Windows.Storage.ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false;
-            if (weatherBarEnabled && WeatherService.IsEnabled)
+            if (ShouldWeatherBarBeEnabled())
             {
                 MyWeatherBar = new WeatherBarWindow();
                 MyWeatherBar.ShowBar();
             }
         }
+
+        private bool ShouldWeatherBarBeEnabled()
+            => (ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false)
+               && WeatherService.IsEnabled;
 
         // The weather bar is reparented as a WS_CHILD of Shell_TrayWnd, so an Explorer restart
         // destroys its native window and it silently disappears — and any later call into the
@@ -349,9 +353,11 @@ namespace Task_Flyout
         {
             try
             {
-                bool enabled = (ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false)
-                               && WeatherService.IsEnabled;
-                if (!enabled) return;
+                if (!ShouldWeatherBarBeEnabled())
+                {
+                    StopWeatherBarWatchdog();
+                    return;
+                }
 
                 // Alive and well — nothing to do (also covers the user-hidden case: the HWND
                 // still exists when merely hidden).
@@ -383,6 +389,7 @@ namespace Task_Flyout
 
                 if (enabled && (App.Current as App)?.WeatherService?.IsEnabled == true)
                 {
+                    (App.Current as App)?.StartWeatherBarWatchdog();
                     if (MyWeatherBar == null)
                     {
                         MyWeatherBar = new WeatherBarWindow();
@@ -393,8 +400,15 @@ namespace Task_Flyout
                 else
                 {
                     MyWeatherBar?.HideBar();
+                    (App.Current as App)?.StopWeatherBarWatchdog();
                 }
             });
+        }
+
+        private void StopWeatherBarWatchdog()
+        {
+            _weatherBarWatchdog?.Stop();
+            _weatherBarWatchdog = null;
         }
 
         public static void RefreshWeatherBar()
