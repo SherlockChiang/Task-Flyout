@@ -71,7 +71,7 @@
 | P1 | 缓存测试 | WebView2 cache prune、邮件正文 volatile LRU、邮件持久账号/文件夹排序 policy 和 JSON fallback recovery 已提取为纯逻辑并测试，覆盖低于上限不删除、按时间删除到目标大小、忽略 0 字节项、跳过当前邮件、持久顺序去重、未知项保序、空 JSON、malformed JSON 和 null deserialize fallback。 | 后续可继续覆盖更复杂的缓存迁移和旧字段兼容场景。 |
 | P1 | 同步测试 | Google/Microsoft task 日期半开区间、已完成任务包含规则、recurrence 映射、事件时间窗口和 item 模型映射 policy 已提取为纯逻辑并测试，覆盖去除时间部分、起止边界、反向区间、Google RRULE、Microsoft pattern type、创建事件频率映射、全天事件、跨午夜事件、事件/任务字段规范化和 Google page token 去重/终止。Microsoft Graph 分页仍依赖 SDK PageIterator，后续需要 mock/integration 覆盖。 |
 | P2 | 性能基线 | 已新增 `docs/performance-baseline.md`，覆盖环境记录、冷启动、托盘 idle 内存、flyout 首次打开、邮件 HTML、RSS 文章和天气刷新测量流程。优化前后结果继续写入 PR 或 release notes。 |
-| P2 | 错误处理 | 日志脱敏 helper 已测试 bearer/basic auth、cookie、URL userinfo、敏感 query 和常见 key/value secret。继续将捕获异常统一转换为用户安全消息和脱敏诊断。测试 malformed RSS、OAuth 过期、IMAP 认证失败、WebView2 runtime 缺失等 fallback。 |
+| P2 | 错误处理 | 日志脱敏 helper 已测试 bearer/basic auth、cookie、URL userinfo、敏感 query 和常见 key/value secret；用户可见错误消息 helper 已测试脱敏、空白折叠、空消息 fallback 和长度限制，并接入 RSS 错误状态。继续测试 OAuth 过期、IMAP 认证失败、WebView2 runtime 缺失等 fallback。 |
 
 ## 建议执行顺序
 
