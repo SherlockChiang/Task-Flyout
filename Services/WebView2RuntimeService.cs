@@ -91,16 +91,15 @@ namespace Task_Flyout.Services
 
                 if (size <= MaxCacheBytes) return;
 
-                var ordered = EnumerateFiles(path)
-                    .OrderBy(file => SafeLastWriteUtc(file))
-                    .ToList(); // only realised when we actually need to delete
+                var files = EnumerateFiles(path).ToList(); // only realised when we actually need to delete
+                var deletePaths = CachePrunePolicy.SelectOldestUntilTarget(
+                    files.Select(file => new CachePruneEntry(file.FullName, SafeLength(file), SafeLastWriteUtc(file))),
+                    MaxCacheBytes,
+                    TargetCacheBytes);
 
-                foreach (var file in ordered)
+                foreach (var filePath in deletePaths)
                 {
-                    var len = SafeLength(file);
-                    TryDeleteFile(file.FullName);
-                    size -= len;
-                    if (size <= TargetCacheBytes) break;
+                    TryDeleteFile(filePath);
                 }
 
                 DeleteEmptyDirectories(path);
