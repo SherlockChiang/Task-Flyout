@@ -830,9 +830,15 @@ namespace Task_Flyout.Services
 
                 if (totalChars <= MaxVolatileBodyCacheChars) return;
 
-                foreach (var entry in live.OrderBy(entry => entry.AccessTicks))
+                var pruneKeys = CachePrunePolicy.SelectLeastRecentlyUsedUntilTarget(
+                    live.Select(entry => new SizedCacheEntry(entry.Key, entry.Chars, entry.AccessTicks)),
+                    MaxVolatileBodyCacheChars,
+                    TargetVolatileBodyCacheChars,
+                    currentKey).ToHashSet(StringComparer.Ordinal);
+
+                foreach (var entry in live)
                 {
-                    if (entry.Key == currentKey) continue;
+                    if (!pruneKeys.Contains(entry.Key)) continue;
 
                     entry.Item.BodyText = "";
                     entry.Item.HtmlBody = "";
