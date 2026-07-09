@@ -1081,9 +1081,7 @@ namespace Task_Flyout.Services
             if (App.Current is App app &&
                 app.SyncManager.GetProvider("Google") is GoogleSyncProvider googleProvider)
             {
-                await googleProvider.EnsureAuthorizedAsync();
-                if (googleProvider.GmailSvc != null)
-                    return googleProvider.GmailSvc;
+                return await googleProvider.EnsureGmailAuthorizedAsync();
             }
 
             throw new InvalidOperationException("Google provider is not available.");

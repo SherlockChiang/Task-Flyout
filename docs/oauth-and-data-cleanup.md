@@ -50,11 +50,12 @@ Local cleanup on mail account removal:
 
 - OAuth tokens and local mail/calendar/task caches are stored only on the device.
 - Google and Microsoft mail send/modify/write scopes are intentionally broad because the app supports in-app send, mark-read, create, edit, and delete operations.
-- If a future release splits read-only and write features, scopes should be revisited for incremental consent.
+- Google Calendar/Tasks setup now requests only Calendar and Tasks scopes. Gmail scopes are requested when the user enables or uses Gmail mail features.
+- If a future release splits read-only and write features further, scopes should be revisited for incremental consent.
 
 ## Incremental Consent Follow-Up
 
-The current app asks for the scopes needed by the full feature set because account setup immediately enables calendar/task sync plus mail read/send/mark-read features. A future incremental-consent design should split setup into feature toggles:
+The app now separates Google Calendar/Tasks setup from Gmail mail scopes. A future incremental-consent design can split the remaining mail/action scopes further into feature toggles:
 
 - Calendar only: request calendar read/write and no mail scopes.
 - Tasks only: request task read/write and no mail scopes.
