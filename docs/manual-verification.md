@@ -51,3 +51,19 @@ Use this checklist for flows that require real Windows credentials, DPAPI, Passw
 2. Trigger refresh in each page.
 3. Confirm visible error states include the last successful load/sync/refresh time where implemented.
 4. Re-enable network and confirm refresh recovers without restarting the app.
+
+## Integration Test Environment Notes
+
+These checks require a dedicated Windows user profile or disposable VM because they touch system credential stores and provider OAuth state.
+
+- Use test-only Google and Microsoft accounts with no personal data.
+- Snapshot `%APPDATA%\TaskFlyout` and `%LOCALAPPDATA%\TaskFlyout` before each run.
+- Clear Windows Credential Manager entries created by the app after each IMAP test.
+- Do not run token cleanup tests against a developer's primary Microsoft account because Azure Identity/MSAL may reuse platform SSO state outside the app-controlled `ms_auth_record.bin` file.
+- Capture `Logs/startup.csv`, `Logs/weatherbar-theme.csv`, and crash logs only after confirming they do not contain tokens or message bodies.
+
+Recommended automation boundary:
+
+- Keep pure parser, sanitizer, URI, and policy logic in `Tests/Task_Flyout.Tests`.
+- Run credential-store and OAuth cleanup as manual or VM-isolated integration tests.
+- Treat provider consent screens as external dependencies; validate app-side state before and after the flow rather than asserting provider UI text.

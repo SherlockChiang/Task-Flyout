@@ -64,3 +64,22 @@ The app now separates Google Calendar/Tasks setup from Gmail mail scopes. A futu
 - Mail actions: request send/modify scopes only when the user enables send or mark-read actions.
 
 Before implementing this, update the setup UI to explain which features each toggle enables, and add migration logic for existing users whose stored tokens already contain the broader scopes.
+
+## Mail Scope Split Risk Notes
+
+Mail read/action split is not just a constants change because the current UX performs write-like actions during normal reading:
+
+- Selecting a message marks it as read, which needs Gmail `GmailModify` or Microsoft `Mail.ReadWrite`.
+- Reply/compose needs Gmail `GmailSend` or Microsoft `Mail.Send`.
+- Folder/message listing and body fetch can use read-only scopes, but the current mail detail flow can immediately transition from read to mark-read.
+
+Safe implementation plan:
+
+1. Add a setting such as `AutoMarkMailAsRead` and default it to the current behavior for existing users.
+2. If auto-mark-read is off, use read-only mail scopes for folder/message/body loading.
+3. Request modify scope only when the user marks a message as read or enables auto-mark-read.
+4. Request send scope only when the user opens compose/reply for the first time.
+5. Store a per-provider scope capability flag so the UI can explain why an extra consent prompt appears.
+6. Keep existing broad-scope tokens valid; do not force reauth unless a requested action fails for missing scope.
+
+Until the mail UX is split this way, requesting mail action scopes on first mail use preserves current behavior without surprising users with a consent prompt when they merely click a message and it is auto-marked read.
