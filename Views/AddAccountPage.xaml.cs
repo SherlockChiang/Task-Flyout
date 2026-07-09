@@ -52,6 +52,18 @@ namespace Task_Flyout.Views
                 : "Enable weather and choose a city from the Weather page.";
 
             ChecklistText.Text = $"Google: {google}\nMicrosoft: {microsoft}\nMail: {mail}\nWeather: {weather}";
+            OpenMailSetupButton.Visibility = mail == "Ready" ? Visibility.Collapsed : Visibility.Visible;
+            OpenWeatherSetupButton.Visibility = weather == "Ready" ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void OpenMailSetupButton_Click(object sender, RoutedEventArgs e)
+        {
+            Frame?.Navigate(typeof(MailPage));
+        }
+
+        private void OpenWeatherSetupButton_Click(object sender, RoutedEventArgs e)
+        {
+            Frame?.Navigate(typeof(WeatherPage));
         }
 
         private StackPanel CreateDisabledContent(string name, string color, string status)
