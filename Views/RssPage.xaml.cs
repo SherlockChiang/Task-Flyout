@@ -96,7 +96,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 LogRssError(ex);
-                ArticleListSubtitle.Text = string.Format(_loader.GetStringOrDefault("TextRssInitFailed") ?? "RSS initialization failed: {0}", ex.Message);
+                ArticleListSubtitle.Text = string.Format(_loader.GetStringOrDefault("TextRssInitFailed") ?? "RSS initialization failed: {0}", UserSafeErrorMessage.FromException(ex));
             }
         }
 
@@ -216,7 +216,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 LogRssError(ex);
-                SetArticleListStatus(string.Format(_loader.GetStringOrDefault("TextCacheLoadFailed") ?? "Cache load failed: {0}", ex.Message), isError: true);
+                SetArticleListStatus(string.Format(_loader.GetStringOrDefault("TextCacheLoadFailed") ?? "Cache load failed: {0}", UserSafeErrorMessage.FromException(ex)), isError: true);
             }
         }
 
@@ -242,7 +242,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 LogRssError(ex);
-                SetArticleListStatus(string.Format(_loader.GetStringOrDefault("TextLoadFailed") ?? "Load failed: {0}", ex.Message), isError: true);
+                SetArticleListStatus(string.Format(_loader.GetStringOrDefault("TextLoadFailed") ?? "Load failed: {0}", UserSafeErrorMessage.FromException(ex)), isError: true);
             }
             finally
             {
@@ -354,7 +354,7 @@ namespace Task_Flyout.Views
                 catch (Exception ex)
                 {
                     args.Cancel = true;
-                    SubscriptionStatusText.Text = string.Format(_loader.GetStringOrDefault("TextAddFailed2") ?? "Add failed: {0}", ex.Message);
+                    SubscriptionStatusText.Text = string.Format(_loader.GetStringOrDefault("TextAddFailed2") ?? "Add failed: {0}", UserSafeErrorMessage.FromException(ex));
                 }
                 finally
                 {
@@ -780,7 +780,7 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 LogRssError(ex);
-                ArticleListSubtitle.Text = string.Format(_loader.GetStringOrDefault("TextArticleRenderFailed") ?? "Article render failed: {0}", ex.Message);
+                ArticleListSubtitle.Text = string.Format(_loader.GetStringOrDefault("TextArticleRenderFailed") ?? "Article render failed: {0}", UserSafeErrorMessage.FromException(ex));
             }
         }
 
