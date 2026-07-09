@@ -344,8 +344,7 @@ namespace Task_Flyout.Services
         private async Task<List<AgendaItem>> FetchMicrosoftTasksAsync(DateTime startDate, DateTime endDate)
         {
             var results = new List<AgendaItem>();
-            startDate = startDate.Date;
-            endDate = endDate.Date;
+            var range = SyncRangePolicy.NormalizeHalfOpenDateRange(startDate, endDate);
             try
             {
                 var lists = await _graphClient.Me.Todo.Lists.GetAsync(req =>
@@ -411,7 +410,7 @@ namespace Task_Flyout.Services
                                 targetDate = targetDate.ToLocalTime();
                             }
 
-                            if (!isCompleted && !IsInDateRange(targetDate, startDate, endDate))
+                            if (!isCompleted && !SyncRangePolicy.IsInHalfOpenDateRange(targetDate, range.StartDate, range.EndDate))
                                 continue;
 
                             results.Add(new AgendaItem
@@ -444,13 +443,6 @@ namespace Task_Flyout.Services
             }
             return results;
         }
-
-        private static bool IsInDateRange(DateTime date, DateTime startDate, DateTime endDate)
-        {
-            var day = date.Date;
-            return day >= startDate && day < endDate;
-        }
-
         public async Task UpdateItemAsync(string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime)
         {
             await EnsureAuthorizedAsync();

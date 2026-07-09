@@ -39,6 +39,7 @@
     <Compile Include="..\..\Services\ProviderAuthCleanup.cs" Link="Source\ProviderAuthCleanup.cs" />
     <Compile Include="..\..\Services\CachePrunePolicy.cs" Link="Source\CachePrunePolicy.cs" />
     <Compile Include="..\..\Services\PersistedOrderPolicy.cs" Link="Source\PersistedOrderPolicy.cs" />
+    <Compile Include="..\..\Services\SyncRangePolicy.cs" Link="Source\SyncRangePolicy.cs" />
   </ItemGroup>
 
 </Project>

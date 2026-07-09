@@ -380,8 +380,7 @@ namespace Task_Flyout.Services
         private async Task<List<AgendaItem>> FetchGoogleTasksAsync(TasksService tasksSvc, DateTime min, DateTime max)
         {
             var items = new List<AgendaItem>();
-            min = min.Date;
-            max = max.Date;
+            var range = SyncRangePolicy.NormalizeHalfOpenDateRange(min, max);
             string? taskPageToken = null;
             do
             {
@@ -397,7 +396,7 @@ namespace Task_Flyout.Services
                         if (!string.IsNullOrEmpty(t.Due) && DateTime.TryParse(t.Due, out var dueTime)) taskDate = dueTime.Date;
                         else if (isDone && !string.IsNullOrEmpty(t.Completed) && DateTime.TryParse(t.Completed, out var compTime)) taskDate = compTime.Date;
 
-                        if (!isDone && !IsInDateRange(taskDate, min, max))
+                        if (!isDone && !SyncRangePolicy.IsInHalfOpenDateRange(taskDate, range.StartDate, range.EndDate))
                             continue;
 
                         items.Add(new AgendaItem
@@ -418,13 +417,6 @@ namespace Task_Flyout.Services
             } while (taskPageToken != null);
             return items;
         }
-
-        private static bool IsInDateRange(DateTime date, DateTime min, DateTime max)
-        {
-            var day = date.Date;
-            return day >= min && day < max;
-        }
-
         public async Task UpdateItemAsync(string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime)
         {
             if (isEvent)
