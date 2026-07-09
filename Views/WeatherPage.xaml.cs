@@ -19,6 +19,7 @@ namespace Task_Flyout.Views
         private WeatherInfo? _currentWeatherInfo;
         private DateTimeOffset? _lastWeatherLoadSucceededAt;
         private bool _isIconPackOperation;
+        private bool _isLoadingWeather;
 
         private readonly string[] _commonFonts = new[]
         {
@@ -879,54 +880,63 @@ namespace Task_Flyout.Views
         private async Task LoadWeatherDataAsync(bool forceRefresh = false)
         {
             if (_weatherService == null || string.IsNullOrWhiteSpace(_weatherService.City)) return;
+            if (_isLoadingWeather) return;
 
-            LoadingRing.IsActive = true;
-            ForecastPanel.Visibility = Visibility.Collapsed;
-            DailyForecastPanel.Visibility = Visibility.Collapsed;
-            SetWeatherStatus(GetSafeString("TextLoading", "Loading"));
-
-            var info = await _weatherService.GetWeatherAsync(forceRefresh);
-            _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh);
-            App.RefreshWeatherBar();
-
-            // Update current weather card
-            if (info == null)
+            try
             {
-                UpdateCurrentWeatherCard(null);
-                SetWeatherStatus(GetSafeString("WeatherPage_LoadFailed", "Weather is unavailable. Check network, city, and provider settings."), isError: true);
-                LoadingRing.IsActive = false;
-                return;
-            }
+                _isLoadingWeather = true;
+                LoadingRing.IsActive = true;
+                BtnRefresh.IsEnabled = false;
+                ForecastPanel.Visibility = Visibility.Collapsed;
+                DailyForecastPanel.Visibility = Visibility.Collapsed;
+                SetWeatherStatus(GetSafeString("TextLoading", "Loading"));
 
-            _lastWeatherLoadSucceededAt = DateTimeOffset.Now;
-            SetWeatherStatus(string.Format(GetSafeString("WeatherPage_Updated", "Updated: {0}"), _lastWeatherLoadSucceededAt.Value.LocalDateTime.ToString("g")));
-            UpdateCurrentWeatherCard(info);
-            UpdateDailyForecast(info);
+                var info = await _weatherService.GetWeatherAsync(forceRefresh);
+                _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh);
+                App.RefreshWeatherBar();
 
-            if (info != null && info.HourlyForecast.Count > 0)
-            {
-                HourlyListView.ItemsSource = info.HourlyForecast;
-                ForecastPanel.Visibility = Visibility.Visible;
-                HourDetailPanel.Visibility = Visibility.Collapsed;
-
-                // Select current hour
-                int nowHour = DateTime.Now.Hour;
-                int idx = 0;
-                for (int i = 0; i < info.HourlyForecast.Count; i++)
+                // Update current weather card
+                if (info == null)
                 {
-                    if (info.HourlyForecast[i].Hour == nowHour) { idx = i; break; }
+                    UpdateCurrentWeatherCard(null);
+                    SetWeatherStatus(GetSafeString("WeatherPage_LoadFailed", "Weather is unavailable. Check network, city, and provider settings."), isError: true);
+                    return;
                 }
-                HourlyListView.SelectedIndex = idx;
 
-                // Scroll to selected
-                DispatcherQueue.TryEnqueue(() =>
+                _lastWeatherLoadSucceededAt = DateTimeOffset.Now;
+                SetWeatherStatus(string.Format(GetSafeString("WeatherPage_Updated", "Updated: {0}"), _lastWeatherLoadSucceededAt.Value.LocalDateTime.ToString("g")));
+                UpdateCurrentWeatherCard(info);
+                UpdateDailyForecast(info);
+
+                if (info.HourlyForecast.Count > 0)
                 {
-                    if (idx < info.HourlyForecast.Count)
-                        HourlyListView.ScrollIntoView(info.HourlyForecast[idx], ScrollIntoViewAlignment.Leading);
-                });
-            }
+                    HourlyListView.ItemsSource = info.HourlyForecast;
+                    ForecastPanel.Visibility = Visibility.Visible;
+                    HourDetailPanel.Visibility = Visibility.Collapsed;
 
-            LoadingRing.IsActive = false;
+                    // Select current hour
+                    int nowHour = DateTime.Now.Hour;
+                    int idx = 0;
+                    for (int i = 0; i < info.HourlyForecast.Count; i++)
+                    {
+                        if (info.HourlyForecast[i].Hour == nowHour) { idx = i; break; }
+                    }
+                    HourlyListView.SelectedIndex = idx;
+
+                    // Scroll to selected
+                    DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (idx < info.HourlyForecast.Count)
+                            HourlyListView.ScrollIntoView(info.HourlyForecast[idx], ScrollIntoViewAlignment.Leading);
+                    });
+                }
+            }
+            finally
+            {
+                LoadingRing.IsActive = false;
+                BtnRefresh.IsEnabled = true;
+                _isLoadingWeather = false;
+            }
         }
 
         private void SetWeatherStatus(string message, bool isError = false)

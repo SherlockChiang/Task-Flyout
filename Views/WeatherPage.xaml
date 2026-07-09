@@ -215,7 +215,7 @@
                             </StackPanel>
                         </Button>
 
-                        <Button x:Uid="WeatherPage_BtnRefresh" Grid.Column="2" Click="BtnRefresh_Click" VerticalAlignment="Center"/>
+                        <Button x:Uid="WeatherPage_BtnRefresh" x:Name="BtnRefresh" Grid.Column="2" Click="BtnRefresh_Click" VerticalAlignment="Center"/>
                     </Grid>
 
                     <TextBlock x:Uid="WeatherPage_LocationPrivacyDesc" Text="使用当前位置或自动跟随定位会调用 Windows 位置权限；坐标仅保存在本机，并只用于向所选天气源请求天气。" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
