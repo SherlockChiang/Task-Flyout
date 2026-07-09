@@ -18,6 +18,17 @@ namespace Task_Flyout.Services
         string RecurringEventId,
         string RecurrenceKind);
 
+    internal readonly record struct MappedSyncTask(
+        string Id,
+        string Title,
+        string Subtitle,
+        string Description,
+        string Provider,
+        string CalendarId,
+        string CalendarName,
+        string DateKey,
+        bool IsCompleted);
+
     internal static class SyncItemMappingPolicy
     {
         public static MappedSyncEvent MapEvent(
@@ -54,5 +65,26 @@ namespace Task_Flyout.Services
                 recurringId,
                 string.IsNullOrWhiteSpace(recurrenceKind) ? "None" : recurrenceKind);
         }
+
+        public static MappedSyncTask MapTask(
+            string? id,
+            string? title,
+            string taskText,
+            string? description,
+            string provider,
+            string? calendarId,
+            string? calendarName,
+            DateTime date,
+            bool isCompleted)
+            => new(
+                id ?? string.Empty,
+                title ?? string.Empty,
+                taskText,
+                description ?? string.Empty,
+                provider,
+                calendarId ?? string.Empty,
+                calendarName ?? string.Empty,
+                date.ToString("yyyy-MM-dd"),
+                isCompleted);
     }
 }

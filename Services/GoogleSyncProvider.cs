@@ -416,17 +416,30 @@ namespace Task_Flyout.Services
                         if (!SyncRangePolicy.ShouldIncludeTask(taskDate, isDone, range.StartDate, range.EndDate))
                             continue;
 
+                        var mapped = SyncItemMappingPolicy.MapTask(
+                            t.Id,
+                            t.Title,
+                            _loader.GetStringOrDefault("TextTask") ?? "Task",
+                            t.Notes,
+                            ProviderName,
+                            null,
+                            null,
+                            taskDate,
+                            isDone);
+
                         items.Add(new AgendaItem
                         {
-                            Id = t.Id ?? "",
-                            Title = t.Title ?? "",
-                            Subtitle = _loader.GetStringOrDefault("TextTask") ?? "Task",
+                            Id = mapped.Id,
+                            Title = mapped.Title,
+                            Subtitle = mapped.Subtitle,
                             IsEvent = false,
                             IsTask = true,
-                            IsCompleted = isDone,
-                            Description = t.Notes ?? "",
-                            Provider = ProviderName,
-                            DateKey = taskDate.ToString("yyyy-MM-dd")
+                            IsCompleted = mapped.IsCompleted,
+                            Description = mapped.Description,
+                            Provider = mapped.Provider,
+                            CalendarId = mapped.CalendarId,
+                            CalendarName = mapped.CalendarName,
+                            DateKey = mapped.DateKey
                         });
                     }
                 }

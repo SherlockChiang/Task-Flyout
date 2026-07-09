@@ -96,4 +96,54 @@ public class SyncItemMappingPolicyTests
         Assert.Equal("", mapped.RecurringEventId);
         Assert.Equal("Daily", mapped.RecurrenceKind);
     }
+
+    [Fact]
+    public void MapTask_normalizes_null_strings_and_formats_date_key()
+    {
+        var mapped = SyncItemMappingPolicy.MapTask(
+            id: null,
+            title: null,
+            taskText: "Task",
+            description: null,
+            provider: "Google",
+            calendarId: null,
+            calendarName: null,
+            date: new DateTime(2026, 7, 9, 15, 30, 0),
+            isCompleted: false);
+
+        Assert.Equal("", mapped.Id);
+        Assert.Equal("", mapped.Title);
+        Assert.Equal("Task", mapped.Subtitle);
+        Assert.Equal("", mapped.Description);
+        Assert.Equal("Google", mapped.Provider);
+        Assert.Equal("", mapped.CalendarId);
+        Assert.Equal("", mapped.CalendarName);
+        Assert.Equal("2026-07-09", mapped.DateKey);
+        Assert.False(mapped.IsCompleted);
+    }
+
+    [Fact]
+    public void MapTask_preserves_calendar_metadata_and_completed_status()
+    {
+        var mapped = SyncItemMappingPolicy.MapTask(
+            id: "task-1",
+            title: "Ship build",
+            taskText: "Task",
+            description: "Finalize package",
+            provider: "Microsoft",
+            calendarId: "list-1",
+            calendarName: "Work Tasks",
+            date: new DateTime(2026, 7, 9),
+            isCompleted: true);
+
+        Assert.Equal("task-1", mapped.Id);
+        Assert.Equal("Ship build", mapped.Title);
+        Assert.Equal("Task", mapped.Subtitle);
+        Assert.Equal("Finalize package", mapped.Description);
+        Assert.Equal("Microsoft", mapped.Provider);
+        Assert.Equal("list-1", mapped.CalendarId);
+        Assert.Equal("Work Tasks", mapped.CalendarName);
+        Assert.Equal("2026-07-09", mapped.DateKey);
+        Assert.True(mapped.IsCompleted);
+    }
 }

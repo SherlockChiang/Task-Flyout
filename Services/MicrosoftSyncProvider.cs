@@ -430,19 +430,30 @@ namespace Task_Flyout.Services
                             if (!SyncRangePolicy.ShouldIncludeTask(targetDate, isCompleted, range.StartDate, range.EndDate))
                                 continue;
 
+                            var mapped = SyncItemMappingPolicy.MapTask(
+                                task.Id,
+                                task.Title,
+                                _loader.GetStringOrDefault("TextTask") ?? "Task",
+                                task.Body?.Content,
+                                ProviderName,
+                                list.Id,
+                                list.DisplayName,
+                                targetDate,
+                                isCompleted);
+
                             results.Add(new AgendaItem
                             {
-                                Id = task.Id ?? "",
-                                Title = task.Title ?? "",
-                                Subtitle = _loader.GetStringOrDefault("TextTask") ?? "Task",
-                                Description = task.Body?.Content ?? "",
+                                Id = mapped.Id,
+                                Title = mapped.Title,
+                                Subtitle = mapped.Subtitle,
+                                Description = mapped.Description,
                                 IsEvent = false,
                                 IsTask = true,
-                                IsCompleted = isCompleted,
-                                Provider = ProviderName,
-                                CalendarId = list.Id ?? "",
-                                CalendarName = list.DisplayName ?? "",
-                                DateKey = targetDate.ToString("yyyy-MM-dd")
+                                IsCompleted = mapped.IsCompleted,
+                                Provider = mapped.Provider,
+                                CalendarId = mapped.CalendarId,
+                                CalendarName = mapped.CalendarName,
+                                DateKey = mapped.DateKey
                             });
                         }
                     }
