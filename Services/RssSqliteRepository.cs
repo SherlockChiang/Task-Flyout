@@ -156,13 +156,14 @@ LIMIT $take OFFSET $skip;
             return RssSensitiveDataProtector.Unprotect(command.ExecuteScalar() as string ?? "");
         }
 
-        private SqliteConnection OpenConnection()
+        internal SqliteConnection OpenConnection()
         {
             if (_isUnavailable())
                 throw new InvalidOperationException("RSS local data is being cleared.");
 
             var connection = new SqliteConnection(_connectionString);
             connection.Open();
+            ExecuteNonQuery(connection, "PRAGMA secure_delete=ON;");
             return connection;
         }
 

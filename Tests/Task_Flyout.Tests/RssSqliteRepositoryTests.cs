@@ -15,7 +15,7 @@ public class RssSqliteRepositoryTests : IDisposable
 
         repository.Initialize();
 
-        using var connection = Open(databasePath);
+        using var connection = repository.OpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT value FROM metadata WHERE key = 'schema_version';";
         Assert.Equal("1", command.ExecuteScalar());

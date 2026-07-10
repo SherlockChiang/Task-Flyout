@@ -1846,6 +1846,7 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
             }.ToString();
             var connection = new SqliteConnection(_connectionString);
             connection.Open();
+            ExecuteNonQuery(connection, "PRAGMA secure_delete=ON;");
             return connection;
         }
 
