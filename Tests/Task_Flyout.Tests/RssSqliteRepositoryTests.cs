@@ -391,6 +391,28 @@ END;
         Assert.True(!File.Exists(walPath) || new FileInfo(walPath).Length == 0);
     }
 
+    [Fact]
+    public void New_repository_instance_checkpoints_wal_left_by_previous_instance()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var firstRepository = new RssSqliteRepository(databasePath);
+        firstRepository.Initialize();
+        using (var connection = firstRepository.OpenConnection())
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "INSERT INTO rss_folders(id, name) VALUES ('folder', $name);";
+            command.Parameters.AddWithValue("$name", RssSensitiveDataProtector.Protect(new string('x', 20_000)));
+            command.ExecuteNonQuery();
+        }
+        var walPath = databasePath + "-wal";
+        Assert.True(File.Exists(walPath) && new FileInfo(walPath).Length > 0);
+
+        var restartedRepository = new RssSqliteRepository(databasePath);
+        restartedRepository.Initialize();
+
+        Assert.True(!File.Exists(walPath) || new FileInfo(walPath).Length == 0);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

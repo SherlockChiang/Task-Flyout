@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS rss_articles (
                 command.Parameters.AddWithValue("$version", SchemaVersion.ToString());
                 command.ExecuteNonQuery();
                 _initialized = true;
+                TryCheckpointDeletedData(connection);
             }
         }
 
