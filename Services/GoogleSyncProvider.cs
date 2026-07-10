@@ -321,7 +321,7 @@ namespace Task_Flyout.Services
         private async Task<List<AgendaItem>> FetchCalendarEventsAsync(CalendarService calendarSvc, SubscribedCalendarInfo cal, DateTime min, DateTime max)
         {
             var items = new List<AgendaItem>();
-            var recurrenceKinds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var allEvents = new List<Google.Apis.Calendar.v3.Data.Event>();
             string? pageToken = null;
             var seenPageTokens = new HashSet<string>(StringComparer.Ordinal);
             do
@@ -336,55 +336,7 @@ namespace Task_Flyout.Services
                     req.PageToken = pageToken;
                     var events = await req.ExecuteAsync().ConfigureAwait(false);
                     if (events?.Items != null)
-                    {
-                        foreach (var ev in events.Items)
-                        {
-                            DateTime? date = ev.Start?.DateTimeDateTimeOffset?.DateTime ?? (DateTime.TryParse(ev.Start?.Date, out var d) ? d : null);
-                            if (date == null) continue;
-
-                            var endDate2 = ev.End?.DateTimeDateTimeOffset?.DateTime ?? (DateTime.TryParse(ev.End?.Date, out var ed) ? ed : (DateTime?)null);
-                            string recurringEventId = ev.RecurringEventId ?? "";
-                            string recurrenceKind = GetGoogleRecurrenceKind(ev.Recurrence);
-                            if (recurrenceKind == "None" && !string.IsNullOrWhiteSpace(recurringEventId))
-                                recurrenceKind = await GetGoogleMasterRecurrenceKindAsync(cal.Id, recurringEventId, recurrenceKinds);
-
-                            var mapped = SyncItemMappingPolicy.MapEvent(
-                                ev.Id,
-                                ev.Summary,
-                                ev.Location,
-                                ev.Description,
-                                ProviderName,
-                                cal.Id,
-                                cal.Name,
-                                date.Value,
-                                ev.Start?.DateTimeDateTimeOffset?.DateTime,
-                                endDate2,
-                                ev.Start?.DateTimeDateTimeOffset == null,
-                                _loader.GetStringOrDefault("TextAllDay") ?? "All Day",
-                                recurringEventId,
-                                ev.Recurrence?.Count > 0,
-                                recurrenceKind);
-
-                            items.Add(new AgendaItem
-                            {
-                                Id = mapped.Id,
-                                Title = mapped.Title,
-                                Subtitle = mapped.Subtitle,
-                                Location = mapped.Location,
-                                Description = mapped.Description,
-                                IsEvent = true,
-                                Provider = mapped.Provider,
-                                CalendarId = mapped.CalendarId,
-                                CalendarName = mapped.CalendarName,
-                                DateKey = mapped.DateKey,
-                                StartDateTime = mapped.StartDateTime,
-                                EndDateTime = mapped.EndDateTime,
-                                IsRecurring = mapped.IsRecurring,
-                                RecurringEventId = mapped.RecurringEventId,
-                                RecurrenceKind = mapped.RecurrenceKind
-                            });
-                        }
-                    }
+                        allEvents.AddRange(events.Items);
                     pageToken = SyncPaginationPolicy.GetNextPageToken(pageToken, events?.NextPageToken, seenPageTokens);
                 }
                 catch (Exception ex)
@@ -393,6 +345,37 @@ namespace Task_Flyout.Services
                     pageToken = null;
                 }
             } while (pageToken != null);
+
+            var recurrenceKinds = await FetchGoogleMasterRecurrenceKindsAsync(calendarSvc, cal.Id, allEvents);
+            foreach (var ev in allEvents)
+            {
+                DateTime? date = ev.Start?.DateTimeDateTimeOffset?.DateTime ?? (DateTime.TryParse(ev.Start?.Date, out var d) ? d : null);
+                if (date == null) continue;
+
+                var endDate2 = ev.End?.DateTimeDateTimeOffset?.DateTime ?? (DateTime.TryParse(ev.End?.Date, out var ed) ? ed : (DateTime?)null);
+                string recurringEventId = ev.RecurringEventId ?? "";
+                string recurrenceKind = GetGoogleRecurrenceKind(ev.Recurrence);
+                if (recurrenceKind == "None" && recurrenceKinds.TryGetValue(recurringEventId, out var masterKind))
+                    recurrenceKind = masterKind;
+
+                var mapped = SyncItemMappingPolicy.MapEvent(
+                    ev.Id, ev.Summary, ev.Location, ev.Description, ProviderName, cal.Id, cal.Name,
+                    date.Value, ev.Start?.DateTimeDateTimeOffset?.DateTime, endDate2,
+                    ev.Start?.DateTimeDateTimeOffset == null,
+                    _loader.GetStringOrDefault("TextAllDay") ?? "All Day",
+                    recurringEventId, ev.Recurrence?.Count > 0, recurrenceKind);
+
+                items.Add(new AgendaItem
+                {
+                    Id = mapped.Id, Title = mapped.Title, Subtitle = mapped.Subtitle,
+                    Location = mapped.Location, Description = mapped.Description, IsEvent = true,
+                    Provider = mapped.Provider, CalendarId = mapped.CalendarId,
+                    CalendarName = mapped.CalendarName, DateKey = mapped.DateKey,
+                    StartDateTime = mapped.StartDateTime, EndDateTime = mapped.EndDateTime,
+                    IsRecurring = mapped.IsRecurring, RecurringEventId = mapped.RecurringEventId,
+                    RecurrenceKind = mapped.RecurrenceKind
+                });
+            }
             return items;
         }
 
@@ -562,25 +545,42 @@ namespace Task_Flyout.Services
             }
         }
 
-        private async Task<string> GetGoogleMasterRecurrenceKindAsync(string calendarId, string eventId, Dictionary<string, string> cache)
+        private static async Task<Dictionary<string, string>> FetchGoogleMasterRecurrenceKindsAsync(
+            CalendarService calendarSvc,
+            string calendarId,
+            IEnumerable<Google.Apis.Calendar.v3.Data.Event> events)
         {
-            string cacheKey = $"{calendarId}|{eventId}";
-            if (cache.TryGetValue(cacheKey, out var cached))
-                return cached;
+            var eventIds = events
+                .Where(item => GetGoogleRecurrenceKind(item.Recurrence) == "None")
+                .Select(item => item.RecurringEventId)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Cast<string>()
+                .ToList();
+            if (eventIds.Count == 0)
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-            try
+            using var gate = new SemaphoreSlim(4);
+            var fetchTasks = eventIds.Select(async eventId =>
             {
-                await EnsureAuthorizedAsync();
-                var master = await CalendarSvc!.Events.Get(calendarId, eventId).ExecuteAsync();
-                cached = GetGoogleRecurrenceKind(master.Recurrence);
-            }
-            catch
-            {
-                cached = "None";
-            }
+                await gate.WaitAsync();
+                try
+                {
+                    var master = await calendarSvc.Events.Get(calendarId, eventId).ExecuteAsync();
+                    return (EventId: eventId, Kind: GetGoogleRecurrenceKind(master.Recurrence));
+                }
+                catch
+                {
+                    return (EventId: eventId, Kind: "None");
+                }
+                finally
+                {
+                    gate.Release();
+                }
+            });
 
-            cache[cacheKey] = cached;
-            return cached;
+            return (await Task.WhenAll(fetchTasks))
+                .ToDictionary(item => item.EventId, item => item.Kind, StringComparer.OrdinalIgnoreCase);
         }
 
         private static string GetGoogleRecurrenceKind(IList<string>? recurrence)
