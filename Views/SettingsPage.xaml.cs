@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Automation;
 using Windows.Storage;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System;
@@ -202,21 +203,34 @@ namespace Task_Flyout.Views
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Auto) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            var dot = new Border
+            var dot = new Button
+            {
+                Width = 44,
+                Height = 44,
+                Padding = new Thickness(0),
+                Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                BorderThickness = new Thickness(0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 12, 0)
+            };
+            dot.Content = new Border
             {
                 Width = 20,
                 Height = 20,
                 CornerRadius = new CornerRadius(10),
-                Background = new SolidColorBrush(ColorHelper.ParseHex(currentHex)),
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 12, 0)
+                Background = new SolidColorBrush(ColorHelper.ParseHex(currentHex))
             };
-            dot.Tapped += (s, e) =>
+            AutomationProperties.SetName(dot, $"{label} color, {currentHex}");
+            ToolTipService.SetToolTip(dot, $"{label}: {currentHex}");
+            dot.Click += (s, e) =>
             {
                 ShowColorPickerFlyout(dot, currentHex, color =>
                 {
-                    dot.Background = new SolidColorBrush(ColorHelper.ParseHex(color));
+                    if (dot.Content is Border colorDot)
+                        colorDot.Background = new SolidColorBrush(ColorHelper.ParseHex(color));
                     currentHex = color;
+                    AutomationProperties.SetName(dot, $"{label} color, {color}");
+                    ToolTipService.SetToolTip(dot, $"{label}: {color}");
                     onColorSelected(color);
                 });
             };
@@ -281,19 +295,29 @@ namespace Task_Flyout.Views
 
             foreach (var hex in monetColors)
             {
-                var swatch = new Border
+                var swatch = new RadioButton
+                {
+                    Width = 44,
+                    Height = 44,
+                    Padding = new Thickness(0),
+                    GroupName = "PresetColor",
+                    Margin = new Thickness(4),
+                    IsChecked = string.Equals(hex, currentColor, StringComparison.OrdinalIgnoreCase)
+                };
+                swatch.Content = new Border
                 {
                     Width = 32,
                     Height = 32,
                     CornerRadius = new CornerRadius(16),
                     Background = new SolidColorBrush(ColorHelper.ParseHex(hex)),
-                    Margin = new Thickness(4),
                     BorderThickness = new Thickness(1),
                     BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.LightGray)
                 };
+                AutomationProperties.SetName(swatch, $"Preset color {hex}");
+                ToolTipService.SetToolTip(swatch, hex);
 
-                // 点击预设色块时，让下方的高级调色盘跟着变
-                swatch.Tapped += (s, args) =>
+                // Keep the detailed picker in sync with a keyboard or pointer choice.
+                swatch.Checked += (s, args) =>
                 {
                     colorPicker.Color = ColorHelper.ParseHex(hex);
                 };
