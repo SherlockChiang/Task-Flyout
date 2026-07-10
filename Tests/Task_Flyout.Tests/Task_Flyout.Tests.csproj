@@ -55,6 +55,7 @@
     <Compile Include="..\..\Services\AppDataPathHelper.cs" Link="Source\AppDataPathHelper.cs" />
     <Compile Include="..\..\Services\LocalSqliteStore.cs" Link="Source\LocalSqliteStore.cs" />
     <Compile Include="..\..\Services\VerificationCodeStore.cs" Link="Source\VerificationCodeStore.cs" />
+    <Compile Include="..\..\Services\SharedRequestCoordinator.cs" Link="Source\SharedRequestCoordinator.cs" />
   </ItemGroup>
 
 </Project>
