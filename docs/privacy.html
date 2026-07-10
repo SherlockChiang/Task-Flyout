@@ -61,7 +61,7 @@
                     <ul class="list-disc pl-6 space-y-2">
                         <li><strong>邮件：</strong>账户配置与邮件元数据（发件人、主题、预览）以 Windows 数据保护接口（DPAPI）加密后缓存在本地；邮件正文按需从您的邮件服务器加载，通常不持久化保存。</li>
                         <li><strong>日历与任务：</strong>同步得到的日程与任务缓存经 DPAPI 加密后保存在本地，用于离线查看。</li>
-                        <li><strong>RSS：</strong>订阅列表与文章保存在本地的 SQLite 数据库中。订阅 URL、文章 URL、摘要、正文和远程图片 URL 使用 Windows DPAPI（CurrentUser）保护；标题、发布时间和本地图片路径保留为明文，以支持本地列表和排序。删除订阅会从应用数据库移除其记录，但系统备份、文件系统快照或 SQLite 空闲页可能在一段时间内仍保留历史数据。</li>
+                        <li><strong>RSS：</strong>订阅列表与文章保存在本地的 SQLite 数据库中。订阅、文件夹和文章的标题、URL、摘要、正文与远程图片 URL 使用 Windows DPAPI（CurrentUser）保护；ID、发布时间和本地图片路径保留为明文，以支持本地关联、排序和图片缓存。删除订阅会从应用数据库移除其记录，但系统备份、文件系统快照或 SQLite 空闲页可能在一段时间内仍保留历史数据。</li>
                         <li><strong>天气：</strong>您选择的城市、坐标与显示设置保存在本地应用设置中。</li>
                     </ul>
 
@@ -100,7 +100,7 @@
                     <ul class="list-disc pl-6 space-y-2">
                         <li><strong>Mail:</strong> Account configuration and message metadata (sender, subject, preview) are cached locally, encrypted with the Windows Data Protection API (DPAPI). Full message bodies are loaded on demand from your mail server and are generally not persisted.</li>
                         <li><strong>Calendar &amp; tasks:</strong> Synced events and tasks are cached locally, encrypted with DPAPI, for offline viewing.</li>
-                        <li><strong>RSS:</strong> Your subscriptions and articles are stored in a local SQLite database. Feed URLs, article URLs, summaries, bodies, and remote image URLs are protected with Windows DPAPI (CurrentUser); titles, publication times, and local image paths remain plaintext to support local listing and sorting. Deleting a feed removes its records from the app database, but system backups, filesystem snapshots, or SQLite free pages can retain historic data for a period of time.</li>
+                        <li><strong>RSS:</strong> Your subscriptions and articles are stored in a local SQLite database. Subscription, folder, and article titles, URLs, summaries, bodies, and remote image URLs are protected with Windows DPAPI (CurrentUser); IDs, publication times, and local image paths remain plaintext to support local association, sorting, and image caching. Deleting a feed removes its records from the app database, but system backups, filesystem snapshots, or SQLite free pages can retain historic data for a period of time.</li>
                         <li><strong>Weather:</strong> Your chosen city, coordinates, and display preferences are stored in local app settings.</li>
                     </ul>
 

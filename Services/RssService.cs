@@ -1249,14 +1249,14 @@ CREATE TABLE IF NOT EXISTS rss_articles (
 
             using (var command = connection.CreateCommand())
             {
-                command.CommandText = "SELECT id, name, sort_order FROM rss_folders ORDER BY sort_order, name;";
+                command.CommandText = "SELECT id, name, sort_order FROM rss_folders ORDER BY sort_order;";
                 using var reader = command.ExecuteReader();
                 while (reader.Read())
                 {
                     cache.Folders.Add(new RssFolder
                     {
                         Id = reader.GetString(0),
-                        Name = reader.GetString(1),
+                        Name = UnprotectValue(reader.GetString(1)),
                         SortOrder = reader.GetInt32(2)
                     });
                 }
@@ -1264,14 +1264,14 @@ CREATE TABLE IF NOT EXISTS rss_articles (
 
             using (var command = connection.CreateCommand())
             {
-                command.CommandText = "SELECT id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks FROM rss_subscriptions ORDER BY title;";
+                command.CommandText = "SELECT id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks FROM rss_subscriptions;";
                 using var reader = command.ExecuteReader();
                 while (reader.Read())
                 {
                     cache.Subscriptions.Add(new RssSubscription
                     {
                         Id = reader.GetString(0),
-                        Title = reader.GetString(1),
+                        Title = UnprotectValue(reader.GetString(1)),
                         Url = UnprotectValue(reader.GetString(2)),
                         FolderId = reader.GetString(3),
                         ImageUrl = UnprotectValue(reader.GetString(4)),
@@ -1363,8 +1363,8 @@ LIMIT $take OFFSET $skip;
             {
                 Id = reader.GetString(0),
                 SubscriptionId = reader.GetString(1),
-                FeedTitle = reader.GetString(2),
-                Title = reader.GetString(3),
+                FeedTitle = UnprotectValue(reader.GetString(2)),
+                Title = UnprotectValue(reader.GetString(3)),
                 Link = UnprotectValue(reader.GetString(4)),
                 Summary = UnprotectValue(reader.GetString(5)),
                 HtmlContent = "",
@@ -1382,7 +1382,7 @@ INSERT INTO rss_folders(id, name, sort_order) VALUES ($id, $name, $sortOrder)
 ON CONFLICT(id) DO UPDATE SET name = excluded.name, sort_order = excluded.sort_order;
 """;
             command.Parameters.AddWithValue("$id", folder.Id ?? "");
-            command.Parameters.AddWithValue("$name", folder.Name ?? "");
+            command.Parameters.AddWithValue("$name", ProtectValue(folder.Name));
             command.Parameters.AddWithValue("$sortOrder", folder.SortOrder);
             command.ExecuteNonQuery();
         }
@@ -1403,7 +1403,7 @@ ON CONFLICT(id) DO UPDATE SET
     last_fetched_ticks = excluded.last_fetched_ticks;
 """;
             command.Parameters.AddWithValue("$id", subscription.Id ?? "");
-            command.Parameters.AddWithValue("$title", subscription.Title ?? "");
+            command.Parameters.AddWithValue("$title", ProtectValue(subscription.Title));
             command.Parameters.AddWithValue("$url", ProtectValue(subscription.Url));
             command.Parameters.AddWithValue("$folderId", subscription.FolderId ?? "");
             command.Parameters.AddWithValue("$imageUrl", ProtectValue(subscription.ImageUrl));
@@ -1432,8 +1432,8 @@ ON CONFLICT(id) DO UPDATE SET
 """;
             command.Parameters.AddWithValue("$id", article.Id ?? "");
             command.Parameters.AddWithValue("$subscriptionId", article.SubscriptionId ?? "");
-            command.Parameters.AddWithValue("$feedTitle", article.FeedTitle ?? "");
-            command.Parameters.AddWithValue("$title", article.Title ?? "");
+            command.Parameters.AddWithValue("$feedTitle", ProtectValue(article.FeedTitle));
+            command.Parameters.AddWithValue("$title", ProtectValue(article.Title));
             command.Parameters.AddWithValue("$link", ProtectValue(article.Link));
             command.Parameters.AddWithValue("$summary", ProtectValue(article.Summary));
             command.Parameters.AddWithValue("$htmlContent", ProtectValue(article.HtmlContent));
@@ -1459,7 +1459,7 @@ ON CONFLICT(id) DO UPDATE SET
     last_fetched_ticks = excluded.last_fetched_ticks;
 """;
                 subscriptionCommand.Parameters.AddWithValue("$id", subscription.Id ?? "");
-                subscriptionCommand.Parameters.AddWithValue("$title", subscription.Title ?? "");
+                subscriptionCommand.Parameters.AddWithValue("$title", ProtectValue(subscription.Title));
                 subscriptionCommand.Parameters.AddWithValue("$url", ProtectValue(subscription.Url));
                 subscriptionCommand.Parameters.AddWithValue("$folderId", subscription.FolderId ?? "");
                 subscriptionCommand.Parameters.AddWithValue("$imageUrl", ProtectValue(subscription.ImageUrl));
@@ -1483,8 +1483,8 @@ ON CONFLICT(id) DO UPDATE SET
 """;
                 command.Parameters.AddWithValue("$id", article.Id ?? "");
                 command.Parameters.AddWithValue("$subscriptionId", article.SubscriptionId ?? "");
-                command.Parameters.AddWithValue("$feedTitle", article.FeedTitle ?? "");
-                command.Parameters.AddWithValue("$title", article.Title ?? "");
+                command.Parameters.AddWithValue("$feedTitle", ProtectValue(article.FeedTitle));
+                command.Parameters.AddWithValue("$title", ProtectValue(article.Title));
                 command.Parameters.AddWithValue("$link", ProtectValue(article.Link));
                 command.Parameters.AddWithValue("$summary", ProtectValue(article.Summary));
                 command.Parameters.AddWithValue("$htmlContent", ProtectValue(article.HtmlContent));
@@ -1534,7 +1534,7 @@ ON CONFLICT(id) DO UPDATE SET
             using var connection = OpenConnection();
             using var command = connection.CreateCommand();
             command.CommandText = "UPDATE rss_articles SET feed_title = $title WHERE subscription_id = $subscriptionId;";
-            command.Parameters.AddWithValue("$title", title ?? "");
+            command.Parameters.AddWithValue("$title", ProtectValue(title));
             command.Parameters.AddWithValue("$subscriptionId", subscriptionId);
             command.ExecuteNonQuery();
         }
@@ -1558,20 +1558,43 @@ WHERE id NOT IN (
             using (var command = connection.CreateCommand())
             {
                 command.Transaction = transaction;
-                command.CommandText = "SELECT id, url, image_url FROM rss_subscriptions;";
+                command.CommandText = "SELECT id, name FROM rss_folders;";
                 using var reader = command.ExecuteReader();
-                var rows = new List<(string Id, string Url, string ImageUrl)>();
+                var rows = new List<(string Id, string Name)>();
                 while (reader.Read())
-                    rows.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+                    rows.Add((reader.GetString(0), reader.GetString(1)));
                 reader.Close();
 
                 foreach (var row in rows)
                 {
-                    if (IsProtectedValue(row.Url) && IsProtectedValue(row.ImageUrl)) continue;
+                    if (IsProtectedValue(row.Name)) continue;
                     using var update = connection.CreateCommand();
                     update.Transaction = transaction;
-                    update.CommandText = "UPDATE rss_subscriptions SET url = $url, image_url = $imageUrl WHERE id = $id;";
+                    update.CommandText = "UPDATE rss_folders SET name = $name WHERE id = $id;";
                     update.Parameters.AddWithValue("$id", row.Id);
+                    update.Parameters.AddWithValue("$name", ProtectValue(UnprotectValue(row.Name)));
+                    update.ExecuteNonQuery();
+                }
+            }
+
+            using (var command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = "SELECT id, title, url, image_url FROM rss_subscriptions;";
+                using var reader = command.ExecuteReader();
+                var rows = new List<(string Id, string Title, string Url, string ImageUrl)>();
+                while (reader.Read())
+                    rows.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
+                reader.Close();
+
+                foreach (var row in rows)
+                {
+                    if (IsProtectedValue(row.Title) && IsProtectedValue(row.Url) && IsProtectedValue(row.ImageUrl)) continue;
+                    using var update = connection.CreateCommand();
+                    update.Transaction = transaction;
+                    update.CommandText = "UPDATE rss_subscriptions SET title = $title, url = $url, image_url = $imageUrl WHERE id = $id;";
+                    update.Parameters.AddWithValue("$id", row.Id);
+                    update.Parameters.AddWithValue("$title", ProtectValue(UnprotectValue(row.Title)));
                     update.Parameters.AddWithValue("$url", ProtectValue(UnprotectValue(row.Url)));
                     update.Parameters.AddWithValue("$imageUrl", ProtectValue(UnprotectValue(row.ImageUrl)));
                     update.ExecuteNonQuery();
@@ -1581,24 +1604,26 @@ WHERE id NOT IN (
             using (var command = connection.CreateCommand())
             {
                 command.Transaction = transaction;
-                command.CommandText = "SELECT id, link, summary, html_content, image_url FROM rss_articles;";
+                command.CommandText = "SELECT id, feed_title, title, link, summary, html_content, image_url FROM rss_articles;";
                 using var reader = command.ExecuteReader();
-                var rows = new List<(string Id, string Link, string Summary, string Html, string ImageUrl)>();
+                var rows = new List<(string Id, string FeedTitle, string Title, string Link, string Summary, string Html, string ImageUrl)>();
                 while (reader.Read())
-                    rows.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4)));
+                    rows.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6)));
                 reader.Close();
 
                 foreach (var row in rows)
                 {
-                    if (IsProtectedValue(row.Link) && IsProtectedValue(row.Summary) && IsProtectedValue(row.Html) && IsProtectedValue(row.ImageUrl)) continue;
+                    if (IsProtectedValue(row.FeedTitle) && IsProtectedValue(row.Title) && IsProtectedValue(row.Link) && IsProtectedValue(row.Summary) && IsProtectedValue(row.Html) && IsProtectedValue(row.ImageUrl)) continue;
                     using var update = connection.CreateCommand();
                     update.Transaction = transaction;
                     update.CommandText = """
 UPDATE rss_articles
-SET link = $link, summary = $summary, html_content = $htmlContent, image_url = $imageUrl
+SET feed_title = $feedTitle, title = $title, link = $link, summary = $summary, html_content = $htmlContent, image_url = $imageUrl
 WHERE id = $id;
 """;
                     update.Parameters.AddWithValue("$id", row.Id);
+                    update.Parameters.AddWithValue("$feedTitle", ProtectValue(UnprotectValue(row.FeedTitle)));
+                    update.Parameters.AddWithValue("$title", ProtectValue(UnprotectValue(row.Title)));
                     update.Parameters.AddWithValue("$link", ProtectValue(UnprotectValue(row.Link)));
                     update.Parameters.AddWithValue("$summary", ProtectValue(UnprotectValue(row.Summary)));
                     update.Parameters.AddWithValue("$htmlContent", ProtectValue(UnprotectValue(row.Html)));
@@ -1652,7 +1677,7 @@ INSERT OR REPLACE INTO rss_folders(id, name, sort_order)
 VALUES ($id, $name, $sortOrder);
 """;
                 command.Parameters.AddWithValue("$id", folder.Id ?? "");
-                command.Parameters.AddWithValue("$name", folder.Name ?? "");
+                command.Parameters.AddWithValue("$name", ProtectValue(folder.Name));
                 command.Parameters.AddWithValue("$sortOrder", folder.SortOrder);
                 command.ExecuteNonQuery();
             }
@@ -1669,7 +1694,7 @@ INSERT OR REPLACE INTO rss_subscriptions(id, title, url, folder_id, image_url, l
 VALUES ($id, $title, $url, $folderId, $imageUrl, $localImagePath, $lastFetchedTicks);
 """;
                 command.Parameters.AddWithValue("$id", subscription.Id ?? "");
-                command.Parameters.AddWithValue("$title", subscription.Title ?? "");
+                command.Parameters.AddWithValue("$title", ProtectValue(subscription.Title));
                 command.Parameters.AddWithValue("$url", ProtectValue(subscription.Url));
                 command.Parameters.AddWithValue("$folderId", subscription.FolderId ?? "");
                 command.Parameters.AddWithValue("$imageUrl", ProtectValue(subscription.ImageUrl));
@@ -1693,8 +1718,8 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
 """;
                 command.Parameters.AddWithValue("$id", article.Id ?? "");
                 command.Parameters.AddWithValue("$subscriptionId", article.SubscriptionId ?? "");
-                command.Parameters.AddWithValue("$feedTitle", article.FeedTitle ?? "");
-                command.Parameters.AddWithValue("$title", article.Title ?? "");
+                command.Parameters.AddWithValue("$feedTitle", ProtectValue(article.FeedTitle));
+                command.Parameters.AddWithValue("$title", ProtectValue(article.Title));
                 command.Parameters.AddWithValue("$link", ProtectValue(article.Link));
                 command.Parameters.AddWithValue("$summary", ProtectValue(article.Summary));
                 command.Parameters.AddWithValue("$htmlContent", ProtectValue(article.HtmlContent));
