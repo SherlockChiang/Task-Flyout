@@ -182,11 +182,17 @@ namespace Task_Flyout.Services
         public static Task ClearLocalDataAsync()
             => Task.Run(() =>
             {
+                SqliteConnection.ClearAllPools();
+                var errors = new List<Exception>();
                 var databasePath = AppDataPathHelper.ResolveLocal("rss_cache.db");
                 foreach (var path in new[] { databasePath, databasePath + "-wal", databasePath + "-shm", AppDataPathHelper.ResolveLocal("rss_cache.json") })
                 {
                     try { File.Delete(path); }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        errors.Add(ex);
+                        System.Diagnostics.Debug.WriteLine($"RSS data cleanup failed for {path}: {ex.Message}");
+                    }
                 }
 
                 var imageCachePath = AppDataPathHelper.ResolveLocal(ImageCacheDirectoryName);
@@ -195,7 +201,14 @@ namespace Task_Flyout.Services
                     if (Directory.Exists(imageCachePath))
                         Directory.Delete(imageCachePath, recursive: true);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    errors.Add(ex);
+                    System.Diagnostics.Debug.WriteLine($"RSS image cleanup failed: {ex.Message}");
+                }
+
+                if (errors.Count > 0)
+                    throw new IOException("One or more RSS data files could not be removed.", new AggregateException(errors));
             });
 
         public IReadOnlyList<RssSubscription> GetSubscriptions()
