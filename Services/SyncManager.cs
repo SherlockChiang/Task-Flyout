@@ -18,7 +18,7 @@ namespace Task_Flyout.Services
         private int _cacheLoaded;
         private readonly ReaderWriterLockSlim _cacheLock = new(LockRecursionPolicy.NoRecursion);
         private readonly object _dataRequestLock = new();
-        private readonly Dictionary<string, Task<List<AgendaItem>>> _inFlightDataRequests = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, SharedDataRequest> _inFlightDataRequests = new(StringComparer.Ordinal);
         private const string StoreScope = "calendar";
         private const string CacheKey = "local_cache_winui3";
         private const int RetainedTaskPastYears = 1;
@@ -249,8 +249,8 @@ namespace Task_Flyout.Services
         public async Task<List<AgendaItem>> GetAllDataAsync(DateTime min, DateTime max, bool forceRefresh = false)
             => await GetAllDataAsync(min, max, forceRefresh, CancellationToken.None);
 
-        // A caller can stop waiting without cancelling the shared provider request. The
-        // underlying request may still serve another page and can update the local cache.
+        // A caller can stop waiting without cancelling work still needed by another caller.
+        // The provider request is cancelled only after its final waiter leaves.
         public async Task<List<AgendaItem>> GetAllDataAsync(DateTime min, DateTime max, bool forceRefresh, CancellationToken cancellationToken)
         {
             min = min.Date;
@@ -263,35 +263,67 @@ namespace Task_Flyout.Services
                     .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
             var requestKey = $"{min:yyyy-MM-dd}|{max:yyyy-MM-dd}|{forceRefresh}|{providerKey}";
 
-            Task<List<AgendaItem>> requestTask;
+            SharedDataRequest request;
             lock (_dataRequestLock)
             {
-                if (!_inFlightDataRequests.TryGetValue(requestKey, out requestTask!))
+                if (!_inFlightDataRequests.TryGetValue(requestKey, out request!))
                 {
-                    requestTask = GetAllDataCoreAsync(min, max, forceRefresh);
-                    _inFlightDataRequests[requestKey] = requestTask;
-                    _ = requestTask.ContinueWith(
-                        completedTask => RemoveCompletedDataRequest(requestKey, completedTask),
+                    var requestCancellation = new CancellationTokenSource();
+                    request = new SharedDataRequest(
+                        GetAllDataCoreAsync(min, max, forceRefresh, requestCancellation.Token),
+                        requestCancellation);
+                    _inFlightDataRequests[requestKey] = request;
+                    _ = request.Task.ContinueWith(
+                        _ => RemoveCompletedDataRequest(requestKey, request),
                         CancellationToken.None,
                         TaskContinuationOptions.ExecuteSynchronously,
                         TaskScheduler.Default);
                 }
+                request.WaiterCount++;
             }
 
-            var result = await requestTask.WaitAsync(cancellationToken);
-            return result.Select(CloneAgendaItem).ToList();
+            try
+            {
+                var result = await request.Task.WaitAsync(cancellationToken);
+                return result.Select(CloneAgendaItem).ToList();
+            }
+            finally
+            {
+                ReleaseDataRequestWaiter(requestKey, request);
+            }
         }
 
-        private void RemoveCompletedDataRequest(string requestKey, Task<List<AgendaItem>> completedTask)
+        private void ReleaseDataRequestWaiter(string requestKey, SharedDataRequest request)
+        {
+            bool cancelRequest = false;
+            lock (_dataRequestLock)
+            {
+                request.WaiterCount--;
+                if (request.WaiterCount == 0 && !request.Task.IsCompleted &&
+                    _inFlightDataRequests.TryGetValue(requestKey, out var current) && ReferenceEquals(current, request))
+                {
+                    _inFlightDataRequests.Remove(requestKey);
+                    cancelRequest = true;
+                }
+            }
+            if (cancelRequest)
+            {
+                try { request.Cancellation.Cancel(); }
+                catch (ObjectDisposedException) { }
+            }
+        }
+
+        private void RemoveCompletedDataRequest(string requestKey, SharedDataRequest completedRequest)
         {
             lock (_dataRequestLock)
             {
-                if (_inFlightDataRequests.TryGetValue(requestKey, out var current) && ReferenceEquals(current, completedTask))
+                if (_inFlightDataRequests.TryGetValue(requestKey, out var current) && ReferenceEquals(current, completedRequest))
                     _inFlightDataRequests.Remove(requestKey);
             }
+            completedRequest.Cancellation.Dispose();
         }
 
-        private async Task<List<AgendaItem>> GetAllDataCoreAsync(DateTime min, DateTime max, bool forceRefresh)
+        private async Task<List<AgendaItem>> GetAllDataCoreAsync(DateTime min, DateTime max, bool forceRefresh, CancellationToken cancellationToken)
         {
             EnsureCacheLoaded();
             min = min.Date;
@@ -313,13 +345,15 @@ namespace Task_Flyout.Services
                 try
                 {
                     await provider.EnsureAuthorizedAsync();
-                    var items = await provider.FetchDataAsync(min, max);
+                    var items = await provider.FetchDataAsync(min, max, cancellationToken);
                     return (Provider: provider.ProviderName, Items: items ?? new List<AgendaItem>(), Success: true);
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
                 catch { return (Provider: provider.ProviderName, Items: new List<AgendaItem>(), Success: false); }
             });
 
             var results = await Task.WhenAll(fetchTasks);
+            cancellationToken.ThrowIfCancellationRequested();
             foreach (var result in results)
             {
                 if (result.Success)
@@ -334,6 +368,13 @@ namespace Task_Flyout.Services
                 await SaveCacheAsync();
 
             return GetCachedItems(min, max);
+        }
+
+        private sealed class SharedDataRequest(Task<List<AgendaItem>> task, CancellationTokenSource cancellation)
+        {
+            public Task<List<AgendaItem>> Task { get; } = task;
+            public CancellationTokenSource Cancellation { get; } = cancellation;
+            public int WaiterCount { get; set; }
         }
 
         public async Task UpdateTaskStatusAsync(string providerName, string taskId, bool isCompleted)

@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
 using Microsoft.Windows.ApplicationModel.Resources;
@@ -220,7 +221,7 @@ namespace Task_Flyout.Services
             }
         }
 
-        public async Task<List<AgendaItem>> FetchDataAsync(DateTime startDate, DateTime endDate)
+        public async Task<List<AgendaItem>> FetchDataAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken)
         {
             await EnsureAuthorizedAsync();
 
@@ -228,7 +229,7 @@ namespace Task_Flyout.Services
             var calendarMap = new Dictionary<string, string>();
             try
             {
-                var calendars = await _graphClient.Me.Calendars.GetAsync();
+                var calendars = await _graphClient.Me.Calendars.GetAsync(cancellationToken: cancellationToken);
                 if (calendars?.Value != null)
                 {
                     foreach (var cal in calendars.Value)
@@ -238,11 +239,12 @@ namespace Task_Flyout.Services
                     }
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch { }
 
             // Fetch events and tasks in parallel
-            var eventsTask = FetchCalendarEventsAsync(startDate, endDate, calendarMap);
-            var tasksTask = FetchMicrosoftTasksAsync(startDate, endDate);
+            var eventsTask = FetchCalendarEventsAsync(startDate, endDate, calendarMap, cancellationToken);
+            var tasksTask = FetchMicrosoftTasksAsync(startDate, endDate, cancellationToken);
 
             await Task.WhenAll(eventsTask, tasksTask);
 
@@ -252,7 +254,7 @@ namespace Task_Flyout.Services
             return results;
         }
 
-        private async Task<List<AgendaItem>> FetchCalendarEventsAsync(DateTime startDate, DateTime endDate, Dictionary<string, string> calendarMap)
+        private async Task<List<AgendaItem>> FetchCalendarEventsAsync(DateTime startDate, DateTime endDate, Dictionary<string, string> calendarMap, CancellationToken cancellationToken)
         {
             var results = new List<AgendaItem>();
             try
@@ -263,7 +265,7 @@ namespace Task_Flyout.Services
                     req.QueryParameters.EndDateTime = endDate.ToString("o");
                     req.QueryParameters.Top = 500;
                     req.QueryParameters.Select = new[] { "id", "subject", "start", "end", "isAllDay", "location", "bodyPreview", "calendar", "recurrence", "seriesMasterId", "type" };
-                });
+                }, cancellationToken);
 
                 var allEvents = new List<Event>();
                 if (events != null)
@@ -276,13 +278,13 @@ namespace Task_Flyout.Services
                             allEvents.Add(ev);
                             return true;
                         });
-                    await pageIterator.IterateAsync();
+                    await pageIterator.IterateAsync(cancellationToken);
                 }
 
                 if (allEvents.Count > 0)
                 {
                     System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] Fetched {allEvents.Count} events");
-                    var recurrenceKinds = await FetchMicrosoftMasterRecurrenceKindsAsync(allEvents);
+                    var recurrenceKinds = await FetchMicrosoftMasterRecurrenceKindsAsync(allEvents, cancellationToken);
                     foreach (var ev in allEvents)
                     {
                         DateTime.TryParse(ev.Start?.DateTime, out var start);
@@ -349,6 +351,7 @@ namespace Task_Flyout.Services
                     }
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Microsoft.Graph.Models.ODataErrors.ODataError odataEx)
             {
                 System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] OData error: Code={odataEx.Error?.Code}, Message={odataEx.Error?.Message}");
@@ -360,7 +363,7 @@ namespace Task_Flyout.Services
             return results;
         }
 
-        private async Task<List<AgendaItem>> FetchMicrosoftTasksAsync(DateTime startDate, DateTime endDate)
+        private async Task<List<AgendaItem>> FetchMicrosoftTasksAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken)
         {
             var results = new List<AgendaItem>();
             var range = SyncRangePolicy.NormalizeHalfOpenDateRange(startDate, endDate);
@@ -369,7 +372,7 @@ namespace Task_Flyout.Services
                 var lists = await _graphClient.Me.Todo.Lists.GetAsync(req =>
                 {
                     req.QueryParameters.Top = 100;
-                });
+                }, cancellationToken);
 
                 var allLists = new List<TodoTaskList>();
                 if (lists != null)
@@ -382,7 +385,7 @@ namespace Task_Flyout.Services
                             allLists.Add(list);
                             return true;
                         });
-                    await listIterator.IterateAsync();
+                    await listIterator.IterateAsync(cancellationToken);
                 }
 
                 using var listGate = new System.Threading.SemaphoreSlim(4);
@@ -390,13 +393,13 @@ namespace Task_Flyout.Services
                     .Where(list => !string.IsNullOrWhiteSpace(list.Id))
                     .Select(async list =>
                     {
-                        await listGate.WaitAsync();
+                        await listGate.WaitAsync(cancellationToken);
                         try
                         {
                             var tasks = await _graphClient.Me.Todo.Lists[list.Id].Tasks.GetAsync(req =>
                             {
                                 req.QueryParameters.Top = 500;
-                            });
+                            }, cancellationToken);
 
                             var fetchedTasks = new List<TodoTask>();
                             if (tasks != null)
@@ -409,7 +412,7 @@ namespace Task_Flyout.Services
                                         fetchedTasks.Add(task);
                                         return true;
                                     });
-                                await pageIterator.IterateAsync();
+                                await pageIterator.IterateAsync(cancellationToken);
                             }
                             return (List: list, Tasks: fetchedTasks);
                         }
@@ -478,6 +481,7 @@ namespace Task_Flyout.Services
                     }
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Microsoft.Graph.Models.ODataErrors.ODataError odataEx)
             {
                 System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] OData error fetching tasks!");
@@ -630,7 +634,7 @@ namespace Task_Flyout.Services
             };
         }
 
-        private async Task<Dictionary<string, string>> FetchMicrosoftMasterRecurrenceKindsAsync(IEnumerable<Event> events)
+        private async Task<Dictionary<string, string>> FetchMicrosoftMasterRecurrenceKindsAsync(IEnumerable<Event> events, CancellationToken cancellationToken)
         {
             var eventIds = events
                 .Where(item => GetMicrosoftRecurrenceKind(item.Recurrence) == "None")
@@ -645,15 +649,16 @@ namespace Task_Flyout.Services
             using var gate = new System.Threading.SemaphoreSlim(4);
             var fetchTasks = eventIds.Select(async eventId =>
             {
-                await gate.WaitAsync();
+                await gate.WaitAsync(cancellationToken);
                 try
                 {
                     var master = await _graphClient.Me.Events[eventId].GetAsync(request =>
                     {
                         request.QueryParameters.Select = new[] { "id", "recurrence" };
-                    });
+                    }, cancellationToken);
                     return (EventId: eventId, Kind: GetMicrosoftRecurrenceKind(master?.Recurrence));
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
                 catch
                 {
                     return (EventId: eventId, Kind: "None");

@@ -219,19 +219,22 @@ namespace Task_Flyout.Services
         }
 
         public async Task<List<SubscribedCalendarInfo>> FetchCalendarListAsync()
+            => await FetchCalendarListAsync(CancellationToken.None);
+
+        private async Task<List<SubscribedCalendarInfo>> FetchCalendarListAsync(CancellationToken cancellationToken)
         {
             var now = DateTimeOffset.UtcNow;
             if (_cachedCalendarList != null && _calendarListCacheExpiresAt > now)
                 return CloneCalendars(_cachedCalendarList);
 
-            await _calendarListLock.WaitAsync();
+            await _calendarListLock.WaitAsync(cancellationToken);
             try
             {
                 now = DateTimeOffset.UtcNow;
                 if (_cachedCalendarList != null && _calendarListCacheExpiresAt > now)
                     return CloneCalendars(_cachedCalendarList);
 
-                var fetched = await FetchCalendarListFromApiAsync();
+                var fetched = await FetchCalendarListFromApiAsync(cancellationToken);
                 _cachedCalendarList = fetched;
                 _calendarListCacheExpiresAt = now.Add(CalendarListCacheDuration);
                 return CloneCalendars(fetched);
@@ -242,7 +245,7 @@ namespace Task_Flyout.Services
             }
         }
 
-        private async Task<List<SubscribedCalendarInfo>> FetchCalendarListFromApiAsync()
+        private async Task<List<SubscribedCalendarInfo>> FetchCalendarListFromApiAsync(CancellationToken cancellationToken)
         {
             var result = new List<SubscribedCalendarInfo>();
             if (CalendarSvc == null) return result;
@@ -255,7 +258,7 @@ namespace Task_Flyout.Services
                 {
                     var listRequest = CalendarSvc.CalendarList.List();
                     listRequest.PageToken = pageToken;
-                    var calendarList = await listRequest.ExecuteAsync();
+                    var calendarList = await listRequest.ExecuteAsync(cancellationToken);
                     if (calendarList?.Items != null)
                     {
                         foreach (var cal in calendarList.Items)
@@ -272,6 +275,7 @@ namespace Task_Flyout.Services
                     pageToken = SyncPaginationPolicy.GetNextPageToken(pageToken, calendarList?.NextPageToken, seenPageTokens);
                 } while (!string.IsNullOrEmpty(pageToken));
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[Google] Failed to fetch calendar list: {ex.Message}");
@@ -290,23 +294,23 @@ namespace Task_Flyout.Services
                 })
                 .ToList();
 
-        public async Task<List<AgendaItem>> FetchDataAsync(DateTime min, DateTime max)
+        public async Task<List<AgendaItem>> FetchDataAsync(DateTime min, DateTime max, CancellationToken cancellationToken)
         {
             await EnsureAuthorizedAsync();
             var calendarSvc = CalendarSvc!;
             var tasksSvc = TasksSvc!;
 
             // Fetch events from all calendars
-            var calendars = await FetchCalendarListAsync();
+            var calendars = await FetchCalendarListAsync(cancellationToken);
             if (calendars.Count == 0)
             {
                 calendars.Add(new SubscribedCalendarInfo { Id = "primary", Name = "Primary" });
             }
 
             var calendarTasks = calendars
-                .Select(cal => FetchCalendarEventsAsync(calendarSvc, cal, min, max))
+                .Select(cal => FetchCalendarEventsAsync(calendarSvc, cal, min, max, cancellationToken))
                 .ToList();
-            var tasksTask = FetchGoogleTasksAsync(tasksSvc, min, max);
+            var tasksTask = FetchGoogleTasksAsync(tasksSvc, min, max, cancellationToken);
 
             await Task.WhenAll(calendarTasks.Append(tasksTask));
 
@@ -318,7 +322,7 @@ namespace Task_Flyout.Services
             return items;
         }
 
-        private async Task<List<AgendaItem>> FetchCalendarEventsAsync(CalendarService calendarSvc, SubscribedCalendarInfo cal, DateTime min, DateTime max)
+        private async Task<List<AgendaItem>> FetchCalendarEventsAsync(CalendarService calendarSvc, SubscribedCalendarInfo cal, DateTime min, DateTime max, CancellationToken cancellationToken)
         {
             var items = new List<AgendaItem>();
             var allEvents = new List<Google.Apis.Calendar.v3.Data.Event>();
@@ -334,11 +338,12 @@ namespace Task_Flyout.Services
                     req.SingleEvents = true;
                     req.MaxResults = 2500;
                     req.PageToken = pageToken;
-                    var events = await req.ExecuteAsync().ConfigureAwait(false);
+                    var events = await req.ExecuteAsync(cancellationToken).ConfigureAwait(false);
                     if (events?.Items != null)
                         allEvents.AddRange(events.Items);
                     pageToken = SyncPaginationPolicy.GetNextPageToken(pageToken, events?.NextPageToken, seenPageTokens);
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"[Google] Failed to fetch events from calendar {cal.Id}: {ex.Message}");
@@ -346,7 +351,7 @@ namespace Task_Flyout.Services
                 }
             } while (pageToken != null);
 
-            var recurrenceKinds = await FetchGoogleMasterRecurrenceKindsAsync(calendarSvc, cal.Id, allEvents);
+            var recurrenceKinds = await FetchGoogleMasterRecurrenceKindsAsync(calendarSvc, cal.Id, allEvents, cancellationToken);
             foreach (var ev in allEvents)
             {
                 DateTime? date = ev.Start?.DateTimeDateTimeOffset?.DateTime ?? (DateTime.TryParse(ev.Start?.Date, out var d) ? d : null);
@@ -379,7 +384,7 @@ namespace Task_Flyout.Services
             return items;
         }
 
-        private async Task<List<AgendaItem>> FetchGoogleTasksAsync(TasksService tasksSvc, DateTime min, DateTime max)
+        private async Task<List<AgendaItem>> FetchGoogleTasksAsync(TasksService tasksSvc, DateTime min, DateTime max, CancellationToken cancellationToken)
         {
             var items = new List<AgendaItem>();
             var range = SyncRangePolicy.NormalizeHalfOpenDateRange(min, max);
@@ -389,7 +394,7 @@ namespace Task_Flyout.Services
             {
                 var tasksReq = tasksSvc.Tasks.List("@default");
                 tasksReq.ShowCompleted = true; tasksReq.ShowHidden = true; tasksReq.MaxResults = 100; tasksReq.PageToken = taskPageToken;
-                var tasks = await tasksReq.ExecuteAsync().ConfigureAwait(false);
+                var tasks = await tasksReq.ExecuteAsync(cancellationToken).ConfigureAwait(false);
                 if (tasks?.Items != null)
                 {
                     foreach (var t in tasks.Items)
@@ -548,7 +553,8 @@ namespace Task_Flyout.Services
         private static async Task<Dictionary<string, string>> FetchGoogleMasterRecurrenceKindsAsync(
             CalendarService calendarSvc,
             string calendarId,
-            IEnumerable<Google.Apis.Calendar.v3.Data.Event> events)
+            IEnumerable<Google.Apis.Calendar.v3.Data.Event> events,
+            CancellationToken cancellationToken)
         {
             var eventIds = events
                 .Where(item => GetGoogleRecurrenceKind(item.Recurrence) == "None")
@@ -563,12 +569,13 @@ namespace Task_Flyout.Services
             using var gate = new SemaphoreSlim(4);
             var fetchTasks = eventIds.Select(async eventId =>
             {
-                await gate.WaitAsync();
+                await gate.WaitAsync(cancellationToken);
                 try
                 {
-                    var master = await calendarSvc.Events.Get(calendarId, eventId).ExecuteAsync();
+                    var master = await calendarSvc.Events.Get(calendarId, eventId).ExecuteAsync(cancellationToken);
                     return (EventId: eventId, Kind: GetGoogleRecurrenceKind(master.Recurrence));
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
                 catch
                 {
                     return (EventId: eventId, Kind: "None");
