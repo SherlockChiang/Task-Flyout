@@ -11,5 +11,8 @@ namespace Task_Flyout.Services
 
         public static bool IsValidImapCursor(uint? cursorUidValidity, uint currentUidValidity, uint? beforeUid)
             => cursorUidValidity == currentUidValidity && beforeUid is > 1;
+
+        public static bool IsValidImapMutation(uint? storedUidValidity, uint currentUidValidity, uint uid)
+            => storedUidValidity is > 0 && storedUidValidity == currentUidValidity && uid > 0;
     }
 }

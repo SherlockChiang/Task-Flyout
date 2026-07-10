@@ -23,4 +23,15 @@ public class MailPaginationPolicyTests
     {
         Assert.Equal(expected, MailPaginationPolicy.IsValidImapCursor(storedValidity, currentValidity, beforeUid));
     }
+
+    [Theory]
+    [InlineData(42u, 42u, 100u, true)]
+    [InlineData(41u, 42u, 100u, false)]
+    [InlineData(null, 42u, 100u, false)]
+    [InlineData(0u, 0u, 100u, false)]
+    [InlineData(42u, 42u, 0u, false)]
+    public void Imap_mutation_requires_matching_uid_validity_and_valid_uid(uint? storedValidity, uint currentValidity, uint uid, bool expected)
+    {
+        Assert.Equal(expected, MailPaginationPolicy.IsValidImapMutation(storedValidity, currentValidity, uid));
+    }
 }

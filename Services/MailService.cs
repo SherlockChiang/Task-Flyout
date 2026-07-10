@@ -97,6 +97,7 @@ namespace Task_Flyout.Services
         public string AccountId { get; set; } = "";
         public string FolderId { get; set; } = "";
         public string Id { get; set; } = "";
+        public uint? ImapUidValidity { get; set; }
         public string Subject { get; set; } = "";
         public string Sender { get; set; } = "";
         public string SenderAddress { get; set; } = "";
@@ -147,6 +148,7 @@ namespace Task_Flyout.Services
         public string FolderId { get; set; } = "";
         public string MessageId { get; set; } = "";
         public MailAccountKind ProviderKind { get; set; }
+        public uint? ImapUidValidity { get; set; }
         public int FailureCount { get; set; }
         public long CreatedUtcTicks { get; set; }
         public long NextAttemptUtcTicks { get; set; }
@@ -443,7 +445,7 @@ namespace Task_Flyout.Services
             lock (_mailCacheLock)
             {
                 nextAttemptUtcTicks = _persistentCache?.PendingMutations
-                    .Where(mutation => mutation.ProviderKind != MailAccountKind.Imap && setupAccountIds.Contains(mutation.AccountId))
+                    .Where(mutation => setupAccountIds.Contains(mutation.AccountId))
                     .Select(mutation => (long?)mutation.NextAttemptUtcTicks)
                     .Min();
             }
@@ -706,7 +708,10 @@ namespace Task_Flyout.Services
             int requestedPageSize = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
             string cacheKey = GetMessageCacheKey(account.Id, folder.Id, unreadOnly);
             if (!forceRefresh && !loadMore && TryGetCachedMessages(cacheKey, out var cachedWindow))
-                return cachedWindow;
+            {
+                if (account.Kind != MailAccountKind.Imap || cachedWindow.Items.All(item => item.ImapUidValidity.HasValue))
+                    return cachedWindow;
+            }
 
             MailCursor? cursor = null;
             List<MailItem> existingItems = new();
@@ -841,8 +846,10 @@ namespace Task_Flyout.Services
                 await ConnectImapAsync(client, account, GetImapPassword(account.Id), operationToken);
                 var folder = await client.GetFolderAsync(item.FolderId, operationToken);
                 await folder.OpenAsync(FolderAccess.ReadWrite, operationToken);
-                if (uint.TryParse(item.Id, out var uidValue))
-                    await folder.AddFlagsAsync(new UniqueId(uidValue), MessageFlags.Seen, true, operationToken);
+                if (!uint.TryParse(item.Id, out var uidValue) ||
+                    !MailPaginationPolicy.IsValidImapMutation(item.ImapUidValidity, folder.UidValidity, uidValue))
+                    throw new InvalidOperationException("IMAP message identity is no longer valid for this folder.");
+                await folder.AddFlagsAsync(new UniqueId(uidValue), MessageFlags.Seen, true, operationToken);
                 await client.DisconnectAsync(true, operationToken);
             }
         }
@@ -865,9 +872,7 @@ namespace Task_Flyout.Services
 
         private bool EnqueuePendingReadMutation(MailAccount account, MailItem item)
         {
-            // IMAP UIDs are unsafe to replay after reconnect unless the original UIDVALIDITY
-            // is also known. The current list item does not carry it, so never persist that write.
-            if (account.Kind == MailAccountKind.Imap) return false;
+            if (account.Kind == MailAccountKind.Imap && !item.ImapUidValidity.HasValue) return false;
 
             EnsurePersistentCacheLoaded();
             lock (_mailCacheLock)
@@ -885,9 +890,15 @@ namespace Task_Flyout.Services
                         FolderId = item.FolderId,
                         MessageId = item.Id,
                         ProviderKind = account.Kind,
+                        ImapUidValidity = item.ImapUidValidity,
                         CreatedUtcTicks = DateTimeOffset.UtcNow.UtcTicks
                     };
                     _persistentCache.PendingMutations.Add(pending);
+                }
+                else
+                {
+                    pending.ProviderKind = account.Kind;
+                    pending.ImapUidValidity = item.ImapUidValidity;
                 }
 
                 pending.FailureCount = Math.Max(1, pending.FailureCount + 1);
@@ -1198,6 +1209,7 @@ namespace Task_Flyout.Services
                             AccountId = mutation.AccountId,
                             FolderId = mutation.FolderId,
                             Id = mutation.MessageId,
+                            ImapUidValidity = mutation.ImapUidValidity,
                             IsRead = true
                         }, timeoutCts.Token);
                         changed |= RemovePendingMutation(mutation);
@@ -1253,6 +1265,7 @@ namespace Task_Flyout.Services
                 FolderId = mutation.FolderId,
                 MessageId = mutation.MessageId,
                 ProviderKind = mutation.ProviderKind,
+                ImapUidValidity = mutation.ImapUidValidity,
                 FailureCount = mutation.FailureCount,
                 CreatedUtcTicks = mutation.CreatedUtcTicks,
                 NextAttemptUtcTicks = mutation.NextAttemptUtcTicks
@@ -1638,6 +1651,7 @@ namespace Task_Flyout.Services
                         AccountId = account.Id,
                         FolderId = folder.Id,
                         Id = id.Id.ToString(),
+                        ImapUidValidity = mailFolder.UidValidity,
                         Subject = _loader.GetStringOrDefault("TextMailReadError") ?? "Unable to read this email",
                         Sender = account.DisplayTitle,
                         Preview = _loader.GetStringOrDefault("TextMailFetchError") ?? "IMAP server returned an invalid FETCH response.",
@@ -1679,6 +1693,7 @@ namespace Task_Flyout.Services
                     AccountId = account.Id,
                     FolderId = folder.Id,
                     Id = id.Id.ToString(),
+                    ImapUidValidity = mailFolder.UidValidity,
                     Subject = string.IsNullOrWhiteSpace(summary?.Envelope?.Subject) ? "(No subject)" : summary.Envelope.Subject,
                     Sender = FormatInternetAddressList(summary?.Envelope?.From),
                     SenderAddress = summary?.Envelope?.From?.Mailboxes?.FirstOrDefault()?.Address ?? "",
@@ -1694,7 +1709,7 @@ namespace Task_Flyout.Services
             try
             {
                 var message = await mailFolder.GetMessageAsync(id, cancellationToken);
-                var item = ToImapMailItem(account.Id, folder.Id, id.Id.ToString(), message, isRead);
+                var item = ToImapMailItem(account.Id, folder.Id, id.Id.ToString(), mailFolder.UidValidity, message, isRead);
                 if (string.IsNullOrWhiteSpace(item.Preview))
                     item.Preview = preview;
                 return item;
@@ -1708,6 +1723,7 @@ namespace Task_Flyout.Services
                     AccountId = account.Id,
                     FolderId = folder.Id,
                     Id = id.Id.ToString(),
+                    ImapUidValidity = mailFolder.UidValidity,
                     Subject = "(No subject)",
                     Sender = account.DisplayTitle,
                     Preview = preview,
@@ -2180,7 +2196,7 @@ namespace Task_Flyout.Services
             };
         }
 
-        private static MailItem ToImapMailItem(string accountId, string folderId, string id, MimeMessage message, bool isRead)
+        private static MailItem ToImapMailItem(string accountId, string folderId, string id, uint uidValidity, MimeMessage message, bool isRead)
         {
             string rawText = message.TextBody ?? "";
             string htmlBody = !string.IsNullOrWhiteSpace(message.HtmlBody)
@@ -2194,6 +2210,7 @@ namespace Task_Flyout.Services
                 AccountId = accountId,
                 FolderId = folderId,
                 Id = id,
+                ImapUidValidity = uidValidity,
                 Subject = string.IsNullOrWhiteSpace(message.Subject) ? "(No subject)" : message.Subject,
                 Sender = FormatInternetAddressList(message.From),
                 SenderAddress = message.From?.Mailboxes?.FirstOrDefault()?.Address ?? "",
@@ -2769,6 +2786,7 @@ namespace Task_Flyout.Services
                 AccountId = item.AccountId,
                 FolderId = item.FolderId,
                 Id = item.Id,
+                ImapUidValidity = item.ImapUidValidity,
                 Subject = item.Subject,
                 Sender = item.Sender,
                 SenderAddress = item.SenderAddress,
