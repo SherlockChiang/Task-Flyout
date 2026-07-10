@@ -59,6 +59,9 @@ namespace Task_Flyout.Views
         private int _messageLoadVersion;
         private DateTimeOffset? _lastMessageLoadSucceededAt;
         private Task? _refreshAccountsTask;
+        private CancellationTokenSource _pageRequestCts = new();
+        private CancellationTokenSource? _messageLoadCts;
+        private CancellationTokenSource? _bodyLoadCts;
         internal bool IsOpeningFromNotification { get; set; }
 
         public MailPage()
@@ -91,6 +94,9 @@ namespace Task_Flyout.Views
 
         public void DisposeLikeCleanup()
         {
+            _pageRequestCts.Cancel();
+            _messageLoadCts?.Cancel();
+            _bodyLoadCts?.Cancel();
             _messageLoadVersion++;
             ReleaseMessageBodies();
             _selectedItem = null;
@@ -110,6 +116,11 @@ namespace Task_Flyout.Views
 
         private async void MailPage_Loaded(object sender, RoutedEventArgs e)
         {
+            if (_pageRequestCts.IsCancellationRequested)
+            {
+                _pageRequestCts.Dispose();
+                _pageRequestCts = new CancellationTokenSource();
+            }
             _mailService = (App.Current as App)?.MailService;
             MailListView.ItemsSource = _items;
             _isInitializing = false;
@@ -244,10 +255,11 @@ namespace Task_Flyout.Views
 
             node.Children.Clear();
             node.HasUnrealizedChildren = false;
+            var cancellationToken = _pageRequestCts.Token;
 
             try
             {
-                var folders = await _mailService.FetchFoldersAsync(account, forceRefresh);
+                var folders = await _mailService.FetchFoldersAsync(account, forceRefresh, cancellationToken);
                 foreach (var folder in folders)
                 {
                     var child = new TreeViewNode
@@ -259,6 +271,7 @@ namespace Task_Flyout.Views
                     _folderNodes[child] = (account, folder);
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Load folders failed: {ex.Message}");
@@ -450,6 +463,9 @@ namespace Task_Flyout.Views
             var loadVersion = ++_messageLoadVersion;
             var account = _selectedAccount;
             var folder = _selectedFolder;
+            _messageLoadCts?.Cancel();
+            var requestCts = CancellationTokenSource.CreateLinkedTokenSource(_pageRequestCts.Token);
+            _messageLoadCts = requestCts;
 
             // A fresh load (folder switch, refresh, toggle) starts from the base page
             // size again; only "Load more" keeps the grown window.
@@ -467,7 +483,7 @@ namespace Task_Flyout.Views
 
             try
             {
-                var messages = await _mailService.FetchMessagesAsync(account, folder, UnreadOnlyToggle.IsOn, pageSize: _loadedCount, forceRefresh: forceRefresh || loadMore);
+                var messages = await _mailService.FetchMessagesAsync(account, folder, UnreadOnlyToggle.IsOn, pageSize: _loadedCount, forceRefresh: forceRefresh || loadMore, cancellationToken: requestCts.Token);
                 if (loadVersion != _messageLoadVersion || !ReferenceEquals(account, _selectedAccount) || !ReferenceEquals(folder, _selectedFolder))
                     return;
                 var previousSelectedId = !string.IsNullOrWhiteSpace(preferredMessageId) ? preferredMessageId : _selectedItem?.Id;
@@ -510,6 +526,7 @@ namespace Task_Flyout.Views
                 if (_items.Count == 0)
                     ClearDetail();
             }
+            catch (OperationCanceledException) when (requestCts.IsCancellationRequested) { }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Load messages failed: {ex.Message}");
@@ -525,6 +542,9 @@ namespace Task_Flyout.Views
                     LoadMoreButton.IsEnabled = true;
                     UnreadOnlyToggle.IsEnabled = true;
                 }
+                if (ReferenceEquals(_messageLoadCts, requestCts))
+                    _messageLoadCts = null;
+                requestCts.Dispose();
             }
         }
 
@@ -860,6 +880,10 @@ namespace Task_Flyout.Views
             }
 
             _selectedItem = item;
+            _bodyLoadCts?.Cancel();
+            var bodyCts = CancellationTokenSource.CreateLinkedTokenSource(_pageRequestCts.Token);
+            _bodyLoadCts = bodyCts;
+            var account = _selectedAccount;
             _showRemoteImagesForCurrentMessage = false; // reset the per-message image override
             AddAccountPanel.Visibility = Visibility.Collapsed;
             ComposePanel.Visibility = Visibility.Collapsed;
@@ -872,10 +896,21 @@ namespace Task_Flyout.Views
             UpdateTrustButton(item);
 
             if (string.IsNullOrWhiteSpace(item.BodyText) && string.IsNullOrWhiteSpace(item.HtmlBody)
-                && _mailService != null && _selectedAccount != null)
+                && _mailService != null && account != null)
             {
-                try { await _mailService.FetchMessageBodyAsync(_selectedAccount, item); }
+                try { await _mailService.FetchMessageBodyAsync(account, item, bodyCts.Token); }
+                catch (OperationCanceledException) when (bodyCts.IsCancellationRequested)
+                {
+                    CompleteBodyLoad(bodyCts);
+                    return;
+                }
                 catch { }
+            }
+
+            if (bodyCts.IsCancellationRequested || !ReferenceEquals(item, _selectedItem))
+            {
+                CompleteBodyLoad(bodyCts);
+                return;
             }
 
             await RenderMailBodyAsync(item);
@@ -884,6 +919,15 @@ namespace Task_Flyout.Views
 
             if (markAsReadTask != null)
                 _ = CompleteMarkAsReadAsync(markAsReadTask);
+
+            CompleteBodyLoad(bodyCts);
+        }
+
+        private void CompleteBodyLoad(CancellationTokenSource bodyCts)
+        {
+            if (ReferenceEquals(_bodyLoadCts, bodyCts))
+                _bodyLoadCts = null;
+            bodyCts.Dispose();
         }
 
         private Task? MarkSelectedMailReadOptimistically(MailItem item)
@@ -933,6 +977,7 @@ namespace Task_Flyout.Views
 
         private void ClearDetail()
         {
+            _bodyLoadCts?.Cancel();
             _selectedItem = null;
             DetailPanel.Visibility = Visibility.Collapsed;
             DetailHtmlViewHost.Visibility = Visibility.Collapsed;
@@ -975,6 +1020,7 @@ namespace Task_Flyout.Views
 
         private async Task RenderMailBodyAsync(MailItem item)
         {
+            if (!ReferenceEquals(item, _selectedItem)) return;
             RemoteImageBanner.Visibility = Visibility.Collapsed;
 
             if (!string.IsNullOrWhiteSpace(item.HtmlBody))
@@ -1037,7 +1083,8 @@ namespace Task_Flyout.Views
                 }
             }
 
-            ShowPlainTextMailBody(item);
+            if (ReferenceEquals(item, _selectedItem))
+                ShowPlainTextMailBody(item);
         }
 
         private async void ShowRemoteImagesButton_Click(object sender, RoutedEventArgs e)

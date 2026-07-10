@@ -68,12 +68,12 @@ namespace Task_Flyout.Services
             _graphClientScopes = scopes;
         }
 
-        public async Task<GraphServiceClient> EnsureMailAuthorizedAsync(bool requireWrite = false, bool requireSend = false)
+        public async Task<GraphServiceClient> EnsureMailAuthorizedAsync(bool requireWrite = false, bool requireSend = false, CancellationToken cancellationToken = default)
         {
             var scopes = MergeScopes(BuildMailScopes(requireWrite, requireSend), _graphClientScopes);
             if (_graphClient == null || !HasScopes(_graphClientScopes, scopes))
             {
-                _graphClient = await CreateAuthorizedGraphClientAsync(scopes);
+                _graphClient = await CreateAuthorizedGraphClientAsync(scopes, cancellationToken);
                 _graphClientScopes = scopes;
             }
 

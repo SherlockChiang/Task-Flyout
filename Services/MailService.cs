@@ -500,7 +500,7 @@ namespace Task_Flyout.Services
             return account;
         }
 
-        public async Task<List<MailFolder>> FetchFoldersAsync(MailAccount account, bool forceRefresh = false)
+        public async Task<List<MailFolder>> FetchFoldersAsync(MailAccount account, bool forceRefresh = false, CancellationToken cancellationToken = default)
         {
             string cacheKey = account.Id;
             if (!forceRefresh && TryGetCachedFolders(cacheKey, out var cachedFolders))
@@ -509,11 +509,11 @@ namespace Task_Flyout.Services
             List<MailFolder> folders;
             if (account.Kind == MailAccountKind.Google && account.IsSetupComplete)
             {
-                folders = await FetchGoogleFoldersAsync(account);
+                folders = await FetchGoogleFoldersAsync(account, cancellationToken);
             }
             else if (account.Kind == MailAccountKind.Imap && account.IsSetupComplete)
             {
-                folders = await FetchImapFoldersAsync(account);
+                folders = await FetchImapFoldersAsync(account, cancellationToken);
             }
             else if (account.Kind != MailAccountKind.Outlook || !account.IsSetupComplete)
             {
@@ -530,14 +530,14 @@ namespace Task_Flyout.Services
             }
             else
             {
-                await EnsureOutlookMailReadAuthorizedAsync();
+                await EnsureOutlookMailReadAuthorizedAsync(cancellationToken);
                 if (_outlookClient == null) return new List<MailFolder>();
 
                 var response = await _outlookClient.Me.MailFolders.GetAsync(request =>
                 {
                     request.QueryParameters.Top = 50;
                     request.QueryParameters.Select = new[] { "id", "displayName", "unreadItemCount" };
-                });
+                }, cancellationToken);
 
                 folders = response?.Value?
                     .Where(folder => folder != null && !string.IsNullOrWhiteSpace(folder.Id))
@@ -559,7 +559,7 @@ namespace Task_Flyout.Services
             return folders;
         }
 
-        public async Task<List<MailItem>> FetchMessagesAsync(MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize = null, bool forceRefresh = false)
+        public async Task<List<MailItem>> FetchMessagesAsync(MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize = null, bool forceRefresh = false, CancellationToken cancellationToken = default)
         {
             string cacheKey = GetMessageCacheKey(account.Id, folder.Id, unreadOnly, pageSize ?? PageSize);
             if (!forceRefresh && TryGetCachedMessages(cacheKey, out var cachedMessages))
@@ -568,11 +568,11 @@ namespace Task_Flyout.Services
             List<MailItem> messages;
             if (account.Kind == MailAccountKind.Google)
             {
-                messages = await FetchGoogleMessagesAsync(account, folder, unreadOnly, pageSize);
+                messages = await FetchGoogleMessagesAsync(account, folder, unreadOnly, pageSize, cancellationToken);
             }
             else if (account.Kind == MailAccountKind.Imap)
             {
-                messages = await FetchImapMessagesAsync(account, folder, unreadOnly, pageSize);
+                messages = await FetchImapMessagesAsync(account, folder, unreadOnly, pageSize, cancellationToken);
             }
             else if (account.Kind != MailAccountKind.Outlook || !account.IsSetupComplete || folder.IsPlaceholder)
             {
@@ -580,7 +580,7 @@ namespace Task_Flyout.Services
             }
             else
             {
-                await EnsureOutlookMailReadAuthorizedAsync();
+                await EnsureOutlookMailReadAuthorizedAsync(cancellationToken);
                 if (_outlookClient == null) return new List<MailItem>();
 
                 int top = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
@@ -595,7 +595,7 @@ namespace Task_Flyout.Services
                     request.QueryParameters.Orderby = new[] { "receivedDateTime desc" };
                     if (unreadOnly)
                         request.QueryParameters.Filter = "isRead eq false";
-                });
+                }, cancellationToken);
 
                 messages = response?.Value?
                     .Where(message => message != null)
@@ -670,7 +670,7 @@ namespace Task_Flyout.Services
             UpdateCachedReadState(item);
         }
 
-        public async Task FetchMessageBodyAsync(MailAccount account, MailItem item)
+        public async Task FetchMessageBodyAsync(MailAccount account, MailItem item, CancellationToken cancellationToken = default)
         {
             if (!string.IsNullOrWhiteSpace(item.BodyText) || !string.IsNullOrWhiteSpace(item.HtmlBody))
             {
@@ -680,13 +680,13 @@ namespace Task_Flyout.Services
 
             if (account.Kind == MailAccountKind.Outlook)
             {
-                await EnsureOutlookMailReadAuthorizedAsync();
+                await EnsureOutlookMailReadAuthorizedAsync(cancellationToken);
                 if (_outlookClient == null) return;
 
                 var message = await _outlookClient.Me.Messages[item.Id].GetAsync(request =>
                 {
                     request.QueryParameters.Select = new[] { "body" };
-                });
+                }, cancellationToken);
                 if (message?.Body?.Content != null)
                 {
                     var content = message.Body.Content;
@@ -697,10 +697,10 @@ namespace Task_Flyout.Services
             }
             else if (account.Kind == MailAccountKind.Google)
             {
-                var gmail = await EnsureGoogleMailReadAuthorizedAsync();
+                var gmail = await EnsureGoogleMailReadAuthorizedAsync(cancellationToken);
                 var get = gmail.Users.Messages.Get("me", item.Id);
                 get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Full;
-                var full = await get.ExecuteAsync();
+                var full = await get.ExecuteAsync(cancellationToken);
                 if (full?.Payload != null)
                 {
                     string body = ExtractGoogleBody(full.Payload);
@@ -719,12 +719,12 @@ namespace Task_Flyout.Services
             else if (account.Kind == MailAccountKind.Imap)
             {
                 using var client = new ImapClient();
-                await ConnectImapAsync(client, account, GetImapPassword(account.Id));
-                var folder = await client.GetFolderAsync(item.FolderId);
-                await folder.OpenAsync(FolderAccess.ReadOnly);
+                await ConnectImapAsync(client, account, GetImapPassword(account.Id), cancellationToken);
+                var folder = await client.GetFolderAsync(item.FolderId, cancellationToken);
+                await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
                 if (uint.TryParse(item.Id, out var uidValue))
                 {
-                    var message = await folder.GetMessageAsync(new UniqueId(uidValue));
+                    var message = await folder.GetMessageAsync(new UniqueId(uidValue), cancellationToken);
                     string rawText = message.TextBody ?? "";
                     string htmlBody = !string.IsNullOrWhiteSpace(message.HtmlBody)
                         ? message.HtmlBody
@@ -1086,9 +1086,9 @@ namespace Task_Flyout.Services
             return CloneMailItems(messages, includeBodies: false);
         }
 
-        private async Task<GmailService> EnsureGoogleMailReadAuthorizedAsync()
+        private async Task<GmailService> EnsureGoogleMailReadAuthorizedAsync(CancellationToken cancellationToken = default)
         {
-            return await EnsureGoogleMailAuthorizedAsync(requireModify: false, requireSend: false);
+            return await EnsureGoogleMailAuthorizedAsync(requireModify: false, requireSend: false, cancellationToken);
         }
 
         private async Task<GmailService> EnsureGoogleMailModifyAuthorizedAsync()
@@ -1101,14 +1101,14 @@ namespace Task_Flyout.Services
             return await EnsureGoogleMailAuthorizedAsync(requireModify: false, requireSend: true);
         }
 
-        private async Task<GmailService> EnsureGoogleMailAuthorizedAsync(bool requireModify, bool requireSend)
+        private async Task<GmailService> EnsureGoogleMailAuthorizedAsync(bool requireModify, bool requireSend, CancellationToken cancellationToken = default)
         {
             EnsureAccountsLoaded();
 
             if (App.Current is App app &&
                 app.SyncManager.GetProvider("Google") is GoogleSyncProvider googleProvider)
             {
-                return await googleProvider.EnsureGmailAuthorizedAsync(requireModify, requireSend);
+                return await googleProvider.EnsureGmailAuthorizedAsync(requireModify, requireSend, cancellationToken);
             }
 
             throw new InvalidOperationException("Google provider is not available.");
@@ -1121,21 +1121,22 @@ namespace Task_Flyout.Services
             await client.DisconnectAsync(true);
         }
 
-        private async Task<List<MailFolder>> FetchImapFoldersAsync(MailAccount account)
+        private async Task<List<MailFolder>> FetchImapFoldersAsync(MailAccount account, CancellationToken cancellationToken)
         {
             using var client = new ImapClient();
-            await ConnectImapAsync(client, account, GetImapPassword(account.Id));
+            await ConnectImapAsync(client, account, GetImapPassword(account.Id), cancellationToken);
 
             var result = new List<MailFolder>();
-            var folders = await client.GetFoldersAsync(client.PersonalNamespaces.FirstOrDefault() ?? client.PersonalNamespaces[0]);
+            var folders = await client.GetFoldersAsync(client.PersonalNamespaces.FirstOrDefault() ?? client.PersonalNamespaces[0], cancellationToken: cancellationToken);
             foreach (var folder in folders.Where(folder => (folder.Attributes & FolderAttributes.NonExistent) == 0))
             {
                 int? unreadCount = null;
                 try
                 {
-                    await folder.StatusAsync(StatusItems.Unread);
+                    await folder.StatusAsync(StatusItems.Unread, cancellationToken);
                     unreadCount = folder.Unread;
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
                 catch { }
 
                 result.Add(new MailFolder
@@ -1147,7 +1148,7 @@ namespace Task_Flyout.Services
                 });
             }
 
-            await client.DisconnectAsync(true);
+            await client.DisconnectAsync(true, cancellationToken);
 
             return result
                 .Where(folder => !IsNoisyImapFolder(folder.Id, folder.DisplayName))
@@ -1158,32 +1159,37 @@ namespace Task_Flyout.Services
                 .ToList();
         }
 
-        private async Task<List<MailItem>> FetchImapMessagesAsync(MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize)
+        private async Task<List<MailItem>> FetchImapMessagesAsync(MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize, CancellationToken cancellationToken)
         {
             if (!account.IsSetupComplete || folder.IsPlaceholder)
                 return new List<MailItem>();
 
             using var client = new ImapClient();
-            await ConnectImapAsync(client, account, GetImapPassword(account.Id));
+            await ConnectImapAsync(client, account, GetImapPassword(account.Id), cancellationToken);
             try
             {
-                return await FetchImapMessagesWithClientAsync(client, account, folder, unreadOnly, pageSize);
+                return await FetchImapMessagesWithClientAsync(client, account, folder, unreadOnly, pageSize, cancellationToken);
             }
             finally
             {
-                try { await client.DisconnectAsync(true); } catch { }
+                try
+                {
+                    if (!cancellationToken.IsCancellationRequested)
+                        await client.DisconnectAsync(true, cancellationToken);
+                }
+                catch { }
             }
         }
 
         // Core fetch against an already-connected client; the caller owns the connection
         // lifetime (UI path opens/closes per call; the poll path reuses a persistent one).
-        private async Task<List<MailItem>> FetchImapMessagesWithClientAsync(ImapClient client, MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize)
+        private async Task<List<MailItem>> FetchImapMessagesWithClientAsync(ImapClient client, MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize, CancellationToken cancellationToken = default)
         {
-            var mailFolder = await client.GetFolderAsync(folder.Id);
-            await mailFolder.OpenAsync(FolderAccess.ReadOnly);
+            var mailFolder = await client.GetFolderAsync(folder.Id, cancellationToken);
+            await mailFolder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
 
             var query = unreadOnly ? MailKit.Search.SearchQuery.NotSeen : MailKit.Search.SearchQuery.All;
-            var ids = await mailFolder.SearchAsync(query);
+            var ids = await mailFolder.SearchAsync(query, cancellationToken);
             int top = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
             var selectedIds = ids.Reverse().Take(top).ToList();
 
@@ -1191,8 +1197,9 @@ namespace Task_Flyout.Services
             IList<IMessageSummary>? summaries = null;
             try
             {
-                summaries = await mailFolder.FetchAsync(selectedIds, summaryItems);
+                summaries = await mailFolder.FetchAsync(selectedIds, summaryItems, cancellationToken);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch
             {
                 // Some IMAP servers return malformed FETCH responses for summaries.
@@ -1203,11 +1210,12 @@ namespace Task_Flyout.Services
             {
                 var summary = summaries?.FirstOrDefault(s => s.UniqueId == id);
                 bool isRead = summary?.Flags?.HasFlag(MessageFlags.Seen) == true
-                    || (unreadOnly ? false : await GetImapReadStateAsync(mailFolder, id, new Dictionary<uint, MessageFlags?>()));
+                    || (unreadOnly ? false : await GetImapReadStateAsync(mailFolder, id, new Dictionary<uint, MessageFlags?>(), cancellationToken));
                 try
                 {
-                    items.Add(await BuildImapMailItemAsync(mailFolder, account, folder, id, summary, isRead));
+                    items.Add(await BuildImapMailItemAsync(mailFolder, account, folder, id, summary, isRead, cancellationToken));
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
                 catch
                 {
                     items.Add(new MailItem
@@ -1232,9 +1240,10 @@ namespace Task_Flyout.Services
             MailFolder folder,
             UniqueId id,
             IMessageSummary? summary,
-            bool isRead)
+            bool isRead,
+            CancellationToken cancellationToken)
         {
-            string preview = await TryGetImapPreviewAsync(mailFolder, id, summary);
+            string preview = await TryGetImapPreviewAsync(mailFolder, id, summary, cancellationToken);
             if (HasUsefulImapEnvelope(summary))
             {
                 var received = summary?.Envelope?.Date;
@@ -1257,12 +1266,13 @@ namespace Task_Flyout.Services
 
             try
             {
-                var message = await mailFolder.GetMessageAsync(id);
+                var message = await mailFolder.GetMessageAsync(id, cancellationToken);
                 var item = ToImapMailItem(account.Id, folder.Id, id.Id.ToString(), message, isRead);
                 if (string.IsNullOrWhiteSpace(item.Preview))
                     item.Preview = preview;
                 return item;
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"IMAP full message fallback failed for {id}: {ex.Message}");
@@ -1287,18 +1297,19 @@ namespace Task_Flyout.Services
                summary?.Envelope?.From?.Mailboxes?.Any() == true ||
                summary?.Envelope?.To?.Mailboxes?.Any() == true;
 
-        private static async Task<string> TryGetImapPreviewAsync(IMailFolder mailFolder, UniqueId id, IMessageSummary? summary)
+        private static async Task<string> TryGetImapPreviewAsync(IMailFolder mailFolder, UniqueId id, IMessageSummary? summary, CancellationToken cancellationToken)
         {
             if (summary?.TextBody is not BodyPartText textPart)
                 return "";
 
             try
             {
-                var entity = await mailFolder.GetBodyPartAsync(id, textPart);
+                var entity = await mailFolder.GetBodyPartAsync(id, textPart, cancellationToken);
                 return entity is TextPart textContent
                     ? Truncate(CleanMailBody(textContent.Text ?? ""), 240).Trim()
                     : "";
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch
             {
                 return "";
@@ -1312,7 +1323,7 @@ namespace Task_Flyout.Services
         // hands off to the per-account poll backoff.
         private const int MailNetworkTimeoutMs = 10000;
 
-        private static async Task ConnectImapAsync(ImapClient client, MailAccount account, string password)
+        private static async Task ConnectImapAsync(ImapClient client, MailAccount account, string password, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(account.ImapHost))
                 throw new InvalidOperationException("IMAP server is required.");
@@ -1322,23 +1333,25 @@ namespace Task_Flyout.Services
                 throw new InvalidOperationException("IMAP password is required.");
 
             client.Timeout = MailNetworkTimeoutMs;
-            using var cts = new CancellationTokenSource(MailNetworkTimeoutMs);
+            using var timeoutCts = new CancellationTokenSource(MailNetworkTimeoutMs);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
             var socketOptions = account.ImapUseSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
             await client.ConnectAsync(account.ImapHost, account.ImapPort, socketOptions, cts.Token);
             await client.AuthenticateAsync(account.ImapUserName, password, cts.Token);
         }
 
-        private static async Task<bool> GetImapReadStateAsync(IMailFolder folder, UniqueId id, Dictionary<uint, MessageFlags?> flagsById)
+        private static async Task<bool> GetImapReadStateAsync(IMailFolder folder, UniqueId id, Dictionary<uint, MessageFlags?> flagsById, CancellationToken cancellationToken = default)
         {
             if (flagsById.TryGetValue(id.Id, out var cachedFlags))
                 return cachedFlags?.HasFlag(MessageFlags.Seen) == true;
 
             try
             {
-                var summaries = await folder.FetchAsync(new[] { id }, MessageSummaryItems.Flags);
+                var summaries = await folder.FetchAsync(new[] { id }, MessageSummaryItems.Flags, cancellationToken);
                 var flags = summaries.FirstOrDefault()?.Flags;
                 return flags?.HasFlag(MessageFlags.Seen) == true;
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch
             {
                 // If the server refuses flag fetches, prefer not to show a false unread dot.
@@ -1346,10 +1359,10 @@ namespace Task_Flyout.Services
             }
         }
 
-        private async Task<List<MailFolder>> FetchGoogleFoldersAsync(MailAccount account)
+        private async Task<List<MailFolder>> FetchGoogleFoldersAsync(MailAccount account, CancellationToken cancellationToken)
         {
-            var gmail = await EnsureGoogleMailReadAuthorizedAsync();
-            var labels = await gmail.Users.Labels.List("me").ExecuteAsync();
+            var gmail = await EnsureGoogleMailReadAuthorizedAsync(cancellationToken);
+            var labels = await gmail.Users.Labels.List("me").ExecuteAsync(cancellationToken);
 
             return labels?.Labels?
                 .Where(label => label != null && !string.IsNullOrWhiteSpace(label.Id))
@@ -1366,12 +1379,12 @@ namespace Task_Flyout.Services
                 .ToList() ?? new List<MailFolder>();
         }
 
-        private async Task<List<MailItem>> FetchGoogleMessagesAsync(MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize)
+        private async Task<List<MailItem>> FetchGoogleMessagesAsync(MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize, CancellationToken cancellationToken)
         {
             if (!account.IsSetupComplete || folder.IsPlaceholder)
                 return new List<MailItem>();
 
-            var gmail = await EnsureGoogleMailReadAuthorizedAsync();
+            var gmail = await EnsureGoogleMailReadAuthorizedAsync(cancellationToken);
             int top = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
 
             var listRequest = gmail.Users.Messages.List("me");
@@ -1380,7 +1393,7 @@ namespace Task_Flyout.Services
             if (unreadOnly)
                 listRequest.Q = "is:unread";
 
-            var list = await listRequest.ExecuteAsync();
+            var list = await listRequest.ExecuteAsync(cancellationToken);
             if (list?.Messages == null || list.Messages.Count == 0)
                 return new List<MailItem>();
 
@@ -1388,7 +1401,7 @@ namespace Task_Flyout.Services
                 .Where(message => !string.IsNullOrWhiteSpace(message.Id))
                 .ToList();
 
-            var messages = await FetchGoogleMessageMetadataBatchAsync(gmail, account.Id, folder.Id, messageRefs);
+            var messages = await FetchGoogleMessageMetadataBatchAsync(gmail, account.Id, folder.Id, messageRefs, cancellationToken);
             return messages
                 .OrderByDescending(message => message.RawReceivedTime)
                 .ToList();
@@ -1398,7 +1411,8 @@ namespace Task_Flyout.Services
             GmailService gmail,
             string accountId,
             string folderId,
-            IReadOnlyList<GmailMessage> messageRefs)
+            IReadOnlyList<GmailMessage> messageRefs,
+            CancellationToken cancellationToken)
         {
             if (messageRefs.Count == 0) return new List<MailItem>();
 
@@ -1423,14 +1437,14 @@ namespace Task_Flyout.Services
                     });
                 }
 
-                await batch.ExecuteAsync();
+                await batch.ExecuteAsync(cancellationToken);
 
                 var missingRefs = messageRefs
                     .Where(message => !string.IsNullOrWhiteSpace(message.Id) && !results.ContainsKey(message.Id))
                     .ToList();
                 if (missingRefs.Count > 0)
                 {
-                    var fallbackItems = await FetchGoogleMessageMetadataIndividuallyAsync(gmail, accountId, folderId, missingRefs);
+                    var fallbackItems = await FetchGoogleMessageMetadataIndividuallyAsync(gmail, accountId, folderId, missingRefs, cancellationToken);
                     foreach (var item in fallbackItems)
                         results[item.Id] = item;
                 }
@@ -1442,33 +1456,36 @@ namespace Task_Flyout.Services
                         .Select(id => results[id!])
                         .ToList();
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Gmail metadata batch failed, falling back to individual requests: {ex.Message}");
             }
 
-            return await FetchGoogleMessageMetadataIndividuallyAsync(gmail, accountId, folderId, messageRefs);
+            return await FetchGoogleMessageMetadataIndividuallyAsync(gmail, accountId, folderId, messageRefs, cancellationToken);
         }
 
         private async Task<List<MailItem>> FetchGoogleMessageMetadataIndividuallyAsync(
             GmailService gmail,
             string accountId,
             string folderId,
-            IReadOnlyList<GmailMessage> messageRefs)
+            IReadOnlyList<GmailMessage> messageRefs,
+            CancellationToken cancellationToken)
         {
             using var metadataGate = new SemaphoreSlim(MaxConcurrentGoogleMessageMetadataRequests);
             var tasks = messageRefs
                 .Where(message => !string.IsNullOrWhiteSpace(message.Id))
                 .Select(async message =>
                 {
-                    await metadataGate.WaitAsync();
+                    await metadataGate.WaitAsync(cancellationToken);
                     try
                     {
                         var get = gmail.Users.Messages.Get("me", message.Id);
                         get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
                         get.MetadataHeaders = new[] { "From", "To", "Subject", "Date" };
-                        return ToGoogleMailItem(accountId, folderId, await get.ExecuteAsync());
+                        return ToGoogleMailItem(accountId, folderId, await get.ExecuteAsync(cancellationToken));
                     }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine($"Gmail metadata request failed for {message.Id}: {ex.Message}");
@@ -1486,9 +1503,9 @@ namespace Task_Flyout.Services
                 .ToList();
         }
 
-        private async Task EnsureOutlookMailReadAuthorizedAsync()
+        private async Task EnsureOutlookMailReadAuthorizedAsync(CancellationToken cancellationToken = default)
         {
-            await EnsureOutlookMailAuthorizedAsync(requireWrite: false, requireSend: false);
+            await EnsureOutlookMailAuthorizedAsync(requireWrite: false, requireSend: false, cancellationToken);
         }
 
         private async Task EnsureOutlookMailWriteAuthorizedAsync()
@@ -1501,12 +1518,12 @@ namespace Task_Flyout.Services
             await EnsureOutlookMailAuthorizedAsync(requireWrite: false, requireSend: true);
         }
 
-        private async Task EnsureOutlookMailAuthorizedAsync(bool requireWrite, bool requireSend)
+        private async Task EnsureOutlookMailAuthorizedAsync(bool requireWrite, bool requireSend, CancellationToken cancellationToken = default)
         {
             if (App.Current is App app &&
                 app.SyncManager.GetProvider("Microsoft") is MicrosoftSyncProvider microsoftProvider)
             {
-                _outlookClient = await microsoftProvider.EnsureMailAuthorizedAsync(requireWrite, requireSend);
+                _outlookClient = await microsoftProvider.EnsureMailAuthorizedAsync(requireWrite, requireSend, cancellationToken);
             }
 
             if (_outlookClient == null)

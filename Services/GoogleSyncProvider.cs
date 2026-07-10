@@ -97,7 +97,7 @@ namespace Task_Flyout.Services
                 : null;
         }
 
-        public async Task<GmailService> EnsureGmailAuthorizedAsync(bool requireModify = false, bool requireSend = false)
+        public async Task<GmailService> EnsureGmailAuthorizedAsync(bool requireModify = false, bool requireSend = false, CancellationToken cancellationToken = default)
         {
             var requiredScopes = BuildGmailScopes(requireModify, requireSend);
             if (CalendarSvc != null && TasksSvc != null)
@@ -108,7 +108,7 @@ namespace Task_Flyout.Services
             string tokenPath = ProviderAuthCleanup.GoogleLegacyTokenPath;
             var dataStore = new ProtectedGoogleDataStore();
             await TryMigrateLegacyTokenStoreAsync(tokenPath, dataStore);
-            UserCredential credential = await AuthorizeAsync(dataStore, requiredScopes);
+            UserCredential credential = await AuthorizeAsync(dataStore, requiredScopes, cancellationToken);
 
             var grantedScopes = credential.Token?.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
             if (!HasScopes(grantedScopes, requiredScopes))
@@ -119,7 +119,7 @@ namespace Task_Flyout.Services
                 _gmailGrantedScopes = Array.Empty<string>();
                 if (Directory.Exists(tokenPath)) Directory.Delete(tokenPath, true);
                 await dataStore.ClearAsync();
-                credential = await AuthorizeAsync(dataStore, requiredScopes);
+                credential = await AuthorizeAsync(dataStore, requiredScopes, cancellationToken);
                 grantedScopes = credential.Token?.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
             }
 
