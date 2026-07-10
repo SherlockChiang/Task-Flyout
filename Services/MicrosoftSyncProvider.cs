@@ -355,10 +355,12 @@ namespace Task_Flyout.Services
             catch (Microsoft.Graph.Models.ODataErrors.ODataError odataEx)
             {
                 System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] OData error: Code={odataEx.Error?.Code}, Message={odataEx.Error?.Message}");
+                throw;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] Other error: {ex.Message}");
+                throw;
             }
             return results;
         }
@@ -487,10 +489,12 @@ namespace Task_Flyout.Services
                 System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] OData error fetching tasks!");
                 System.Diagnostics.Debug.WriteLine($"Code: {odataEx.Error?.Code}");
                 System.Diagnostics.Debug.WriteLine($"Message: {odataEx.Error?.Message}");
+                throw;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] Other error fetching tasks: {ex.Message}");
+                throw;
             }
             return results;
         }

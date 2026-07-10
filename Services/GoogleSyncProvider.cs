@@ -279,6 +279,7 @@ namespace Task_Flyout.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[Google] Failed to fetch calendar list: {ex.Message}");
+                throw;
             }
 
             return result;
@@ -347,7 +348,7 @@ namespace Task_Flyout.Services
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"[Google] Failed to fetch events from calendar {cal.Id}: {ex.Message}");
-                    pageToken = null;
+                    throw;
                 }
             } while (pageToken != null);
 
