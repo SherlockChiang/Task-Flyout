@@ -205,6 +205,7 @@ namespace Task_Flyout.Services
         private readonly object _persistentCacheSaveLock = new();
         private readonly object _mailCacheLock = new();
         private readonly SemaphoreSlim _persistentCacheWriteGate = new(1, 1);
+        private readonly MailCacheRepository _cacheRepository = new();
         private readonly SemaphoreSlim _pendingMutationRetryGate = new(1, 1);
         private CancellationTokenSource? _persistentCacheSaveCts;
         private long _persistentCacheVersion;
@@ -2504,7 +2505,7 @@ namespace Task_Flyout.Services
 
                 try
                 {
-                    var json = LocalSqliteStore.ReadProtectedText("mail", "cache");
+                    var json = _cacheRepository.Load();
                     _persistentCache = JsonFallbackPolicy.DeserializeOrDefault(
                         json,
                         value => JsonSerializer.Deserialize(value, AppJsonContext.Default.MailPersistentCache),
@@ -2619,7 +2620,7 @@ namespace Task_Flyout.Services
             try
             {
                 if (version <= _lastPersistedCacheVersion) return;
-                await LocalSqliteStore.WriteProtectedTextAsync("mail", "cache", json);
+                await _cacheRepository.SaveAsync(json);
                 _lastPersistedCacheVersion = version;
             }
             finally

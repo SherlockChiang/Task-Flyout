@@ -2,6 +2,7 @@ using Task_Flyout.Services;
 
 namespace Task_Flyout.Tests;
 
+[Collection("LocalSqliteStore")]
 public class LocalSqliteStoreTests
 {
     [Fact]
