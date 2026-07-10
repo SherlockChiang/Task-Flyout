@@ -389,6 +389,13 @@ WHERE id NOT IN (
             command.ExecuteNonQuery();
         }
 
+        public void FlushCheckpoint()
+        {
+            if (!_initialized || _isUnavailable()) return;
+            using var connection = OpenConnection();
+            TryCheckpointDeletedData(connection);
+        }
+
         private static void WriteSubscription(SqliteCommand command, RssSubscriptionRecord subscription)
         {
             command.CommandText = """

@@ -560,7 +560,8 @@ namespace Task_Flyout
             {
                 await Task.WhenAll(
                     SyncManager.AccountManager.FlushPendingSavesAsync(),
-                    MailService.FlushPendingSavesAsync())
+                    MailService.FlushPendingSavesAsync(),
+                    RssService.FlushPendingCheckpointsAsync())
                     .WaitAsync(TimeSpan.FromSeconds(2));
             }
             catch (Exception ex)

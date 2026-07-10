@@ -242,6 +242,16 @@ namespace Task_Flyout.Services
             }
         }
 
+        public static Task FlushPendingCheckpointsAsync()
+            => Task.Run(() =>
+            {
+                foreach (var instance in GetLiveInstances())
+                {
+                    lock (instance._loadLock)
+                        instance._repository?.FlushCheckpoint();
+                }
+            });
+
         private static List<RssService> GetLiveInstances()
         {
             lock (InstancesLock)

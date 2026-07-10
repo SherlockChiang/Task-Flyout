@@ -413,6 +413,23 @@ END;
         Assert.True(!File.Exists(walPath) || new FileInfo(walPath).Length == 0);
     }
 
+    [Fact]
+    public void Explicit_flush_checkpoints_initialized_repository_without_creating_new_data()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.FlushCheckpoint();
+        Assert.False(File.Exists(databasePath));
+
+        repository.UpsertFolder(new RssFolderRecord("folder", new string('x', 20_000), 0));
+        var walPath = databasePath + "-wal";
+        Assert.True(File.Exists(walPath) && new FileInfo(walPath).Length > 0);
+
+        repository.FlushCheckpoint();
+
+        Assert.True(!File.Exists(walPath) || new FileInfo(walPath).Length == 0);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
