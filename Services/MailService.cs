@@ -1107,7 +1107,7 @@ namespace Task_Flyout.Services
 
         private async Task SendOutlookMailAsync(MailAccount account, string to, string subject, string body, CancellationToken cancellationToken)
         {
-            await EnsureOutlookMailSendAuthorizedAsync(cancellationToken);
+            await EnsureOutlookMailAuthorizedAsync(requireWrite: true, requireSend: true, cancellationToken);
             if (_outlookClient == null) return;
 
             var message = new GraphMessage
@@ -1119,17 +1119,71 @@ namespace Task_Flyout.Services
                     .ToList()
             };
 
+            var draft = await _outlookClient.Me.Messages.PostAsync(message, request =>
+                request.Headers.Add("Prefer", "IdType=\"ImmutableId\""), cancellationToken);
+            if (string.IsNullOrWhiteSpace(draft?.Id))
+                throw new InvalidOperationException("Microsoft Graph did not return a draft identifier.");
+
             try
             {
-                await _outlookClient.Me.SendMail.PostAsync(new Microsoft.Graph.Me.SendMail.SendMailPostRequestBody
-                {
-                    Message = message,
-                    SaveToSentItems = true
-                }, cancellationToken: cancellationToken);
+                await _outlookClient.Me.Messages[draft.Id].Send.PostAsync(request =>
+                    request.Headers.Add("Prefer", "IdType=\"ImmutableId\""), cancellationToken);
             }
             catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
             {
+                if (await TryConfirmOutlookSentMessageAsync(draft.Id))
+                    return;
                 throw new MailSendStatusUnknownException(ex);
+            }
+            catch
+            {
+                await TryDeleteOutlookDraftAsync(draft.Id);
+                throw;
+            }
+        }
+
+        private async Task<bool> TryConfirmOutlookSentMessageAsync(string immutableMessageId)
+        {
+            if (_outlookClient == null || string.IsNullOrWhiteSpace(immutableMessageId)) return false;
+
+            using var confirmationCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            try
+            {
+                for (int attempt = 0; attempt < 2; attempt++)
+                {
+                    if (attempt > 0)
+                        await Task.Delay(TimeSpan.FromSeconds(2), confirmationCts.Token);
+
+                    var message = await _outlookClient.Me.Messages[immutableMessageId].GetAsync(request =>
+                    {
+                        request.Headers.Add("Prefer", "IdType=\"ImmutableId\"");
+                        request.QueryParameters.Select = new[] { "isDraft", "sentDateTime" };
+                    }, confirmationCts.Token);
+                    if (MailSendConfirmationPolicy.IsConfirmedOutlookSentItem(message?.IsDraft, message?.SentDateTime))
+                        return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Outlook sent-message confirmation failed: {ex.Message}");
+            }
+
+            return false;
+        }
+
+        private async Task TryDeleteOutlookDraftAsync(string draftId)
+        {
+            if (_outlookClient == null || string.IsNullOrWhiteSpace(draftId)) return;
+
+            using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            try
+            {
+                await _outlookClient.Me.Messages[draftId].DeleteAsync(request =>
+                    request.Headers.Add("Prefer", "IdType=\"ImmutableId\""), cleanupCts.Token);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Outlook draft cleanup failed: {ex.Message}");
             }
         }
 

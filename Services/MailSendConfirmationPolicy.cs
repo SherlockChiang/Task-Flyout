@@ -13,5 +13,9 @@ namespace Task_Flyout.Services
             var normalized = NormalizeMessageId(messageId);
             return normalized == null ? null : $"rfc822msgid:{normalized}";
         }
+
+        public static bool IsConfirmedOutlookSentItem(bool? isDraft, System.DateTimeOffset? sentDateTime)
+            => isDraft == false && sentDateTime.HasValue;
+
     }
 }

@@ -21,4 +21,17 @@ public class MailSendConfirmationPolicyTests
     {
         Assert.Equal("rfc822msgid:message@example.com", MailSendConfirmationPolicy.BuildGmailQuery("<message@example.com>"));
     }
+
+    [Theory]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, false)]
+    [InlineData(null, true, false)]
+    public void Outlook_confirmation_requires_non_draft_with_sent_time(bool? isDraft, bool hasSentTime, bool expected)
+    {
+        DateTimeOffset? sentTime = hasSentTime ? DateTimeOffset.UtcNow : null;
+
+        Assert.Equal(expected, MailSendConfirmationPolicy.IsConfirmedOutlookSentItem(isDraft, sentTime));
+    }
+
 }
