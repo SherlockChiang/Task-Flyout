@@ -206,6 +206,11 @@ namespace Task_Flyout.Views
             {
                 if (DayCells.Count == 0) return;
 
+                // A rapid mouse wheel/month navigation should settle before it starts a
+                // provider request. Providers do not all expose cancellation yet.
+                await Task.Delay(TimeSpan.FromMilliseconds(200), token);
+                if (token.IsCancellationRequested) return;
+
                 var start = DayCells.First().Date;
                 var end = DayCells.Last().Date.AddDays(1);
 
@@ -249,6 +254,7 @@ namespace Task_Flyout.Views
             }
             catch (Exception ex)
             {
+                if (token.IsCancellationRequested) return;
                 System.Diagnostics.Debug.WriteLine($"Sync error: {ex.Message}");
                 SetCalendarStatus(StatusMessageFormatter.Format(_loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed", _lastCalendarSyncSucceededAt, includeLastSuccess: true), isError: true);
             }
