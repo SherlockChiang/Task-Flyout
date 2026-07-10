@@ -1459,89 +1459,14 @@ LIMIT 1000;
                 ToTicks(article.PublishedAt));
 
         private void TrimDatabaseArticles()
-        {
-            using var connection = OpenConnection();
-            ExecuteNonQuery(connection, """
-DELETE FROM rss_articles
-WHERE id NOT IN (
-    SELECT id FROM rss_articles ORDER BY published_ticks DESC LIMIT 1000
-);
-""");
-        }
-
-        private static string ProtectValue(string? value)
-            => RssSensitiveDataProtector.Protect(value);
+            => Repository.TrimArticles(1000);
 
         private void SaveToDatabase()
-        {
-            using var connection = OpenConnection();
-            using var transaction = connection.BeginTransaction();
-
-            foreach (var folder in _cache.Folders)
-            {
-                using var command = connection.CreateCommand();
-                command.Transaction = transaction;
-                command.CommandText = """
-INSERT OR REPLACE INTO rss_folders(id, name, sort_order)
-VALUES ($id, $name, $sortOrder);
-""";
-                command.Parameters.AddWithValue("$id", folder.Id ?? "");
-                command.Parameters.AddWithValue("$name", ProtectValue(folder.Name));
-                command.Parameters.AddWithValue("$sortOrder", folder.SortOrder);
-                command.ExecuteNonQuery();
-            }
-
-            var currentFolderIds = _cache.Folders.Select(f => f.Id ?? "").ToHashSet(StringComparer.Ordinal);
-            DeleteRowsNotIn(connection, transaction, "rss_folders", currentFolderIds);
-
-            foreach (var subscription in _cache.Subscriptions)
-            {
-                using var command = connection.CreateCommand();
-                command.Transaction = transaction;
-                command.CommandText = """
-INSERT OR REPLACE INTO rss_subscriptions(id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks)
-VALUES ($id, $title, $url, $folderId, $imageUrl, $localImagePath, $lastFetchedTicks);
-""";
-                command.Parameters.AddWithValue("$id", subscription.Id ?? "");
-                command.Parameters.AddWithValue("$title", ProtectValue(subscription.Title));
-                command.Parameters.AddWithValue("$url", ProtectValue(subscription.Url));
-                command.Parameters.AddWithValue("$folderId", subscription.FolderId ?? "");
-                command.Parameters.AddWithValue("$imageUrl", ProtectValue(subscription.ImageUrl));
-                command.Parameters.AddWithValue("$localImagePath", subscription.LocalImagePath ?? "");
-                command.Parameters.AddWithValue("$lastFetchedTicks", ToTicks(subscription.LastFetchedAt));
-                command.ExecuteNonQuery();
-            }
-
-            var currentSubIds = _cache.Subscriptions.Select(s => s.Id ?? "").ToHashSet(StringComparer.Ordinal);
-            DeleteRowsNotIn(connection, transaction, "rss_subscriptions", currentSubIds);
-
-            var keptArticleIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var article in _cache.Articles.OrderByDescending(item => item.PublishedAt).Take(1000))
-            {
-                keptArticleIds.Add(article.Id ?? "");
-                using var command = connection.CreateCommand();
-                command.Transaction = transaction;
-                command.CommandText = """
-INSERT OR REPLACE INTO rss_articles(id, subscription_id, feed_title, title, link, summary, html_content, image_url, local_image_path, published_ticks)
-VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent, $imageUrl, $localImagePath, $publishedTicks);
-""";
-                command.Parameters.AddWithValue("$id", article.Id ?? "");
-                command.Parameters.AddWithValue("$subscriptionId", article.SubscriptionId ?? "");
-                command.Parameters.AddWithValue("$feedTitle", ProtectValue(article.FeedTitle));
-                command.Parameters.AddWithValue("$title", ProtectValue(article.Title));
-                command.Parameters.AddWithValue("$link", ProtectValue(article.Link));
-                command.Parameters.AddWithValue("$summary", ProtectValue(article.Summary));
-                command.Parameters.AddWithValue("$htmlContent", ProtectValue(article.HtmlContent));
-                command.Parameters.AddWithValue("$imageUrl", ProtectValue(article.ImageUrl));
-                command.Parameters.AddWithValue("$localImagePath", article.LocalImagePath ?? "");
-                command.Parameters.AddWithValue("$publishedTicks", ToTicks(article.PublishedAt));
-                command.ExecuteNonQuery();
-            }
-
-            DeleteRowsNotIn(connection, transaction, "rss_articles", keptArticleIds);
-
-            transaction.Commit();
-        }
+            => Repository.SaveSnapshot(
+                _cache.Folders.Select(folder => new RssFolderRecord(folder.Id ?? "", folder.Name ?? "", folder.SortOrder)),
+                _cache.Subscriptions.Select(ToSubscriptionRecord),
+                _cache.Articles.Select(ToArticleWriteRecord),
+                1000);
 
         private void TryMigrateLegacyJsonCache()
         {
@@ -1626,44 +1551,6 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
             command.Transaction = transaction;
             command.CommandText = sql;
             command.ExecuteNonQuery();
-        }
-
-        private static void DeleteRowsNotIn(
-            SqliteConnection connection,
-            SqliteTransaction transaction,
-            string tableName,
-            IReadOnlyCollection<string> ids)
-        {
-            if (ids.Count == 0)
-            {
-                ExecuteNonQuery(connection, $"DELETE FROM {tableName};", transaction);
-                return;
-            }
-
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            var parameterNames = ids
-                .Select((id, index) =>
-                {
-                    var name = $"$id{index}";
-                    command.Parameters.AddWithValue(name, id);
-                    return name;
-                })
-                .ToArray();
-
-            command.CommandText = $"DELETE FROM {tableName} WHERE id NOT IN ({string.Join(",", parameterNames)});";
-            command.ExecuteNonQuery();
-        }
-
-        private static void TryAddColumn(SqliteConnection connection, string table, string column, string definition)
-        {
-            try
-            {
-                ExecuteNonQuery(connection, $"ALTER TABLE {table} ADD COLUMN {column} {definition};");
-            }
-            catch (SqliteException ex) when (ex.SqliteErrorCode == 1)
-            {
-            }
         }
 
         private static long ToTicks(DateTimeOffset value)

@@ -186,13 +186,7 @@ LIMIT $take OFFSET $skip;
             Initialize();
             using var connection = OpenConnection();
             using var command = connection.CreateCommand();
-            command.CommandText = """
-INSERT INTO rss_folders(id, name, sort_order) VALUES ($id, $name, $sortOrder)
-ON CONFLICT(id) DO UPDATE SET name = excluded.name, sort_order = excluded.sort_order;
-""";
-            command.Parameters.AddWithValue("$id", folder.Id);
-            command.Parameters.AddWithValue("$name", RssSensitiveDataProtector.Protect(folder.Name));
-            command.Parameters.AddWithValue("$sortOrder", folder.SortOrder);
+            WriteFolder(command, folder);
             command.ExecuteNonQuery();
         }
 
@@ -259,6 +253,66 @@ ON CONFLICT(id) DO UPDATE SET name = excluded.name, sort_order = excluded.sort_o
             migrationComplete.CommandText = "INSERT OR REPLACE INTO metadata(key, value) VALUES ($key, 'complete');";
             migrationComplete.Parameters.AddWithValue("$key", SensitiveDataMigrationKey);
             migrationComplete.ExecuteNonQuery();
+            transaction.Commit();
+        }
+
+        public void TrimArticles(int maximumCount)
+        {
+            Initialize();
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+DELETE FROM rss_articles
+WHERE id NOT IN (
+    SELECT id FROM rss_articles ORDER BY published_ticks DESC LIMIT $maximumCount
+);
+""";
+            command.Parameters.AddWithValue("$maximumCount", Math.Max(0, maximumCount));
+            command.ExecuteNonQuery();
+        }
+
+        public void SaveSnapshot(
+            IEnumerable<RssFolderRecord> folders,
+            IEnumerable<RssSubscriptionRecord> subscriptions,
+            IEnumerable<RssArticleWriteRecord> articles,
+            int maximumArticleCount)
+        {
+            Initialize();
+            var folderList = folders.ToList();
+            var subscriptionList = subscriptions.ToList();
+            var articleList = articles
+                .OrderByDescending(article => article.PublishedUtcTicks)
+                .Take(Math.Max(0, maximumArticleCount))
+                .ToList();
+
+            using var connection = OpenConnection();
+            using var transaction = connection.BeginTransaction();
+            foreach (var folder in folderList)
+            {
+                using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                WriteFolder(command, folder);
+                command.ExecuteNonQuery();
+            }
+            DeleteRowsNotIn(connection, transaction, "rss_folders", folderList.Select(folder => folder.Id).ToHashSet(StringComparer.Ordinal));
+
+            foreach (var subscription in subscriptionList)
+            {
+                using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                WriteSubscription(command, subscription);
+                command.ExecuteNonQuery();
+            }
+            DeleteRowsNotIn(connection, transaction, "rss_subscriptions", subscriptionList.Select(subscription => subscription.Id).ToHashSet(StringComparer.Ordinal));
+
+            foreach (var article in articleList)
+            {
+                using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                WriteArticle(command, article);
+                command.ExecuteNonQuery();
+            }
+            DeleteRowsNotIn(connection, transaction, "rss_articles", articleList.Select(article => article.Id).ToHashSet(StringComparer.Ordinal));
             transaction.Commit();
         }
 
@@ -341,6 +395,17 @@ ON CONFLICT(id) DO UPDATE SET
             command.Parameters.AddWithValue("$lastFetchedTicks", subscription.LastFetchedUtcTicks);
         }
 
+        private static void WriteFolder(SqliteCommand command, RssFolderRecord folder)
+        {
+            command.CommandText = """
+INSERT INTO rss_folders(id, name, sort_order) VALUES ($id, $name, $sortOrder)
+ON CONFLICT(id) DO UPDATE SET name = excluded.name, sort_order = excluded.sort_order;
+""";
+            command.Parameters.AddWithValue("$id", folder.Id);
+            command.Parameters.AddWithValue("$name", RssSensitiveDataProtector.Protect(folder.Name));
+            command.Parameters.AddWithValue("$sortOrder", folder.SortOrder);
+        }
+
         private static void WriteArticle(SqliteCommand command, RssArticleWriteRecord article)
         {
             command.CommandText = """
@@ -407,6 +472,33 @@ ON CONFLICT(id) DO UPDATE SET
                 update.Parameters.AddWithValue("$id", row.Id);
                 update.ExecuteNonQuery();
             }
+        }
+
+        private static void DeleteRowsNotIn(
+            SqliteConnection connection,
+            SqliteTransaction transaction,
+            string tableName,
+            IReadOnlyCollection<string> ids)
+        {
+            if (ids.Count == 0)
+            {
+                using var deleteAll = connection.CreateCommand();
+                deleteAll.Transaction = transaction;
+                deleteAll.CommandText = $"DELETE FROM {tableName};";
+                deleteAll.ExecuteNonQuery();
+                return;
+            }
+
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            var parameterNames = ids.Select((id, index) =>
+            {
+                var name = $"$id{index}";
+                command.Parameters.AddWithValue(name, id);
+                return name;
+            });
+            command.CommandText = $"DELETE FROM {tableName} WHERE id NOT IN ({string.Join(",", parameterNames)});";
+            command.ExecuteNonQuery();
         }
 
         internal SqliteConnection OpenConnection()

@@ -228,6 +228,47 @@ END;
         Assert.Equal(0L, ScalarInt64(verification, "SELECT COUNT(*) FROM metadata WHERE key = 'sensitive_data_dpapi_v1';"));
     }
 
+    [Fact]
+    public void Snapshot_replaces_stale_rows_and_keeps_newest_articles()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertFolder(new RssFolderRecord("stale-folder", "Stale", 0));
+        repository.UpsertSubscription(new RssSubscriptionRecord("stale-subscription", "Stale", "https://stale.test", "", "", "", 0));
+        repository.UpsertArticle(new RssArticleWriteRecord("stale-article", "stale-subscription", "Stale", "Stale", "", "", "", "", "", 1));
+
+        repository.SaveSnapshot(
+            new[] { new RssFolderRecord("folder", "Current", 1) },
+            new[] { new RssSubscriptionRecord("subscription", "Current", "https://example.test", "folder", "", "", 0) },
+            new[]
+            {
+                new RssArticleWriteRecord("old", "subscription", "Current", "Old", "", "", "", "", "", 10),
+                new RssArticleWriteRecord("new", "subscription", "Current", "New", "", "", "", "", "", 20)
+            },
+            maximumArticleCount: 1);
+
+        using var connection = Open(databasePath);
+        Assert.Equal(0L, ScalarInt64(connection, "SELECT COUNT(*) FROM rss_folders WHERE id = 'stale-folder';"));
+        Assert.Equal(0L, ScalarInt64(connection, "SELECT COUNT(*) FROM rss_subscriptions WHERE id = 'stale-subscription';"));
+        Assert.Equal(1L, ScalarInt64(connection, "SELECT COUNT(*) FROM rss_articles;"));
+        Assert.Equal("new", ScalarString(connection, "SELECT id FROM rss_articles;"));
+    }
+
+    [Fact]
+    public void Trim_articles_keeps_newest_rows()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertArticle(new RssArticleWriteRecord("old", "subscription", "Feed", "Old", "", "", "", "", "", 10));
+        repository.UpsertArticle(new RssArticleWriteRecord("new", "subscription", "Feed", "New", "", "", "", "", "", 20));
+
+        repository.TrimArticles(1);
+
+        using var connection = Open(databasePath);
+        Assert.Equal(1L, ScalarInt64(connection, "SELECT COUNT(*) FROM rss_articles;"));
+        Assert.Equal("new", ScalarString(connection, "SELECT id FROM rss_articles;"));
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
