@@ -132,6 +132,7 @@ namespace Task_Flyout
 
             HandleLaunchActivation(args);
             QueueFlyoutPrewarmIfEnabled();
+            QueueInitialNotificationCheck();
             startup.Mark("activation");
 
             // Launched into the tray with no window on screen — start throttled.
@@ -184,6 +185,24 @@ namespace Task_Flyout
                     EnsureFlyoutWindow();
                 }
                 catch { }
+            });
+        }
+
+        private void QueueInitialNotificationCheck()
+        {
+            if (NotificationService?.IsEnabled != true) return;
+
+            MainDispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, async () =>
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+                    NotificationService.CheckUpcomingEvents();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Initial notification check failed: {ex.Message}");
+                }
             });
         }
 

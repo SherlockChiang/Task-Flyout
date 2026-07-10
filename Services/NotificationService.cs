@@ -68,8 +68,6 @@ namespace Task_Flyout.Services
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
             _timer.Tick += (s, e) => CheckUpcomingEvents();
             _timer.Start();
-
-            CheckUpcomingEvents();
         }
 
         public void StopTimer()
