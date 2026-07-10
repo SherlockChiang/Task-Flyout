@@ -2228,23 +2228,30 @@ namespace Task_Flyout.Services
         {
             var sender = string.IsNullOrWhiteSpace(item.Sender) ? account.DisplayTitle : item.Sender;
             var subject = string.IsNullOrWhiteSpace(item.Subject) ? "(No subject)" : item.Subject;
+            var hideContent = ApplicationData.Current.LocalSettings.Values["HideNotificationContent"] as bool? ?? false;
 
             try
             {
                 var builder = new AppNotificationBuilder()
-                    .AddText($"{(_loader.GetStringOrDefault("TextNewMail") ?? "New Mail")} · {account.DisplayTitle}")
-                    .AddText(subject)
-                    .AddText(sender)
+                    .AddText(hideContent
+                        ? (_loader.GetStringOrDefault("TextNewMail") ?? "New Mail")
+                        : $"{(_loader.GetStringOrDefault("TextNewMail") ?? "New Mail")} · {account.DisplayTitle}")
                     .AddArgument("action", "openMail")
                     .AddArgument("accountId", item.AccountId)
                     .AddArgument("folderId", item.FolderId)
                     .AddArgument("messageId", item.Id);
 
+                if (!hideContent)
+                {
+                    builder.AddText(subject)
+                        .AddText(sender);
+                }
+
                 // Verification-code mail: offer a one-tap "copy code" button on the toast,
                 // showing the detected code right on the button.
                 if (VerificationCodeDetector.TryExtract(item.Subject, item.Preview, out var code))
                 {
-                    var copyLabel = $"{_loader.GetStringOrDefault("MailCopyCode") ?? "Copy code"} {code}";
+                    var copyLabel = _loader.GetStringOrDefault("MailCopyCode") ?? "Copy code";
                     builder.AddButton(new AppNotificationButton(copyLabel)
                         .AddArgument("action", "copyCode")
                         .AddArgument("code", code));

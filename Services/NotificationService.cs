@@ -162,11 +162,14 @@ namespace Task_Flyout.Services
                     ? (_loader.GetStringOrDefault("TextOneMinuteLater") ?? "Starts in 1 minute")
                     : string.Format(_loader.GetStringOrDefault("TextMinutesLater") ?? "Starts in {0} minutes", minutesLeft);
 
+                var hideContent = ApplicationData.Current.LocalSettings.Values["HideNotificationContent"] as bool? ?? false;
                 var builder = new AppNotificationBuilder()
-                    .AddText(item.Title ?? (_loader.GetStringOrDefault("TextEventReminder") ?? "Event Reminder"))
+                    .AddText(hideContent
+                        ? (_loader.GetStringOrDefault("TextEventReminder") ?? "Event Reminder")
+                        : item.Title ?? (_loader.GetStringOrDefault("TextEventReminder") ?? "Event Reminder"))
                     .AddText($"{timeText} · {startTime:HH:mm}");
 
-                if (!string.IsNullOrEmpty(item.Location))
+                if (!hideContent && !string.IsNullOrEmpty(item.Location))
                     builder.AddText($"\ud83d\udccd {item.Location}");
 
                 var notification = builder.BuildNotification();

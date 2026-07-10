@@ -40,8 +40,9 @@
             <!-- Notification Section -->
             <StackPanel Spacing="8">
                 <TextBlock x:Uid="SettingsPage_Notification" Text="通知提醒" FontWeight="SemiBold" FontSize="16"/>
-                <ToggleSwitch x:Uid="SettingsPage_NotifyToggle" x:Name="NotifyToggle" Header="日程开始前弹出通知" IsOn="True" Toggled="NotifyToggle_Toggled"/>
-                <TextBlock x:Uid="SettingsPage_NotifyDesc" Text="日程提醒只影响日历/任务开始前的提醒通知；天气警报在天气页单独设置。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                 <ToggleSwitch x:Uid="SettingsPage_NotifyToggle" x:Name="NotifyToggle" Header="日程开始前弹出通知" IsOn="True" Toggled="NotifyToggle_Toggled"/>
+                 <ToggleSwitch x:Name="HideNotificationContentToggle" Header="在系统通知中隐藏邮件与日程内容" IsOn="False" Toggled="HideNotificationContentToggle_Toggled"/>
+                 <TextBlock x:Uid="SettingsPage_NotifyDesc" Text="日程提醒只影响日历/任务开始前的提醒通知；天气警报在天气页单独设置。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                 
                 <ComboBox x:Uid="SettingsPage_NotifyTime" x:Name="NotifyTimeComboBox" Header="提前提醒时间" Width="200" SelectionChanged="NotifyTimeComboBox_SelectionChanged" />
             </StackPanel>

@@ -57,6 +57,7 @@ namespace Task_Flyout.Views
             BackgroundToggle.IsOn = settings.Values["RunInBackground"] as bool? ?? true;
             EfficiencyModeToggle.IsOn = settings.Values["EfficiencyModeEnabled"] as bool? ?? true;
             NotifyToggle.IsOn = settings.Values["NotifyEnabled"] as bool? ?? true;
+            HideNotificationContentToggle.IsOn = settings.Values["HideNotificationContent"] as bool? ?? false;
             MailPollingToggle.IsOn = settings.Values["MailPollingEnabled"] as bool? ?? true;
             AutoMarkMailAsReadToggle.IsOn = settings.Values["AutoMarkMailAsRead"] as bool? ?? true;
             BlockRemoteImagesToggle.IsOn = settings.Values["BlockRemoteImagesByDefault"] as bool? ?? true;
@@ -456,6 +457,12 @@ namespace Task_Flyout.Views
         {
             if (_isInitializing) return;
             ApplicationData.Current.LocalSettings.Values["AutoMarkMailAsRead"] = AutoMarkMailAsReadToggle.IsOn;
+        }
+
+        private void HideNotificationContentToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            ApplicationData.Current.LocalSettings.Values["HideNotificationContent"] = HideNotificationContentToggle.IsOn;
         }
 
         private void BlockRemoteImagesToggle_Toggled(object sender, RoutedEventArgs e)
