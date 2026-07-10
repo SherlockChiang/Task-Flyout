@@ -351,6 +351,46 @@ END;
         Assert.Throws<InvalidOperationException>(() => repository.SaveSnapshot(Array.Empty<RssFolderRecord>(), Array.Empty<RssSubscriptionRecord>(), Array.Empty<RssArticleWriteRecord>(), 1000));
     }
 
+    [Fact]
+    public void Sensitive_delete_truncates_wal_when_no_reader_is_active()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertArticle(new RssArticleWriteRecord("old", "subscription", "Feed", new string('x', 20_000), "", "", "", "", "", 10));
+        repository.UpsertArticle(new RssArticleWriteRecord("new", "subscription", "Feed", "New", "", "", "", "", "", 20));
+
+        repository.TrimArticles(1);
+
+        var walPath = databasePath + "-wal";
+        Assert.True(!File.Exists(walPath) || new FileInfo(walPath).Length == 0);
+    }
+
+    [Fact]
+    public void Busy_reader_defers_checkpoint_without_rolling_back_delete()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertArticle(new RssArticleWriteRecord("old", "subscription", "Feed", new string('x', 20_000), "", "", "", "", "", 10));
+        repository.UpsertArticle(new RssArticleWriteRecord("new", "subscription", "Feed", "New", "", "", "", "", "", 20));
+
+        using (var readerConnection = repository.OpenConnection())
+        using (var readerTransaction = readerConnection.BeginTransaction(deferred: true))
+        using (var command = readerConnection.CreateCommand())
+        {
+            command.Transaction = readerTransaction;
+            command.CommandText = "SELECT title FROM rss_articles WHERE id = 'old';";
+            using var reader = command.ExecuteReader();
+            Assert.True(reader.Read());
+
+            repository.TrimArticles(1);
+            Assert.Equal("new", Assert.Single(repository.QueryArticlesPage(null, null, 0, 10)).Id);
+        }
+
+        repository.TrimArticles(1);
+        var walPath = databasePath + "-wal";
+        Assert.True(!File.Exists(walPath) || new FileInfo(walPath).Length == 0);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

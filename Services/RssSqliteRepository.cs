@@ -264,6 +264,7 @@ CREATE TABLE IF NOT EXISTS rss_articles (
             migrationComplete.Parameters.AddWithValue("$key", SensitiveDataMigrationKey);
             migrationComplete.ExecuteNonQuery();
             transaction.Commit();
+            TryCheckpointDeletedData(connection);
         }
 
         public void TrimArticles(int maximumCount)
@@ -279,6 +280,7 @@ WHERE id NOT IN (
 """;
             command.Parameters.AddWithValue("$maximumCount", Math.Max(0, maximumCount));
             command.ExecuteNonQuery();
+            TryCheckpointDeletedData(connection);
         }
 
         public void SaveSnapshot(
@@ -324,6 +326,7 @@ WHERE id NOT IN (
             }
             DeleteRowsNotIn(connection, transaction, "rss_articles", articleList.Select(article => article.Id).ToHashSet(StringComparer.Ordinal));
             transaction.Commit();
+            TryCheckpointDeletedData(connection);
         }
 
         public void RemoveFolder(string folderId)
@@ -346,6 +349,7 @@ WHERE id NOT IN (
                 delete.ExecuteNonQuery();
             }
             transaction.Commit();
+            TryCheckpointDeletedData(connection);
         }
 
         public void RemoveSubscription(string subscriptionId)
@@ -368,8 +372,7 @@ WHERE id NOT IN (
                 deleteSubscription.ExecuteNonQuery();
             }
             transaction.Commit();
-            try { ExecuteNonQuery(connection, "PRAGMA wal_checkpoint(TRUNCATE);"); }
-            catch (SqliteException) { }
+            TryCheckpointDeletedData(connection);
         }
 
         public void UpdateArticleFeedTitle(string subscriptionId, string title)
@@ -552,6 +555,28 @@ LIMIT $take OFFSET $skip;
             });
             command.CommandText = $"DELETE FROM {tableName} WHERE id NOT IN ({string.Join(",", parameterNames)});";
             command.ExecuteNonQuery();
+        }
+
+        private static void TryCheckpointDeletedData(SqliteConnection connection)
+        {
+            try
+            {
+                ExecuteNonQuery(connection, "PRAGMA busy_timeout=0;");
+                using var command = connection.CreateCommand();
+                command.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+                using var reader = command.ExecuteReader();
+                if (reader.Read() && reader.GetInt32(0) != 0)
+                    System.Diagnostics.Debug.WriteLine("RSS WAL checkpoint deferred because a reader is active.");
+            }
+            catch (SqliteException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"RSS WAL checkpoint failed: {ex.Message}");
+            }
+            finally
+            {
+                try { ExecuteNonQuery(connection, $"PRAGMA busy_timeout={BusyTimeoutMilliseconds};"); }
+                catch (SqliteException) { }
+            }
         }
 
         internal SqliteConnection OpenConnection()
