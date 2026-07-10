@@ -58,7 +58,7 @@ namespace Task_Flyout.Views
             BackgroundToggle.IsOn = settings.Values["RunInBackground"] as bool? ?? true;
             EfficiencyModeToggle.IsOn = settings.Values["EfficiencyModeEnabled"] as bool? ?? true;
             NotifyToggle.IsOn = settings.Values["NotifyEnabled"] as bool? ?? true;
-            HideNotificationContentToggle.IsOn = settings.Values["HideNotificationContent"] as bool? ?? false;
+            HideNotificationContentToggle.IsOn = settings.Values["HideNotificationContent"] as bool? ?? true;
             MailPollingToggle.IsOn = settings.Values["MailPollingEnabled"] as bool? ?? true;
             AutoMarkMailAsReadToggle.IsOn = settings.Values["AutoMarkMailAsRead"] as bool? ?? true;
             BlockRemoteImagesToggle.IsOn = settings.Values["BlockRemoteImagesByDefault"] as bool? ?? true;
@@ -102,6 +102,7 @@ namespace Task_Flyout.Views
             BuildColorPaletteUI();
 
             _isInitializing = false;
+            UpdateDependentControlStates();
         }
 
         private static string GetVersionText()
@@ -404,6 +405,7 @@ namespace Task_Flyout.Views
         {
             if (_isInitializing) return;
             ApplicationData.Current.LocalSettings.Values["NotifyEnabled"] = NotifyToggle.IsOn;
+            UpdateDependentControlStates();
 
             if (App.Current is App app && app.NotificationService != null)
             {
@@ -439,8 +441,15 @@ namespace Task_Flyout.Views
         {
             if (_isInitializing) return;
             ApplicationData.Current.LocalSettings.Values["MailPollingEnabled"] = MailPollingToggle.IsOn;
+            UpdateDependentControlStates();
             if (App.Current is App app)
                 app.MailService.UpdateMailPollingSettings();
+        }
+
+        private void UpdateDependentControlStates()
+        {
+            NotifyTimeComboBox.IsEnabled = NotifyToggle.IsOn;
+            MailPollingIntervalComboBox.IsEnabled = MailPollingToggle.IsOn;
         }
 
         private void MailPollingIntervalComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

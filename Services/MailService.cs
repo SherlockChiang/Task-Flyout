@@ -2228,7 +2228,7 @@ namespace Task_Flyout.Services
         {
             var sender = string.IsNullOrWhiteSpace(item.Sender) ? account.DisplayTitle : item.Sender;
             var subject = string.IsNullOrWhiteSpace(item.Subject) ? "(No subject)" : item.Subject;
-            var hideContent = ApplicationData.Current.LocalSettings.Values["HideNotificationContent"] as bool? ?? false;
+            var hideContent = ApplicationData.Current.LocalSettings.Values["HideNotificationContent"] as bool? ?? true;
 
             try
             {

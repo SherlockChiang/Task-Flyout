@@ -51,6 +51,9 @@ namespace Task_Flyout.Services
 
         public bool IsEnabled => ApplicationData.Current.LocalSettings.Values["NotifyEnabled"] as bool? ?? true;
 
+        private static bool HideNotificationContent
+            => ApplicationData.Current.LocalSettings.Values["HideNotificationContent"] as bool? ?? true;
+
         public void SetReminderMinutes(int minutes)
         {
             _reminderMinutes = minutes;
@@ -162,14 +165,13 @@ namespace Task_Flyout.Services
                     ? (_loader.GetStringOrDefault("TextOneMinuteLater") ?? "Starts in 1 minute")
                     : string.Format(_loader.GetStringOrDefault("TextMinutesLater") ?? "Starts in {0} minutes", minutesLeft);
 
-                var hideContent = ApplicationData.Current.LocalSettings.Values["HideNotificationContent"] as bool? ?? false;
                 var builder = new AppNotificationBuilder()
-                    .AddText(hideContent
+                    .AddText(HideNotificationContent
                         ? (_loader.GetStringOrDefault("TextEventReminder") ?? "Event Reminder")
                         : item.Title ?? (_loader.GetStringOrDefault("TextEventReminder") ?? "Event Reminder"))
                     .AddText($"{timeText} · {startTime:HH:mm}");
 
-                if (!hideContent && !string.IsNullOrEmpty(item.Location))
+                if (!HideNotificationContent && !string.IsNullOrEmpty(item.Location))
                     builder.AddText($"\ud83d\udccd {item.Location}");
 
                 var notification = builder.BuildNotification();
