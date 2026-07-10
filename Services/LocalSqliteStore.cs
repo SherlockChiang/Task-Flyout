@@ -68,24 +68,28 @@ ON CONFLICT(scope, key) DO UPDATE SET value = excluded.value, updated_ticks = ex
         public static async Task DeleteProtectedTextAsync(string scope, string key)
         {
             EnsureInitialized();
-            await using var connection = CreateConnection();
-            await connection.OpenAsync();
-            await using var command = connection.CreateCommand();
-            command.CommandText = "DELETE FROM protected_store WHERE scope = $scope AND key = $key;";
-            command.Parameters.AddWithValue("$scope", scope);
-            command.Parameters.AddWithValue("$key", key);
-            await command.ExecuteNonQueryAsync();
+            await using var connection = await OpenConnectionAsync();
+            await using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "DELETE FROM protected_store WHERE scope = $scope AND key = $key;";
+                command.Parameters.AddWithValue("$scope", scope);
+                command.Parameters.AddWithValue("$key", key);
+                await command.ExecuteNonQueryAsync();
+            }
+            await TruncateWalAsync(connection);
         }
 
         public static async Task DeleteProtectedScopeAsync(string scope)
         {
             EnsureInitialized();
-            await using var connection = CreateConnection();
-            await connection.OpenAsync();
-            await using var command = connection.CreateCommand();
-            command.CommandText = "DELETE FROM protected_store WHERE scope = $scope;";
-            command.Parameters.AddWithValue("$scope", scope);
-            await command.ExecuteNonQueryAsync();
+            await using var connection = await OpenConnectionAsync();
+            await using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "DELETE FROM protected_store WHERE scope = $scope;";
+                command.Parameters.AddWithValue("$scope", scope);
+                await command.ExecuteNonQueryAsync();
+            }
+            await TruncateWalAsync(connection);
         }
 
         private static void EnsureInitialized()
@@ -115,7 +119,33 @@ CREATE TABLE IF NOT EXISTS protected_store (
         {
             var connection = CreateConnection();
             connection.Open();
+            ExecuteNonQuery(connection, "PRAGMA secure_delete=ON;");
             return connection;
+        }
+
+        private static async Task<SqliteConnection> OpenConnectionAsync()
+        {
+            var connection = CreateConnection();
+            try
+            {
+                await connection.OpenAsync();
+                await using var command = connection.CreateCommand();
+                command.CommandText = "PRAGMA secure_delete=ON;";
+                await command.ExecuteNonQueryAsync();
+                return connection;
+            }
+            catch
+            {
+                await connection.DisposeAsync();
+                throw;
+            }
+        }
+
+        private static async Task TruncateWalAsync(SqliteConnection connection)
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+            await command.ExecuteNonQueryAsync();
         }
 
         private static SqliteConnection CreateConnection()
