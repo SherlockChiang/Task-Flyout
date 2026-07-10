@@ -59,6 +59,7 @@
     <Compile Include="..\..\Services\MailCacheKeyPolicy.cs" Link="Source\MailCacheKeyPolicy.cs" />
     <Compile Include="..\..\Services\MailPaginationPolicy.cs" Link="Source\MailPaginationPolicy.cs" />
     <Compile Include="..\..\Services\MailMutationRetryPolicy.cs" Link="Source\MailMutationRetryPolicy.cs" />
+    <Compile Include="..\..\Services\MailSendConfirmationPolicy.cs" Link="Source\MailSendConfirmationPolicy.cs" />
   </ItemGroup>
 
 </Project>

@@ -1149,6 +1149,8 @@ namespace Task_Flyout.Services
             }
             catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
             {
+                if (await TryConfirmGoogleSentMessageAsync(gmail, mime.MessageId))
+                    return;
                 throw new MailSendStatusUnknownException(ex);
             }
         }
@@ -1171,11 +1173,86 @@ namespace Task_Flyout.Services
             }
             catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
             {
+                if (await TryConfirmImapSentMessageAsync(account, password, message.MessageId))
+                    return;
                 throw new MailSendStatusUnknownException(ex);
             }
 
             try { await client.DisconnectAsync(true, cancellationToken); }
             catch { }
+        }
+
+        private static async Task<bool> TryConfirmGoogleSentMessageAsync(GmailService gmail, string? messageId)
+        {
+            var query = MailSendConfirmationPolicy.BuildGmailQuery(messageId);
+            if (query == null) return false;
+
+            using var confirmationCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            try
+            {
+                for (int attempt = 0; attempt < 2; attempt++)
+                {
+                    if (attempt > 0)
+                        await Task.Delay(TimeSpan.FromSeconds(2), confirmationCts.Token);
+
+                    var request = gmail.Users.Messages.List("me");
+                    request.LabelIds = "SENT";
+                    request.Q = query;
+                    request.MaxResults = 1;
+                    var response = await request.ExecuteAsync(confirmationCts.Token);
+                    if (response.Messages?.Count > 0)
+                        return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Gmail sent-message confirmation failed: {ex.Message}");
+            }
+
+            return false;
+        }
+
+        private async Task<bool> TryConfirmImapSentMessageAsync(MailAccount account, string password, string? messageId)
+        {
+            var normalizedMessageId = MailSendConfirmationPolicy.NormalizeMessageId(messageId);
+            if (normalizedMessageId == null) return false;
+
+            using var confirmationCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using var client = new ImapClient { Timeout = MailNetworkTimeoutMs };
+            try
+            {
+                await ConnectImapAsync(client, account, password, confirmationCts.Token);
+                var sentFolder = client.GetFolder(MailKit.SpecialFolder.Sent);
+                if (sentFolder == null) return false;
+                await sentFolder.OpenAsync(FolderAccess.ReadOnly, confirmationCts.Token);
+
+                for (int attempt = 0; attempt < 2; attempt++)
+                {
+                    if (attempt > 0)
+                        await Task.Delay(TimeSpan.FromSeconds(2), confirmationCts.Token);
+
+                    var matches = await sentFolder.SearchAsync(
+                        MailKit.Search.SearchQuery.HeaderContains("Message-Id", normalizedMessageId),
+                        confirmationCts.Token);
+                    if (matches.Count > 0)
+                        return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"IMAP sent-message confirmation failed: {ex.Message}");
+            }
+            finally
+            {
+                try
+                {
+                    if (client.IsConnected)
+                        await client.DisconnectAsync(true, CancellationToken.None);
+                }
+                catch { }
+            }
+
+            return false;
         }
 
         private async Task RetryPendingReadMutationsAsync(MailAccount account)
@@ -2128,6 +2205,7 @@ namespace Task_Flyout.Services
         private static MimeMessage CreateMimeMessage(MailAccount account, string to, string subject, string body)
         {
             var message = new MimeMessage();
+            message.MessageId = MimeKit.Utils.MimeUtils.GenerateMessageId();
             message.From.Add(MailboxAddress.Parse(string.IsNullOrWhiteSpace(account.Address) ? account.ImapUserName : account.Address));
             foreach (var address in ParseRecipients(to))
                 message.To.Add(MailboxAddress.Parse(address));
