@@ -349,6 +349,7 @@ namespace Task_Flyout.Services
             PruneOrphanedImageCache(force: true);
             DeleteById("rss_subscriptions", subscriptionId);
             DeleteArticlesForSubscription(subscriptionId);
+            CheckpointDeletedData();
         }
 
         public Task<List<RssArticle>> LoadMoreArticlesAsync(string? subscriptionId, string? folderId, int skip, int take)
@@ -1190,6 +1191,7 @@ namespace Task_Flyout.Services
             using var connection = OpenConnection();
             ExecuteNonQuery(connection, "PRAGMA journal_mode=WAL;");
             ExecuteNonQuery(connection, "PRAGMA synchronous=NORMAL;");
+            ExecuteNonQuery(connection, "PRAGMA secure_delete=ON;");
             ExecuteNonQuery(connection, """
 CREATE TABLE IF NOT EXISTS metadata (
     key TEXT PRIMARY KEY,
@@ -1511,6 +1513,20 @@ ON CONFLICT(id) DO UPDATE SET
             command.CommandText = "DELETE FROM rss_articles WHERE subscription_id = $subscriptionId;";
             command.Parameters.AddWithValue("$subscriptionId", subscriptionId);
             command.ExecuteNonQuery();
+        }
+
+        private void CheckpointDeletedData()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                ExecuteNonQuery(connection, "PRAGMA wal_checkpoint(TRUNCATE);");
+            }
+            catch
+            {
+                // A checkpoint can be busy while another RSS operation is reading. The
+                // secure-delete setting still applies, and a later write can checkpoint.
+            }
         }
 
         private void UpdateArticleFeedTitle(string subscriptionId, string title)
