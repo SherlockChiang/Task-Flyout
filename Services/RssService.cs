@@ -158,6 +158,7 @@ namespace Task_Flyout.Services
         private const int MaxFeedUrlLength = 4096;
         private const string ImageCacheDirectoryName = "RssImages";
         private const string ProtectedValuePrefix = "dpapi:v1:";
+        private const string SensitiveDataMigrationKey = "sensitive_data_dpapi_v1";
         private static readonly byte[] SensitiveDataEntropy = Encoding.UTF8.GetBytes("TaskFlyout.RssSensitiveData.v1");
         // This flows only while fetching a user-entered local source. Redirects always
         // clear it so a public feed cannot pivot into a private network address.
@@ -1553,6 +1554,14 @@ WHERE id NOT IN (
         private void MigrateSensitiveData()
         {
             using var connection = OpenConnection();
+            using (var migrationCheck = connection.CreateCommand())
+            {
+                migrationCheck.CommandText = "SELECT value FROM metadata WHERE key = $key LIMIT 1;";
+                migrationCheck.Parameters.AddWithValue("$key", SensitiveDataMigrationKey);
+                if (string.Equals(migrationCheck.ExecuteScalar() as string, "complete", StringComparison.Ordinal))
+                    return;
+            }
+
             using var transaction = connection.BeginTransaction();
 
             using (var command = connection.CreateCommand())
@@ -1630,6 +1639,14 @@ WHERE id = $id;
                     update.Parameters.AddWithValue("$imageUrl", ProtectValue(UnprotectValue(row.ImageUrl)));
                     update.ExecuteNonQuery();
                 }
+            }
+
+            using (var migrationComplete = connection.CreateCommand())
+            {
+                migrationComplete.Transaction = transaction;
+                migrationComplete.CommandText = "INSERT OR REPLACE INTO metadata(key, value) VALUES ($key, 'complete');";
+                migrationComplete.Parameters.AddWithValue("$key", SensitiveDataMigrationKey);
+                migrationComplete.ExecuteNonQuery();
             }
 
             transaction.Commit();
