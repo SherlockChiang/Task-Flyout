@@ -270,21 +270,24 @@ namespace Task_Flyout.Services
                 {
                     requestTask = GetAllDataCoreAsync(min, max, forceRefresh);
                     _inFlightDataRequests[requestKey] = requestTask;
+                    _ = requestTask.ContinueWith(
+                        completedTask => RemoveCompletedDataRequest(requestKey, completedTask),
+                        CancellationToken.None,
+                        TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
                 }
             }
 
-            try
+            var result = await requestTask.WaitAsync(cancellationToken);
+            return result.Select(CloneAgendaItem).ToList();
+        }
+
+        private void RemoveCompletedDataRequest(string requestKey, Task<List<AgendaItem>> completedTask)
+        {
+            lock (_dataRequestLock)
             {
-                var result = await requestTask.WaitAsync(cancellationToken);
-                return result.Select(CloneAgendaItem).ToList();
-            }
-            finally
-            {
-                lock (_dataRequestLock)
-                {
-                    if (_inFlightDataRequests.TryGetValue(requestKey, out var current) && ReferenceEquals(current, requestTask))
-                        _inFlightDataRequests.Remove(requestKey);
-                }
+                if (_inFlightDataRequests.TryGetValue(requestKey, out var current) && ReferenceEquals(current, completedTask))
+                    _inFlightDataRequests.Remove(requestKey);
             }
         }
 
