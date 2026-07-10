@@ -682,9 +682,9 @@ namespace Task_Flyout.Views
         {
             var message = ex.Message ?? "";
             if (message.Contains("non-public IP", StringComparison.OrdinalIgnoreCase))
-                return "刷新被安全策略拦截：RSS 地址或重定向解析到了非公网 IP。若正在使用 TUN/本地代理，可在设置中开启 RSS 本地网络访问。";
+                return "刷新被安全策略拦截：RSS 地址或重定向解析到了非公网 IP。仅可访问用户直接添加的本地 RSS 地址。";
 
-            return $"刷新失败：{message}";
+            return $"刷新失败：{UserSafeErrorMessage.FromException(ex)}";
         }
 
         private void SetArticleListStatus(string message, bool isError = false)
@@ -1037,7 +1037,7 @@ pre, code { white-space: pre-wrap; overflow-wrap: anywhere; }
             {
                 var logDir = AppDataPathHelper.EnsureDirectory(AppDataPathHelper.ResolveRoaming("Logs"));
                 var logPath = AppDataPathHelper.ResolveRoaming("Logs", "TaskFlyout_RssLog.txt");
-                File.AppendAllText(logPath, $"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n{ex}\n\n");
+                File.AppendAllText(logPath, $"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n{DiagnosticsRedactor.Redact(ex.ToString())}\n\n");
             }
             catch { }
         }

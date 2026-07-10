@@ -79,6 +79,7 @@ namespace Task_Flyout.Services
             _timer?.Stop();
             try
             {
+                AppNotificationManager.Default.NotificationInvoked -= OnNotificationInvoked;
                 AppNotificationManager.Default.Unregister();
             }
             catch { }

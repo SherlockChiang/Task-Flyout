@@ -685,69 +685,83 @@ namespace Task_Flyout.Views
 
         private async void EditDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
         {
-            if (string.IsNullOrWhiteSpace(EditTxtTitle.Text)) return;
-
-            var newDateKey = EditDatePicker.Date.ToString("yyyy-MM-dd");
-            TimeSpan? newStartTime = EditChkAllDay.IsChecked == true ? null : EditStartTimePicker.SelectedTime;
-            TimeSpan? newEndTime = EditChkAllDay.IsChecked == true ? null : EditEndTimePicker.SelectedTime;
-
-            string newSubtitleText = _loader.GetStringOrDefault("TextAllDay") ?? "All Day";
-            if (newStartTime.HasValue && newEndTime.HasValue) newSubtitleText = $"{newStartTime.Value:hh\\:mm} - {newEndTime.Value:hh\\:mm}";
-            else if (newStartTime.HasValue) newSubtitleText = $"{newStartTime.Value:hh\\:mm}";
-
-            bool isEvent = EditRadioEvent.IsChecked == true;
-            bool isAllDay = EditChkAllDay.IsChecked == true;
-            string providerName = (EditCmbProvider.SelectedItem as ComboBoxItem)?.Tag.ToString() ?? "Google";
-            var recurrence = GetSelectedRecurrence();
-
-            if (_itemBeingEdited == null)
+            if (string.IsNullOrWhiteSpace(EditTxtTitle.Text))
             {
-                try
+                args.Cancel = true;
+                EditValidationText.Text = _loader.GetStringOrDefault("TextTitleRequired") ?? "A title is required.";
+                EditValidationText.Visibility = Visibility.Visible;
+                EditTxtTitle.Focus(FocusState.Programmatic);
+                return;
+            }
+
+            args.Cancel = true;
+            var deferral = args.GetDeferral();
+            try
+            {
+                sender.IsPrimaryButtonEnabled = false;
+                sender.IsSecondaryButtonEnabled = false;
+                EditValidationText.Visibility = Visibility.Collapsed;
+
+                var newDateKey = EditDatePicker.Date.ToString("yyyy-MM-dd");
+                TimeSpan? newStartTime = EditChkAllDay.IsChecked == true ? null : EditStartTimePicker.SelectedTime;
+                TimeSpan? newEndTime = EditChkAllDay.IsChecked == true ? null : EditEndTimePicker.SelectedTime;
+                string newSubtitleText = _loader.GetStringOrDefault("TextAllDay") ?? "All Day";
+                if (newStartTime.HasValue && newEndTime.HasValue) newSubtitleText = $"{newStartTime.Value:hh\\:mm} - {newEndTime.Value:hh\\:mm}";
+                else if (newStartTime.HasValue) newSubtitleText = $"{newStartTime.Value:hh\\:mm}";
+
+                if (_itemBeingEdited == null)
                 {
                     if (_syncManager != null)
                     {
                         await _syncManager.CreateItemAsync(
-                            EditTxtTitle.Text, isEvent, isAllDay, EditDatePicker.Date.DateTime,
-                            newStartTime ?? TimeSpan.Zero, newEndTime ?? TimeSpan.Zero, EditTxtLocation.Text, recurrence, providerName);
-                        _ = SyncMonthDataAsync(forceRefresh: true);
+                            EditTxtTitle.Text, EditRadioEvent.IsChecked == true, EditChkAllDay.IsChecked == true,
+                            EditDatePicker.Date.DateTime, newStartTime ?? TimeSpan.Zero, newEndTime ?? TimeSpan.Zero,
+                            EditTxtLocation.Text, GetSelectedRecurrence(),
+                            (EditCmbProvider.SelectedItem as ComboBoxItem)?.Tag.ToString() ?? "Google");
                     }
                 }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Create failed: {ex.Message}"); }
-            }
-            else
-            {
-                if (_localCache.DayItems.TryGetValue(_itemBeingEdited.DateKey, out var oldList))
+                else if (_syncManager != null && !string.IsNullOrEmpty(_itemBeingEdited.Id))
                 {
-                    var orig = oldList.FirstOrDefault(x => x.Id == _itemBeingEdited.Id);
-                    if (orig != null)
-                    {
-                        var oldDateKey = orig.DateKey;
-                        oldList.Remove(orig);
-                        orig.Title = EditTxtTitle.Text;
-                        orig.Location = EditTxtLocation.Text;
-                        orig.Description = EditTxtDescription.Text;
-                        orig.DateKey = newDateKey;
-                        orig.Subtitle = newSubtitleText;
-                        if (!_localCache.DayItems.ContainsKey(newDateKey)) _localCache.DayItems[newDateKey] = new List<AgendaItem>();
-                        _localCache.DayItems[newDateKey].Add(orig);
-                        if (_syncManager != null)
-                            _ = _syncManager.UpsertCachedItemAsync(orig, oldDateKey);
-                    }
-                }
-                LoadCalendar(_viewDate);
+                    // Update the cloud item first; failed requests must not make the UI imply success.
+                    await _syncManager.UpdateItemAsync(
+                        _itemBeingEdited.Provider, _itemBeingEdited.Id, _itemBeingEdited.IsEvent,
+                        EditTxtTitle.Text, EditTxtLocation.Text, EditTxtDescription.Text,
+                        EditDatePicker.Date.DateTime, newStartTime, newEndTime);
 
-                if (_syncManager != null && !string.IsNullOrEmpty(_itemBeingEdited.Id))
-                {
-                    try
+                    if (_localCache.DayItems.TryGetValue(_itemBeingEdited.DateKey, out var oldList))
                     {
-                        await _syncManager.UpdateItemAsync(
-                            _itemBeingEdited.Provider, _itemBeingEdited.Id, _itemBeingEdited.IsEvent,
-                            EditTxtTitle.Text, EditTxtLocation.Text, EditTxtDescription.Text,
-                            EditDatePicker.Date.DateTime, newStartTime, newEndTime);
-                        _ = SyncMonthDataAsync(forceRefresh: true);
+                        var original = oldList.FirstOrDefault(x => x.Id == _itemBeingEdited.Id);
+                        if (original != null)
+                        {
+                            var oldDateKey = original.DateKey;
+                            oldList.Remove(original);
+                            original.Title = EditTxtTitle.Text;
+                            original.Location = EditTxtLocation.Text;
+                            original.Description = EditTxtDescription.Text;
+                            original.DateKey = newDateKey;
+                            original.Subtitle = newSubtitleText;
+                            if (!_localCache.DayItems.ContainsKey(newDateKey)) _localCache.DayItems[newDateKey] = new List<AgendaItem>();
+                            _localCache.DayItems[newDateKey].Add(original);
+                            await _syncManager.UpsertCachedItemAsync(original, oldDateKey);
+                        }
                     }
-                    catch { }
                 }
+
+                LoadCalendar(_viewDate);
+                _ = SyncMonthDataAsync(forceRefresh: true);
+                sender.Hide();
+            }
+            catch (Exception ex)
+            {
+                EditValidationText.Text = UserSafeErrorMessage.FromException(ex, _loader.GetStringOrDefault("TextSaveFailed") ?? "Unable to save. Please try again.");
+                EditValidationText.Visibility = Visibility.Visible;
+                SetCalendarStatus(EditValidationText.Text, isError: true);
+            }
+            finally
+            {
+                sender.IsPrimaryButtonEnabled = true;
+                sender.IsSecondaryButtonEnabled = _itemBeingEdited != null;
+                deferral.Complete();
             }
         }
 
@@ -769,38 +783,42 @@ namespace Task_Flyout.Views
         private async Task DeleteAgendaItemWithPromptAsync(AgendaItem itemToDelete)
         {
             var deleteMode = await GetRecurringDeleteModeAsync(itemToDelete);
-                if (deleteMode == null)
-                {
+            if (deleteMode == null)
+            {
                     return;
-                }
-
-            if (_localCache.DayItems.TryGetValue(itemToDelete.DateKey, out var list))
-                {
-                list.RemoveAll(x => x.Id == itemToDelete.Id);
-                    if (_syncManager != null)
-                        _ = _syncManager.RemoveCachedItemAsync(itemToDelete);
-                }
-                LoadCalendar(_viewDate);
+            }
 
             if (_syncManager != null && !string.IsNullOrEmpty(itemToDelete.Id))
+            {
+                try
                 {
-                    try
-                    {
                     DateTime? occurrenceDate = itemToDelete.StartDateTime;
                     if (!occurrenceDate.HasValue && DateTime.TryParse(itemToDelete.DateKey, out var parsedDate))
-                            occurrenceDate = parsedDate;
+                        occurrenceDate = parsedDate;
 
-                        await _syncManager.DeleteItemAsync(
+                    await _syncManager.DeleteItemAsync(
                         itemToDelete.Provider,
                         itemToDelete.Id,
                         itemToDelete.IsEvent,
-                            deleteMode.Value,
-                            occurrenceDate,
+                        deleteMode.Value,
+                        occurrenceDate,
                         itemToDelete.RecurringEventId);
-                        _ = SyncMonthDataAsync(forceRefresh: true);
-                    }
-                    catch { }
                 }
+                catch (Exception ex)
+                {
+                    SetCalendarStatus(UserSafeErrorMessage.FromException(ex, _loader.GetStringOrDefault("TextDeleteFailed") ?? "Unable to delete. Please try again."), isError: true);
+                    return;
+                }
+            }
+
+            if (_localCache.DayItems.TryGetValue(itemToDelete.DateKey, out var list))
+            {
+                list.RemoveAll(x => x.Id == itemToDelete.Id);
+                if (_syncManager != null)
+                    await _syncManager.RemoveCachedItemAsync(itemToDelete);
+            }
+            LoadCalendar(_viewDate);
+            _ = SyncMonthDataAsync(forceRefresh: true);
         }
 
         private EventRecurrenceKind GetSelectedRecurrence()
@@ -823,7 +841,7 @@ namespace Task_Flyout.Views
         private async Task<RecurringDeleteMode?> GetRecurringDeleteModeAsync(AgendaItem item)
         {
             if (!item.IsEvent || !item.IsRecurring)
-                return RecurringDeleteMode.Single;
+                return await ConfirmSingleDeleteAsync() ? RecurringDeleteMode.Single : null;
 
             RecurringDeleteMode? selectedMode = null;
             var dialog = new ContentDialog
@@ -869,6 +887,20 @@ namespace Task_Flyout.Views
 
             await dialog.ShowAsync();
             return selectedMode;
+        }
+
+        private async Task<bool> ConfirmSingleDeleteAsync()
+        {
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = _loader.GetStringOrDefault("TextDeleteAgendaItem") ?? "Delete item?",
+                Content = _loader.GetStringOrDefault("TextDeleteAgendaItemContent") ?? "This item will be removed from the connected account.",
+                PrimaryButtonText = _loader.GetStringOrDefault("TextDelete") ?? "Delete",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
+                DefaultButton = ContentDialogButton.Close
+            };
+            return await dialog.ShowAsync() == ContentDialogResult.Primary;
         }
 
         private static Button CreateDeleteModeButton(string text)

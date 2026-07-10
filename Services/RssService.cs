@@ -155,7 +155,11 @@ namespace Task_Flyout.Services
         private const long MaxImageBytes = 5 * 1024 * 1024;
         private const long MaxFeedBytes = 5 * 1024 * 1024;
         private const int MaxRedirects = 5;
+        private const int MaxFeedUrlLength = 4096;
         private const string ImageCacheDirectoryName = "RssImages";
+        // This flows only while fetching a user-entered local source. Redirects always
+        // clear it so a public feed cannot pivot into a private network address.
+        private static readonly AsyncLocal<bool> AllowCurrentLocalNetworkRequest = new();
         private static readonly HttpClient HttpClient = new(new SocketsHttpHandler
         {
             AllowAutoRedirect = false,
@@ -378,6 +382,14 @@ namespace Task_Flyout.Services
             {
                 url = "https://" + url;
             }
+
+            if (url.Length > MaxFeedUrlLength ||
+                !Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+                !string.IsNullOrEmpty(uri.UserInfo))
+            {
+                throw new InvalidOperationException("Feed URL is invalid or too long.");
+            }
+
             return url;
         }
 
@@ -603,7 +615,7 @@ namespace Task_Flyout.Services
 
         private static async Task<bool> IsSafeToFetchAsync(Uri uri)
         {
-            if (AllowRssLocalNetworkAccess)
+            if (AllowCurrentLocalNetworkRequest.Value)
                 return true;
 
             if (uri.HostNameType is not (UriHostNameType.IPv4 or UriHostNameType.IPv6))
@@ -630,7 +642,7 @@ namespace Task_Flyout.Services
 
         private static async Task<List<IPAddress>> ResolveConnectAddressesAsync(string host, System.Threading.CancellationToken cancellationToken)
         {
-            if (!AllowRssLocalNetworkAccess)
+            if (!AllowCurrentLocalNetworkRequest.Value)
                 return await ResolvePublicAddressesAsync(host, cancellationToken);
 
             IPAddress[] addresses = IPAddress.TryParse(host, out var parsed)
@@ -755,6 +767,7 @@ namespace Task_Flyout.Services
 
                 currentUri = location;
                 response.Dispose();
+                AllowCurrentLocalNetworkRequest.Value = false;
                 request = new HttpRequestMessage(HttpMethod.Get, currentUri);
                 foreach (var header in requestHeaders)
                     request.Headers.TryAddWithoutValidation(header.Key, header.Values);
@@ -768,25 +781,48 @@ namespace Task_Flyout.Services
             if (!RssFetchPolicy.IsAllowedFetchScheme(uri))
                 throw new InvalidOperationException("Feed URL must use HTTP or HTTPS.");
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-            using var response = await SendWithRedirectsAsync(request);
-            response.EnsureSuccessStatusCode();
-
-            if (response.Content.Headers.ContentLength is > MaxFeedBytes)
-                throw new InvalidOperationException("Feed response exceeds maximum size.");
-
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var buffer = new MemoryStream();
-            var chunk = new byte[81920];
-            int bytesRead;
-            while ((bytesRead = await stream.ReadAsync(chunk)) > 0)
+            var priorLocalNetworkPermission = AllowCurrentLocalNetworkRequest.Value;
+            AllowCurrentLocalNetworkRequest.Value = AllowRssLocalNetworkAccess && IsLocalNetworkUri(uri);
+            try
             {
-                if (buffer.Length + bytesRead > MaxFeedBytes)
-                    throw new InvalidOperationException("Feed response exceeds maximum size.");
-                buffer.Write(chunk, 0, bytesRead);
-            }
+                using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+                using var response = await SendWithRedirectsAsync(request);
+                response.EnsureSuccessStatusCode();
 
-            return DecodeFeedBytes(buffer.ToArray(), response.Content.Headers.ContentType?.CharSet);
+                if (response.Content.Headers.ContentLength is > MaxFeedBytes)
+                    throw new InvalidOperationException("Feed response exceeds maximum size.");
+
+                using var stream = await response.Content.ReadAsStreamAsync();
+                using var buffer = new MemoryStream();
+                var chunk = new byte[81920];
+                int bytesRead;
+                while ((bytesRead = await stream.ReadAsync(chunk)) > 0)
+                {
+                    if (buffer.Length + bytesRead > MaxFeedBytes)
+                        throw new InvalidOperationException("Feed response exceeds maximum size.");
+                    buffer.Write(chunk, 0, bytesRead);
+                }
+
+                return DecodeFeedBytes(buffer.ToArray(), response.Content.Headers.ContentType?.CharSet);
+            }
+            finally
+            {
+                AllowCurrentLocalNetworkRequest.Value = priorLocalNetworkPermission;
+            }
+        }
+
+        private static bool IsLocalNetworkUri(Uri uri)
+        {
+            if (NetworkSafety.IsUnsafeHost(uri)) return true;
+
+            try
+            {
+                return Dns.GetHostAddresses(uri.Host).Any(address => !NetworkSafety.IsPublicIpAddress(address));
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         static RssService()

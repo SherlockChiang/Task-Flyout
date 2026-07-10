@@ -361,6 +361,7 @@
                     </ComboBox>
 
                     <TextBox x:Uid="CalendarDialog_TitleInput" x:Name="EditTxtTitle" Header="名称" PlaceholderText="日程名称"/>
+                    <TextBlock x:Name="EditValidationText" Visibility="Collapsed" Foreground="{ThemeResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" />
                     <TextBox x:Uid="CalendarDialog_LocationInput" x:Name="EditTxtLocation" Header="地点 (选填)" PlaceholderText="添加位置信息"/>
                     <TextBox x:Uid="CalendarDialog_DescInput" x:Name="EditTxtDescription" Header="详情备注 (选填)" PlaceholderText="记录详细内容..." AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" MaxHeight="160"/>
                     <StackPanel Spacing="8">
