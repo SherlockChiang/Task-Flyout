@@ -34,7 +34,7 @@
 
             <Grid Margin="4,0,0,8">
                 <TextBlock x:Uid="CalendarPage_AccountHeader" Text="日程账户" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                <Button x:Uid="CalendarPage_BtnCollapseAccounts" HorizontalAlignment="Right" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
+                <Button x:Uid="CalendarPage_BtnCollapseAccounts" HorizontalAlignment="Right" Width="40" Height="40" Padding="0" Background="Transparent" BorderThickness="0"
                         Click="ToggleAccountPane_Click" AutomationProperties.Name="折叠账户" ToolTipService.ToolTip="折叠账户">
                     <FontIcon Glyph="&#xE76B;" FontSize="12"/>
                 </Button>
@@ -71,7 +71,7 @@
                                                   Foreground="{ThemeResource SystemAccentColor}" VerticalAlignment="Center"/>
                                         <TextBlock Grid.Column="1" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"
                                                    Text="{Binding ProviderName}" TextTrimming="CharacterEllipsis"/>
-                                        <Button Grid.Column="2" x:Uid="CalendarPage_BtnRemoveAccount" Padding="4" Background="Transparent" BorderThickness="0"
+                                        <Button Grid.Column="2" x:Uid="CalendarPage_BtnRemoveAccount" Width="40" Height="40" Padding="0" Background="Transparent" BorderThickness="0"
                                                 Tag="{Binding ProviderName}" Click="BtnRemoveAccount_Click"
                                                 AutomationProperties.Name="移除账户" ToolTipService.ToolTip="移除账户" VerticalAlignment="Center">
                                             <FontIcon Glyph="&#xE711;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
@@ -100,8 +100,9 @@
                                                                    TextTrimming="CharacterEllipsis" FontSize="13"
                                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                                         <ToggleSwitch Grid.Column="2" IsOn="{Binding IsVisible, Mode=TwoWay}"
-                                                                      OffContent="" OnContent="" MinWidth="0" Margin="0"
-                                                                      Toggled="CalendarToggle_Toggled" VerticalAlignment="Center"/>
+                                                                       OffContent="" OnContent="" MinWidth="0" Margin="0"
+                                                                       Toggled="CalendarToggle_Toggled" VerticalAlignment="Center"
+                                                                       AutomationProperties.Name="{Binding Name}"/>
                                                     </Grid>
                                                 </DataTemplate>
                                             </ItemsRepeater.ItemTemplate>
@@ -120,8 +121,9 @@
                                                        TextTrimming="CharacterEllipsis" FontSize="13"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                             <ToggleSwitch Grid.Column="2" IsOn="{Binding ShowTasks, Mode=TwoWay}"
-                                                          OffContent="" OnContent="" MinWidth="0" Margin="0"
-                                                          Toggled="AccountToggle_Toggled" Tag="{Binding ProviderName}" VerticalAlignment="Center"/>
+                                                           OffContent="" OnContent="" MinWidth="0" Margin="0"
+                                                           Toggled="AccountToggle_Toggled" Tag="{Binding ProviderName}" VerticalAlignment="Center"
+                                                           AutomationProperties.Name="显示或隐藏待办任务"/>
                                         </Grid>
                                     </StackPanel>
                                 </Expander.Content>

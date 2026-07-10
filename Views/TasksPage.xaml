@@ -33,7 +33,7 @@
 
             <Grid Margin="4,0,0,8">
                 <TextBlock x:Uid="TasksPage_AccountHeader" Text="任务账户" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                <Button HorizontalAlignment="Right" Width="32" Height="32" Padding="0"
+                <Button HorizontalAlignment="Right" Width="40" Height="40" Padding="0"
                         Background="Transparent" BorderThickness="0"
                         Click="ToggleAccountPane_Click"
                         AutomationProperties.Name="折叠账户" ToolTipService.ToolTip="折叠账户">
@@ -80,7 +80,7 @@
                                                    VerticalAlignment="Center"
                                                    Text="{Binding ProviderName}"
                                                    TextTrimming="CharacterEllipsis"/>
-                                        <Button Grid.Column="2" Padding="4"
+                                        <Button Grid.Column="2" Width="40" Height="40" Padding="0"
                                                 Background="Transparent"
                                                 BorderThickness="0"
                                                 Tag="{Binding ProviderName}"
@@ -109,13 +109,14 @@
                                                    FontSize="13"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         <ToggleSwitch Grid.Column="2"
-                                                      IsOn="{Binding ShowTasks, Mode=TwoWay}"
-                                                      OffContent=""
-                                                      OnContent=""
-                                                      MinWidth="0"
-                                                      Margin="0"
-                                                      Toggled="AccountToggle_Toggled"
-                                                      VerticalAlignment="Center"/>
+                                                       IsOn="{Binding ShowTasks, Mode=TwoWay}"
+                                                       OffContent=""
+                                                       OnContent=""
+                                                       MinWidth="0"
+                                                       Margin="0"
+                                                       Toggled="AccountToggle_Toggled"
+                                                       VerticalAlignment="Center"
+                                                       AutomationProperties.Name="显示或隐藏待办任务"/>
                                     </Grid>
                                 </Expander.Content>
                             </Expander>
