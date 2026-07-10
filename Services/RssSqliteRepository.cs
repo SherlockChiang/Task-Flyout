@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 
 namespace Task_Flyout.Services
 {
@@ -54,6 +55,7 @@ namespace Task_Flyout.Services
         private readonly Func<bool> _isUnavailable;
         private readonly object _initializationLock = new();
         private bool _initialized;
+        private int _checkpointPending;
 
         public RssSqliteRepository(string databasePath, Func<bool>? isUnavailable = null)
         {
@@ -557,15 +559,17 @@ LIMIT $take OFFSET $skip;
             command.ExecuteNonQuery();
         }
 
-        private static void TryCheckpointDeletedData(SqliteConnection connection)
+        private void TryCheckpointDeletedData(SqliteConnection connection)
         {
+            bool completed = false;
             try
             {
                 ExecuteNonQuery(connection, "PRAGMA busy_timeout=0;");
                 using var command = connection.CreateCommand();
                 command.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
                 using var reader = command.ExecuteReader();
-                if (reader.Read() && reader.GetInt32(0) != 0)
+                completed = reader.Read() && reader.GetInt32(0) == 0;
+                if (!completed)
                     System.Diagnostics.Debug.WriteLine("RSS WAL checkpoint deferred because a reader is active.");
             }
             catch (SqliteException ex)
@@ -577,6 +581,8 @@ LIMIT $take OFFSET $skip;
                 try { ExecuteNonQuery(connection, $"PRAGMA busy_timeout={BusyTimeoutMilliseconds};"); }
                 catch (SqliteException) { }
             }
+
+            Interlocked.Exchange(ref _checkpointPending, completed ? 0 : 1);
         }
 
         internal SqliteConnection OpenConnection()
@@ -588,6 +594,8 @@ LIMIT $take OFFSET $skip;
             connection.Open();
             ExecuteNonQuery(connection, "PRAGMA secure_delete=ON;");
             ExecuteNonQuery(connection, $"PRAGMA busy_timeout={BusyTimeoutMilliseconds};");
+            if (Volatile.Read(ref _checkpointPending) != 0)
+                TryCheckpointDeletedData(connection);
             return connection;
         }
 

@@ -386,7 +386,7 @@ END;
             Assert.Equal("new", Assert.Single(repository.QueryArticlesPage(null, null, 0, 10)).Id);
         }
 
-        repository.TrimArticles(1);
+        Assert.Equal("new", Assert.Single(repository.QueryArticlesPage(null, null, 0, 10)).Id);
         var walPath = databasePath + "-wal";
         Assert.True(!File.Exists(walPath) || new FileInfo(walPath).Length == 0);
     }
