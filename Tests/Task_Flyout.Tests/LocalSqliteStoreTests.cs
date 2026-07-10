@@ -31,4 +31,61 @@ public class LocalSqliteStoreTests
             Directory.Delete(testRoot, recursive: true);
         }
     }
+
+    [Fact]
+    public async Task Verification_code_token_is_single_use()
+    {
+        var testRoot = CreateIsolatedStore();
+        var token = Guid.NewGuid().ToString("N");
+        LocalSqliteStore.WriteProtectedText(
+            "notification-verification-code",
+            token,
+            $"{DateTimeOffset.UtcNow.UtcTicks}|123456");
+
+        try
+        {
+            Assert.Equal("123456", await VerificationCodeStore.TakeAsync(token));
+            Assert.Null(await VerificationCodeStore.TakeAsync(token));
+        }
+        finally
+        {
+            DeleteIsolatedStore(testRoot);
+        }
+    }
+
+    [Fact]
+    public async Task Verification_code_token_rejects_and_deletes_expired_value()
+    {
+        var testRoot = CreateIsolatedStore();
+        var token = Guid.NewGuid().ToString("N");
+        var expiredAt = DateTimeOffset.UtcNow.Subtract(TimeSpan.FromMinutes(11));
+        LocalSqliteStore.WriteProtectedText(
+            "notification-verification-code",
+            token,
+            $"{expiredAt.UtcTicks}|654321");
+
+        try
+        {
+            Assert.Null(await VerificationCodeStore.TakeAsync(token));
+            Assert.Null(LocalSqliteStore.ReadProtectedText("notification-verification-code", token));
+        }
+        finally
+        {
+            DeleteIsolatedStore(testRoot);
+        }
+    }
+
+    private static string CreateIsolatedStore()
+    {
+        var testRoot = Path.Combine(Path.GetTempPath(), "taskflyout-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(testRoot);
+        LocalSqliteStore.SetDataPathForTests(testRoot);
+        return testRoot;
+    }
+
+    private static void DeleteIsolatedStore(string testRoot)
+    {
+        LocalSqliteStore.SetDataPathForTests(null);
+        Directory.Delete(testRoot, recursive: true);
+    }
 }

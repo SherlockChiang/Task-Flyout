@@ -54,6 +54,7 @@
     <Compile Include="..\..\Services\RecurrencePolicy.cs" Link="Source\RecurrencePolicy.cs" />
     <Compile Include="..\..\Services\AppDataPathHelper.cs" Link="Source\AppDataPathHelper.cs" />
     <Compile Include="..\..\Services\LocalSqliteStore.cs" Link="Source\LocalSqliteStore.cs" />
+    <Compile Include="..\..\Services\VerificationCodeStore.cs" Link="Source\VerificationCodeStore.cs" />
   </ItemGroup>
 
 </Project>
