@@ -561,47 +561,17 @@ namespace Task_Flyout.Services
 
         public async Task<List<MailItem>> FetchMessagesAsync(MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize = null, bool forceRefresh = false, CancellationToken cancellationToken = default)
         {
-            string cacheKey = GetMessageCacheKey(account.Id, folder.Id, unreadOnly, pageSize ?? PageSize);
-            if (!forceRefresh && TryGetCachedMessages(cacheKey, out var cachedMessages))
+            int requestedPageSize = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
+            string cacheKey = GetMessageCacheKey(account.Id, folder.Id, unreadOnly);
+            if (!forceRefresh && TryGetCachedMessages(cacheKey, requestedPageSize, out var cachedMessages))
                 return cachedMessages;
 
-            List<MailItem> messages;
-            if (account.Kind == MailAccountKind.Google)
-            {
-                messages = await FetchGoogleMessagesAsync(account, folder, unreadOnly, pageSize, cancellationToken);
-            }
-            else if (account.Kind == MailAccountKind.Imap)
-            {
-                messages = await FetchImapMessagesAsync(account, folder, unreadOnly, pageSize, cancellationToken);
-            }
-            else if (account.Kind != MailAccountKind.Outlook || !account.IsSetupComplete || folder.IsPlaceholder)
-            {
-                messages = new List<MailItem>();
-            }
-            else
-            {
-                await EnsureOutlookMailReadAuthorizedAsync(cancellationToken);
-                if (_outlookClient == null) return new List<MailItem>();
-
-                int top = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
-                var response = await _outlookClient.Me.MailFolders[folder.Id].Messages.GetAsync(request =>
-                {
-                    request.QueryParameters.Top = top;
-                    request.QueryParameters.Select = new[]
-                    {
-                        "id", "subject", "from", "toRecipients", "receivedDateTime", "isRead",
-                        "bodyPreview", "webLink", "hasAttachments", "importance"
-                    };
-                    request.QueryParameters.Orderby = new[] { "receivedDateTime desc" };
-                    if (unreadOnly)
-                        request.QueryParameters.Filter = "isRead eq false";
-                }, cancellationToken);
-
-                messages = response?.Value?
-                    .Where(message => message != null)
-                    .Select(message => ToOutlookMailItem(account.Id, folder.Id, message))
-                    .ToList() ?? new List<MailItem>();
-            }
+            var messages = await FetchMessagesFromProviderAsync(
+                account,
+                folder,
+                unreadOnly,
+                requestedPageSize,
+                cancellationToken);
 
             _messageCache[cacheKey] = new CacheEntry<List<MailItem>> { Value = StripBodies(messages) };
             UpdatePersistentMessages(cacheKey, messages);
@@ -1065,7 +1035,7 @@ namespace Task_Flyout.Services
         {
             const int pollPageSize = 5;
             if (account.Kind != MailAccountKind.Imap)
-                return await FetchMessagesAsync(account, inbox, unreadOnly: true, pageSize: pollPageSize, forceRefresh: true);
+                return await FetchMessagesFromProviderAsync(account, inbox, unreadOnly: true, pageSize: pollPageSize);
 
             var client = await GetOrConnectPollImapClientAsync(account);
             List<MailItem> messages;
@@ -1080,10 +1050,42 @@ namespace Task_Flyout.Services
                 throw;
             }
 
-            string cacheKey = GetMessageCacheKey(account.Id, inbox.Id, true, pollPageSize);
-            _messageCache[cacheKey] = new CacheEntry<List<MailItem>> { Value = StripBodies(messages) };
-            UpdatePersistentMessages(cacheKey, messages);
             return CloneMailItems(messages, includeBodies: false);
+        }
+
+        private async Task<List<MailItem>> FetchMessagesFromProviderAsync(
+            MailAccount account,
+            MailFolder folder,
+            bool unreadOnly,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            if (account.Kind == MailAccountKind.Google)
+                return await FetchGoogleMessagesAsync(account, folder, unreadOnly, pageSize, cancellationToken);
+            if (account.Kind == MailAccountKind.Imap)
+                return await FetchImapMessagesAsync(account, folder, unreadOnly, pageSize, cancellationToken);
+            if (account.Kind != MailAccountKind.Outlook || !account.IsSetupComplete || folder.IsPlaceholder)
+                return new List<MailItem>();
+
+            await EnsureOutlookMailReadAuthorizedAsync(cancellationToken);
+            if (_outlookClient == null) return new List<MailItem>();
+
+            var response = await _outlookClient.Me.MailFolders[folder.Id].Messages.GetAsync(request =>
+            {
+                request.QueryParameters.Top = Math.Clamp(pageSize, MinPageSize, MaxPageSize);
+                request.QueryParameters.Select = new[]
+                {
+                    "id", "subject", "from", "toRecipients", "receivedDateTime", "isRead",
+                    "bodyPreview", "webLink", "hasAttachments", "importance"
+                };
+                request.QueryParameters.Orderby = new[] { "receivedDateTime desc" };
+                if (unreadOnly)
+                    request.QueryParameters.Filter = "isRead eq false";
+            }, cancellationToken);
+            return response?.Value?
+                .Where(message => message != null)
+                .Select(message => ToOutlookMailItem(account.Id, folder.Id, message))
+                .ToList() ?? new List<MailItem>();
         }
 
         private async Task<GmailService> EnsureGoogleMailReadAuthorizedAsync(CancellationToken cancellationToken = default)
@@ -1862,11 +1864,11 @@ namespace Task_Flyout.Services
             return false;
         }
 
-        private bool TryGetCachedMessages(string key, out List<MailItem> messages)
+        private bool TryGetCachedMessages(string key, int pageSize, out List<MailItem> messages)
         {
             if (_messageCache.TryGetValue(key, out var entry) && DateTimeOffset.Now - entry.CreatedAt < CacheLifetime)
             {
-                messages = CloneMailItems(entry.Value, includeBodies: false);
+                messages = CloneMailItems(entry.Value.Take(pageSize), includeBodies: false);
                 return true;
             }
 
@@ -1876,7 +1878,7 @@ namespace Task_Flyout.Services
                 var cachedMessages = StripBodies(persistentMessages);
                 _persistentCache.Messages[key] = cachedMessages;
                 _messageCache[key] = new CacheEntry<List<MailItem>> { Value = cachedMessages };
-                messages = CloneMailItems(cachedMessages, includeBodies: false);
+                messages = CloneMailItems(cachedMessages.Take(pageSize), includeBodies: false);
                 return true;
             }
 
@@ -1917,7 +1919,7 @@ namespace Task_Flyout.Services
                 if (cached != null)
                     cached.IsRead = true;
 
-                if (pair.Key.StartsWith($"{item.AccountId}|{item.FolderId}|True|", StringComparison.Ordinal))
+                if (string.Equals(pair.Key, GetMessageCacheKey(item.AccountId, item.FolderId, true), StringComparison.Ordinal))
                     pair.Value.Value.RemoveAll(message => message.Id == item.Id);
             }
 
@@ -1934,14 +1936,14 @@ namespace Task_Flyout.Services
                 if (cached != null)
                     cached.IsRead = true;
 
-                if (pair.Key.StartsWith($"{item.AccountId}|{item.FolderId}|True|", StringComparison.Ordinal))
+                if (string.Equals(pair.Key, GetMessageCacheKey(item.AccountId, item.FolderId, true), StringComparison.Ordinal))
                     pair.Value.RemoveAll(message => message.Id == item.Id);
             }
             SavePersistentCache();
         }
 
-        private static string GetMessageCacheKey(string accountId, string folderId, bool unreadOnly, int pageSize)
-            => $"{accountId}|{folderId}|{unreadOnly}|{pageSize}";
+        private static string GetMessageCacheKey(string accountId, string folderId, bool unreadOnly)
+            => MailCacheKeyPolicy.Build(accountId, folderId, unreadOnly);
 
         private void EnsurePersistentCacheLoaded()
         {
@@ -1967,7 +1969,34 @@ namespace Task_Flyout.Services
             _persistentCache.LastSeenInboxTicks ??= new Dictionary<string, long>();
             _persistentCache.AccountOrder ??= new List<string>();
             _persistentCache.FolderOrder ??= new Dictionary<string, List<string>>();
+            MigrateLegacyMessageCacheKeys();
             TrimPersistentCacheForMemory();
+        }
+
+        private void MigrateLegacyMessageCacheKeys()
+        {
+            if (_persistentCache == null) return;
+
+            bool changed = false;
+            foreach (var key in _persistentCache.Messages.Keys.ToList())
+            {
+                if (!MailCacheKeyPolicy.TryCanonicalizeLegacy(key, out var canonicalKey)) continue;
+
+                var combined = _persistentCache.Messages.TryGetValue(canonicalKey, out var existing)
+                    ? existing.Concat(_persistentCache.Messages[key])
+                    : _persistentCache.Messages[key];
+                _persistentCache.Messages[canonicalKey] = combined
+                    .GroupBy(item => item.Id, StringComparer.Ordinal)
+                    .Select(group => group.OrderByDescending(item => item.RawReceivedTime).First())
+                    .OrderByDescending(item => item.RawReceivedTime)
+                    .Take(MaxPageSize)
+                    .ToList();
+                _persistentCache.Messages.Remove(key);
+                changed = true;
+            }
+
+            if (changed)
+                SavePersistentCache();
         }
 
         private void SavePersistentCache()
@@ -2084,15 +2113,9 @@ namespace Task_Flyout.Services
                 var messages = StripBodies(_persistentCache.Messages[key]);
                 _persistentCache.Messages[key] = messages
                     .OrderByDescending(item => item.RawReceivedTime)
-                    .Take(Math.Clamp(GetPageSizeFromCacheKey(key), MinPageSize, MaxPageSize))
+                    .Take(MaxPageSize)
                     .ToList();
             }
-        }
-
-        private int GetPageSizeFromCacheKey(string key)
-        {
-            var parts = key.Split('|');
-            return parts.Length > 0 && int.TryParse(parts[^1], out var value) ? value : PageSize;
         }
 
         private void UpdatePersistentMessageBody(MailItem item)
@@ -2131,13 +2154,18 @@ namespace Task_Flyout.Services
             if (_persistentCache == null || newMessages.Count == 0) return;
 
             var strippedNewMessages = StripBodies(newMessages);
-            int pageSize = PageSize;
             foreach (bool unreadOnly in new[] { true, false })
             {
-                var key = GetMessageCacheKey(accountId, folderId, unreadOnly, pageSize);
-                var existing = _persistentCache.Messages.TryGetValue(key, out var cached)
-                    ? StripBodies(cached)
-                    : new List<MailItem>();
+                var key = GetMessageCacheKey(accountId, folderId, unreadOnly);
+                List<MailItem> existing;
+                if (_persistentCache.Messages.TryGetValue(key, out var cached))
+                    existing = StripBodies(cached);
+                else if (_messageCache.TryGetValue(key, out var memoryEntry))
+                    existing = StripBodies(memoryEntry.Value);
+                else
+                    continue;
+
+                int retainedCount = Math.Clamp(existing.Count, MinPageSize, MaxPageSize);
 
                 foreach (var message in strippedNewMessages)
                 {
@@ -2148,7 +2176,7 @@ namespace Task_Flyout.Services
 
                 _persistentCache.Messages[key] = existing
                     .OrderByDescending(item => item.RawReceivedTime)
-                    .Take(Math.Clamp(pageSize, MinPageSize, MaxPageSize))
+                    .Take(retainedCount)
                     .ToList();
 
                 _messageCache[key] = new CacheEntry<List<MailItem>> { Value = StripBodies(_persistentCache.Messages[key]) };
