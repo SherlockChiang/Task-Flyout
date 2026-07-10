@@ -20,6 +20,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -691,10 +692,29 @@ namespace Task_Flyout.Services
         {
             if (item.IsRead && !forceRemoteSync) return;
 
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-            using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-            var operationToken = operationCts.Token;
+            for (int attempt = 0; ; attempt++)
+            {
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+                try
+                {
+                    await MarkAsReadRemoteOnceAsync(account, item, operationCts.Token);
+                    break;
+                }
+                catch (Exception ex) when (attempt == 0 &&
+                                           !cancellationToken.IsCancellationRequested &&
+                                           IsTransientReadStateFailure(ex, timeoutCts.IsCancellationRequested))
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+                }
+            }
 
+            item.IsRead = true;
+            UpdateCachedReadState(item);
+        }
+
+        private async Task MarkAsReadRemoteOnceAsync(MailAccount account, MailItem item, CancellationToken operationToken)
+        {
             if (account.Kind == MailAccountKind.Outlook)
             {
                 await EnsureOutlookMailWriteAuthorizedAsync(operationToken);
@@ -719,9 +739,22 @@ namespace Task_Flyout.Services
                     await folder.AddFlagsAsync(new UniqueId(uidValue), MessageFlags.Seen, true, operationToken);
                 await client.DisconnectAsync(true, operationToken);
             }
+        }
 
-            item.IsRead = true;
-            UpdateCachedReadState(item);
+        private static bool IsTransientReadStateFailure(Exception exception, bool operationTimedOut)
+        {
+            if (exception is OperationCanceledException)
+                return operationTimedOut;
+            if (exception is HttpRequestException httpException)
+                return httpException.StatusCode == null || MailMutationRetryPolicy.IsTransientStatusCode((int)httpException.StatusCode.Value);
+            if (exception is IOException)
+                return true;
+            if (exception is Microsoft.Kiota.Abstractions.ApiException kiotaException)
+                return MailMutationRetryPolicy.IsTransientStatusCode(kiotaException.ResponseStatusCode);
+            if (exception is Google.GoogleApiException googleException)
+                return MailMutationRetryPolicy.IsTransientStatusCode((int)googleException.HttpStatusCode);
+
+            return false;
         }
 
         public async Task FetchMessageBodyAsync(MailAccount account, MailItem item, CancellationToken cancellationToken = default)
