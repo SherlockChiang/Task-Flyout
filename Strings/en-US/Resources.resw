@@ -1477,7 +1477,7 @@
     <value>When enabled, closing the main window keeps tray, sync, reminders, and mail polling running. When disabled, closing exits the app.</value>
   </data>
   <data name="MailPage_ComposeConsentHint.Text" xml:space="preserve">
-    <value>Gmail/Outlook may ask for extra send permission the first time you send mail.</value>
+    <value>Gmail may request send access. Outlook may request mail read/write and send access to create a tracked draft and avoid duplicate sends.</value>
   </data>
   <data name="WeatherPage_LocationPrivacyDesc.Text" xml:space="preserve">
     <value>Use current location or auto-follow asks Windows for location permission. Coordinates stay on this device and are only used to request weather from the selected provider.</value>

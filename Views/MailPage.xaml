@@ -378,7 +378,7 @@
                                         </Button>
                                     </StackPanel>
                                 </Grid>
-                                <TextBlock x:Uid="MailPage_ComposeConsentHint" Text="Gmail/Outlook 首次发送邮件时可能会要求额外授权发送权限。" FontSize="12"
+                                <TextBlock x:Uid="MailPage_ComposeConsentHint" Text="Gmail 可能请求发送权限；Outlook 可能请求邮件读写和发送权限，以创建可追踪草稿并避免重复发送。" FontSize="12"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="WrapWholeWords"/>
                                 <ComboBox x:Name="ComposeFromBox" x:Uid="MailPage_ComposeFrom" Header="发件人" HorizontalAlignment="Stretch"/>
                                 <TextBox x:Name="ComposeToBox" x:Uid="MailPage_ComposeTo" Header="收件人" PlaceholderText="name@example.com; other@example.com"/>
