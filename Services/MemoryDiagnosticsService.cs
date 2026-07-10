@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using Windows.Storage;
 
 namespace Task_Flyout.Services
@@ -15,6 +16,8 @@ namespace Task_Flyout.Services
         private readonly TimeSpan _interval = TimeSpan.FromSeconds(60);
         private DispatcherTimer? _timer;
         private string? _logPath;
+        private readonly object _writeLock = new();
+        private Task _pendingWrite = Task.CompletedTask;
 
         public bool IsEnabled
         {
@@ -91,11 +94,25 @@ namespace Task_Flyout.Services
                     Bool(App.MyFlyoutWindow != null),
                     Bool(App.MyWeatherBar != null));
 
-                File.AppendAllText(_logPath, line + Environment.NewLine, Encoding.UTF8);
+                QueueLogWrite(_logPath, line + Environment.NewLine);
             }
             catch
             {
                 // Diagnostics must never affect normal app behavior.
+            }
+        }
+
+        private void QueueLogWrite(string path, string line)
+        {
+            lock (_writeLock)
+            {
+                _pendingWrite = _pendingWrite.ContinueWith(
+                    _ =>
+                    {
+                        try { File.AppendAllText(path, line, Encoding.UTF8); }
+                        catch { }
+                    },
+                    TaskScheduler.Default);
             }
         }
 
