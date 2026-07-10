@@ -59,6 +59,7 @@ namespace Task_Flyout.Views
         private CancellationTokenSource? _bodyLoadCts;
         private CancellationTokenSource? _accountAuthCts;
         private CancellationTokenSource? _imapSetupCts;
+        private bool _isSendingMail;
         internal bool IsOpeningFromNotification { get; set; }
 
         public MailPage()
@@ -1459,6 +1460,7 @@ body { background-color: {{background}} !important; }
 
         private async void CancelComposeButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isSendingMail) return;
             if (!string.IsNullOrWhiteSpace(ComposeToBox.Text) ||
                 !string.IsNullOrWhiteSpace(ComposeSubjectBox.Text) ||
                 !string.IsNullOrWhiteSpace(ComposeBodyBox.Text))
@@ -1488,7 +1490,7 @@ body { background-color: {{background}} !important; }
 
         private async void SendComposeButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_mailService == null) return;
+            if (_mailService == null || _isSendingMail) return;
 
             if (ComposeFromBox.SelectedItem is not ComboBoxItem selectedFrom)
             {
@@ -1509,7 +1511,9 @@ body { background-color: {{background}} !important; }
                 return;
             }
 
+            _isSendingMail = true;
             SendComposeButton.IsEnabled = false;
+            CancelComposeButton.IsEnabled = false;
             ComposeStatusText.Text = _loader.GetStringOrDefault("TextSending") ?? "Sending...";
 
             try
@@ -1519,6 +1523,11 @@ body { background-color: {{background}} !important; }
                 ComposePanel.Visibility = Visibility.Collapsed;
                 ClearDetail();
             }
+            catch (MailSendStatusUnknownException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Send mail status unknown: {ex.Message}");
+                ComposeStatusText.Text = _loader.GetStringOrDefault("TextSendStatusUnknown") ?? "Sending timed out. Check your Sent folder before trying again.";
+            }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Send mail failed: {ex.Message}");
@@ -1526,7 +1535,9 @@ body { background-color: {{background}} !important; }
             }
             finally
             {
+                _isSendingMail = false;
                 SendComposeButton.IsEnabled = true;
+                CancelComposeButton.IsEnabled = true;
             }
         }
 

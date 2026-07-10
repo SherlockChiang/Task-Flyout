@@ -159,6 +159,14 @@ namespace Task_Flyout.Services
         public required MailItem Item { get; init; }
     }
 
+    public sealed class MailSendStatusUnknownException : Exception
+    {
+        public MailSendStatusUnknownException(Exception innerException)
+            : base("The mail provider may have accepted the message before the operation timed out.", innerException)
+        {
+        }
+    }
+
     public class MailService
     {
         private readonly ResourceLoader _loader = new();
@@ -646,23 +654,27 @@ namespace Task_Flyout.Services
             return CommitMessagePage(cacheKey, page, append: loadMore);
         }
 
-        public async Task SendMailAsync(MailAccount account, string to, string subject, string body)
+        public async Task SendMailAsync(MailAccount account, string to, string subject, string body, CancellationToken cancellationToken = default)
         {
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            var operationToken = operationCts.Token;
+
             if (account.Kind == MailAccountKind.Outlook)
             {
-                await SendOutlookMailAsync(account, to, subject, body);
+                await SendOutlookMailAsync(account, to, subject, body, operationToken);
                 return;
             }
 
             if (account.Kind == MailAccountKind.Google)
             {
-                await SendGoogleMailAsync(account, to, subject, body);
+                await SendGoogleMailAsync(account, to, subject, body, operationToken);
                 return;
             }
 
             if (account.Kind == MailAccountKind.Imap)
             {
-                await SendSmtpMailAsync(account, to, subject, body);
+                await SendSmtpMailAsync(account, to, subject, body, operationToken);
                 return;
             }
 
@@ -901,9 +913,9 @@ namespace Task_Flyout.Services
         private static int GetBodyCharCount(MailItem item)
             => (item.BodyText?.Length ?? 0) + (item.HtmlBody?.Length ?? 0);
 
-        private async Task SendOutlookMailAsync(MailAccount account, string to, string subject, string body)
+        private async Task SendOutlookMailAsync(MailAccount account, string to, string subject, string body, CancellationToken cancellationToken)
         {
-            await EnsureOutlookMailSendAuthorizedAsync();
+            await EnsureOutlookMailSendAuthorizedAsync(cancellationToken);
             if (_outlookClient == null) return;
 
             var message = new GraphMessage
@@ -915,27 +927,41 @@ namespace Task_Flyout.Services
                     .ToList()
             };
 
-            await _outlookClient.Me.SendMail.PostAsync(new Microsoft.Graph.Me.SendMail.SendMailPostRequestBody
+            try
             {
-                Message = message,
-                SaveToSentItems = true
-            });
+                await _outlookClient.Me.SendMail.PostAsync(new Microsoft.Graph.Me.SendMail.SendMailPostRequestBody
+                {
+                    Message = message,
+                    SaveToSentItems = true
+                }, cancellationToken: cancellationToken);
+            }
+            catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+            {
+                throw new MailSendStatusUnknownException(ex);
+            }
         }
 
-        private async Task SendGoogleMailAsync(MailAccount account, string to, string subject, string body)
+        private async Task SendGoogleMailAsync(MailAccount account, string to, string subject, string body, CancellationToken cancellationToken)
         {
-            var gmail = await EnsureGoogleMailSendAuthorizedAsync();
+            var gmail = await EnsureGoogleMailSendAuthorizedAsync(cancellationToken);
             var mime = CreateMimeMessage(account, to, subject, body);
             using var stream = new MemoryStream();
-            await mime.WriteToAsync(stream);
+            await mime.WriteToAsync(stream, cancellationToken);
 
-            await gmail.Users.Messages.Send(new GmailMessage
+            try
             {
-                Raw = ToBase64Url(stream.ToArray())
-            }, "me").ExecuteAsync();
+                await gmail.Users.Messages.Send(new GmailMessage
+                {
+                    Raw = ToBase64Url(stream.ToArray())
+                }, "me").ExecuteAsync(cancellationToken);
+            }
+            catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+            {
+                throw new MailSendStatusUnknownException(ex);
+            }
         }
 
-        private async Task SendSmtpMailAsync(MailAccount account, string to, string subject, string body)
+        private async Task SendSmtpMailAsync(MailAccount account, string to, string subject, string body, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(account.SmtpHost))
                 throw new InvalidOperationException("SMTP server is required for IMAP mail sending.");
@@ -944,12 +970,20 @@ namespace Task_Flyout.Services
             var message = CreateMimeMessage(account, to, subject, body);
 
             using var client = new MailKit.Net.Smtp.SmtpClient { Timeout = MailNetworkTimeoutMs };
-            using var cts = new CancellationTokenSource(MailNetworkTimeoutMs);
             var socketOptions = GetSmtpSocketOptions(account);
-            await client.ConnectAsync(account.SmtpHost, account.SmtpPort, socketOptions, cts.Token);
-            await client.AuthenticateAsync(string.IsNullOrWhiteSpace(account.SmtpUserName) ? account.ImapUserName : account.SmtpUserName, password, cts.Token);
-            await client.SendAsync(message);
-            await client.DisconnectAsync(true);
+            await client.ConnectAsync(account.SmtpHost, account.SmtpPort, socketOptions, cancellationToken);
+            await client.AuthenticateAsync(string.IsNullOrWhiteSpace(account.SmtpUserName) ? account.ImapUserName : account.SmtpUserName, password, cancellationToken);
+            try
+            {
+                await client.SendAsync(message, cancellationToken);
+            }
+            catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+            {
+                throw new MailSendStatusUnknownException(ex);
+            }
+
+            try { await client.DisconnectAsync(true, cancellationToken); }
+            catch { }
         }
 
         private async Task CheckNewMailAsync()
@@ -1198,9 +1232,9 @@ namespace Task_Flyout.Services
             return await EnsureGoogleMailAuthorizedAsync(requireModify: true, requireSend: false, cancellationToken);
         }
 
-        private async Task<GmailService> EnsureGoogleMailSendAuthorizedAsync()
+        private async Task<GmailService> EnsureGoogleMailSendAuthorizedAsync(CancellationToken cancellationToken = default)
         {
-            return await EnsureGoogleMailAuthorizedAsync(requireModify: false, requireSend: true);
+            return await EnsureGoogleMailAuthorizedAsync(requireModify: false, requireSend: true, cancellationToken);
         }
 
         private async Task<GmailService> EnsureGoogleMailAuthorizedAsync(bool requireModify, bool requireSend, CancellationToken cancellationToken = default)
@@ -1642,9 +1676,9 @@ namespace Task_Flyout.Services
             await EnsureOutlookMailAuthorizedAsync(requireWrite: true, requireSend: false, cancellationToken);
         }
 
-        private async Task EnsureOutlookMailSendAuthorizedAsync()
+        private async Task EnsureOutlookMailSendAuthorizedAsync(CancellationToken cancellationToken = default)
         {
-            await EnsureOutlookMailAuthorizedAsync(requireWrite: false, requireSend: true);
+            await EnsureOutlookMailAuthorizedAsync(requireWrite: false, requireSend: true, cancellationToken);
         }
 
         private async Task EnsureOutlookMailAuthorizedAsync(bool requireWrite, bool requireSend, CancellationToken cancellationToken = default)

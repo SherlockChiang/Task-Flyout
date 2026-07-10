@@ -367,7 +367,7 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBlock x:Name="ComposeTitleText" x:Uid="MailPage_ComposeTitle" Text="写邮件" FontSize="24" FontWeight="SemiBold"/>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                                        <Button x:Uid="MailPage_BtnCancelCompose" Content="取消" Click="CancelComposeButton_Click"
+                                        <Button x:Name="CancelComposeButton" x:Uid="MailPage_BtnCancelCompose" Content="取消" Click="CancelComposeButton_Click"
                                                 AutomationProperties.Name="取消写邮件" ToolTipService.ToolTip="取消写邮件"/>
                                         <Button x:Name="SendComposeButton" Click="SendComposeButton_Click"
                                                 AutomationProperties.Name="发送邮件" ToolTipService.ToolTip="发送邮件">
