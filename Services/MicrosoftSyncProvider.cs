@@ -59,12 +59,12 @@ namespace Task_Flyout.Services
             return Task.CompletedTask;
         }
 
-        public async Task EnsureAuthorizedAsync()
+        public async Task EnsureAuthorizedAsync(CancellationToken cancellationToken = default)
         {
             if (_graphClient != null && HasScopes(_graphClientScopes, AgendaScopes)) return;
 
             var scopes = MergeScopes(AgendaScopes, _graphClientScopes);
-            _graphClient = await CreateAuthorizedGraphClientAsync(scopes);
+            _graphClient = await CreateAuthorizedGraphClientAsync(scopes, cancellationToken);
             _graphClientScopes = scopes;
         }
 
@@ -105,7 +105,7 @@ namespace Task_Flyout.Services
                 .ToArray();
         }
 
-        private async Task<GraphServiceClient> CreateAuthorizedGraphClientAsync(string[] scopes)
+        private async Task<GraphServiceClient> CreateAuthorizedGraphClientAsync(string[] scopes, CancellationToken cancellationToken = default)
         {
 
             string authRecordPath = GetAuthRecordPath();
@@ -142,20 +142,21 @@ namespace Task_Flyout.Services
 
                 if (authRecord == null)
                 {
-                    authRecord = await credential.AuthenticateAsync(tokenContext);
+                    authRecord = await credential.AuthenticateAsync(tokenContext, cancellationToken);
                     await SaveAuthRecordAsync(authRecordPath, authRecord);
                 }
                 else
                 {
-                    await credential.GetTokenAsync(tokenContext);
+                    await credential.GetTokenAsync(tokenContext, cancellationToken);
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Exception)
             {
                 if (File.Exists(authRecordPath)) File.Delete(authRecordPath);
                 options.AuthenticationRecord = null;
 
-                authRecord = await credential.AuthenticateAsync(new TokenRequestContext(scopes));
+                authRecord = await credential.AuthenticateAsync(new TokenRequestContext(scopes), cancellationToken);
                 await SaveAuthRecordAsync(authRecordPath, authRecord);
             }
 
@@ -223,7 +224,7 @@ namespace Task_Flyout.Services
 
         public async Task<List<AgendaItem>> FetchDataAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken)
         {
-            await EnsureAuthorizedAsync();
+            await EnsureAuthorizedAsync(cancellationToken);
 
             // Fetch calendars to get names for CalendarId/CalendarName
             var calendarMap = new Dictionary<string, string>();

@@ -25,7 +25,7 @@ namespace Task_Flyout.Services
     public interface ISyncProvider
     {
         string ProviderName { get; }
-        Task EnsureAuthorizedAsync();
+        Task EnsureAuthorizedAsync(CancellationToken cancellationToken = default);
         Task<List<AgendaItem>> FetchDataAsync(DateTime min, DateTime max, CancellationToken cancellationToken);
         Task<List<SubscribedCalendarInfo>> FetchCalendarListAsync();
         Task UpdateTaskStatusAsync(string taskId, bool isCompleted);

@@ -66,7 +66,7 @@ namespace Task_Flyout.Services
             }
         }
 
-        public async Task EnsureAuthorizedAsync()
+        public async Task EnsureAuthorizedAsync(CancellationToken cancellationToken = default)
         {
             if (CalendarSvc != null && TasksSvc != null) return;
 
@@ -74,7 +74,7 @@ namespace Task_Flyout.Services
             var dataStore = new ProtectedGoogleDataStore();
             await TryMigrateLegacyTokenStoreAsync(tokenPath, dataStore);
             var requiredScopes = MergeScopes(CalendarTaskScopes, _gmailGrantedScopes.Where(scope => GmailScopes.Contains(scope, StringComparer.OrdinalIgnoreCase)));
-            UserCredential credential = await AuthorizeAsync(dataStore, requiredScopes);
+            UserCredential credential = await AuthorizeAsync(dataStore, requiredScopes, cancellationToken);
 
             var grantedScopes = credential.Token?.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
             if (!HasScopes(grantedScopes, CalendarTaskScopes))
@@ -85,7 +85,7 @@ namespace Task_Flyout.Services
                 _gmailGrantedScopes = Array.Empty<string>();
                 if (Directory.Exists(tokenPath)) Directory.Delete(tokenPath, true);
                 await dataStore.ClearAsync();
-                credential = await AuthorizeAsync(dataStore, requiredScopes);
+                credential = await AuthorizeAsync(dataStore, requiredScopes, cancellationToken);
                 grantedScopes = credential.Token?.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
             }
 
@@ -151,7 +151,7 @@ namespace Task_Flyout.Services
                 .ToArray();
         }
 
-        private async Task<UserCredential> AuthorizeAsync(IDataStore dataStore, string[] scopes)
+        private async Task<UserCredential> AuthorizeAsync(IDataStore dataStore, string[] scopes, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -161,7 +161,7 @@ namespace Task_Flyout.Services
                         GoogleClientSecrets.FromStream(stream).Secrets,
                         scopes,
                         "user",
-                        CancellationToken.None,
+                        cancellationToken,
                         dataStore);
                 }
             }
@@ -297,7 +297,7 @@ namespace Task_Flyout.Services
 
         public async Task<List<AgendaItem>> FetchDataAsync(DateTime min, DateTime max, CancellationToken cancellationToken)
         {
-            await EnsureAuthorizedAsync();
+            await EnsureAuthorizedAsync(cancellationToken);
             var calendarSvc = CalendarSvc!;
             var tasksSvc = TasksSvc!;
 

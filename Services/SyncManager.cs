@@ -344,7 +344,7 @@ namespace Task_Flyout.Services
             {
                 try
                 {
-                    await provider.EnsureAuthorizedAsync();
+                    await provider.EnsureAuthorizedAsync(cancellationToken);
                     var items = await provider.FetchDataAsync(min, max, cancellationToken);
                     return (Provider: provider.ProviderName, Items: items ?? new List<AgendaItem>(), Success: true);
                 }
