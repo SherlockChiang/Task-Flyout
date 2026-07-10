@@ -178,7 +178,6 @@ namespace Task_Flyout.Services
         private DateTimeOffset _lastImageCachePrunedAt = DateTimeOffset.MinValue;
         private readonly object _loadLock = new();
         private RssSqliteRepository? _repository;
-        private string? _connectionString;
         private CancellationTokenSource _dataLifecycleCts = new();
         private long _dataGeneration;
         private bool _dataClearInProgress;
@@ -283,7 +282,6 @@ namespace Task_Flyout.Services
                 _cache = new RssCache();
                 _loaded = false;
                 _repository = null;
-                _connectionString = null;
                 _lastImageCachePrunedAt = DateTimeOffset.MinValue;
             }
         }
@@ -1305,59 +1303,27 @@ namespace Task_Flyout.Services
 
         private RssCache LoadFromDatabase()
         {
-            var cache = new RssCache();
-            using var connection = OpenConnection();
-
-            using (var command = connection.CreateCommand())
+            var snapshot = Repository.LoadSnapshot(1000);
+            return new RssCache
             {
-                command.CommandText = "SELECT id, name, sort_order FROM rss_folders ORDER BY sort_order;";
-                using var reader = command.ExecuteReader();
-                while (reader.Read())
+                Folders = snapshot.Folders.Select(folder => new RssFolder
                 {
-                    cache.Folders.Add(new RssFolder
-                    {
-                        Id = reader.GetString(0),
-                        Name = RssSensitiveDataProtector.Unprotect(reader.GetString(1)),
-                        SortOrder = reader.GetInt32(2)
-                    });
-                }
-            }
-
-            using (var command = connection.CreateCommand())
-            {
-                command.CommandText = "SELECT id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks FROM rss_subscriptions;";
-                using var reader = command.ExecuteReader();
-                while (reader.Read())
+                    Id = folder.Id,
+                    Name = folder.Name,
+                    SortOrder = folder.SortOrder
+                }).ToList(),
+                Subscriptions = snapshot.Subscriptions.Select(subscription => new RssSubscription
                 {
-                    cache.Subscriptions.Add(new RssSubscription
-                    {
-                        Id = reader.GetString(0),
-                        Title = RssSensitiveDataProtector.Unprotect(reader.GetString(1)),
-                        Url = RssSensitiveDataProtector.Unprotect(reader.GetString(2)),
-                        FolderId = reader.GetString(3),
-                        ImageUrl = RssSensitiveDataProtector.Unprotect(reader.GetString(4)),
-                        LocalImagePath = reader.GetString(5),
-                        LastFetchedAt = FromTicks(reader.GetInt64(6))
-                    });
-                }
-            }
-
-            using (var command = connection.CreateCommand())
-            {
-                // Listing only — html_content is hydrated on demand via GetArticleHtml
-                // to keep startup memory in check (1000 articles × ~50 KB html = 50 MB).
-                command.CommandText = """
-SELECT id, subscription_id, feed_title, title, link, summary, image_url, local_image_path, published_ticks
-FROM rss_articles
-ORDER BY published_ticks DESC
-LIMIT 1000;
-""";
-                using var reader = command.ExecuteReader();
-                while (reader.Read())
-                    cache.Articles.Add(ReadArticleListItem(reader));
-            }
-
-            return cache;
+                    Id = subscription.Id,
+                    Title = subscription.Title,
+                    Url = subscription.Url,
+                    FolderId = subscription.FolderId,
+                    ImageUrl = subscription.ImageUrl,
+                    LocalImagePath = subscription.LocalImagePath,
+                    LastFetchedAt = FromTicks(subscription.LastFetchedUtcTicks)
+                }).ToList(),
+                Articles = snapshot.Articles.Select(ToArticleListItem).ToList()
+            };
         }
 
         private List<RssArticle> QueryCachedArticlesPage(string? subscriptionId, string? folderId, int skip, int take)
@@ -1398,20 +1364,19 @@ LIMIT 1000;
             }
         }
 
-        // Listing rows: column order matches the abbreviated SELECT above (no html_content).
-        private static RssArticle ReadArticleListItem(SqliteDataReader reader)
+        private static RssArticle ToArticleListItem(RssArticleRecord record)
             => new()
             {
-                Id = reader.GetString(0),
-                SubscriptionId = reader.GetString(1),
-                FeedTitle = RssSensitiveDataProtector.Unprotect(reader.GetString(2)),
-                Title = RssSensitiveDataProtector.Unprotect(reader.GetString(3)),
-                Link = RssSensitiveDataProtector.Unprotect(reader.GetString(4)),
-                Summary = RssSensitiveDataProtector.Unprotect(reader.GetString(5)),
+                Id = record.Id,
+                SubscriptionId = record.SubscriptionId,
+                FeedTitle = record.FeedTitle,
+                Title = record.Title,
+                Link = record.Link,
+                Summary = record.Summary,
                 HtmlContent = "",
-                ImageUrl = RssSensitiveDataProtector.Unprotect(reader.GetString(6)),
-                LocalImagePath = reader.GetString(7),
-                PublishedAt = FromTicks(reader.GetInt64(8))
+                ImageUrl = record.ImageUrl,
+                LocalImagePath = record.LocalImagePath,
+                PublishedAt = FromTicks(record.PublishedUtcTicks)
             };
 
         private void SaveFolder(RssFolder folder)
@@ -1526,32 +1491,10 @@ LIMIT 1000;
             }
         }
 
-        private SqliteConnection OpenConnection()
-        {
-            if (_dataClearInProgress || GlobalDataClearInProgress)
-                throw new InvalidOperationException("RSS local data is being cleared.");
-            _connectionString ??= new SqliteConnectionStringBuilder
-            {
-                DataSource = GetDatabasePath()
-            }.ToString();
-            var connection = new SqliteConnection(_connectionString);
-            connection.Open();
-            ExecuteNonQuery(connection, "PRAGMA secure_delete=ON;");
-            return connection;
-        }
-
         private RssSqliteRepository Repository
             => _repository ??= new RssSqliteRepository(
                 GetDatabasePath(),
                 () => _dataClearInProgress || GlobalDataClearInProgress);
-
-        private static void ExecuteNonQuery(SqliteConnection connection, string sql, SqliteTransaction? transaction = null)
-        {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText = sql;
-            command.ExecuteNonQuery();
-        }
 
         private static long ToTicks(DateTimeOffset value)
             => value == default ? 0 : value.UtcTicks;

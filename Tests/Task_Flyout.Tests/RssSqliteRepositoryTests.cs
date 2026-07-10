@@ -269,6 +269,25 @@ END;
         Assert.Equal("new", ScalarString(connection, "SELECT id FROM rss_articles;"));
     }
 
+    [Fact]
+    public void Load_snapshot_decrypts_all_entity_types_and_limits_articles()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertFolder(new RssFolderRecord("folder", "Private folder", 3));
+        repository.UpsertSubscription(new RssSubscriptionRecord("subscription", "Private feed", "https://example.test/private", "folder", "https://example.test/feed.png", "feed.png", 30));
+        repository.UpsertArticle(new RssArticleWriteRecord("old", "subscription", "Private feed", "Old", "", "", "<p>Old body</p>", "", "", 10));
+        repository.UpsertArticle(new RssArticleWriteRecord("new", "subscription", "Private feed", "New", "", "", "<p>New body</p>", "", "", 20));
+
+        var snapshot = repository.LoadSnapshot(1);
+
+        Assert.Equal("Private folder", Assert.Single(snapshot.Folders).Name);
+        Assert.Equal("https://example.test/private", Assert.Single(snapshot.Subscriptions).Url);
+        var article = Assert.Single(snapshot.Articles);
+        Assert.Equal("new", article.Id);
+        Assert.Equal("Private feed", article.FeedTitle);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

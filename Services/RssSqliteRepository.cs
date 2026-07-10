@@ -40,6 +40,11 @@ namespace Task_Flyout.Services
         string LocalImagePath,
         long PublishedUtcTicks);
 
+    internal sealed record RssRepositorySnapshot(
+        List<RssFolderRecord> Folders,
+        List<RssSubscriptionRecord> Subscriptions,
+        List<RssArticleRecord> Articles);
+
     internal sealed class RssSqliteRepository
     {
         private const int SchemaVersion = 1;
@@ -127,46 +132,46 @@ CREATE TABLE IF NOT EXISTS rss_articles (
         public List<RssArticleRecord> QueryArticlesPage(string? subscriptionId, string? folderId, int skip, int take)
         {
             Initialize();
-            bool hasSubscription = !string.IsNullOrWhiteSpace(subscriptionId);
-            bool hasFolder = folderId != null;
-
             using var connection = OpenConnection();
-            using var command = connection.CreateCommand();
-            command.CommandText = """
-SELECT a.id, a.subscription_id, a.feed_title, a.title, a.link, a.summary, a.image_url, a.local_image_path, a.published_ticks
-FROM rss_articles a
-WHERE ($hasSubscription = 0 OR a.subscription_id = $subscriptionId)
-  AND ($hasFolder = 0 OR EXISTS (
-      SELECT 1 FROM rss_subscriptions s
-      WHERE s.id = a.subscription_id AND s.folder_id = $folderId
-  ))
-ORDER BY a.published_ticks DESC
-LIMIT $take OFFSET $skip;
-""";
-            command.Parameters.AddWithValue("$hasSubscription", hasSubscription ? 1 : 0);
-            command.Parameters.AddWithValue("$subscriptionId", subscriptionId ?? "");
-            command.Parameters.AddWithValue("$hasFolder", hasFolder ? 1 : 0);
-            command.Parameters.AddWithValue("$folderId", folderId ?? "");
-            command.Parameters.AddWithValue("$take", Math.Max(0, take));
-            command.Parameters.AddWithValue("$skip", Math.Max(0, skip));
+            return ReadArticles(connection, subscriptionId, folderId, skip, take);
+        }
 
-            var articles = new List<RssArticleRecord>(Math.Max(0, take));
-            using var reader = command.ExecuteReader();
-            while (reader.Read())
+        public RssRepositorySnapshot LoadSnapshot(int maximumArticleCount)
+        {
+            Initialize();
+            var folders = new List<RssFolderRecord>();
+            var subscriptions = new List<RssSubscriptionRecord>();
+            using var connection = OpenConnection();
+            using (var command = connection.CreateCommand())
             {
-                articles.Add(new RssArticleRecord(
-                    reader.GetString(0),
-                    reader.GetString(1),
-                    RssSensitiveDataProtector.Unprotect(reader.GetString(2)),
-                    RssSensitiveDataProtector.Unprotect(reader.GetString(3)),
-                    RssSensitiveDataProtector.Unprotect(reader.GetString(4)),
-                    RssSensitiveDataProtector.Unprotect(reader.GetString(5)),
-                    RssSensitiveDataProtector.Unprotect(reader.GetString(6)),
-                    reader.GetString(7),
-                    reader.GetInt64(8)));
+                command.CommandText = "SELECT id, name, sort_order FROM rss_folders ORDER BY sort_order;";
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                    folders.Add(new RssFolderRecord(
+                        reader.GetString(0),
+                        RssSensitiveDataProtector.Unprotect(reader.GetString(1)),
+                        reader.GetInt32(2)));
             }
 
-            return articles;
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks FROM rss_subscriptions;";
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                    subscriptions.Add(new RssSubscriptionRecord(
+                        reader.GetString(0),
+                        RssSensitiveDataProtector.Unprotect(reader.GetString(1)),
+                        RssSensitiveDataProtector.Unprotect(reader.GetString(2)),
+                        reader.GetString(3),
+                        RssSensitiveDataProtector.Unprotect(reader.GetString(4)),
+                        reader.GetString(5),
+                        reader.GetInt64(6)));
+            }
+
+            return new RssRepositorySnapshot(
+                folders,
+                subscriptions,
+                ReadArticles(connection, null, null, 0, maximumArticleCount));
         }
 
         public string GetArticleHtml(string articleId)
@@ -472,6 +477,49 @@ ON CONFLICT(id) DO UPDATE SET
                 update.Parameters.AddWithValue("$id", row.Id);
                 update.ExecuteNonQuery();
             }
+        }
+
+        private static List<RssArticleRecord> ReadArticles(
+            SqliteConnection connection,
+            string? subscriptionId,
+            string? folderId,
+            int skip,
+            int take)
+        {
+            bool hasSubscription = !string.IsNullOrWhiteSpace(subscriptionId);
+            bool hasFolder = folderId != null;
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+SELECT a.id, a.subscription_id, a.feed_title, a.title, a.link, a.summary, a.image_url, a.local_image_path, a.published_ticks
+FROM rss_articles a
+WHERE ($hasSubscription = 0 OR a.subscription_id = $subscriptionId)
+  AND ($hasFolder = 0 OR EXISTS (
+      SELECT 1 FROM rss_subscriptions s
+      WHERE s.id = a.subscription_id AND s.folder_id = $folderId
+  ))
+ORDER BY a.published_ticks DESC
+LIMIT $take OFFSET $skip;
+""";
+            command.Parameters.AddWithValue("$hasSubscription", hasSubscription ? 1 : 0);
+            command.Parameters.AddWithValue("$subscriptionId", subscriptionId ?? "");
+            command.Parameters.AddWithValue("$hasFolder", hasFolder ? 1 : 0);
+            command.Parameters.AddWithValue("$folderId", folderId ?? "");
+            command.Parameters.AddWithValue("$take", Math.Max(0, take));
+            command.Parameters.AddWithValue("$skip", Math.Max(0, skip));
+            var articles = new List<RssArticleRecord>(Math.Max(0, take));
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                articles.Add(new RssArticleRecord(
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    RssSensitiveDataProtector.Unprotect(reader.GetString(2)),
+                    RssSensitiveDataProtector.Unprotect(reader.GetString(3)),
+                    RssSensitiveDataProtector.Unprotect(reader.GetString(4)),
+                    RssSensitiveDataProtector.Unprotect(reader.GetString(5)),
+                    RssSensitiveDataProtector.Unprotect(reader.GetString(6)),
+                    reader.GetString(7),
+                    reader.GetInt64(8)));
+            return articles;
         }
 
         private static void DeleteRowsNotIn(
