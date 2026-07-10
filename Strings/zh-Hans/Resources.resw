@@ -786,6 +786,18 @@
   <data name="TextSendFailed" xml:space="preserve">
     <value>发送邮件失败，请检查网络连接和账户设置。</value>
   </data>
+  <data name="TextSendStatusUnknown" xml:space="preserve">
+    <value>发送操作已超时。再次尝试前，请先检查“已发送”文件夹。</value>
+  </data>
+  <data name="TextClearRssDataTitle" xml:space="preserve">
+    <value>清除 RSS 本地数据？</value>
+  </data>
+  <data name="TextClearRssDataContent" xml:space="preserve">
+    <value>这将删除此设备上缓存的 RSS 订阅、文章和图片，但不会取消来源网站上的订阅，也不会删除系统备份。</value>
+  </data>
+  <data name="TextRssDataCleared" xml:space="preserve">
+    <value>RSS 本地数据已清除。</value>
+  </data>
   <data name="TextOriginalMail" xml:space="preserve">
     <value>---- 原始邮件 ----</value>
   </data>
