@@ -151,7 +151,6 @@ namespace Task_Flyout.Services
         {
         private readonly ResourceLoader _loader = new();
         private const int FeedRefreshMinutes = 30;
-        private const int SchemaVersion = 1;
         private const long MaxImageBytes = 5 * 1024 * 1024;
         private const long MaxFeedBytes = 5 * 1024 * 1024;
         private const int MaxRedirects = 5;
@@ -179,7 +178,7 @@ namespace Task_Flyout.Services
         private volatile bool _loaded;
         private DateTimeOffset _lastImageCachePrunedAt = DateTimeOffset.MinValue;
         private readonly object _loadLock = new();
-        private bool _databaseInitialized;
+        private RssSqliteRepository? _repository;
         private string? _connectionString;
         private CancellationTokenSource _dataLifecycleCts = new();
         private long _dataGeneration;
@@ -284,7 +283,7 @@ namespace Task_Flyout.Services
                 _dataLifecycleCts = new CancellationTokenSource();
                 _cache = new RssCache();
                 _loaded = false;
-                _databaseInitialized = false;
+                _repository = null;
                 _connectionString = null;
                 _lastImageCachePrunedAt = DateTimeOffset.MinValue;
             }
@@ -1307,62 +1306,7 @@ namespace Task_Flyout.Services
 
         private void InitializeDatabase()
         {
-            if (_databaseInitialized) return;
-            _databaseInitialized = true;
-
-            Directory.CreateDirectory(_appDataPath);
-            using var connection = OpenConnection();
-            ExecuteNonQuery(connection, "PRAGMA journal_mode=WAL;");
-            ExecuteNonQuery(connection, "PRAGMA synchronous=NORMAL;");
-            ExecuteNonQuery(connection, "PRAGMA secure_delete=ON;");
-            ExecuteNonQuery(connection, """
-CREATE TABLE IF NOT EXISTS metadata (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-);
-""");
-            ExecuteNonQuery(connection, """
-CREATE TABLE IF NOT EXISTS rss_folders (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    sort_order INTEGER NOT NULL DEFAULT 0
-);
-""");
-            ExecuteNonQuery(connection, """
-CREATE TABLE IF NOT EXISTS rss_subscriptions (
-    id TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
-    url TEXT NOT NULL,
-    folder_id TEXT NOT NULL DEFAULT '',
-    image_url TEXT NOT NULL DEFAULT '',
-    local_image_path TEXT NOT NULL DEFAULT '',
-    last_fetched_ticks INTEGER NOT NULL DEFAULT 0
-);
-""");
-            TryAddColumn(connection, "rss_subscriptions", "image_url", "TEXT NOT NULL DEFAULT ''");
-            TryAddColumn(connection, "rss_subscriptions", "local_image_path", "TEXT NOT NULL DEFAULT ''");
-            ExecuteNonQuery(connection, """
-CREATE TABLE IF NOT EXISTS rss_articles (
-    id TEXT PRIMARY KEY,
-    subscription_id TEXT NOT NULL,
-    feed_title TEXT NOT NULL,
-    title TEXT NOT NULL,
-    link TEXT NOT NULL,
-    summary TEXT NOT NULL,
-    html_content TEXT NOT NULL,
-    image_url TEXT NOT NULL,
-    local_image_path TEXT NOT NULL,
-    published_ticks INTEGER NOT NULL DEFAULT 0
-);
-""");
-            ExecuteNonQuery(connection, "CREATE INDEX IF NOT EXISTS idx_rss_articles_published ON rss_articles(published_ticks DESC);");
-            ExecuteNonQuery(connection, "CREATE INDEX IF NOT EXISTS idx_rss_articles_subscription_published ON rss_articles(subscription_id, published_ticks DESC);");
-            ExecuteNonQuery(connection, "CREATE INDEX IF NOT EXISTS idx_rss_subscriptions_folder ON rss_subscriptions(folder_id);");
-
-            using var command = connection.CreateCommand();
-            command.CommandText = "INSERT OR REPLACE INTO metadata(key, value) VALUES ('schema_version', $version);";
-            command.Parameters.AddWithValue("$version", SchemaVersion.ToString());
-            command.ExecuteNonQuery();
+            Repository.Initialize();
         }
 
         private RssCache LoadFromDatabase()
@@ -1424,35 +1368,21 @@ LIMIT 1000;
 
         private List<RssArticle> QueryCachedArticlesPage(string? subscriptionId, string? folderId, int skip, int take)
         {
-            var hasSubscription = !string.IsNullOrWhiteSpace(subscriptionId);
-            var hasFolder = folderId != null;
-
-            using var connection = OpenConnection();
-            using var command = connection.CreateCommand();
-            command.CommandText = """
-SELECT a.id, a.subscription_id, a.feed_title, a.title, a.link, a.summary, a.image_url, a.local_image_path, a.published_ticks
-FROM rss_articles a
-WHERE ($hasSubscription = 0 OR a.subscription_id = $subscriptionId)
-  AND ($hasFolder = 0 OR EXISTS (
-      SELECT 1 FROM rss_subscriptions s
-      WHERE s.id = a.subscription_id AND s.folder_id = $folderId
-  ))
-ORDER BY a.published_ticks DESC
-LIMIT $take OFFSET $skip;
-""";
-            command.Parameters.AddWithValue("$hasSubscription", hasSubscription ? 1 : 0);
-            command.Parameters.AddWithValue("$subscriptionId", subscriptionId ?? "");
-            command.Parameters.AddWithValue("$hasFolder", hasFolder ? 1 : 0);
-            command.Parameters.AddWithValue("$folderId", folderId ?? "");
-            command.Parameters.AddWithValue("$take", take);
-            command.Parameters.AddWithValue("$skip", skip);
-
-            var articles = new List<RssArticle>(take);
-            using var reader = command.ExecuteReader();
-            while (reader.Read())
-                articles.Add(ReadArticleListItem(reader));
-
-            return articles;
+            return Repository.QueryArticlesPage(subscriptionId, folderId, skip, take)
+                .Select(record => new RssArticle
+                {
+                    Id = record.Id,
+                    SubscriptionId = record.SubscriptionId,
+                    FeedTitle = record.FeedTitle,
+                    Title = record.Title,
+                    Link = record.Link,
+                    Summary = record.Summary,
+                    HtmlContent = "",
+                    ImageUrl = record.ImageUrl,
+                    LocalImagePath = record.LocalImagePath,
+                    PublishedAt = FromTicks(record.PublishedUtcTicks)
+                })
+                .ToList();
         }
 
         /// <summary>
@@ -1465,13 +1395,7 @@ LIMIT $take OFFSET $skip;
             EnsureLoaded();
             try
             {
-                InitializeDatabase();
-                using var connection = OpenConnection();
-                using var command = connection.CreateCommand();
-                command.CommandText = "SELECT html_content FROM rss_articles WHERE id = $id LIMIT 1;";
-                command.Parameters.AddWithValue("$id", articleId);
-                var value = command.ExecuteScalar();
-                return RssSensitiveDataProtector.Unprotect(value as string ?? "");
+                return Repository.GetArticleHtml(articleId);
             }
             catch (Exception ex)
             {
@@ -1924,6 +1848,11 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
             connection.Open();
             return connection;
         }
+
+        private RssSqliteRepository Repository
+            => _repository ??= new RssSqliteRepository(
+                GetDatabasePath(),
+                () => _dataClearInProgress || GlobalDataClearInProgress);
 
         private static void ExecuteNonQuery(SqliteConnection connection, string sql, SqliteTransaction? transaction = null)
         {
