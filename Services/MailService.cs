@@ -2396,13 +2396,16 @@ namespace Task_Flyout.Services
                     else
                         continue;
 
-                    int retainedCount = Math.Clamp(existing.Count, MinPageSize, MaxPageSize);
+                    int retainedCount = existing.Count;
 
                     foreach (var message in strippedNewMessages)
                     {
                         if (unreadOnly && message.IsRead) continue;
+                        bool isNew = existing.All(item => item.Id != message.Id);
                         existing.RemoveAll(item => item.Id == message.Id);
                         existing.Add(CloneMailItem(message, includeBodies: false));
+                        if (isNew)
+                            retainedCount = Math.Min(retainedCount + 1, MaxPageSize);
                     }
 
                     _persistentCache.Messages[key] = existing
