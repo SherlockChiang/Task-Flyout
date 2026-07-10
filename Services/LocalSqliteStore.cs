@@ -9,6 +9,7 @@ namespace Task_Flyout.Services
 {
     public static class LocalSqliteStore
     {
+        private const int BusyTimeoutMilliseconds = 5000;
         private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("TaskFlyout.LocalCache.v1");
         private static readonly object InitLock = new();
         private static bool _initialized;
@@ -120,6 +121,7 @@ CREATE TABLE IF NOT EXISTS protected_store (
             var connection = CreateConnection();
             connection.Open();
             ExecuteNonQuery(connection, "PRAGMA secure_delete=ON;");
+            ExecuteNonQuery(connection, $"PRAGMA busy_timeout={BusyTimeoutMilliseconds};");
             return connection;
         }
 
@@ -130,7 +132,7 @@ CREATE TABLE IF NOT EXISTS protected_store (
             {
                 await connection.OpenAsync();
                 await using var command = connection.CreateCommand();
-                command.CommandText = "PRAGMA secure_delete=ON;";
+                command.CommandText = $"PRAGMA secure_delete=ON; PRAGMA busy_timeout={BusyTimeoutMilliseconds};";
                 await command.ExecuteNonQueryAsync();
                 return connection;
             }
@@ -152,7 +154,8 @@ CREATE TABLE IF NOT EXISTS protected_store (
         {
             _connectionString ??= new SqliteConnectionStringBuilder
             {
-                DataSource = Path.Combine(GetAppDataPath(), "taskflyout_store.db")
+                DataSource = Path.Combine(GetAppDataPath(), "taskflyout_store.db"),
+                DefaultTimeout = BusyTimeoutMilliseconds / 1000
             }.ToString();
             return new SqliteConnection(_connectionString);
         }

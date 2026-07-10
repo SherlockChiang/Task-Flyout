@@ -76,6 +76,38 @@ public class LocalSqliteStoreTests
         }
     }
 
+    [Fact]
+    public async Task Protected_store_waits_for_short_write_lock_contention()
+    {
+        var testRoot = CreateIsolatedStore();
+        try
+        {
+            LocalSqliteStore.WriteProtectedText("test-scope", "initial", "value");
+            var databasePath = Path.Combine(testRoot, "taskflyout_store.db");
+            using var blocker = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={databasePath}");
+            blocker.Open();
+            using var transaction = blocker.BeginTransaction();
+            using (var command = blocker.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = "UPDATE protected_store SET updated_ticks = updated_ticks + 1 WHERE scope = 'test-scope';";
+                command.ExecuteNonQuery();
+            }
+
+            var pendingWrite = Task.Run(() => LocalSqliteStore.WriteProtectedText("mail", "cache", "snapshot"));
+            await Task.Delay(150);
+            Assert.False(pendingWrite.IsCompleted);
+            transaction.Commit();
+            await pendingWrite.WaitAsync(TimeSpan.FromSeconds(3));
+
+            Assert.Equal("snapshot", LocalSqliteStore.ReadProtectedText("mail", "cache"));
+        }
+        finally
+        {
+            DeleteIsolatedStore(testRoot);
+        }
+    }
+
     private static string CreateIsolatedStore()
     {
         var testRoot = Path.Combine(Path.GetTempPath(), "taskflyout-tests", Guid.NewGuid().ToString("N"));
