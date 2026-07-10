@@ -368,17 +368,18 @@ namespace Task_Flyout.Services
                 StopMailPolling();
         }
 
-        public async Task<MailAccount> AddOutlookAccountAsync()
+        public async Task<MailAccount> AddOutlookAccountAsync(CancellationToken cancellationToken = default)
         {
             EnsureAccountsLoaded();
-            await EnsureOutlookMailReadAuthorizedAsync();
+            await EnsureOutlookMailReadAuthorizedAsync(cancellationToken);
             if (_outlookClient == null)
                 throw new InvalidOperationException("Outlook authorization failed.");
 
             var me = await _outlookClient.Me.GetAsync(request =>
             {
                 request.QueryParameters.Select = new[] { "displayName", "mail", "userPrincipalName" };
-            });
+            }, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
 
             var address = me?.Mail ?? me?.UserPrincipalName ?? "";
             var existing = _accounts.FirstOrDefault(a =>
@@ -481,11 +482,12 @@ namespace Task_Flyout.Services
             return account;
         }
 
-        public async Task<MailAccount> AddGoogleAccountAsync()
+        public async Task<MailAccount> AddGoogleAccountAsync(CancellationToken cancellationToken = default)
         {
             EnsureAccountsLoaded();
-            var gmail = await EnsureGoogleMailReadAuthorizedAsync();
-            var profile = await gmail.Users.GetProfile("me").ExecuteAsync();
+            var gmail = await EnsureGoogleMailReadAuthorizedAsync(cancellationToken);
+            var profile = await gmail.Users.GetProfile("me").ExecuteAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             var address = profile?.EmailAddress ?? "";
 
             var existing = _accounts.FirstOrDefault(a =>

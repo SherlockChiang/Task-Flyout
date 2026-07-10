@@ -62,6 +62,7 @@ namespace Task_Flyout.Views
         private CancellationTokenSource _pageRequestCts = new();
         private CancellationTokenSource? _messageLoadCts;
         private CancellationTokenSource? _bodyLoadCts;
+        private CancellationTokenSource? _accountAuthCts;
         internal bool IsOpeningFromNotification { get; set; }
 
         public MailPage()
@@ -97,6 +98,7 @@ namespace Task_Flyout.Views
             _pageRequestCts.Cancel();
             _messageLoadCts?.Cancel();
             _bodyLoadCts?.Cancel();
+            _accountAuthCts?.Cancel();
             _messageLoadVersion++;
             ReleaseMessageBodies();
             _selectedItem = null;
@@ -720,15 +722,20 @@ namespace Task_Flyout.Views
         {
             if (_mailService == null) return;
 
+            _accountAuthCts?.Cancel();
+            var authCts = CancellationTokenSource.CreateLinkedTokenSource(_pageRequestCts.Token);
+            _accountAuthCts = authCts;
+
             SetAddButtonsEnabled(false);
             AddStatusText.Text = _loader.GetStringOrDefault("TextOpeningMSAuth") ?? "Opening Microsoft authorization...";
 
             try
             {
-                var account = await _mailService.AddOutlookAccountAsync();
+                var account = await _mailService.AddOutlookAccountAsync(authCts.Token);
                 AddStatusText.Text = string.Format(_loader.GetStringOrDefault("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
                 await RefreshAccountsAsync();
             }
+            catch (OperationCanceledException) when (authCts.IsCancellationRequested) { }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Add Outlook account failed: {ex.Message}");
@@ -736,6 +743,7 @@ namespace Task_Flyout.Views
             }
             finally
             {
+                CompleteAccountAuthorization(authCts);
                 SetAddButtonsEnabled(true);
             }
         }
@@ -754,15 +762,20 @@ namespace Task_Flyout.Views
         {
             if (_mailService == null) return;
 
+            _accountAuthCts?.Cancel();
+            var authCts = CancellationTokenSource.CreateLinkedTokenSource(_pageRequestCts.Token);
+            _accountAuthCts = authCts;
+
             SetAddButtonsEnabled(false);
             AddStatusText.Text = _loader.GetStringOrDefault("TextOpeningGoogleAuth") ?? "Opening Google authorization...";
 
             try
             {
-                var account = await _mailService.AddGoogleAccountAsync();
+                var account = await _mailService.AddGoogleAccountAsync(authCts.Token);
                 AddStatusText.Text = string.Format(_loader.GetStringOrDefault("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
                 await RefreshAccountsAsync();
             }
+            catch (OperationCanceledException) when (authCts.IsCancellationRequested) { }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Add Google account failed: {ex.Message}");
@@ -770,8 +783,16 @@ namespace Task_Flyout.Views
             }
             finally
             {
+                CompleteAccountAuthorization(authCts);
                 SetAddButtonsEnabled(true);
             }
+        }
+
+        private void CompleteAccountAuthorization(CancellationTokenSource authCts)
+        {
+            if (ReferenceEquals(_accountAuthCts, authCts))
+                _accountAuthCts = null;
+            authCts.Dispose();
         }
 
         private void ShowImapSettings()
