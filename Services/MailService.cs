@@ -132,9 +132,25 @@ namespace Task_Flyout.Services
     {
         public Dictionary<string, List<MailFolder>> Folders { get; set; } = new();
         public Dictionary<string, List<MailItem>> Messages { get; set; } = new();
+        public Dictionary<string, MailCursor> MessageCursors { get; set; } = new();
+        public Dictionary<string, bool> MessageHasMore { get; set; } = new();
         public Dictionary<string, long> LastSeenInboxTicks { get; set; } = new();
         public List<string> AccountOrder { get; set; } = new();
         public Dictionary<string, List<string>> FolderOrder { get; set; } = new();
+    }
+
+    public sealed class MailCursor
+    {
+        public MailAccountKind ProviderKind { get; set; }
+        public string Value { get; set; } = "";
+        public uint? UidValidity { get; set; }
+        public uint? BeforeUid { get; set; }
+    }
+
+    public sealed class MailMessageWindow
+    {
+        public List<MailItem> Items { get; set; } = new();
+        public bool HasMore { get; set; }
     }
 
     public sealed class NewMailNotificationEventArgs : EventArgs
@@ -253,6 +269,13 @@ namespace Task_Flyout.Services
                     .ToList();
             }
             SavePersistentCache();
+        }
+
+        private sealed class MailProviderPage
+        {
+            public List<MailItem> Items { get; init; } = new();
+            public MailCursor? NextCursor { get; init; }
+            public bool HasMore => NextCursor != null;
         }
 
         public void SaveMailFolderOrder(string accountId, IEnumerable<string> folderIds)
@@ -568,22 +591,57 @@ namespace Task_Flyout.Services
             return folders;
         }
 
-        public async Task<List<MailItem>> FetchMessagesAsync(MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize = null, bool forceRefresh = false, CancellationToken cancellationToken = default)
+        public async Task<MailMessageWindow> FetchMessagesAsync(
+            MailAccount account,
+            MailFolder folder,
+            bool unreadOnly,
+            int? pageSize = null,
+            bool forceRefresh = false,
+            bool loadMore = false,
+            CancellationToken cancellationToken = default)
         {
             int requestedPageSize = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
             string cacheKey = GetMessageCacheKey(account.Id, folder.Id, unreadOnly);
-            if (!forceRefresh && TryGetCachedMessages(cacheKey, requestedPageSize, out var cachedMessages))
-                return cachedMessages;
+            if (!forceRefresh && !loadMore && TryGetCachedMessages(cacheKey, out var cachedWindow))
+                return cachedWindow;
 
-            var messages = await FetchMessagesFromProviderAsync(
-                account,
-                folder,
-                unreadOnly,
-                requestedPageSize,
-                cancellationToken);
+            MailCursor? cursor = null;
+            List<MailItem> existingItems = new();
+            if (loadMore)
+            {
+                EnsurePersistentCacheLoaded();
+                lock (_mailCacheLock)
+                {
+                    if (_persistentCache != null)
+                    {
+                        _persistentCache.Messages.TryGetValue(cacheKey, out existingItems!);
+                        _persistentCache.MessageCursors.TryGetValue(cacheKey, out cursor);
+                        existingItems = existingItems == null ? new List<MailItem>() : StripBodies(existingItems);
+                    }
+                }
 
-            UpdateMessageWindow(cacheKey, messages);
-            return CloneMailItems(messages, includeBodies: false);
+                if (cursor == null)
+                    return new MailMessageWindow { Items = existingItems, HasMore = false };
+            }
+
+            MailProviderPage page;
+            try
+            {
+                page = await FetchMessagesFromProviderAsync(
+                    account,
+                    folder,
+                    unreadOnly,
+                    requestedPageSize,
+                    cursor,
+                    cancellationToken);
+            }
+            catch when (loadMore && !cancellationToken.IsCancellationRequested)
+            {
+                InvalidateMessageCursor(cacheKey);
+                throw;
+            }
+
+            return CommitMessagePage(cacheKey, page, append: loadMore);
         }
 
         public async Task SendMailAsync(MailAccount account, string to, string subject, string body)
@@ -1046,13 +1104,13 @@ namespace Task_Flyout.Services
         {
             const int pollPageSize = 5;
             if (account.Kind != MailAccountKind.Imap)
-                return await FetchMessagesFromProviderAsync(account, inbox, unreadOnly: true, pageSize: pollPageSize);
+                return (await FetchMessagesFromProviderAsync(account, inbox, unreadOnly: true, pageSize: pollPageSize)).Items;
 
             var client = await GetOrConnectPollImapClientAsync(account);
             List<MailItem> messages;
             try
             {
-                messages = await FetchImapMessagesWithClientAsync(client, account, inbox, unreadOnly: true, pageSize: pollPageSize);
+                messages = (await FetchImapMessagesWithClientAsync(client, account, inbox, unreadOnly: true, pageSize: pollPageSize)).Items;
             }
             catch
             {
@@ -1064,39 +1122,64 @@ namespace Task_Flyout.Services
             return CloneMailItems(messages, includeBodies: false);
         }
 
-        private async Task<List<MailItem>> FetchMessagesFromProviderAsync(
+        private async Task<MailProviderPage> FetchMessagesFromProviderAsync(
             MailAccount account,
             MailFolder folder,
             bool unreadOnly,
             int pageSize,
+            MailCursor? cursor = null,
             CancellationToken cancellationToken = default)
         {
             if (account.Kind == MailAccountKind.Google)
-                return await FetchGoogleMessagesAsync(account, folder, unreadOnly, pageSize, cancellationToken);
+                return await FetchGoogleMessagesAsync(account, folder, unreadOnly, pageSize, cursor, cancellationToken);
             if (account.Kind == MailAccountKind.Imap)
-                return await FetchImapMessagesAsync(account, folder, unreadOnly, pageSize, cancellationToken);
+                return await FetchImapMessagesAsync(account, folder, unreadOnly, pageSize, cursor, cancellationToken);
             if (account.Kind != MailAccountKind.Outlook || !account.IsSetupComplete || folder.IsPlaceholder)
-                return new List<MailItem>();
+                return new MailProviderPage();
+
+            if (cursor != null && cursor.ProviderKind != MailAccountKind.Outlook)
+                throw new InvalidOperationException("Mail continuation does not match the account provider.");
 
             await EnsureOutlookMailReadAuthorizedAsync(cancellationToken);
-            if (_outlookClient == null) return new List<MailItem>();
+            if (_outlookClient == null) return new MailProviderPage();
 
-            var response = await _outlookClient.Me.MailFolders[folder.Id].Messages.GetAsync(request =>
+            Microsoft.Graph.Models.MessageCollectionResponse? response;
+            if (cursor != null)
             {
-                request.QueryParameters.Top = Math.Clamp(pageSize, MinPageSize, MaxPageSize);
-                request.QueryParameters.Select = new[]
+                if (!MailPaginationPolicy.IsAllowedGraphNextLink(cursor.Value))
+                    throw new InvalidOperationException("Mail continuation URL is invalid.");
+                response = await _outlookClient.Me.MailFolders[folder.Id].Messages
+                    .WithUrl(cursor.Value)
+                    .GetAsync(cancellationToken: cancellationToken);
+            }
+            else
+            {
+                response = await _outlookClient.Me.MailFolders[folder.Id].Messages.GetAsync(request =>
                 {
-                    "id", "subject", "from", "toRecipients", "receivedDateTime", "isRead",
-                    "bodyPreview", "webLink", "hasAttachments", "importance"
-                };
-                request.QueryParameters.Orderby = new[] { "receivedDateTime desc" };
-                if (unreadOnly)
-                    request.QueryParameters.Filter = "isRead eq false";
-            }, cancellationToken);
-            return response?.Value?
+                    request.QueryParameters.Top = Math.Clamp(pageSize, MinPageSize, MaxPageSize);
+                    request.QueryParameters.Select = new[]
+                    {
+                        "id", "subject", "from", "toRecipients", "receivedDateTime", "isRead",
+                        "bodyPreview", "webLink", "hasAttachments", "importance"
+                    };
+                    request.QueryParameters.Orderby = new[] { "receivedDateTime desc" };
+                    if (unreadOnly)
+                        request.QueryParameters.Filter = "isRead eq false";
+                }, cancellationToken);
+            }
+
+            var items = response?.Value?
                 .Where(message => message != null)
                 .Select(message => ToOutlookMailItem(account.Id, folder.Id, message))
                 .ToList() ?? new List<MailItem>();
+            var nextLink = response?.OdataNextLink;
+            return new MailProviderPage
+            {
+                Items = items,
+                NextCursor = MailPaginationPolicy.IsAllowedGraphNextLink(nextLink)
+                    ? new MailCursor { ProviderKind = MailAccountKind.Outlook, Value = nextLink! }
+                    : null
+            };
         }
 
         private async Task<GmailService> EnsureGoogleMailReadAuthorizedAsync(CancellationToken cancellationToken = default)
@@ -1172,16 +1255,16 @@ namespace Task_Flyout.Services
                 .ToList();
         }
 
-        private async Task<List<MailItem>> FetchImapMessagesAsync(MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize, CancellationToken cancellationToken)
+        private async Task<MailProviderPage> FetchImapMessagesAsync(MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize, MailCursor? cursor, CancellationToken cancellationToken)
         {
             if (!account.IsSetupComplete || folder.IsPlaceholder)
-                return new List<MailItem>();
+                return new MailProviderPage();
 
             using var client = new ImapClient();
             await ConnectImapAsync(client, account, GetImapPassword(account.Id), cancellationToken);
             try
             {
-                return await FetchImapMessagesWithClientAsync(client, account, folder, unreadOnly, pageSize, cancellationToken);
+                return await FetchImapMessagesWithClientAsync(client, account, folder, unreadOnly, pageSize, cursor, cancellationToken);
             }
             finally
             {
@@ -1196,15 +1279,21 @@ namespace Task_Flyout.Services
 
         // Core fetch against an already-connected client; the caller owns the connection
         // lifetime (UI path opens/closes per call; the poll path reuses a persistent one).
-        private async Task<List<MailItem>> FetchImapMessagesWithClientAsync(ImapClient client, MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize, CancellationToken cancellationToken = default)
+        private async Task<MailProviderPage> FetchImapMessagesWithClientAsync(ImapClient client, MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize, MailCursor? cursor = null, CancellationToken cancellationToken = default)
         {
             var mailFolder = await client.GetFolderAsync(folder.Id, cancellationToken);
             await mailFolder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
 
+            if (cursor != null && (cursor.ProviderKind != MailAccountKind.Imap ||
+                                   !MailPaginationPolicy.IsValidImapCursor(cursor.UidValidity, mailFolder.UidValidity, cursor.BeforeUid)))
+                throw new InvalidOperationException("IMAP continuation is no longer valid for this folder.");
+
             var query = unreadOnly ? MailKit.Search.SearchQuery.NotSeen : MailKit.Search.SearchQuery.All;
+            if (cursor?.BeforeUid is uint beforeUid)
+                query = query.And(MailKit.Search.SearchQuery.Uids(new UniqueIdRange(new UniqueId(1), new UniqueId(beforeUid - 1))));
             var ids = await mailFolder.SearchAsync(query, cancellationToken);
             int top = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
-            var selectedIds = ids.Reverse().Take(top).ToList();
+            var selectedIds = ids.OrderByDescending(id => id.Id).Take(top).ToList();
 
             var summaryItems = MessageSummaryItems.Envelope | MessageSummaryItems.Flags | MessageSummaryItems.BodyStructure;
             IList<IMessageSummary>? summaries = null;
@@ -1244,7 +1333,19 @@ namespace Task_Flyout.Services
                 }
             }
 
-            return items.OrderByDescending(item => item.RawReceivedTime).ToList();
+            uint? nextBeforeUid = ids.Count > top ? selectedIds.Min(id => id.Id) : null;
+            return new MailProviderPage
+            {
+                Items = items.OrderByDescending(item => item.RawReceivedTime).ToList(),
+                NextCursor = nextBeforeUid is > 1
+                    ? new MailCursor
+                    {
+                        ProviderKind = MailAccountKind.Imap,
+                        UidValidity = mailFolder.UidValidity,
+                        BeforeUid = nextBeforeUid
+                    }
+                    : null
+            };
         }
 
         private async Task<MailItem> BuildImapMailItemAsync(
@@ -1392,10 +1493,12 @@ namespace Task_Flyout.Services
                 .ToList() ?? new List<MailFolder>();
         }
 
-        private async Task<List<MailItem>> FetchGoogleMessagesAsync(MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize, CancellationToken cancellationToken)
+        private async Task<MailProviderPage> FetchGoogleMessagesAsync(MailAccount account, MailFolder folder, bool unreadOnly, int? pageSize, MailCursor? cursor, CancellationToken cancellationToken)
         {
             if (!account.IsSetupComplete || folder.IsPlaceholder)
-                return new List<MailItem>();
+                return new MailProviderPage();
+            if (cursor != null && cursor.ProviderKind != MailAccountKind.Google)
+                throw new InvalidOperationException("Mail continuation does not match the account provider.");
 
             var gmail = await EnsureGoogleMailReadAuthorizedAsync(cancellationToken);
             int top = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
@@ -1403,21 +1506,28 @@ namespace Task_Flyout.Services
             var listRequest = gmail.Users.Messages.List("me");
             listRequest.LabelIds = folder.Id;
             listRequest.MaxResults = top;
+            listRequest.PageToken = cursor?.Value;
             if (unreadOnly)
                 listRequest.Q = "is:unread";
 
             var list = await listRequest.ExecuteAsync(cancellationToken);
             if (list?.Messages == null || list.Messages.Count == 0)
-                return new List<MailItem>();
+                return new MailProviderPage();
 
             var messageRefs = list.Messages
                 .Where(message => !string.IsNullOrWhiteSpace(message.Id))
                 .ToList();
 
             var messages = await FetchGoogleMessageMetadataBatchAsync(gmail, account.Id, folder.Id, messageRefs, cancellationToken);
-            return messages
-                .OrderByDescending(message => message.RawReceivedTime)
-                .ToList();
+            if (messages.Count != messageRefs.Count)
+                throw new InvalidOperationException("One or more Gmail messages could not be loaded; the continuation was not advanced.");
+            return new MailProviderPage
+            {
+                Items = messages.OrderByDescending(message => message.RawReceivedTime).ToList(),
+                NextCursor = string.IsNullOrWhiteSpace(list.NextPageToken)
+                    ? null
+                    : new MailCursor { ProviderKind = MailAccountKind.Google, Value = list.NextPageToken }
+            };
         }
 
         private async Task<List<MailItem>> FetchGoogleMessageMetadataBatchAsync(
@@ -1873,28 +1983,47 @@ namespace Task_Flyout.Services
             return false;
         }
 
-        private bool TryGetCachedMessages(string key, int pageSize, out List<MailItem> messages)
+        private bool TryGetCachedMessages(string key, out MailMessageWindow window)
         {
             lock (_mailCacheLock)
             {
                 if (_messageCache.TryGetValue(key, out var entry) && DateTimeOffset.Now - entry.CreatedAt < CacheLifetime)
                 {
-                    messages = CloneMailItems(entry.Value.Take(pageSize), includeBodies: false);
+                    EnsurePersistentCacheLoaded();
+                    if (_persistentCache?.MessageHasMore.ContainsKey(key) != true)
+                    {
+                        window = new MailMessageWindow();
+                        return false;
+                    }
+                    window = new MailMessageWindow
+                    {
+                        Items = CloneMailItems(entry.Value, includeBodies: false),
+                        HasMore = _persistentCache?.MessageHasMore.TryGetValue(key, out var hasMore) == true && hasMore
+                    };
                     return true;
                 }
 
                 EnsurePersistentCacheLoaded();
                 if (_persistentCache?.Messages.TryGetValue(key, out var persistentMessages) == true)
                 {
+                    if (!_persistentCache.MessageHasMore.ContainsKey(key))
+                    {
+                        window = new MailMessageWindow();
+                        return false;
+                    }
                     var cachedMessages = StripBodies(persistentMessages);
                     _persistentCache.Messages[key] = cachedMessages;
                     _messageCache[key] = new CacheEntry<List<MailItem>> { Value = cachedMessages };
-                    messages = CloneMailItems(cachedMessages.Take(pageSize), includeBodies: false);
+                    window = new MailMessageWindow
+                    {
+                        Items = CloneMailItems(cachedMessages, includeBodies: false),
+                        HasMore = _persistentCache.MessageHasMore.TryGetValue(key, out var hasMore) && hasMore
+                    };
                     return true;
                 }
             }
 
-            messages = new List<MailItem>();
+            window = new MailMessageWindow();
             return false;
         }
 
@@ -1912,6 +2041,10 @@ namespace Task_Flyout.Services
                 _persistentCache.FolderOrder.Remove(accountId);
                 foreach (var key in _persistentCache.Messages.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
                     _persistentCache.Messages.Remove(key);
+                foreach (var key in _persistentCache.MessageCursors.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
+                    _persistentCache.MessageCursors.Remove(key);
+                foreach (var key in _persistentCache.MessageHasMore.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
+                    _persistentCache.MessageHasMore.Remove(key);
                 foreach (var key in _persistentCache.LastSeenInboxTicks.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
                     _persistentCache.LastSeenInboxTicks.Remove(key);
             }
@@ -1952,6 +2085,11 @@ namespace Task_Flyout.Services
                     if (string.Equals(pair.Key, GetMessageCacheKey(item.AccountId, item.FolderId, true), StringComparison.Ordinal))
                         pair.Value.RemoveAll(message => message.Id == item.Id);
                 }
+
+                var unreadKey = GetMessageCacheKey(item.AccountId, item.FolderId, true);
+                _messageCache.Remove(unreadKey);
+                _persistentCache.MessageCursors.Remove(unreadKey);
+                _persistentCache.MessageHasMore.Remove(unreadKey);
             }
             SavePersistentCache();
         }
@@ -1982,6 +2120,8 @@ namespace Task_Flyout.Services
                 _persistentCache ??= new MailPersistentCache();
                 _persistentCache.Folders ??= new Dictionary<string, List<MailFolder>>();
                 _persistentCache.Messages ??= new Dictionary<string, List<MailItem>>();
+                _persistentCache.MessageCursors ??= new Dictionary<string, MailCursor>();
+                _persistentCache.MessageHasMore ??= new Dictionary<string, bool>();
                 _persistentCache.LastSeenInboxTicks ??= new Dictionary<string, long>();
                 _persistentCache.AccountOrder ??= new List<string>();
                 _persistentCache.FolderOrder ??= new Dictionary<string, List<string>>();
@@ -2140,15 +2280,49 @@ namespace Task_Flyout.Services
             }
         }
 
-        private void UpdateMessageWindow(string key, List<MailItem> messages)
+        private MailMessageWindow CommitMessagePage(string key, MailProviderPage page, bool append)
+        {
+            EnsurePersistentCacheLoaded();
+            List<MailItem> windowItems;
+            bool hasMore;
+            lock (_mailCacheLock)
+            {
+                if (_persistentCache == null) return new MailMessageWindow();
+                var currentItems = append && _persistentCache.Messages.TryGetValue(key, out var current)
+                    ? current
+                    : Enumerable.Empty<MailItem>();
+                windowItems = currentItems.Concat(page.Items)
+                    .GroupBy(item => item.Id, StringComparer.Ordinal)
+                    .Select(group => group.First())
+                    .OrderByDescending(item => item.RawReceivedTime)
+                    .Take(MaxPageSize)
+                    .ToList();
+                hasMore = page.HasMore && windowItems.Count < MaxPageSize;
+
+                _persistentCache.Messages[key] = StripBodies(windowItems);
+                if (!hasMore || page.NextCursor == null)
+                    _persistentCache.MessageCursors.Remove(key);
+                else
+                    _persistentCache.MessageCursors[key] = page.NextCursor;
+                _persistentCache.MessageHasMore[key] = hasMore;
+                _messageCache[key] = new CacheEntry<List<MailItem>> { Value = StripBodies(windowItems) };
+            }
+            SavePersistentCache();
+            return new MailMessageWindow
+            {
+                Items = CloneMailItems(windowItems, includeBodies: false),
+                HasMore = hasMore
+            };
+        }
+
+        private void InvalidateMessageCursor(string key)
         {
             EnsurePersistentCacheLoaded();
             lock (_mailCacheLock)
             {
                 if (_persistentCache == null) return;
-                var cachedMessages = StripBodies(messages);
-                _persistentCache.Messages[key] = cachedMessages;
-                _messageCache[key] = new CacheEntry<List<MailItem>> { Value = StripBodies(cachedMessages) };
+                _persistentCache.MessageCursors.Remove(key);
+                _persistentCache.MessageHasMore[key] = false;
             }
             SavePersistentCache();
         }

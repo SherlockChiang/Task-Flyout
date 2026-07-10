@@ -33,11 +33,6 @@ namespace Task_Flyout.Views
         private readonly MailTrustStore _mailTrustStore = new();
         private readonly ResourceLoader _loader = new();
 
-        // How many messages the current folder view is requesting. Grows by PageStep
-        // when the user taps "Load more"; reset to the base PageSize on a fresh load.
-        private int _loadedCount;
-        private const int PageStep = 25;
-
         // Pre-compiled regex patterns for mail HTML sanitization
         private static readonly Regex RxHtmlContentTags = new(@"<\s*(html|head|body|style|table|div|p|span|br|img|a|meta)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex RxHtmlTag = new(@"<\s*html\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -469,11 +464,6 @@ namespace Task_Flyout.Views
             var requestCts = CancellationTokenSource.CreateLinkedTokenSource(_pageRequestCts.Token);
             _messageLoadCts = requestCts;
 
-            // A fresh load (folder switch, refresh, toggle) starts from the base page
-            // size again; only "Load more" keeps the grown window.
-            if (!loadMore)
-                _loadedCount = Math.Clamp(_mailService.PageSize, MailService.MinPageSize, MailService.MaxPageSize);
-
             _isLoadingMessages = true;
             AddAccountPanel.Visibility = Visibility.Collapsed;
             LoadingRing.IsActive = true;
@@ -485,14 +475,20 @@ namespace Task_Flyout.Views
 
             try
             {
-                var messages = await _mailService.FetchMessagesAsync(account, folder, UnreadOnlyToggle.IsOn, pageSize: _loadedCount, forceRefresh: forceRefresh || loadMore, cancellationToken: requestCts.Token);
+                var window = await _mailService.FetchMessagesAsync(
+                    account,
+                    folder,
+                    UnreadOnlyToggle.IsOn,
+                    pageSize: _mailService.PageSize,
+                    forceRefresh: forceRefresh,
+                    loadMore: loadMore,
+                    cancellationToken: requestCts.Token);
                 if (loadVersion != _messageLoadVersion || !ReferenceEquals(account, _selectedAccount) || !ReferenceEquals(folder, _selectedFolder))
                     return;
+                var messages = window.Items;
                 var previousSelectedId = !string.IsNullOrWhiteSpace(preferredMessageId) ? preferredMessageId : _selectedItem?.Id;
                 if (loadMore)
                 {
-                    // Providers currently return an expanded window rather than a cursor
-                    // page. Keep realized rows intact and append only the newly exposed IDs.
                     var existingIds = _items.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
                     foreach (var item in messages.OrderByDescending(item => item.RawReceivedTime))
                     {
@@ -510,10 +506,7 @@ namespace Task_Flyout.Views
                 _lastMessageLoadSucceededAt = DateTimeOffset.Now;
                 SetMessageListStatus($"{account.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}");
 
-                // Offer "Load more" only while the server filled the whole window (so older
-                // messages likely remain) and we haven't hit the fetch ceiling.
-                bool mightHaveMore = _items.Count >= _loadedCount && _loadedCount < MailService.MaxPageSize && !UnreadOnlyToggle.IsOn;
-                LoadMoreButton.Visibility = mightHaveMore ? Visibility.Visible : Visibility.Collapsed;
+                LoadMoreButton.Visibility = window.HasMore ? Visibility.Visible : Visibility.Collapsed;
 
                 var itemToSelect = !string.IsNullOrWhiteSpace(previousSelectedId)
                     ? _items.FirstOrDefault(item => item.Id == previousSelectedId)
@@ -532,6 +525,8 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Load messages failed: {ex.Message}");
+                if (loadMore)
+                    LoadMoreButton.Visibility = Visibility.Collapsed;
                 SetMessageListStatus(_loader.GetStringOrDefault("TextLoadMailFailed") ?? "Failed to load messages, please try again later.", isError: true);
             }
             finally
@@ -558,7 +553,6 @@ namespace Task_Flyout.Views
             var listScrollViewer = FindVisualChild<ScrollViewer>(MailListView);
             double? previousVerticalOffset = listScrollViewer?.VerticalOffset;
 
-            _loadedCount = Math.Min(_loadedCount + PageStep, MailService.MaxPageSize);
             await LoadMessagesAsync(loadMore: true, selectFirstWhenNoMatch: false);
             await RestoreMailListScrollPositionAsync(listScrollViewer, previousVerticalOffset);
 
