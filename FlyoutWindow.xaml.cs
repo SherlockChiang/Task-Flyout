@@ -215,7 +215,7 @@ namespace Task_Flyout
         {
             _showSeconds = Windows.Storage.ApplicationData.Current.LocalSettings.Values["ShowSeconds"] as bool? ?? false;
             UpdateClock();
-            _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            _clockTimer = new DispatcherTimer { Interval = _showSeconds ? TimeSpan.FromSeconds(1) : TimeSpan.FromMinutes(1) };
             _clockTimer.Tick += (s, e) => UpdateClock();
         }
 
@@ -231,6 +231,8 @@ namespace Task_Flyout
         public void UpdateClockFormat()
         {
             _showSeconds = Windows.Storage.ApplicationData.Current.LocalSettings.Values["ShowSeconds"] as bool? ?? false;
+            if (_clockTimer != null)
+                _clockTimer.Interval = _showSeconds ? TimeSpan.FromSeconds(1) : TimeSpan.FromMinutes(1);
             UpdateClock();
         }
 

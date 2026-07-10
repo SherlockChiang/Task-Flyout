@@ -79,6 +79,11 @@ namespace Task_Flyout.Views
                 LoadCache();
                 ReloadTasks();
             }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Task sync failed: {ex.Message}");
+                TaskSummaryText.Text = _loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed. Please try again.";
+            }
             finally
             {
                 SetSyncProgress(false);

@@ -933,6 +933,11 @@ namespace Task_Flyout.Views
                     });
                 }
             }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Weather refresh failed: {ex.Message}");
+                SetWeatherStatus(GetSafeString("WeatherPage_LoadFailed", "Weather is unavailable. Check network, city, and provider settings."), isError: true);
+            }
             finally
             {
                 LoadingRing.IsActive = false;

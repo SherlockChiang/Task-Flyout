@@ -326,7 +326,9 @@ namespace Task_Flyout.Services
 
         public Task<List<RssArticle>> LoadMoreArticlesAsync(string? subscriptionId, string? folderId, int skip, int take)
         {
-            return Task.FromResult(GetCachedArticlesPage(subscriptionId, folderId, skip, take).ToList());
+            // SQLite paging may block on disk or antivirus scans; callers update the UI only
+            // after awaiting this operation, so keep the synchronous database work off it.
+            return Task.Run(() => GetCachedArticlesPage(subscriptionId, folderId, skip, take).ToList());
         }
 
         public async Task RefreshSubscriptionAsync(RssSubscription subscription, bool force)

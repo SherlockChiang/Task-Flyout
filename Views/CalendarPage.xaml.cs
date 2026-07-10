@@ -111,6 +111,12 @@ namespace Task_Flyout.Views
                 RefreshAccountList();
                 LoadCalendar(_viewDate);
             };
+            this.Unloaded += (_, _) =>
+            {
+                _syncCts?.Cancel();
+                _syncCts?.Dispose();
+                _syncCts = null;
+            };
         }
 
         // Fill the column headers (Sunday-first, matching the grid layout) from the
