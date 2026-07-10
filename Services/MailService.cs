@@ -454,7 +454,8 @@ namespace Task_Flyout.Services
             string smtpHost,
             int smtpPort,
             bool smtpUseSsl,
-            string smtpUserName)
+            string smtpUserName,
+            CancellationToken cancellationToken = default)
         {
             EnsureAccountsLoaded();
 
@@ -474,7 +475,8 @@ namespace Task_Flyout.Services
                 IsSetupComplete = true
             };
 
-            await TestImapConnectionAsync(account, password);
+            await TestImapConnectionAsync(account, password, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
 
             var existing = _accounts.FirstOrDefault(a =>
                 a.Kind == MailAccountKind.Imap &&
@@ -1210,11 +1212,11 @@ namespace Task_Flyout.Services
             throw new InvalidOperationException("Google provider is not available.");
         }
 
-        private async Task TestImapConnectionAsync(MailAccount account, string password)
+        private async Task TestImapConnectionAsync(MailAccount account, string password, CancellationToken cancellationToken)
         {
             using var client = new ImapClient();
-            await ConnectImapAsync(client, account, password);
-            await client.DisconnectAsync(true);
+            await ConnectImapAsync(client, account, password, cancellationToken);
+            await client.DisconnectAsync(true, cancellationToken);
         }
 
         private async Task<List<MailFolder>> FetchImapFoldersAsync(MailAccount account, CancellationToken cancellationToken)

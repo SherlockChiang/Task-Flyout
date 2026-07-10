@@ -58,6 +58,7 @@ namespace Task_Flyout.Views
         private CancellationTokenSource? _messageLoadCts;
         private CancellationTokenSource? _bodyLoadCts;
         private CancellationTokenSource? _accountAuthCts;
+        private CancellationTokenSource? _imapSetupCts;
         internal bool IsOpeningFromNotification { get; set; }
 
         public MailPage()
@@ -94,6 +95,7 @@ namespace Task_Flyout.Views
             _messageLoadCts?.Cancel();
             _bodyLoadCts?.Cancel();
             _accountAuthCts?.Cancel();
+            _imapSetupCts?.Cancel();
             _messageLoadVersion++;
             ReleaseMessageBodies();
             _selectedItem = null;
@@ -808,6 +810,7 @@ namespace Task_Flyout.Views
 
         private void CancelImapButton_Click(object sender, RoutedEventArgs e)
         {
+            _imapSetupCts?.Cancel();
             ImapSettingsPanel.Visibility = Visibility.Collapsed;
             AddStatusText.Text = "";
         }
@@ -847,6 +850,9 @@ namespace Task_Flyout.Views
 
             SetAddButtonsEnabled(false);
             AddStatusText.Text = _loader.GetStringOrDefault("TextConnectingImap") ?? "Connecting to IMAP server...";
+            _imapSetupCts?.Cancel();
+            var setupCts = CancellationTokenSource.CreateLinkedTokenSource(_pageRequestCts.Token);
+            _imapSetupCts = setupCts;
 
             try
             {
@@ -861,11 +867,13 @@ namespace Task_Flyout.Views
                     smtpHost,
                     smtpPort,
                     SmtpSslToggle.IsOn,
-                    smtpUserName);
+                    smtpUserName,
+                    setupCts.Token);
 
                 AddStatusText.Text = string.Format(_loader.GetStringOrDefault("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
                 await RefreshAccountsAsync();
             }
+            catch (OperationCanceledException) when (setupCts.IsCancellationRequested) { }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Add IMAP account failed: {ex.Message}");
@@ -873,6 +881,9 @@ namespace Task_Flyout.Views
             }
             finally
             {
+                if (ReferenceEquals(_imapSetupCts, setupCts))
+                    _imapSetupCts = null;
+                setupCts.Dispose();
                 SetAddButtonsEnabled(true);
             }
         }
