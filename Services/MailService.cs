@@ -199,6 +199,8 @@ namespace Task_Flyout.Services
         private readonly Dictionary<string, CacheEntry<List<MailItem>>> _messageCache = new();
         private readonly ConcurrentDictionary<string, byte> _knownUnreadIds = new(StringComparer.Ordinal);
         private DispatcherTimer? _pollTimer;
+        private DispatcherTimer? _pendingMutationTimer;
+        private bool _pendingMutationRetryStopped;
         private int _isPollingMail;
         private int _knownUnreadLoaded;
         private DateTimeOffset _lastMailPollStartedUtc = DateTimeOffset.MinValue;
@@ -220,6 +222,7 @@ namespace Task_Flyout.Services
         private readonly object _persistentCacheSaveLock = new();
         private readonly object _mailCacheLock = new();
         private readonly SemaphoreSlim _persistentCacheWriteGate = new(1, 1);
+        private readonly SemaphoreSlim _pendingMutationRetryGate = new(1, 1);
         private CancellationTokenSource? _persistentCacheSaveCts;
         private long _persistentCacheVersion;
         private long _lastPersistedCacheVersion;
@@ -357,6 +360,7 @@ namespace Task_Flyout.Services
 
         public void StartMailPolling()
         {
+            StartPendingMutationRetryScheduler();
             if (!MailPollingEnabled || !HasSetupCompleteAccounts())
             {
                 StopMailPolling();
@@ -410,6 +414,74 @@ namespace Task_Flyout.Services
                 _pollTimer = null;
             }
             DisconnectAllPollImapClients();
+        }
+
+        public void StopPendingMutationRetryScheduler()
+        {
+            _pendingMutationRetryStopped = true;
+            _pendingMutationTimer?.Stop();
+            _pendingMutationTimer = null;
+        }
+
+        private void StartPendingMutationRetryScheduler()
+        {
+            _pendingMutationRetryStopped = false;
+            EnsureAccountsLoaded();
+            EnsurePersistentCacheLoaded();
+            ScheduleNextPendingMutationRetry();
+        }
+
+        private void ScheduleNextPendingMutationRetry()
+        {
+            if (_pendingMutationRetryStopped) return;
+
+            long? nextAttemptUtcTicks;
+            var setupAccountIds = _accounts
+                .Where(account => account.IsSetupComplete)
+                .Select(account => account.Id)
+                .ToHashSet(StringComparer.Ordinal);
+            lock (_mailCacheLock)
+            {
+                nextAttemptUtcTicks = _persistentCache?.PendingMutations
+                    .Where(mutation => mutation.ProviderKind != MailAccountKind.Imap && setupAccountIds.Contains(mutation.AccountId))
+                    .Select(mutation => (long?)mutation.NextAttemptUtcTicks)
+                    .Min();
+            }
+
+            if (!nextAttemptUtcTicks.HasValue)
+            {
+                _pendingMutationTimer?.Stop();
+                _pendingMutationTimer = null;
+                return;
+            }
+
+            var delay = MailMutationRetryPolicy.GetSchedulerDelay(nextAttemptUtcTicks.Value, DateTimeOffset.UtcNow);
+
+            _pendingMutationTimer ??= new DispatcherTimer();
+            _pendingMutationTimer.Stop();
+            _pendingMutationTimer.Interval = delay;
+            _pendingMutationTimer.Tick -= PendingMutationTimer_Tick;
+            _pendingMutationTimer.Tick += PendingMutationTimer_Tick;
+            _pendingMutationTimer.Start();
+        }
+
+        private async void PendingMutationTimer_Tick(object? sender, object e)
+        {
+            _pendingMutationTimer?.Stop();
+            try
+            {
+                EnsureAccountsLoaded();
+                foreach (var account in _accounts.Where(account => account.IsSetupComplete).ToList())
+                    await RetryPendingReadMutationsAsync(account);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Pending mail mutation retry failed: {ex.Message}");
+            }
+            finally
+            {
+                ScheduleNextPendingMutationRetry();
+            }
         }
 
         public void UpdateMailPollingSettings()
@@ -829,6 +901,7 @@ namespace Task_Flyout.Services
                 }
             }
             SavePersistentCache();
+            ScheduleNextPendingMutationRetry();
             return true;
         }
 
@@ -1096,47 +1169,55 @@ namespace Task_Flyout.Services
 
         private async Task RetryPendingReadMutationsAsync(MailAccount account)
         {
-            List<PendingMailMutation> due;
-            var now = DateTimeOffset.UtcNow;
-            lock (_mailCacheLock)
+            await _pendingMutationRetryGate.WaitAsync();
+            try
             {
-                if (_persistentCache == null) return;
-                due = _persistentCache.PendingMutations
-                    .Where(mutation => mutation.AccountId == account.Id &&
-                                       mutation.ProviderKind == account.Kind &&
-                                       mutation.NextAttemptUtcTicks <= now.UtcTicks)
-                    .OrderBy(mutation => mutation.NextAttemptUtcTicks)
-                    .Take(3)
-                    .Select(ClonePendingMutation)
-                    .ToList();
-            }
-
-            bool changed = false;
-            foreach (var mutation in due)
-            {
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-                try
+                List<PendingMailMutation> due;
+                var now = DateTimeOffset.UtcNow;
+                lock (_mailCacheLock)
                 {
-                    await MarkAsReadRemoteOnceAsync(account, new MailItem
+                    if (_persistentCache == null) return;
+                    due = _persistentCache.PendingMutations
+                        .Where(mutation => mutation.AccountId == account.Id &&
+                                           mutation.ProviderKind == account.Kind &&
+                                           mutation.NextAttemptUtcTicks <= now.UtcTicks)
+                        .OrderBy(mutation => mutation.NextAttemptUtcTicks)
+                        .Take(3)
+                        .Select(ClonePendingMutation)
+                        .ToList();
+                }
+
+                bool changed = false;
+                foreach (var mutation in due)
+                {
+                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                    try
                     {
-                        AccountId = mutation.AccountId,
-                        FolderId = mutation.FolderId,
-                        Id = mutation.MessageId,
-                        IsRead = true
-                    }, timeoutCts.Token);
-                    changed |= RemovePendingMutation(mutation);
-                }
-                catch (Exception ex)
-                {
-                    if (IsTransientReadStateFailure(ex, timeoutCts.IsCancellationRequested))
-                        changed |= ReschedulePendingMutation(mutation);
-                    else
+                        await MarkAsReadRemoteOnceAsync(account, new MailItem
+                        {
+                            AccountId = mutation.AccountId,
+                            FolderId = mutation.FolderId,
+                            Id = mutation.MessageId,
+                            IsRead = true
+                        }, timeoutCts.Token);
                         changed |= RemovePendingMutation(mutation);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (IsTransientReadStateFailure(ex, timeoutCts.IsCancellationRequested))
+                            changed |= ReschedulePendingMutation(mutation);
+                        else
+                            changed |= RemovePendingMutation(mutation);
+                    }
                 }
-            }
 
-            if (changed)
-                SavePersistentCache();
+                if (changed)
+                    SavePersistentCache();
+            }
+            finally
+            {
+                _pendingMutationRetryGate.Release();
+            }
         }
 
         private bool RemovePendingMutation(PendingMailMutation mutation)

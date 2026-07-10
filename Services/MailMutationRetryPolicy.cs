@@ -13,5 +13,13 @@ namespace Task_Flyout.Services
 
         public static bool IsExpired(long createdUtcTicks, System.DateTimeOffset now)
             => createdUtcTicks <= 0 || now - new System.DateTimeOffset(createdUtcTicks, System.TimeSpan.Zero) > System.TimeSpan.FromDays(7);
+
+        public static System.TimeSpan GetSchedulerDelay(long nextAttemptUtcTicks, System.DateTimeOffset now)
+        {
+            long delayTicks = System.Math.Max(
+                System.TimeSpan.FromSeconds(1).Ticks,
+                nextAttemptUtcTicks - now.UtcTicks);
+            return System.TimeSpan.FromTicks(System.Math.Min(delayTicks, System.TimeSpan.FromDays(1).Ticks));
+        }
     }
 }

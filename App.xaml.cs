@@ -543,6 +543,7 @@ namespace Task_Flyout
             _weatherBarWatchdog?.Stop();
             NotificationService?.Stop();
             MailService.StopMailPolling();
+            MailService.StopPendingMutationRetryScheduler();
             MailService.NewMailArrived -= MailService_NewMailArrived;
             await FlushPendingSavesBeforeExitAsync();
             if (_uiSettings != null) _uiSettings.ColorValuesChanged -= UiSettings_ColorValuesChanged;

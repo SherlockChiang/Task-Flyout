@@ -38,4 +38,14 @@ public class MailMutationRetryPolicyTests
         Assert.True(MailMutationRetryPolicy.IsExpired(now.Subtract(TimeSpan.FromDays(8)).UtcTicks, now));
         Assert.True(MailMutationRetryPolicy.IsExpired(0, now));
     }
+
+    [Fact]
+    public void Scheduler_delay_is_bounded()
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        Assert.Equal(TimeSpan.FromSeconds(1), MailMutationRetryPolicy.GetSchedulerDelay(now.Subtract(TimeSpan.FromMinutes(1)).UtcTicks, now));
+        Assert.Equal(TimeSpan.FromMinutes(5), MailMutationRetryPolicy.GetSchedulerDelay(now.AddMinutes(5).UtcTicks, now));
+        Assert.Equal(TimeSpan.FromDays(1), MailMutationRetryPolicy.GetSchedulerDelay(now.AddDays(2).UtcTicks, now));
+    }
 }
