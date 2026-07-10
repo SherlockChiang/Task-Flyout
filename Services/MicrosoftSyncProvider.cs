@@ -385,27 +385,44 @@ namespace Task_Flyout.Services
                     await listIterator.IterateAsync();
                 }
 
-                foreach (var list in allLists.Where(list => !string.IsNullOrWhiteSpace(list.Id)))
-                {
-                    var tasks = await _graphClient.Me.Todo.Lists[list.Id].Tasks.GetAsync(req =>
+                using var listGate = new System.Threading.SemaphoreSlim(4);
+                var listTasks = allLists
+                    .Where(list => !string.IsNullOrWhiteSpace(list.Id))
+                    .Select(async list =>
                     {
-                        req.QueryParameters.Top = 500;
+                        await listGate.WaitAsync();
+                        try
+                        {
+                            var tasks = await _graphClient.Me.Todo.Lists[list.Id].Tasks.GetAsync(req =>
+                            {
+                                req.QueryParameters.Top = 500;
+                            });
+
+                            var fetchedTasks = new List<TodoTask>();
+                            if (tasks != null)
+                            {
+                                var pageIterator = PageIterator<TodoTask, TodoTaskCollectionResponse>.CreatePageIterator(
+                                    _graphClient,
+                                    tasks,
+                                    task =>
+                                    {
+                                        fetchedTasks.Add(task);
+                                        return true;
+                                    });
+                                await pageIterator.IterateAsync();
+                            }
+                            return (List: list, Tasks: fetchedTasks);
+                        }
+                        finally
+                        {
+                            listGate.Release();
+                        }
                     });
 
-                    var allTasks = new List<TodoTask>();
-                    if (tasks != null)
-                    {
-                        var pageIterator = PageIterator<TodoTask, TodoTaskCollectionResponse>.CreatePageIterator(
-                            _graphClient,
-                            tasks,
-                            task =>
-                            {
-                                allTasks.Add(task);
-                                return true;
-                            });
-                        await pageIterator.IterateAsync();
-                    }
-
+                foreach (var listResult in await Task.WhenAll(listTasks))
+                {
+                    var list = listResult.List;
+                    var allTasks = listResult.Tasks;
                     if (allTasks.Count > 0)
                     {
                         System.Diagnostics.Debug.WriteLine($"[Microsoft To Do] Fetched {allTasks.Count} tasks. Parsing...");
