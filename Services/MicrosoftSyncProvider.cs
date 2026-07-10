@@ -282,7 +282,7 @@ namespace Task_Flyout.Services
                 if (allEvents.Count > 0)
                 {
                     System.Diagnostics.Debug.WriteLine($"[Microsoft Calendar] Fetched {allEvents.Count} events");
-                    var recurrenceKinds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    var recurrenceKinds = await FetchMicrosoftMasterRecurrenceKindsAsync(allEvents);
                     foreach (var ev in allEvents)
                     {
                         DateTime.TryParse(ev.Start?.DateTime, out var start);
@@ -305,8 +305,10 @@ namespace Task_Flyout.Services
                         DateTime.TryParse(ev.End?.DateTime, out var end);
                         string recurringEventId = ev.SeriesMasterId ?? "";
                         string recurrenceKind = GetMicrosoftRecurrenceKind(ev.Recurrence);
-                        if (recurrenceKind == "None" && !string.IsNullOrWhiteSpace(recurringEventId))
-                            recurrenceKind = await GetMicrosoftMasterRecurrenceKindAsync(recurringEventId, recurrenceKinds);
+                        if (recurrenceKind == "None" &&
+                            !string.IsNullOrWhiteSpace(recurringEventId) &&
+                            recurrenceKinds.TryGetValue(recurringEventId, out var masterKind))
+                            recurrenceKind = masterKind;
 
                         var mapped = SyncItemMappingPolicy.MapEvent(
                             ev.Id,
@@ -611,26 +613,42 @@ namespace Task_Flyout.Services
             };
         }
 
-        private async Task<string> GetMicrosoftMasterRecurrenceKindAsync(string eventId, Dictionary<string, string> cache)
+        private async Task<Dictionary<string, string>> FetchMicrosoftMasterRecurrenceKindsAsync(IEnumerable<Event> events)
         {
-            if (cache.TryGetValue(eventId, out var cached))
-                return cached;
+            var eventIds = events
+                .Where(item => GetMicrosoftRecurrenceKind(item.Recurrence) == "None")
+                .Select(item => item.SeriesMasterId)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Cast<string>()
+                .ToList();
+            if (eventIds.Count == 0)
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-            try
+            using var gate = new System.Threading.SemaphoreSlim(4);
+            var fetchTasks = eventIds.Select(async eventId =>
             {
-                var master = await _graphClient.Me.Events[eventId].GetAsync(request =>
+                await gate.WaitAsync();
+                try
                 {
-                    request.QueryParameters.Select = new[] { "id", "recurrence" };
-                });
-                cached = GetMicrosoftRecurrenceKind(master?.Recurrence);
-            }
-            catch
-            {
-                cached = "None";
-            }
+                    var master = await _graphClient.Me.Events[eventId].GetAsync(request =>
+                    {
+                        request.QueryParameters.Select = new[] { "id", "recurrence" };
+                    });
+                    return (EventId: eventId, Kind: GetMicrosoftRecurrenceKind(master?.Recurrence));
+                }
+                catch
+                {
+                    return (EventId: eventId, Kind: "None");
+                }
+                finally
+                {
+                    gate.Release();
+                }
+            });
 
-            cache[eventId] = cached;
-            return cached;
+            return (await Task.WhenAll(fetchTasks))
+                .ToDictionary(item => item.EventId, item => item.Kind, StringComparer.OrdinalIgnoreCase);
         }
 
         private static string GetMicrosoftRecurrenceKind(PatternedRecurrence? recurrence)
