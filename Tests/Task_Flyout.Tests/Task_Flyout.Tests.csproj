@@ -39,6 +39,7 @@
     <Compile Include="..\..\Services\RssFetchPolicy.cs" Link="Source\RssFetchPolicy.cs" />
     <Compile Include="..\..\Services\RssSensitiveDataProtector.cs" Link="Source\RssSensitiveDataProtector.cs" />
     <Compile Include="..\..\Services\RssSqliteRepository.cs" Link="Source\RssSqliteRepository.cs" />
+    <Compile Include="..\..\Services\RssStorageCleanup.cs" Link="Source\RssStorageCleanup.cs" />
     <Compile Include="..\..\Services\DiagnosticsRedactor.cs" Link="Source\DiagnosticsRedactor.cs" />
     <Compile Include="..\..\Services\UserSafeErrorMessage.cs" Link="Source\UserSafeErrorMessage.cs" />
     <Compile Include="..\..\Services\JsonFallbackPolicy.cs" Link="Source\JsonFallbackPolicy.cs" />
