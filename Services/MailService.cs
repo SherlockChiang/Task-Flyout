@@ -173,7 +173,11 @@ namespace Task_Flyout.Services
         private MailPersistentCache? _persistentCache;
         private bool _persistentCacheLoaded;
         private readonly object _persistentCacheSaveLock = new();
+        private readonly object _mailCacheLock = new();
+        private readonly SemaphoreSlim _persistentCacheWriteGate = new(1, 1);
         private CancellationTokenSource? _persistentCacheSaveCts;
+        private long _persistentCacheVersion;
+        private long _lastPersistedCacheVersion;
         private readonly object _accountSaveQueueLock = new();
         private Task _accountSaveQueue = Task.CompletedTask;
         private readonly object _bodyCacheLock = new();
@@ -239,31 +243,35 @@ namespace Task_Flyout.Services
         {
             EnsureAccountsLoaded();
             EnsurePersistentCacheLoaded();
-            if (_persistentCache == null) return;
-
-            var knownIds = _accounts.Select(account => account.Id).ToHashSet(StringComparer.Ordinal);
-            _persistentCache.AccountOrder = accountIds
-                .Where(id => knownIds.Contains(id))
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
+            lock (_mailCacheLock)
+            {
+                if (_persistentCache == null) return;
+                var knownIds = _accounts.Select(account => account.Id).ToHashSet(StringComparer.Ordinal);
+                _persistentCache.AccountOrder = accountIds
+                    .Where(id => knownIds.Contains(id))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+            }
             SavePersistentCache();
         }
 
         public void SaveMailFolderOrder(string accountId, IEnumerable<string> folderIds)
         {
             EnsurePersistentCacheLoaded();
-            if (_persistentCache == null) return;
-
-            _persistentCache.FolderOrder[accountId] = folderIds
-                .Where(id => !string.IsNullOrWhiteSpace(id))
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-
-            if (_persistentCache.Folders.TryGetValue(accountId, out var folders))
+            lock (_mailCacheLock)
             {
-                var orderedFolders = ApplyFolderOrder(accountId, folders);
-                _persistentCache.Folders[accountId] = orderedFolders;
-                _folderCache[accountId] = new CacheEntry<List<MailFolder>> { Value = orderedFolders };
+                if (_persistentCache == null) return;
+                _persistentCache.FolderOrder[accountId] = folderIds
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+
+                if (_persistentCache.Folders.TryGetValue(accountId, out var folders))
+                {
+                    var orderedFolders = ApplyFolderOrder(accountId, folders);
+                    _persistentCache.Folders[accountId] = orderedFolders;
+                    _folderCache[accountId] = new CacheEntry<List<MailFolder>> { Value = orderedFolders };
+                }
             }
 
             SavePersistentCache();
@@ -554,8 +562,7 @@ namespace Task_Flyout.Services
             }
 
             folders = ApplyFolderOrder(cacheKey, folders);
-            _folderCache[cacheKey] = new CacheEntry<List<MailFolder>> { Value = folders };
-            UpdatePersistentFolders(cacheKey, folders);
+            UpdateFolderWindow(cacheKey, folders);
             return folders;
         }
 
@@ -573,8 +580,7 @@ namespace Task_Flyout.Services
                 requestedPageSize,
                 cancellationToken);
 
-            _messageCache[cacheKey] = new CacheEntry<List<MailItem>> { Value = StripBodies(messages) };
-            UpdatePersistentMessages(cacheKey, messages);
+            UpdateMessageWindow(cacheKey, messages);
             return CloneMailItems(messages, includeBodies: false);
         }
 
@@ -716,8 +722,11 @@ namespace Task_Flyout.Services
 
         public void ClearVolatileMessageBodies()
         {
-            foreach (var key in _messageCache.Keys.ToList())
-                _messageCache[key].Value = StripBodies(_messageCache[key].Value);
+            lock (_mailCacheLock)
+            {
+                foreach (var key in _messageCache.Keys.ToList())
+                    _messageCache[key].Value = StripBodies(_messageCache[key].Value);
+            }
 
             lock (_bodyCacheLock)
             {
@@ -1620,24 +1629,19 @@ namespace Task_Flyout.Services
         {
             CancellationTokenSource? pendingSave;
             string? json;
+            long version;
 
             lock (_persistentCacheSaveLock)
             {
                 pendingSave = _persistentCacheSaveCts;
-                if (pendingSave == null || !_persistentCacheLoaded || _persistentCache == null)
+                if (pendingSave == null)
                     return;
 
                 _persistentCacheSaveCts = null;
-                try
-                {
-                    json = JsonSerializer.Serialize(_persistentCache, AppJsonContext.Default.MailPersistentCache);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Serialize mail cache during flush failed: {ex.Message}");
-                    json = null;
-                }
+                version = ++_persistentCacheVersion;
             }
+
+            json = SerializePersistentCache("Serialize mail cache during flush failed");
 
             try
             {
@@ -1648,7 +1652,7 @@ namespace Task_Flyout.Services
             }
 
             if (!string.IsNullOrWhiteSpace(json))
-                await LocalSqliteStore.WriteProtectedTextAsync("mail", "cache", json);
+                await WritePersistentCacheSnapshotAsync(json, version);
         }
 
         private static string GetAppDataPath()
@@ -1846,18 +1850,21 @@ namespace Task_Flyout.Services
 
         private bool TryGetCachedFolders(string key, out List<MailFolder> folders)
         {
-            if (_folderCache.TryGetValue(key, out var entry) && DateTimeOffset.Now - entry.CreatedAt < CacheLifetime)
+            lock (_mailCacheLock)
             {
-                folders = ApplyFolderOrder(key, entry.Value);
-                return true;
-            }
+                if (_folderCache.TryGetValue(key, out var entry) && DateTimeOffset.Now - entry.CreatedAt < CacheLifetime)
+                {
+                    folders = ApplyFolderOrder(key, entry.Value);
+                    return true;
+                }
 
-            EnsurePersistentCacheLoaded();
-            if (_persistentCache?.Folders.TryGetValue(key, out var persistentFolders) == true)
-            {
-                folders = ApplyFolderOrder(key, persistentFolders);
-                _folderCache[key] = new CacheEntry<List<MailFolder>> { Value = folders };
-                return true;
+                EnsurePersistentCacheLoaded();
+                if (_persistentCache?.Folders.TryGetValue(key, out var persistentFolders) == true)
+                {
+                    folders = ApplyFolderOrder(key, persistentFolders);
+                    _folderCache[key] = new CacheEntry<List<MailFolder>> { Value = folders };
+                    return true;
+                }
             }
 
             folders = new List<MailFolder>();
@@ -1866,20 +1873,23 @@ namespace Task_Flyout.Services
 
         private bool TryGetCachedMessages(string key, int pageSize, out List<MailItem> messages)
         {
-            if (_messageCache.TryGetValue(key, out var entry) && DateTimeOffset.Now - entry.CreatedAt < CacheLifetime)
+            lock (_mailCacheLock)
             {
-                messages = CloneMailItems(entry.Value.Take(pageSize), includeBodies: false);
-                return true;
-            }
+                if (_messageCache.TryGetValue(key, out var entry) && DateTimeOffset.Now - entry.CreatedAt < CacheLifetime)
+                {
+                    messages = CloneMailItems(entry.Value.Take(pageSize), includeBodies: false);
+                    return true;
+                }
 
-            EnsurePersistentCacheLoaded();
-            if (_persistentCache?.Messages.TryGetValue(key, out var persistentMessages) == true)
-            {
-                var cachedMessages = StripBodies(persistentMessages);
-                _persistentCache.Messages[key] = cachedMessages;
-                _messageCache[key] = new CacheEntry<List<MailItem>> { Value = cachedMessages };
-                messages = CloneMailItems(cachedMessages.Take(pageSize), includeBodies: false);
-                return true;
+                EnsurePersistentCacheLoaded();
+                if (_persistentCache?.Messages.TryGetValue(key, out var persistentMessages) == true)
+                {
+                    var cachedMessages = StripBodies(persistentMessages);
+                    _persistentCache.Messages[key] = cachedMessages;
+                    _messageCache[key] = new CacheEntry<List<MailItem>> { Value = cachedMessages };
+                    messages = CloneMailItems(cachedMessages.Take(pageSize), includeBodies: false);
+                    return true;
+                }
             }
 
             messages = new List<MailItem>();
@@ -1888,14 +1898,13 @@ namespace Task_Flyout.Services
 
         private void ClearAccountCache(string accountId)
         {
-            _folderCache.Remove(accountId);
-
-            foreach (var key in _messageCache.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
-                _messageCache.Remove(key);
-
             EnsurePersistentCacheLoaded();
-            if (_persistentCache != null)
+            lock (_mailCacheLock)
             {
+                _folderCache.Remove(accountId);
+                foreach (var key in _messageCache.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
+                    _messageCache.Remove(key);
+                if (_persistentCache == null) return;
                 _persistentCache.Folders.Remove(accountId);
                 _persistentCache.AccountOrder.RemoveAll(id => string.Equals(id, accountId, StringComparison.Ordinal));
                 _persistentCache.FolderOrder.Remove(accountId);
@@ -1903,41 +1912,44 @@ namespace Task_Flyout.Services
                     _persistentCache.Messages.Remove(key);
                 foreach (var key in _persistentCache.LastSeenInboxTicks.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
                     _persistentCache.LastSeenInboxTicks.Remove(key);
-                SavePersistentCache();
             }
+            SavePersistentCache();
         }
 
         private void UpdateCachedReadState(MailItem item)
         {
-            foreach (var pair in _messageCache.ToList())
-            {
-                var cached = pair.Value.Value.FirstOrDefault(message =>
-                    message.AccountId == item.AccountId &&
-                    message.FolderId == item.FolderId &&
-                    message.Id == item.Id);
-
-                if (cached != null)
-                    cached.IsRead = true;
-
-                if (string.Equals(pair.Key, GetMessageCacheKey(item.AccountId, item.FolderId, true), StringComparison.Ordinal))
-                    pair.Value.Value.RemoveAll(message => message.Id == item.Id);
-            }
-
             EnsurePersistentCacheLoaded();
-            if (_persistentCache == null) return;
-
-            foreach (var pair in _persistentCache.Messages.ToList())
+            lock (_mailCacheLock)
             {
-                var cached = pair.Value.FirstOrDefault(message =>
-                    message.AccountId == item.AccountId &&
-                    message.FolderId == item.FolderId &&
-                    message.Id == item.Id);
+                foreach (var pair in _messageCache.ToList())
+                {
+                    var cached = pair.Value.Value.FirstOrDefault(message =>
+                        message.AccountId == item.AccountId &&
+                        message.FolderId == item.FolderId &&
+                        message.Id == item.Id);
 
-                if (cached != null)
-                    cached.IsRead = true;
+                    if (cached != null)
+                        cached.IsRead = true;
 
-                if (string.Equals(pair.Key, GetMessageCacheKey(item.AccountId, item.FolderId, true), StringComparison.Ordinal))
-                    pair.Value.RemoveAll(message => message.Id == item.Id);
+                    if (string.Equals(pair.Key, GetMessageCacheKey(item.AccountId, item.FolderId, true), StringComparison.Ordinal))
+                        pair.Value.Value.RemoveAll(message => message.Id == item.Id);
+                }
+
+                if (_persistentCache == null) return;
+
+                foreach (var pair in _persistentCache.Messages.ToList())
+                {
+                    var cached = pair.Value.FirstOrDefault(message =>
+                        message.AccountId == item.AccountId &&
+                        message.FolderId == item.FolderId &&
+                        message.Id == item.Id);
+
+                    if (cached != null)
+                        cached.IsRead = true;
+
+                    if (string.Equals(pair.Key, GetMessageCacheKey(item.AccountId, item.FolderId, true), StringComparison.Ordinal))
+                        pair.Value.RemoveAll(message => message.Id == item.Id);
+                }
             }
             SavePersistentCache();
         }
@@ -1947,30 +1959,33 @@ namespace Task_Flyout.Services
 
         private void EnsurePersistentCacheLoaded()
         {
-            if (_persistentCacheLoaded) return;
-            _persistentCacheLoaded = true;
-
-            try
+            lock (_mailCacheLock)
             {
-                var json = LocalSqliteStore.ReadProtectedText("mail", "cache");
-                _persistentCache = JsonFallbackPolicy.DeserializeOrDefault(
-                    json,
-                    value => JsonSerializer.Deserialize(value, AppJsonContext.Default.MailPersistentCache),
-                    () => new MailPersistentCache());
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Mail cache load failed: {ex.Message}");
-            }
+                if (_persistentCacheLoaded) return;
+                _persistentCacheLoaded = true;
 
-            _persistentCache ??= new MailPersistentCache();
-            _persistentCache.Folders ??= new Dictionary<string, List<MailFolder>>();
-            _persistentCache.Messages ??= new Dictionary<string, List<MailItem>>();
-            _persistentCache.LastSeenInboxTicks ??= new Dictionary<string, long>();
-            _persistentCache.AccountOrder ??= new List<string>();
-            _persistentCache.FolderOrder ??= new Dictionary<string, List<string>>();
-            MigrateLegacyMessageCacheKeys();
-            TrimPersistentCacheForMemory();
+                try
+                {
+                    var json = LocalSqliteStore.ReadProtectedText("mail", "cache");
+                    _persistentCache = JsonFallbackPolicy.DeserializeOrDefault(
+                        json,
+                        value => JsonSerializer.Deserialize(value, AppJsonContext.Default.MailPersistentCache),
+                        () => new MailPersistentCache());
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Mail cache load failed: {ex.Message}");
+                }
+
+                _persistentCache ??= new MailPersistentCache();
+                _persistentCache.Folders ??= new Dictionary<string, List<MailFolder>>();
+                _persistentCache.Messages ??= new Dictionary<string, List<MailItem>>();
+                _persistentCache.LastSeenInboxTicks ??= new Dictionary<string, long>();
+                _persistentCache.AccountOrder ??= new List<string>();
+                _persistentCache.FolderOrder ??= new Dictionary<string, List<string>>();
+                MigrateLegacyMessageCacheKeys();
+                TrimPersistentCacheForMemory();
+            }
         }
 
         private void MigrateLegacyMessageCacheKeys()
@@ -2004,17 +2019,19 @@ namespace Task_Flyout.Services
             EnsurePersistentCacheLoaded();
 
             CancellationTokenSource cts;
+            long version;
             lock (_persistentCacheSaveLock)
             {
                 _persistentCacheSaveCts?.Cancel();
                 _persistentCacheSaveCts = new CancellationTokenSource();
                 cts = _persistentCacheSaveCts;
+                version = ++_persistentCacheVersion;
             }
 
-            _ = SavePersistentCacheAfterDelayAsync(cts);
+            _ = SavePersistentCacheAfterDelayAsync(cts, version);
         }
 
-        private async Task SavePersistentCacheAfterDelayAsync(CancellationTokenSource cts)
+        private async Task SavePersistentCacheAfterDelayAsync(CancellationTokenSource cts, long version)
         {
             try
             {
@@ -2025,23 +2042,12 @@ namespace Task_Flyout.Services
                 {
                     if (!ReferenceEquals(cts, _persistentCacheSaveCts))
                         return;
-
-                    try
-                    {
-                        json = _persistentCache == null
-                            ? null
-                            : JsonSerializer.Serialize(_persistentCache, AppJsonContext.Default.MailPersistentCache);
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Serialize mail cache failed: {ex.Message}");
-                        json = null;
-                    }
-                    _persistentCacheSaveCts = null;
                 }
 
+                json = SerializePersistentCache("Serialize mail cache failed");
+
                 if (!string.IsNullOrWhiteSpace(json))
-                    await LocalSqliteStore.WriteProtectedTextAsync("mail", "cache", json);
+                    await WritePersistentCacheSnapshotAsync(json, version);
             }
             catch (OperationCanceledException)
             {
@@ -2062,12 +2068,49 @@ namespace Task_Flyout.Services
             }
         }
 
-        private void UpdatePersistentFolders(string key, List<MailFolder> folders)
+        private async Task WritePersistentCacheSnapshotAsync(string json, long version)
+        {
+            await _persistentCacheWriteGate.WaitAsync();
+            try
+            {
+                if (version <= _lastPersistedCacheVersion) return;
+                await LocalSqliteStore.WriteProtectedTextAsync("mail", "cache", json);
+                _lastPersistedCacheVersion = version;
+            }
+            finally
+            {
+                _persistentCacheWriteGate.Release();
+            }
+        }
+
+        private string? SerializePersistentCache(string errorPrefix)
+        {
+            lock (_mailCacheLock)
+            {
+                if (!_persistentCacheLoaded || _persistentCache == null) return null;
+                try
+                {
+                    return JsonSerializer.Serialize(_persistentCache, AppJsonContext.Default.MailPersistentCache);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"{errorPrefix}: {ex.Message}");
+                    return null;
+                }
+            }
+        }
+
+        private void UpdateFolderWindow(string key, List<MailFolder> folders)
         {
             EnsurePersistentCacheLoaded();
-            if (_persistentCache == null) return;
+            lock (_mailCacheLock)
+            {
+                if (_persistentCache == null) return;
+                var orderedFolders = ApplyFolderOrder(key, folders);
+                _persistentCache.Folders[key] = orderedFolders;
+                _folderCache[key] = new CacheEntry<List<MailFolder>> { Value = orderedFolders };
+            }
 
-            _persistentCache.Folders[key] = ApplyFolderOrder(key, folders);
             SavePersistentCache();
         }
 
@@ -2075,29 +2118,36 @@ namespace Task_Flyout.Services
         {
             EnsurePersistentCacheLoaded();
             var accountList = accounts.ToList();
-            var order = _persistentCache?.AccountOrder;
-            return PersistedOrderPolicy.Apply(accountList, order, account => account.Id);
+            lock (_mailCacheLock)
+                return PersistedOrderPolicy.Apply(accountList, _persistentCache?.AccountOrder, account => account.Id);
         }
 
         private List<MailFolder> ApplyFolderOrder(string accountId, IEnumerable<MailFolder> folders)
         {
             EnsurePersistentCacheLoaded();
             var folderList = folders.ToList();
-            if (_persistentCache == null ||
-                !_persistentCache.FolderOrder.TryGetValue(accountId, out var order) ||
-                order == null ||
-                order.Count == 0)
-                return folderList;
+            lock (_mailCacheLock)
+            {
+                if (_persistentCache == null ||
+                    !_persistentCache.FolderOrder.TryGetValue(accountId, out var order) ||
+                    order == null ||
+                    order.Count == 0)
+                    return folderList;
 
-            return PersistedOrderPolicy.Apply(folderList, order, folder => folder.Id);
+                return PersistedOrderPolicy.Apply(folderList, order, folder => folder.Id);
+            }
         }
 
-        private void UpdatePersistentMessages(string key, List<MailItem> messages)
+        private void UpdateMessageWindow(string key, List<MailItem> messages)
         {
             EnsurePersistentCacheLoaded();
-            if (_persistentCache == null) return;
-
-            _persistentCache.Messages[key] = StripBodies(messages);
+            lock (_mailCacheLock)
+            {
+                if (_persistentCache == null) return;
+                var cachedMessages = StripBodies(messages);
+                _persistentCache.Messages[key] = cachedMessages;
+                _messageCache[key] = new CacheEntry<List<MailItem>> { Value = StripBodies(cachedMessages) };
+            }
             SavePersistentCache();
         }
 
@@ -2121,15 +2171,14 @@ namespace Task_Flyout.Services
         private void UpdatePersistentMessageBody(MailItem item)
         {
             EnsurePersistentCacheLoaded();
-            if (_persistentCache == null) return;
-
             bool changed = false;
-            foreach (var messages in _persistentCache.Messages.Values)
+            lock (_mailCacheLock)
             {
-                var existing = messages.FirstOrDefault(m => m.Id == item.Id && m.AccountId == item.AccountId);
-                if (existing != null)
+                if (_persistentCache == null) return;
+                foreach (var messages in _persistentCache.Messages.Values)
                 {
-                    if (!string.IsNullOrEmpty(existing.BodyText) || !string.IsNullOrEmpty(existing.HtmlBody))
+                    var existing = messages.FirstOrDefault(m => m.Id == item.Id && m.AccountId == item.AccountId);
+                    if (existing != null && (!string.IsNullOrEmpty(existing.BodyText) || !string.IsNullOrEmpty(existing.HtmlBody)))
                     {
                         existing.BodyText = "";
                         existing.HtmlBody = "";
@@ -2151,43 +2200,52 @@ namespace Task_Flyout.Services
         private void MergeMessagesIntoPersistentCache(string accountId, string folderId, List<MailItem> newMessages)
         {
             EnsurePersistentCacheLoaded();
-            if (_persistentCache == null || newMessages.Count == 0) return;
+            if (newMessages.Count == 0) return;
 
             var strippedNewMessages = StripBodies(newMessages);
-            foreach (bool unreadOnly in new[] { true, false })
+            bool changed = false;
+            lock (_mailCacheLock)
             {
-                var key = GetMessageCacheKey(accountId, folderId, unreadOnly);
-                List<MailItem> existing;
-                if (_persistentCache.Messages.TryGetValue(key, out var cached))
-                    existing = StripBodies(cached);
-                else if (_messageCache.TryGetValue(key, out var memoryEntry))
-                    existing = StripBodies(memoryEntry.Value);
-                else
-                    continue;
-
-                int retainedCount = Math.Clamp(existing.Count, MinPageSize, MaxPageSize);
-
-                foreach (var message in strippedNewMessages)
+                if (_persistentCache == null) return;
+                foreach (bool unreadOnly in new[] { true, false })
                 {
-                    if (unreadOnly && message.IsRead) continue;
-                    existing.RemoveAll(item => item.Id == message.Id);
-                    existing.Add(CloneMailItem(message, includeBodies: false));
+                    var key = GetMessageCacheKey(accountId, folderId, unreadOnly);
+                    List<MailItem> existing;
+                    if (_persistentCache.Messages.TryGetValue(key, out var cached))
+                        existing = StripBodies(cached);
+                    else if (_messageCache.TryGetValue(key, out var memoryEntry))
+                        existing = StripBodies(memoryEntry.Value);
+                    else
+                        continue;
+
+                    int retainedCount = Math.Clamp(existing.Count, MinPageSize, MaxPageSize);
+
+                    foreach (var message in strippedNewMessages)
+                    {
+                        if (unreadOnly && message.IsRead) continue;
+                        existing.RemoveAll(item => item.Id == message.Id);
+                        existing.Add(CloneMailItem(message, includeBodies: false));
+                    }
+
+                    _persistentCache.Messages[key] = existing
+                        .OrderByDescending(item => item.RawReceivedTime)
+                        .Take(retainedCount)
+                        .ToList();
+
+                    _messageCache[key] = new CacheEntry<List<MailItem>> { Value = StripBodies(_persistentCache.Messages[key]) };
+                    changed = true;
                 }
-
-                _persistentCache.Messages[key] = existing
-                    .OrderByDescending(item => item.RawReceivedTime)
-                    .Take(retainedCount)
-                    .ToList();
-
-                _messageCache[key] = new CacheEntry<List<MailItem>> { Value = StripBodies(_persistentCache.Messages[key]) };
             }
 
-            SavePersistentCache();
+            if (changed)
+                SavePersistentCache();
         }
 
         public MailItem? TryGetCachedMessage(string accountId, string folderId, string messageId)
         {
             EnsurePersistentCacheLoaded();
+            lock (_mailCacheLock)
+            {
 
             foreach (var pair in _messageCache.Concat(_persistentCache?.Messages.ToDictionary(
                          entry => entry.Key,
@@ -2198,6 +2256,7 @@ namespace Task_Flyout.Services
                     message.FolderId == folderId &&
                     message.Id == messageId);
                 if (item != null) return CloneMailItem(item, includeBodies: false);
+            }
             }
 
             return null;
@@ -2253,14 +2312,18 @@ namespace Task_Flyout.Services
         private long GetLastSeenInboxTicks(string inboxKey)
         {
             EnsurePersistentCacheLoaded();
-            return _persistentCache?.LastSeenInboxTicks.TryGetValue(inboxKey, out var ticks) == true ? ticks : 0;
+            lock (_mailCacheLock)
+                return _persistentCache?.LastSeenInboxTicks.TryGetValue(inboxKey, out var ticks) == true ? ticks : 0;
         }
 
         private void SetLastSeenInboxTicks(string inboxKey, long ticks)
         {
             EnsurePersistentCacheLoaded();
-            if (_persistentCache == null) return;
-            _persistentCache.LastSeenInboxTicks[inboxKey] = ticks;
+            lock (_mailCacheLock)
+            {
+                if (_persistentCache == null) return;
+                _persistentCache.LastSeenInboxTicks[inboxKey] = ticks;
+            }
         }
 
         private static long GetMailReceivedTicks(MailItem item)
