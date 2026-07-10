@@ -2252,9 +2252,10 @@ namespace Task_Flyout.Services
                 if (VerificationCodeDetector.TryExtract(item.Subject, item.Preview, out var code))
                 {
                     var copyLabel = _loader.GetStringOrDefault("MailCopyCode") ?? "Copy code";
+                    var codeToken = VerificationCodeStore.Store(code);
                     builder.AddButton(new AppNotificationButton(copyLabel)
                         .AddArgument("action", "copyCode")
-                        .AddArgument("code", code));
+                        .AddArgument("codeToken", codeToken));
                 }
 
                 AppNotificationManager.Default.Show(builder.BuildNotification());

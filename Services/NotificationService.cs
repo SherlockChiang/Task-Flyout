@@ -277,8 +277,8 @@ namespace Task_Flyout.Services
             {
                 if (arguments.TryGetValue("action", out var copyAction) &&
                     copyAction == "copyCode" &&
-                    arguments.TryGetValue("code", out var code) &&
-                    NotificationActivationParser.IsVerificationCode(code))
+                    arguments.TryGetValue("codeToken", out var codeToken) &&
+                    VerificationCodeStore.Take(codeToken) is { } code)
                 {
                     CopyVerificationCodeToClipboard(code);
                     return;

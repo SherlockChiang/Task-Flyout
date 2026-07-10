@@ -18,10 +18,10 @@ public class NotificationActivationParserTests
     [Fact]
     public void ParseArguments_accepts_html_encoded_separator()
     {
-        var result = NotificationActivationParser.ParseArguments("action=copyCode&amp;code=123456");
+        var result = NotificationActivationParser.ParseArguments("action=copyCode&amp;codeToken=token-123");
 
         Assert.Equal("copyCode", result["action"]);
-        Assert.Equal("123456", result["code"]);
+        Assert.Equal("token-123", result["codeToken"]);
     }
 
     [Fact]
