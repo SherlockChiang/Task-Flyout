@@ -786,6 +786,12 @@
   <data name="TextSendFailed" xml:space="preserve">
     <value>Failed to send email. Please check network and account settings.</value>
   </data>
+  <data name="TextRemoveAccountFailedTitle" xml:space="preserve">
+    <value>Account Not Removed</value>
+  </data>
+  <data name="TextRemoveAccountFailedContent" xml:space="preserve">
+    <value>Authorization data could not be completely removed. The account was kept so you can try again.</value>
+  </data>
   <data name="TextSendStatusUnknown" xml:space="preserve">
     <value>Sending timed out. Check your Sent folder before trying again.</value>
   </data>

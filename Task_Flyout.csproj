@@ -68,6 +68,7 @@
         <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
         <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
         <PackageReference Include="Microsoft.Graph" Version="5.105.0" />
+        <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.83.1" />
         <PackageReference Include="Microsoft.Kiota.Abstractions" Version="1.22.0" />
         <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1839" />
         <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.1.3" />

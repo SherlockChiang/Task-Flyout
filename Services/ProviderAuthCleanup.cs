@@ -18,6 +18,15 @@ namespace Task_Flyout.Services
             }
         }
 
+        public static string MicrosoftTokenCacheDirectory
+            => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ".IdentityService");
+
+        public static System.Collections.Generic.IReadOnlyList<string> MicrosoftTokenCacheNames { get; } = new[]
+        {
+            "TaskFlyout_MSAL_Cache.nocae",
+            "TaskFlyout_MSAL_Cache.cae"
+        };
+
         public static bool SupportsProvider(string providerName)
             => providerName.Equals("Google", StringComparison.OrdinalIgnoreCase) ||
                providerName.Equals("Microsoft", StringComparison.OrdinalIgnoreCase);

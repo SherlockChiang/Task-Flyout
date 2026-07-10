@@ -392,8 +392,24 @@ namespace Task_Flyout.Views
             var result = await dialog.ShowAsync();
             if (result != ContentDialogResult.Primary) return;
 
-            if (_syncManager != null)
-                await _syncManager.RemoveAccountAsync(providerName);
+            try
+            {
+                if (_syncManager != null)
+                    await _syncManager.RemoveAccountAsync(providerName);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Account removal failed: {ex.Message}");
+                var errorDialog = new ContentDialog
+                {
+                    Title = _loader.GetStringOrDefault("TextRemoveAccountFailedTitle") ?? "Account Not Removed",
+                    Content = _loader.GetStringOrDefault("TextRemoveAccountFailedContent") ?? "Authorization data could not be completely removed. The account was kept so you can try again.",
+                    CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Close",
+                    XamlRoot = XamlRoot
+                };
+                await errorDialog.ShowAsync();
+                return;
+            }
             RefreshAccountList();
             LoadCalendar(_viewDate);
             App.MyFlyoutWindow?.ReloadFilters();

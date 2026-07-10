@@ -302,8 +302,24 @@ namespace Task_Flyout
                 var result = await dialog.ShowAsync();
                 if (result == ContentDialogResult.Primary)
                 {
-                    if (App.Current is App app)
-                        await app.SyncManager.RemoveAccountAsync(providerName);
+                    try
+                    {
+                        if (App.Current is App app)
+                            await app.SyncManager.RemoveAccountAsync(providerName);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Account removal failed: {ex.Message}");
+                        var errorDialog = new ContentDialog
+                        {
+                            Title = GetSafeString("TextRemoveAccountFailedTitle", "Account Not Removed"),
+                            Content = GetSafeString("TextRemoveAccountFailedContent", "Authorization data could not be completely removed. The account was kept so you can try again."),
+                            CloseButtonText = GetSafeString("CalendarDialog.CloseButtonText", "Close"),
+                            XamlRoot = this.Content.XamlRoot
+                        };
+                        await errorDialog.ShowAsync();
+                        return;
+                    }
                     _ = RefreshAccountListAsync();
 
                     if (ContentFrame.Content is CalendarPage page) page.ForceSync();

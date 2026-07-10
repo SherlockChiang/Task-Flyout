@@ -786,6 +786,12 @@
   <data name="TextSendFailed" xml:space="preserve">
     <value>发送邮件失败，请检查网络连接和账户设置。</value>
   </data>
+  <data name="TextRemoveAccountFailedTitle" xml:space="preserve">
+    <value>未移除账户</value>
+  </data>
+  <data name="TextRemoveAccountFailedContent" xml:space="preserve">
+    <value>无法完整清除授权数据。账户已保留，您可以重试。</value>
+  </data>
   <data name="TextSendStatusUnknown" xml:space="preserve">
     <value>发送操作已超时。再次尝试前，请先检查“已发送”文件夹。</value>
   </data>

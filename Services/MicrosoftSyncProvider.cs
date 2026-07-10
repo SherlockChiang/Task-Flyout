@@ -39,12 +39,13 @@ namespace Task_Flyout.Services
 
         public GraphServiceClient? GraphClient => _graphClient;
 
-        public Task ClearLocalAuthorizationAsync()
+        public async Task ClearLocalAuthorizationAsync()
         {
             _graphClient = null!;
             _graphClientScopes = Array.Empty<string>();
             _defaultTodoListId = "";
 
+            var failures = new List<Exception>();
             try
             {
                 var authRecordPath = GetAuthRecordPath();
@@ -54,9 +55,43 @@ namespace Task_Flyout.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Microsoft auth record cleanup failed: {ex.Message}");
+                failures.Add(ex);
             }
 
-            return Task.CompletedTask;
+            foreach (var cacheName in ProviderAuthCleanup.MicrosoftTokenCacheNames)
+            {
+                try
+                {
+                    var storageProperties = new Microsoft.Identity.Client.Extensions.Msal.StorageCreationPropertiesBuilder(
+                        cacheName,
+                        ProviderAuthCleanup.MicrosoftTokenCacheDirectory)
+                        .Build();
+                    var cacheHelper = await Microsoft.Identity.Client.Extensions.Msal.MsalCacheHelper.CreateAsync(storageProperties);
+                    var cacheClient = Microsoft.Identity.Client.PublicClientApplicationBuilder
+                        .Create(Secrets.MicrosoftClientId)
+                        .WithAuthority(Microsoft.Identity.Client.AzureCloudInstance.AzurePublic, "common")
+                        .WithRedirectUri("http://localhost")
+                        .Build();
+                    cacheHelper.RegisterCache(cacheClient.UserTokenCache);
+                    try
+                    {
+                        foreach (var account in await cacheClient.GetAccountsAsync())
+                            await cacheClient.RemoveAsync(account);
+                    }
+                    finally
+                    {
+                        cacheHelper.UnregisterCache(cacheClient.UserTokenCache);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Microsoft token cache cleanup failed for {cacheName}: {ex.Message}");
+                    failures.Add(ex);
+                }
+            }
+
+            if (failures.Count > 0)
+                throw new AggregateException("Microsoft authorization data could not be completely removed.", failures);
         }
 
         public async Task EnsureAuthorizedAsync(CancellationToken cancellationToken = default)

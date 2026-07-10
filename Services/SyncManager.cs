@@ -356,9 +356,9 @@ namespace Task_Flyout.Services
 
         public async Task RemoveAccountAsync(string providerName)
         {
+            await ClearProviderAuthorizationAsync(providerName);
             AccountManager.RemoveAccount(providerName);
             RemoveProviderFromCache(providerName);
-            await ClearProviderAuthorizationAsync(providerName);
             await SaveCacheAsync();
         }
 
@@ -375,6 +375,7 @@ namespace Task_Flyout.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Provider auth cleanup failed for {providerName}: {ex.Message}");
+                throw;
             }
         }
 

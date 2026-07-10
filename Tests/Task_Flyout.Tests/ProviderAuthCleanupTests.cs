@@ -30,4 +30,13 @@ public class ProviderAuthCleanupTests
     {
         Assert.EndsWith(Path.Combine("TaskFlyout", "ms_auth_record.bin"), ProviderAuthCleanup.MicrosoftAuthRecordPath);
     }
+
+    [Fact]
+    public void Exposes_azure_identity_microsoft_cache_locations()
+    {
+        Assert.EndsWith(".IdentityService", ProviderAuthCleanup.MicrosoftTokenCacheDirectory);
+        Assert.Equal(
+            new[] { "TaskFlyout_MSAL_Cache.nocae", "TaskFlyout_MSAL_Cache.cae" },
+            ProviderAuthCleanup.MicrosoftTokenCacheNames);
+    }
 }
