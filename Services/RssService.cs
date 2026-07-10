@@ -161,6 +161,9 @@ namespace Task_Flyout.Services
         // This flows only while fetching a user-entered local source. Redirects always
         // clear it so a public feed cannot pivot into a private network address.
         private static readonly AsyncLocal<bool> AllowCurrentLocalNetworkRequest = new();
+        private static readonly object InstancesLock = new();
+        private static readonly List<WeakReference<RssService>> Instances = new();
+        private static volatile bool GlobalDataClearInProgress;
         private static readonly HttpClient HttpClient = new(new SocketsHttpHandler
         {
             AllowAutoRedirect = false,
@@ -177,39 +180,103 @@ namespace Task_Flyout.Services
         private DateTimeOffset _lastImageCachePrunedAt = DateTimeOffset.MinValue;
         private readonly object _loadLock = new();
         private bool _databaseInitialized;
-            private string? _connectionString;
+        private string? _connectionString;
+        private CancellationTokenSource _dataLifecycleCts = new();
+        private long _dataGeneration;
+        private bool _dataClearInProgress;
+
+        public RssService()
+        {
+            lock (InstancesLock)
+            {
+                Instances.RemoveAll(reference => !reference.TryGetTarget(out _));
+                Instances.Add(new WeakReference<RssService>(this));
+            }
+        }
 
         public static Task ClearLocalDataAsync()
             => Task.Run(() =>
             {
-                SqliteConnection.ClearAllPools();
-                var errors = new List<Exception>();
-                var databasePath = AppDataPathHelper.ResolveLocal("rss_cache.db");
-                foreach (var path in new[] { databasePath, databasePath + "-wal", databasePath + "-shm", AppDataPathHelper.ResolveLocal("rss_cache.json") })
+                GlobalDataClearInProgress = true;
+                var instances = GetLiveInstances();
+                foreach (var instance in instances)
+                    instance.BeginDataClear();
+
+                try
                 {
-                    try { File.Delete(path); }
+                    SqliteConnection.ClearAllPools();
+                    var errors = new List<Exception>();
+                    var databasePath = AppDataPathHelper.ResolveLocal("rss_cache.db");
+                    foreach (var path in new[] { databasePath, databasePath + "-wal", databasePath + "-shm", AppDataPathHelper.ResolveLocal("rss_cache.json") })
+                    {
+                        try { File.Delete(path); }
+                        catch (Exception ex)
+                        {
+                            errors.Add(ex);
+                            System.Diagnostics.Debug.WriteLine($"RSS data cleanup failed for {path}: {ex.Message}");
+                        }
+                    }
+
+                    var imageCachePath = AppDataPathHelper.ResolveLocal(ImageCacheDirectoryName);
+                    try
+                    {
+                        if (Directory.Exists(imageCachePath))
+                            Directory.Delete(imageCachePath, recursive: true);
+                    }
                     catch (Exception ex)
                     {
                         errors.Add(ex);
-                        System.Diagnostics.Debug.WriteLine($"RSS data cleanup failed for {path}: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"RSS image cleanup failed: {ex.Message}");
                     }
-                }
 
-                var imageCachePath = AppDataPathHelper.ResolveLocal(ImageCacheDirectoryName);
-                try
-                {
-                    if (Directory.Exists(imageCachePath))
-                        Directory.Delete(imageCachePath, recursive: true);
+                    if (errors.Count > 0)
+                        throw new IOException("One or more RSS data files could not be removed.", new AggregateException(errors));
                 }
-                catch (Exception ex)
+                finally
                 {
-                    errors.Add(ex);
-                    System.Diagnostics.Debug.WriteLine($"RSS image cleanup failed: {ex.Message}");
+                    foreach (var instance in instances)
+                        instance.EndDataClear();
+                    GlobalDataClearInProgress = false;
                 }
-
-                if (errors.Count > 0)
-                    throw new IOException("One or more RSS data files could not be removed.", new AggregateException(errors));
             });
+
+        private static List<RssService> GetLiveInstances()
+        {
+            lock (InstancesLock)
+            {
+                var live = new List<RssService>();
+                Instances.RemoveAll(reference =>
+                {
+                    if (!reference.TryGetTarget(out var instance)) return true;
+                    live.Add(instance);
+                    return false;
+                });
+                return live;
+            }
+        }
+
+        private void BeginDataClear()
+        {
+            lock (_loadLock)
+            {
+                _dataClearInProgress = true;
+                _dataGeneration++;
+                try { _dataLifecycleCts.Cancel(); }
+                catch (AggregateException ex) { System.Diagnostics.Debug.WriteLine($"RSS refresh cancellation failed: {ex.Message}"); }
+                _dataLifecycleCts = new CancellationTokenSource();
+                _cache = new RssCache();
+                _loaded = false;
+                _databaseInitialized = false;
+                _connectionString = null;
+                _lastImageCachePrunedAt = DateTimeOffset.MinValue;
+            }
+        }
+
+        private void EndDataClear()
+        {
+            lock (_loadLock)
+                _dataClearInProgress = false;
+        }
 
         public IReadOnlyList<RssSubscription> GetSubscriptions()
         {
@@ -376,42 +443,63 @@ namespace Task_Flyout.Services
             EnsureLoaded();
             if (!force && !ShouldRefresh(subscription)) return;
 
-            var xml = await FetchFeedAsync(subscription.Url);
+            CancellationToken cancellationToken;
+            long generation;
+            lock (_loadLock)
+            {
+                if (!_cache.Subscriptions.Any(item => ReferenceEquals(item, subscription))) return;
+                cancellationToken = _dataLifecycleCts.Token;
+                generation = _dataGeneration;
+            }
+
+            var xml = await FetchFeedAsync(subscription.Url, cancellationToken);
             var parsed = ParseFeed(subscription, xml);
 
-            if (!string.IsNullOrWhiteSpace(parsed.FeedTitle))
-                subscription.Title = parsed.FeedTitle;
+            string localFeedImagePath = subscription.LocalImagePath;
             if (!string.IsNullOrWhiteSpace(parsed.FeedImageUrl))
-            {
-                subscription.ImageUrl = parsed.FeedImageUrl;
-                subscription.LocalImagePath = await CacheImageAsync(parsed.FeedImageUrl);
-            }
+                localFeedImagePath = await CacheImageAsync(parsed.FeedImageUrl, cancellationToken);
 
             foreach (var article in parsed.Articles)
-            {
-                article.LocalImagePath = await CacheImageAsync(article.ImageUrl);
-                var existing = _cache.Articles.FirstOrDefault(item => item.Id == article.Id);
-                if (existing == null)
-                {
-                    _cache.Articles.Add(article);
-                }
-                else
-                {
-                    existing.Title = article.Title;
-                    existing.Link = article.Link;
-                    existing.Summary = article.Summary;
-                    existing.HtmlContent = article.HtmlContent;
-                    existing.ImageUrl = article.ImageUrl;
-                    existing.LocalImagePath = article.LocalImagePath;
-                    existing.PublishedAt = article.PublishedAt;
-                    existing.FeedTitle = article.FeedTitle;
-                }
-            }
+                article.LocalImagePath = await CacheImageAsync(article.ImageUrl, cancellationToken);
 
-            subscription.LastFetchedAt = DateTimeOffset.Now;
-            TrimCache();
-            SaveRefresh(subscription, parsed.Articles);
-            TrimDatabaseArticles();
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_loadLock)
+            {
+                if (generation != _dataGeneration || cancellationToken.IsCancellationRequested) return;
+
+                if (!string.IsNullOrWhiteSpace(parsed.FeedTitle))
+                    subscription.Title = parsed.FeedTitle;
+                if (!string.IsNullOrWhiteSpace(parsed.FeedImageUrl))
+                {
+                    subscription.ImageUrl = parsed.FeedImageUrl;
+                    subscription.LocalImagePath = localFeedImagePath;
+                }
+
+                foreach (var article in parsed.Articles)
+                {
+                    var existing = _cache.Articles.FirstOrDefault(item => item.Id == article.Id);
+                    if (existing == null)
+                    {
+                        _cache.Articles.Add(article);
+                    }
+                    else
+                    {
+                        existing.Title = article.Title;
+                        existing.Link = article.Link;
+                        existing.Summary = article.Summary;
+                        existing.HtmlContent = article.HtmlContent;
+                        existing.ImageUrl = article.ImageUrl;
+                        existing.LocalImagePath = article.LocalImagePath;
+                        existing.PublishedAt = article.PublishedAt;
+                        existing.FeedTitle = article.FeedTitle;
+                    }
+                }
+
+                subscription.LastFetchedAt = DateTimeOffset.Now;
+                TrimCache();
+                SaveRefresh(subscription, parsed.Articles);
+                TrimDatabaseArticles();
+            }
         }
 
         private bool ShouldRefresh(RssSubscription subscription)
@@ -817,7 +905,7 @@ namespace Task_Flyout.Services
             }
         }
 
-        private async Task<string> FetchFeedAsync(string url)
+        private async Task<string> FetchFeedAsync(string url, CancellationToken cancellationToken)
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
                 throw new InvalidOperationException("Invalid feed URL.");
@@ -829,17 +917,17 @@ namespace Task_Flyout.Services
             try
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-                using var response = await SendWithRedirectsAsync(request);
+                using var response = await SendWithRedirectsAsync(request, cancellationToken);
                 response.EnsureSuccessStatusCode();
 
                 if (response.Content.Headers.ContentLength is > MaxFeedBytes)
                     throw new InvalidOperationException("Feed response exceeds maximum size.");
 
-                using var stream = await response.Content.ReadAsStreamAsync();
+                using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
                 using var buffer = new MemoryStream();
                 var chunk = new byte[81920];
                 int bytesRead;
-                while ((bytesRead = await stream.ReadAsync(chunk)) > 0)
+                while ((bytesRead = await stream.ReadAsync(chunk, cancellationToken)) > 0)
                 {
                     if (buffer.Length + bytesRead > MaxFeedBytes)
                         throw new InvalidOperationException("Feed response exceeds maximum size.");
@@ -916,7 +1004,7 @@ namespace Task_Flyout.Services
             return reader.ReadToEnd();
         }
 
-        private async Task<string> CacheImageAsync(string imageUrl)
+        private async Task<string> CacheImageAsync(string imageUrl, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(imageUrl) || !Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri))
                 return "";
@@ -941,7 +1029,7 @@ namespace Task_Flyout.Services
 
                 using var request = new HttpRequestMessage(HttpMethod.Get, uri);
                 request.Headers.Accept.ParseAdd("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
-                using var response = await SendWithRedirectsAsync(request);
+                using var response = await SendWithRedirectsAsync(request, cancellationToken);
                 response.EnsureSuccessStatusCode();
 
                 var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
@@ -951,11 +1039,11 @@ namespace Task_Flyout.Services
                 if (response.Content.Headers.ContentLength is > MaxImageBytes)
                     return "";
 
-                using var stream = await response.Content.ReadAsStreamAsync();
+                using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
                 using var buffer = new MemoryStream();
                 var chunk = new byte[81920];
                 int bytesRead;
-                while ((bytesRead = await stream.ReadAsync(chunk)) > 0)
+                while ((bytesRead = await stream.ReadAsync(chunk, cancellationToken)) > 0)
                 {
                     if (buffer.Length + bytesRead > MaxImageBytes)
                         return "";
@@ -966,9 +1054,10 @@ namespace Task_Flyout.Services
                 if (!IsPlausibleImageBytes(bytes))
                     return "";
 
-                await File.WriteAllBytesAsync(path, bytes);
+                await File.WriteAllBytesAsync(path, bytes, cancellationToken);
                 return path;
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch
             {
                 return "";
@@ -1027,10 +1116,14 @@ namespace Task_Flyout.Services
 
         private void EnsureLoaded()
         {
+            if (GlobalDataClearInProgress)
+                throw new InvalidOperationException("RSS local data is being cleared.");
             if (_loaded) return;
 
             lock (_loadLock)
             {
+                if (_dataClearInProgress || GlobalDataClearInProgress)
+                    throw new InvalidOperationException("RSS local data is being cleared.");
                 if (_loaded) return;
 
                 RssCache loaded;
@@ -1803,6 +1896,8 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
 
         private SqliteConnection OpenConnection()
         {
+            if (_dataClearInProgress || GlobalDataClearInProgress)
+                throw new InvalidOperationException("RSS local data is being cleared.");
             _connectionString ??= new SqliteConnectionStringBuilder
             {
                 DataSource = GetDatabasePath()

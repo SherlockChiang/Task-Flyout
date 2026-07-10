@@ -666,6 +666,10 @@ namespace Task_Flyout.Views
                 _lastArticleLoadSucceededAt = DateTimeOffset.Now;
                 SetArticleListStatus(ArticleListSubtitle.Text);
             }
+            catch (OperationCanceledException)
+            {
+                // Clearing RSS data cancels any refresh that still belongs to the old cache.
+            }
             catch (Exception ex)
             {
                 LogRssError(ex);
