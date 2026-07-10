@@ -1033,10 +1033,13 @@ pre, code { white-space: pre-wrap; overflow-wrap: anywhere; }
 
         private static void LogRssError(Exception ex)
         {
+            const long maxLogBytes = 512 * 1024;
             try
             {
                 var logDir = AppDataPathHelper.EnsureDirectory(AppDataPathHelper.ResolveRoaming("Logs"));
                 var logPath = AppDataPathHelper.ResolveRoaming("Logs", "TaskFlyout_RssLog.txt");
+                if (File.Exists(logPath) && new FileInfo(logPath).Length >= maxLogBytes)
+                    File.WriteAllText(logPath, "");
                 File.AppendAllText(logPath, $"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n{DiagnosticsRedactor.Redact(ex.ToString())}\n\n");
             }
             catch { }

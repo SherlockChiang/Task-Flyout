@@ -61,7 +61,7 @@
                     <ul class="list-disc pl-6 space-y-2">
                         <li><strong>邮件：</strong>账户配置与邮件元数据（发件人、主题、预览）以 Windows 数据保护接口（DPAPI）加密后缓存在本地；邮件正文按需从您的邮件服务器加载，通常不持久化保存。</li>
                         <li><strong>日历与任务：</strong>同步得到的日程与任务缓存经 DPAPI 加密后保存在本地，用于离线查看。</li>
-                        <li><strong>RSS：</strong>订阅列表与文章保存在本地的 SQLite 数据库中（均为公开的订阅源内容）。</li>
+                        <li><strong>RSS：</strong>订阅列表与文章保存在本地的 SQLite 数据库中。部分订阅 URL 或文章可能包含私有内容；删除订阅会从应用数据库移除其记录，但系统备份、文件系统快照或 SQLite 空闲页可能在一段时间内仍保留历史数据。</li>
                         <li><strong>天气：</strong>您选择的城市、坐标与显示设置保存在本地应用设置中。</li>
                     </ul>
 
@@ -83,7 +83,7 @@
                     </ul>
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">4. 删除数据</h2>
-                    <p>在应用内移除某个账户即会删除其对应的令牌、密码与缓存。卸载本软件将清除其在您设备上保存的所有本地数据。</p>
+                    <p>在应用内移除某个账户会删除应用记录、IMAP/SMTP 密码、Google 授权材料和对应缓存。Microsoft 登录使用 Windows 加密的共享平台令牌缓存；应用会移除认证记录，但缓存条目可能保留到其自然过期或由 Microsoft 帐户/Windows 管理。卸载会移除应用包数据，但系统备份、通知历史和文件系统快照不受本软件控制。</p>
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">5. 联系我们</h2>
                     <p>如果您对本隐私政策有任何疑问或安全担忧，请通过 GitHub Issues 联系开发者。</p>
@@ -100,7 +100,7 @@
                     <ul class="list-disc pl-6 space-y-2">
                         <li><strong>Mail:</strong> Account configuration and message metadata (sender, subject, preview) are cached locally, encrypted with the Windows Data Protection API (DPAPI). Full message bodies are loaded on demand from your mail server and are generally not persisted.</li>
                         <li><strong>Calendar &amp; tasks:</strong> Synced events and tasks are cached locally, encrypted with DPAPI, for offline viewing.</li>
-                        <li><strong>RSS:</strong> Your subscriptions and articles are stored in a local SQLite database (all of it public feed content).</li>
+                        <li><strong>RSS:</strong> Your subscriptions and articles are stored in a local SQLite database. Feed URLs and articles can contain private content; deleting a feed removes its records from the app database, but system backups, filesystem snapshots, or SQLite free pages can retain historic data for a period of time.</li>
                         <li><strong>Weather:</strong> Your chosen city, coordinates, and display preferences are stored in local app settings.</li>
                     </ul>
 
@@ -122,7 +122,7 @@
                     </ul>
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">4. Deleting your data</h2>
-                    <p>Removing an account inside the App deletes its tokens, passwords, and cache. Uninstalling the App clears all local data it kept on your device.</p>
+                    <p>Removing an account deletes the app record, IMAP/SMTP password, Google authorization material, and associated cache. Microsoft sign-in uses a Windows-encrypted shared platform token cache; the App removes its authentication record, but cache entries can remain until they expire naturally or are managed through the Microsoft account or Windows. Uninstalling removes app package data, but system backups, notification history, and filesystem snapshots are outside the App's control.</p>
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">5. Contact Us</h2>
                     <p>If you have any questions or security concerns regarding this Privacy Policy, please contact the developer via GitHub Issues.</p>
