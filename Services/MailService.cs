@@ -35,13 +35,6 @@ using GraphMessage = Microsoft.Graph.Models.Message;
 
 namespace Task_Flyout.Services
 {
-    public enum MailAccountKind
-    {
-        Outlook,
-        Google,
-        Imap
-    }
-
     public class MailAccount
     {
         private static readonly ResourceLoader _accountLoader = new();
@@ -140,18 +133,6 @@ namespace Task_Flyout.Services
         public Dictionary<string, long> LastSeenInboxTicks { get; set; } = new();
         public List<string> AccountOrder { get; set; } = new();
         public Dictionary<string, List<string>> FolderOrder { get; set; } = new();
-    }
-
-    public sealed class PendingMailMutation
-    {
-        public string AccountId { get; set; } = "";
-        public string FolderId { get; set; } = "";
-        public string MessageId { get; set; } = "";
-        public MailAccountKind ProviderKind { get; set; }
-        public uint? ImapUidValidity { get; set; }
-        public int FailureCount { get; set; }
-        public long CreatedUtcTicks { get; set; }
-        public long NextAttemptUtcTicks { get; set; }
     }
 
     public sealed class MailCursor
@@ -878,38 +859,14 @@ namespace Task_Flyout.Services
             lock (_mailCacheLock)
             {
                 if (_persistentCache == null) return false;
-                var pending = _persistentCache.PendingMutations.FirstOrDefault(mutation =>
-                    mutation.AccountId == account.Id &&
-                    mutation.FolderId == item.FolderId &&
-                    mutation.MessageId == item.Id);
-                if (pending == null)
+                MailPendingMutationPolicy.Upsert(_persistentCache.PendingMutations, new PendingMailMutation
                 {
-                    pending = new PendingMailMutation
-                    {
-                        AccountId = account.Id,
-                        FolderId = item.FolderId,
-                        MessageId = item.Id,
-                        ProviderKind = account.Kind,
-                        ImapUidValidity = item.ImapUidValidity,
-                        CreatedUtcTicks = DateTimeOffset.UtcNow.UtcTicks
-                    };
-                    _persistentCache.PendingMutations.Add(pending);
-                }
-                else
-                {
-                    pending.ProviderKind = account.Kind;
-                    pending.ImapUidValidity = item.ImapUidValidity;
-                }
-
-                pending.FailureCount = Math.Max(1, pending.FailureCount + 1);
-                pending.NextAttemptUtcTicks = (DateTimeOffset.UtcNow + MailMutationRetryPolicy.GetRetryDelay(pending.FailureCount)).UtcTicks;
-                if (_persistentCache.PendingMutations.Count > 500)
-                {
-                    _persistentCache.PendingMutations = _persistentCache.PendingMutations
-                        .OrderByDescending(mutation => mutation.CreatedUtcTicks)
-                        .Take(500)
-                        .ToList();
-                }
+                    AccountId = account.Id,
+                    FolderId = item.FolderId,
+                    MessageId = item.Id,
+                    ProviderKind = account.Kind,
+                    ImapUidValidity = item.ImapUidValidity
+                }, DateTimeOffset.UtcNow, maximumCount: 500);
             }
             SavePersistentCache();
             ScheduleNextPendingMutationRetry();
@@ -1319,14 +1276,8 @@ namespace Task_Flyout.Services
                 lock (_mailCacheLock)
                 {
                     if (_persistentCache == null) return;
-                    due = _persistentCache.PendingMutations
-                        .Where(mutation => mutation.AccountId == account.Id &&
-                                           mutation.ProviderKind == account.Kind &&
-                                           mutation.NextAttemptUtcTicks <= now.UtcTicks)
-                        .OrderBy(mutation => mutation.NextAttemptUtcTicks)
-                        .Take(3)
-                        .Select(ClonePendingMutation)
-                        .ToList();
+                    due = MailPendingMutationPolicy.SelectDue(
+                        _persistentCache.PendingMutations, account.Id, account.Kind, now, maximumCount: 3);
                 }
 
                 bool changed = false;
@@ -1368,7 +1319,7 @@ namespace Task_Flyout.Services
             lock (_mailCacheLock)
             {
                 if (_persistentCache == null) return false;
-                return _persistentCache.PendingMutations.RemoveAll(candidate => IsSameMutation(candidate, mutation)) > 0;
+                return MailPendingMutationPolicy.Remove(_persistentCache.PendingMutations, mutation);
             }
         }
 
@@ -1377,7 +1328,7 @@ namespace Task_Flyout.Services
             lock (_mailCacheLock)
             {
                 if (_persistentCache == null) return false;
-                var current = _persistentCache.PendingMutations.FirstOrDefault(candidate => IsSameMutation(candidate, mutation));
+                var current = MailPendingMutationPolicy.Find(_persistentCache.PendingMutations, mutation);
                 if (current == null) return false;
 
                 current.FailureCount = Math.Min(current.FailureCount + 1, 30);
@@ -1385,22 +1336,6 @@ namespace Task_Flyout.Services
                 return true;
             }
         }
-
-        private static bool IsSameMutation(PendingMailMutation left, PendingMailMutation right)
-            => left.AccountId == right.AccountId && left.FolderId == right.FolderId && left.MessageId == right.MessageId;
-
-        private static PendingMailMutation ClonePendingMutation(PendingMailMutation mutation)
-            => new()
-            {
-                AccountId = mutation.AccountId,
-                FolderId = mutation.FolderId,
-                MessageId = mutation.MessageId,
-                ProviderKind = mutation.ProviderKind,
-                ImapUidValidity = mutation.ImapUidValidity,
-                FailureCount = mutation.FailureCount,
-                CreatedUtcTicks = mutation.CreatedUtcTicks,
-                NextAttemptUtcTicks = mutation.NextAttemptUtcTicks
-            };
 
         private async Task CheckNewMailAsync()
         {
@@ -2507,7 +2442,7 @@ namespace Task_Flyout.Services
                     _persistentCache.MessageCursors.Remove(key);
                 foreach (var key in _persistentCache.MessageHasMore.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
                     _persistentCache.MessageHasMore.Remove(key);
-                _persistentCache.PendingMutations.RemoveAll(mutation => mutation.AccountId == accountId);
+                MailPendingMutationPolicy.RemoveAccount(_persistentCache.PendingMutations, accountId);
                 foreach (var key in _persistentCache.LastSeenInboxTicks.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
                     _persistentCache.LastSeenInboxTicks.Remove(key);
             }
@@ -2586,8 +2521,8 @@ namespace Task_Flyout.Services
                 _persistentCache.MessageCursors ??= new Dictionary<string, MailCursor>();
                 _persistentCache.MessageHasMore ??= new Dictionary<string, bool>();
                 _persistentCache.PendingMutations ??= new List<PendingMailMutation>();
-                bool removedExpiredMutations = _persistentCache.PendingMutations.RemoveAll(
-                    mutation => MailMutationRetryPolicy.IsExpired(mutation.CreatedUtcTicks, DateTimeOffset.UtcNow)) > 0;
+                bool removedExpiredMutations = MailPendingMutationPolicy.RemoveExpired(
+                    _persistentCache.PendingMutations, DateTimeOffset.UtcNow) > 0;
                 _persistentCache.LastSeenInboxTicks ??= new Dictionary<string, long>();
                 _persistentCache.AccountOrder ??= new List<string>();
                 _persistentCache.FolderOrder ??= new Dictionary<string, List<string>>();
