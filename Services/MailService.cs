@@ -135,9 +135,21 @@ namespace Task_Flyout.Services
         public Dictionary<string, List<MailItem>> Messages { get; set; } = new();
         public Dictionary<string, MailCursor> MessageCursors { get; set; } = new();
         public Dictionary<string, bool> MessageHasMore { get; set; } = new();
+        public List<PendingMailMutation> PendingMutations { get; set; } = new();
         public Dictionary<string, long> LastSeenInboxTicks { get; set; } = new();
         public List<string> AccountOrder { get; set; } = new();
         public Dictionary<string, List<string>> FolderOrder { get; set; } = new();
+    }
+
+    public sealed class PendingMailMutation
+    {
+        public string AccountId { get; set; } = "";
+        public string FolderId { get; set; } = "";
+        public string MessageId { get; set; } = "";
+        public MailAccountKind ProviderKind { get; set; }
+        public int FailureCount { get; set; }
+        public long CreatedUtcTicks { get; set; }
+        public long NextAttemptUtcTicks { get; set; }
     }
 
     public sealed class MailCursor
@@ -707,8 +719,21 @@ namespace Task_Flyout.Services
                 {
                     await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
                 }
+                catch (Exception ex) when (!cancellationToken.IsCancellationRequested &&
+                                           IsTransientReadStateFailure(ex, timeoutCts.IsCancellationRequested))
+                {
+                    EnqueuePendingReadMutation(account, item);
+                    throw;
+                }
             }
 
+            if (RemovePendingMutation(new PendingMailMutation
+                {
+                    AccountId = account.Id,
+                    FolderId = item.FolderId,
+                    MessageId = item.Id
+                }))
+                SavePersistentCache();
             item.IsRead = true;
             UpdateCachedReadState(item);
         }
@@ -755,6 +780,46 @@ namespace Task_Flyout.Services
                 return MailMutationRetryPolicy.IsTransientStatusCode((int)googleException.HttpStatusCode);
 
             return false;
+        }
+
+        private void EnqueuePendingReadMutation(MailAccount account, MailItem item)
+        {
+            // IMAP UIDs are unsafe to replay after reconnect unless the original UIDVALIDITY
+            // is also known. The current list item does not carry it, so never persist that write.
+            if (account.Kind == MailAccountKind.Imap) return;
+
+            EnsurePersistentCacheLoaded();
+            lock (_mailCacheLock)
+            {
+                if (_persistentCache == null) return;
+                var pending = _persistentCache.PendingMutations.FirstOrDefault(mutation =>
+                    mutation.AccountId == account.Id &&
+                    mutation.FolderId == item.FolderId &&
+                    mutation.MessageId == item.Id);
+                if (pending == null)
+                {
+                    pending = new PendingMailMutation
+                    {
+                        AccountId = account.Id,
+                        FolderId = item.FolderId,
+                        MessageId = item.Id,
+                        ProviderKind = account.Kind,
+                        CreatedUtcTicks = DateTimeOffset.UtcNow.UtcTicks
+                    };
+                    _persistentCache.PendingMutations.Add(pending);
+                }
+
+                pending.FailureCount = Math.Max(1, pending.FailureCount + 1);
+                pending.NextAttemptUtcTicks = (DateTimeOffset.UtcNow + MailMutationRetryPolicy.GetRetryDelay(pending.FailureCount)).UtcTicks;
+                if (_persistentCache.PendingMutations.Count > 500)
+                {
+                    _persistentCache.PendingMutations = _persistentCache.PendingMutations
+                        .OrderByDescending(mutation => mutation.CreatedUtcTicks)
+                        .Take(500)
+                        .ToList();
+                }
+            }
+            SavePersistentCache();
         }
 
         public async Task FetchMessageBodyAsync(MailAccount account, MailItem item, CancellationToken cancellationToken = default)
@@ -1019,6 +1084,89 @@ namespace Task_Flyout.Services
             catch { }
         }
 
+        private async Task RetryPendingReadMutationsAsync(MailAccount account)
+        {
+            List<PendingMailMutation> due;
+            var now = DateTimeOffset.UtcNow;
+            lock (_mailCacheLock)
+            {
+                if (_persistentCache == null) return;
+                due = _persistentCache.PendingMutations
+                    .Where(mutation => mutation.AccountId == account.Id &&
+                                       mutation.ProviderKind == account.Kind &&
+                                       mutation.NextAttemptUtcTicks <= now.UtcTicks)
+                    .OrderBy(mutation => mutation.NextAttemptUtcTicks)
+                    .Take(3)
+                    .Select(ClonePendingMutation)
+                    .ToList();
+            }
+
+            bool changed = false;
+            foreach (var mutation in due)
+            {
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                try
+                {
+                    await MarkAsReadRemoteOnceAsync(account, new MailItem
+                    {
+                        AccountId = mutation.AccountId,
+                        FolderId = mutation.FolderId,
+                        Id = mutation.MessageId,
+                        IsRead = true
+                    }, timeoutCts.Token);
+                    changed |= RemovePendingMutation(mutation);
+                }
+                catch (Exception ex)
+                {
+                    if (IsTransientReadStateFailure(ex, timeoutCts.IsCancellationRequested))
+                        changed |= ReschedulePendingMutation(mutation);
+                    else
+                        changed |= RemovePendingMutation(mutation);
+                }
+            }
+
+            if (changed)
+                SavePersistentCache();
+        }
+
+        private bool RemovePendingMutation(PendingMailMutation mutation)
+        {
+            lock (_mailCacheLock)
+            {
+                if (_persistentCache == null) return false;
+                return _persistentCache.PendingMutations.RemoveAll(candidate => IsSameMutation(candidate, mutation)) > 0;
+            }
+        }
+
+        private bool ReschedulePendingMutation(PendingMailMutation mutation)
+        {
+            lock (_mailCacheLock)
+            {
+                if (_persistentCache == null) return false;
+                var current = _persistentCache.PendingMutations.FirstOrDefault(candidate => IsSameMutation(candidate, mutation));
+                if (current == null) return false;
+
+                current.FailureCount = Math.Min(current.FailureCount + 1, 30);
+                current.NextAttemptUtcTicks = (DateTimeOffset.UtcNow + MailMutationRetryPolicy.GetRetryDelay(current.FailureCount)).UtcTicks;
+                return true;
+            }
+        }
+
+        private static bool IsSameMutation(PendingMailMutation left, PendingMailMutation right)
+            => left.AccountId == right.AccountId && left.FolderId == right.FolderId && left.MessageId == right.MessageId;
+
+        private static PendingMailMutation ClonePendingMutation(PendingMailMutation mutation)
+            => new()
+            {
+                AccountId = mutation.AccountId,
+                FolderId = mutation.FolderId,
+                MessageId = mutation.MessageId,
+                ProviderKind = mutation.ProviderKind,
+                FailureCount = mutation.FailureCount,
+                CreatedUtcTicks = mutation.CreatedUtcTicks,
+                NextAttemptUtcTicks = mutation.NextAttemptUtcTicks
+            };
+
         private async Task CheckNewMailAsync()
         {
             if (Interlocked.CompareExchange(ref _isPollingMail, 1, 0) != 0 || !MailPollingEnabled) return;
@@ -1040,6 +1188,7 @@ namespace Task_Flyout.Services
 
                     try
                     {
+                        await RetryPendingReadMutationsAsync(account);
                         var folders = await FetchFoldersAsync(account, forceRefresh: false);
                         var inbox = folders.FirstOrDefault(folder => IsInboxName(folder.Id) || IsInboxName(folder.DisplayName))
                                     ?? folders.FirstOrDefault(folder => !folder.IsPlaceholder);
@@ -2118,6 +2267,7 @@ namespace Task_Flyout.Services
                     _persistentCache.MessageCursors.Remove(key);
                 foreach (var key in _persistentCache.MessageHasMore.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
                     _persistentCache.MessageHasMore.Remove(key);
+                _persistentCache.PendingMutations.RemoveAll(mutation => mutation.AccountId == accountId);
                 foreach (var key in _persistentCache.LastSeenInboxTicks.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
                     _persistentCache.LastSeenInboxTicks.Remove(key);
             }
@@ -2195,11 +2345,16 @@ namespace Task_Flyout.Services
                 _persistentCache.Messages ??= new Dictionary<string, List<MailItem>>();
                 _persistentCache.MessageCursors ??= new Dictionary<string, MailCursor>();
                 _persistentCache.MessageHasMore ??= new Dictionary<string, bool>();
+                _persistentCache.PendingMutations ??= new List<PendingMailMutation>();
+                bool removedExpiredMutations = _persistentCache.PendingMutations.RemoveAll(
+                    mutation => MailMutationRetryPolicy.IsExpired(mutation.CreatedUtcTicks, DateTimeOffset.UtcNow)) > 0;
                 _persistentCache.LastSeenInboxTicks ??= new Dictionary<string, long>();
                 _persistentCache.AccountOrder ??= new List<string>();
                 _persistentCache.FolderOrder ??= new Dictionary<string, List<string>>();
                 MigrateLegacyMessageCacheKeys();
                 TrimPersistentCacheForMemory();
+                if (removedExpiredMutations)
+                    SavePersistentCache();
             }
         }
 
