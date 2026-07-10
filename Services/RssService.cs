@@ -147,8 +147,8 @@ namespace Task_Flyout.Services
         public List<RssArticle> Articles { get; set; } = new();
     }
 
-    public class RssService
-    {
+        public class RssService
+        {
         private readonly ResourceLoader _loader = new();
         private const int FeedRefreshMinutes = 30;
         private const int SchemaVersion = 1;
@@ -176,7 +176,26 @@ namespace Task_Flyout.Services
         private DateTimeOffset _lastImageCachePrunedAt = DateTimeOffset.MinValue;
         private readonly object _loadLock = new();
         private bool _databaseInitialized;
-        private string? _connectionString;
+            private string? _connectionString;
+
+        public static Task ClearLocalDataAsync()
+            => Task.Run(() =>
+            {
+                var databasePath = AppDataPathHelper.ResolveLocal("rss_cache.db");
+                foreach (var path in new[] { databasePath, databasePath + "-wal", databasePath + "-shm", AppDataPathHelper.ResolveLocal("rss_cache.json") })
+                {
+                    try { File.Delete(path); }
+                    catch { }
+                }
+
+                var imageCachePath = AppDataPathHelper.ResolveLocal(ImageCacheDirectoryName);
+                try
+                {
+                    if (Directory.Exists(imageCachePath))
+                        Directory.Delete(imageCachePath, recursive: true);
+                }
+                catch { }
+            });
 
         public IReadOnlyList<RssSubscription> GetSubscriptions()
         {

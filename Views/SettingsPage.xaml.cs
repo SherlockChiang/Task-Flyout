@@ -19,6 +19,7 @@ namespace Task_Flyout.Views
         private ResourceLoader _loader;
         private bool _isInitializing = true;
         private bool _isClearingWebViewCache;
+        private bool _isClearingRssData;
 
         public SettingsPage()
         {
@@ -503,6 +504,39 @@ namespace Task_Flyout.Views
             {
                 _isClearingWebViewCache = false;
                 ClearWebViewCacheButton.IsEnabled = true;
+            }
+        }
+
+        private async void ClearRssDataButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isClearingRssData) return;
+
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = GetSafeString("TextClearRssDataTitle", "Clear RSS local data?"),
+                Content = GetSafeString("TextClearRssDataContent", "This removes cached RSS subscriptions, articles, and images from this device. It does not cancel subscriptions at the source or remove system backups."),
+                PrimaryButtonText = GetSafeString("TextClear", "Clear"),
+                CloseButtonText = GetSafeString("CalendarDialog.CloseButtonText", "Cancel"),
+                DefaultButton = ContentDialogButton.Close
+            };
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+            _isClearingRssData = true;
+            ClearRssDataButton.IsEnabled = false;
+            try
+            {
+                await RssService.ClearLocalDataAsync();
+                WebViewCacheStatusText.Text = GetSafeString("TextRssDataCleared", "RSS local data cleared. Restart the RSS page to reload it.");
+            }
+            catch
+            {
+                WebViewCacheStatusText.Text = GetSafeString("TextCleanFailed", "Clean failed");
+            }
+            finally
+            {
+                _isClearingRssData = false;
+                ClearRssDataButton.IsEnabled = true;
             }
         }
 
