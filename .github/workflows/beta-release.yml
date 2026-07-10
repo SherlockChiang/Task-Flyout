@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: beta-release-${{ github.ref }}
@@ -17,6 +17,8 @@ jobs:
   beta-release:
     name: Build and publish beta
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     env:
       CONFIGURATION: Release
@@ -60,13 +62,7 @@ jobs:
           $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
             $env:CERTIFICATE_PATH,
             $env:CERTIFICATE_PASSWORD,
-            [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable -bor
-              [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet)
-
-          $store = [System.Security.Cryptography.X509Certificates.X509Store]::new("My", "CurrentUser")
-          $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-          $store.Add($certificate)
-          $store.Close()
+            [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
 
           "PACKAGE_CERTIFICATE_THUMBPRINT=$($certificate.Thumbprint)" >> $env:GITHUB_ENV
 
@@ -170,3 +166,10 @@ jobs:
             --notes-file "release-artifacts\release-notes.md" `
             --target "$env:GITHUB_SHA" `
             --prerelease
+
+      - name: Remove build secrets
+        if: always()
+        shell: pwsh
+        run: |
+          Remove-Item -LiteralPath $env:CERTIFICATE_PATH -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE "credentials.json") -Force -ErrorAction SilentlyContinue
