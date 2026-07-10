@@ -214,7 +214,7 @@ namespace Task_Flyout.Views
                 var start = DayCells.First().Date;
                 var end = DayCells.Last().Date.AddDays(1);
 
-                var allItems = await _syncManager.GetAllDataAsync(start, end, forceRefresh);
+                var allItems = await _syncManager.GetAllDataAsync(start, end, forceRefresh, token);
 
                 if (token.IsCancellationRequested) return;
 

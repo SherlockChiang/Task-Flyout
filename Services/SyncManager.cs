@@ -247,6 +247,11 @@ namespace Task_Flyout.Services
         }
 
         public async Task<List<AgendaItem>> GetAllDataAsync(DateTime min, DateTime max, bool forceRefresh = false)
+            => await GetAllDataAsync(min, max, forceRefresh, CancellationToken.None);
+
+        // A caller can stop waiting without cancelling the shared provider request. The
+        // underlying request may still serve another page and can update the local cache.
+        public async Task<List<AgendaItem>> GetAllDataAsync(DateTime min, DateTime max, bool forceRefresh, CancellationToken cancellationToken)
         {
             min = min.Date;
             max = max.Date;
@@ -270,7 +275,7 @@ namespace Task_Flyout.Services
 
             try
             {
-                var result = await requestTask;
+                var result = await requestTask.WaitAsync(cancellationToken);
                 return result.Select(CloneAgendaItem).ToList();
             }
             finally
