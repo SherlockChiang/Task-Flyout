@@ -212,6 +212,29 @@ ON CONFLICT(id) DO UPDATE SET name = excluded.name, sort_order = excluded.sort_o
             command.ExecuteNonQuery();
         }
 
+        public void SaveRefresh(RssSubscriptionRecord subscription, IEnumerable<RssArticleWriteRecord> articles)
+        {
+            Initialize();
+            using var connection = OpenConnection();
+            using var transaction = connection.BeginTransaction();
+            using (var subscriptionCommand = connection.CreateCommand())
+            {
+                subscriptionCommand.Transaction = transaction;
+                WriteSubscription(subscriptionCommand, subscription);
+                subscriptionCommand.ExecuteNonQuery();
+            }
+
+            foreach (var article in articles)
+            {
+                using var articleCommand = connection.CreateCommand();
+                articleCommand.Transaction = transaction;
+                WriteArticle(articleCommand, article);
+                articleCommand.ExecuteNonQuery();
+            }
+
+            transaction.Commit();
+        }
+
         public void RemoveFolder(string folderId)
         {
             Initialize();

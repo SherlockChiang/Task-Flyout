@@ -1431,58 +1431,7 @@ LIMIT 1000;
         }
 
         private void SaveRefresh(RssSubscription subscription, IEnumerable<RssArticle> articles)
-        {
-            using var connection = OpenConnection();
-            using var transaction = connection.BeginTransaction();
-            using (var subscriptionCommand = connection.CreateCommand())
-            {
-                subscriptionCommand.Transaction = transaction;
-                subscriptionCommand.CommandText = """
-INSERT INTO rss_subscriptions(id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks)
-VALUES ($id, $title, $url, $folderId, $imageUrl, $localImagePath, $lastFetchedTicks)
-ON CONFLICT(id) DO UPDATE SET
-    title = excluded.title, url = excluded.url, folder_id = excluded.folder_id,
-    image_url = excluded.image_url, local_image_path = excluded.local_image_path,
-    last_fetched_ticks = excluded.last_fetched_ticks;
-""";
-                subscriptionCommand.Parameters.AddWithValue("$id", subscription.Id ?? "");
-                subscriptionCommand.Parameters.AddWithValue("$title", ProtectValue(subscription.Title));
-                subscriptionCommand.Parameters.AddWithValue("$url", ProtectValue(subscription.Url));
-                subscriptionCommand.Parameters.AddWithValue("$folderId", subscription.FolderId ?? "");
-                subscriptionCommand.Parameters.AddWithValue("$imageUrl", ProtectValue(subscription.ImageUrl));
-                subscriptionCommand.Parameters.AddWithValue("$localImagePath", subscription.LocalImagePath ?? "");
-                subscriptionCommand.Parameters.AddWithValue("$lastFetchedTicks", ToTicks(subscription.LastFetchedAt));
-                subscriptionCommand.ExecuteNonQuery();
-            }
-
-            foreach (var article in articles)
-            {
-                using var command = connection.CreateCommand();
-                command.Transaction = transaction;
-                command.CommandText = """
-INSERT INTO rss_articles(id, subscription_id, feed_title, title, link, summary, html_content, image_url, local_image_path, published_ticks)
-VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent, $imageUrl, $localImagePath, $publishedTicks)
-ON CONFLICT(id) DO UPDATE SET
-    subscription_id = excluded.subscription_id, feed_title = excluded.feed_title,
-    title = excluded.title, link = excluded.link, summary = excluded.summary,
-    html_content = excluded.html_content, image_url = excluded.image_url,
-    local_image_path = excluded.local_image_path, published_ticks = excluded.published_ticks;
-""";
-                command.Parameters.AddWithValue("$id", article.Id ?? "");
-                command.Parameters.AddWithValue("$subscriptionId", article.SubscriptionId ?? "");
-                command.Parameters.AddWithValue("$feedTitle", ProtectValue(article.FeedTitle));
-                command.Parameters.AddWithValue("$title", ProtectValue(article.Title));
-                command.Parameters.AddWithValue("$link", ProtectValue(article.Link));
-                command.Parameters.AddWithValue("$summary", ProtectValue(article.Summary));
-                command.Parameters.AddWithValue("$htmlContent", ProtectValue(article.HtmlContent));
-                command.Parameters.AddWithValue("$imageUrl", ProtectValue(article.ImageUrl));
-                command.Parameters.AddWithValue("$localImagePath", article.LocalImagePath ?? "");
-                command.Parameters.AddWithValue("$publishedTicks", ToTicks(article.PublishedAt));
-                command.ExecuteNonQuery();
-            }
-
-            transaction.Commit();
-        }
+            => Repository.SaveRefresh(ToSubscriptionRecord(subscription), articles.Select(ToArticleWriteRecord));
 
         private void UpdateArticleFeedTitle(string subscriptionId, string title)
             => Repository.UpdateArticleFeedTitle(subscriptionId, title);

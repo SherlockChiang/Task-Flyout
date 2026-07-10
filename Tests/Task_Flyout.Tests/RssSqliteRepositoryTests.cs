@@ -124,6 +124,47 @@ VALUES ($id, 'sub-a', $feedTitle, $title, $link, $summary, $html, $imageUrl, '',
         Assert.Equal(0L, ScalarInt64(connection, "SELECT COUNT(*) FROM rss_articles WHERE subscription_id = 'subscription';"));
     }
 
+    [Fact]
+    public void Refresh_saves_subscription_and_articles_together()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+
+        repository.SaveRefresh(
+            new RssSubscriptionRecord("subscription", "Updated feed", "https://example.test", "", "", "", 50),
+            new[]
+            {
+                new RssArticleWriteRecord("article-a", "subscription", "Updated feed", "First", "", "", "", "", "", 20),
+                new RssArticleWriteRecord("article-b", "subscription", "Updated feed", "Second", "", "", "", "", "", 10)
+            });
+
+        Assert.Equal(2, repository.QueryArticlesPage("subscription", null, 0, 10).Count);
+        using var connection = Open(databasePath);
+        var encryptedTitle = ScalarString(connection, "SELECT title FROM rss_subscriptions WHERE id = 'subscription';");
+        Assert.Equal("Updated feed", RssSensitiveDataProtector.Unprotect(encryptedTitle));
+    }
+
+    [Fact]
+    public void Refresh_rolls_back_subscription_and_articles_when_a_write_fails()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertSubscription(new RssSubscriptionRecord("subscription", "Original feed", "https://example.test", "", "", "", 10));
+
+        Assert.ThrowsAny<Exception>(() => repository.SaveRefresh(
+            new RssSubscriptionRecord("subscription", "Updated feed", "https://example.test", "", "", "", 20),
+            new[]
+            {
+                new RssArticleWriteRecord("valid", "subscription", "Updated feed", "Valid", "", "", "", "", "", 20),
+                new RssArticleWriteRecord(null!, "subscription", "Updated feed", "Invalid", "", "", "", "", "", 10)
+            }));
+
+        using var connection = Open(databasePath);
+        var encryptedTitle = ScalarString(connection, "SELECT title FROM rss_subscriptions WHERE id = 'subscription';");
+        Assert.Equal("Original feed", RssSensitiveDataProtector.Unprotect(encryptedTitle));
+        Assert.Equal(0L, ScalarInt64(connection, "SELECT COUNT(*) FROM rss_articles;"));
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
