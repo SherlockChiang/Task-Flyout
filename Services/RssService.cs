@@ -359,11 +359,8 @@ namespace Task_Flyout.Services
             EnsureLoaded();
             _cache.Folders.RemoveAll(folder => folder.Id == folderId);
             foreach (var subscription in _cache.Subscriptions.Where(item => item.FolderId == folderId))
-            {
                 subscription.FolderId = "";
-                SaveSubscription(subscription);
-            }
-            DeleteById("rss_folders", folderId);
+            Repository.RemoveFolder(folderId);
         }
 
         public void SaveFolderOrder(IEnumerable<string> folderIds)
@@ -443,9 +440,7 @@ namespace Task_Flyout.Services
             _cache.Subscriptions.RemoveAll(item => item.Id == subscriptionId);
             _cache.Articles.RemoveAll(item => item.SubscriptionId == subscriptionId);
             PruneOrphanedImageCache(force: true);
-            DeleteById("rss_subscriptions", subscriptionId);
-            DeleteArticlesForSubscription(subscriptionId);
-            CheckpointDeletedData();
+            Repository.RemoveSubscription(subscriptionId);
         }
 
         public Task<List<RssArticle>> LoadMoreArticlesAsync(string? subscriptionId, string? folderId, int skip, int take)
@@ -1422,72 +1417,17 @@ LIMIT 1000;
 
         private void SaveFolder(RssFolder folder)
         {
-            using var connection = OpenConnection();
-            using var command = connection.CreateCommand();
-            command.CommandText = """
-INSERT INTO rss_folders(id, name, sort_order) VALUES ($id, $name, $sortOrder)
-ON CONFLICT(id) DO UPDATE SET name = excluded.name, sort_order = excluded.sort_order;
-""";
-            command.Parameters.AddWithValue("$id", folder.Id ?? "");
-            command.Parameters.AddWithValue("$name", ProtectValue(folder.Name));
-            command.Parameters.AddWithValue("$sortOrder", folder.SortOrder);
-            command.ExecuteNonQuery();
+            Repository.UpsertFolder(new RssFolderRecord(folder.Id ?? "", folder.Name ?? "", folder.SortOrder));
         }
 
         private void SaveSubscription(RssSubscription subscription)
         {
-            using var connection = OpenConnection();
-            using var command = connection.CreateCommand();
-            command.CommandText = """
-INSERT INTO rss_subscriptions(id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks)
-VALUES ($id, $title, $url, $folderId, $imageUrl, $localImagePath, $lastFetchedTicks)
-ON CONFLICT(id) DO UPDATE SET
-    title = excluded.title,
-    url = excluded.url,
-    folder_id = excluded.folder_id,
-    image_url = excluded.image_url,
-    local_image_path = excluded.local_image_path,
-    last_fetched_ticks = excluded.last_fetched_ticks;
-""";
-            command.Parameters.AddWithValue("$id", subscription.Id ?? "");
-            command.Parameters.AddWithValue("$title", ProtectValue(subscription.Title));
-            command.Parameters.AddWithValue("$url", ProtectValue(subscription.Url));
-            command.Parameters.AddWithValue("$folderId", subscription.FolderId ?? "");
-            command.Parameters.AddWithValue("$imageUrl", ProtectValue(subscription.ImageUrl));
-            command.Parameters.AddWithValue("$localImagePath", subscription.LocalImagePath ?? "");
-            command.Parameters.AddWithValue("$lastFetchedTicks", ToTicks(subscription.LastFetchedAt));
-            command.ExecuteNonQuery();
+            Repository.UpsertSubscription(ToSubscriptionRecord(subscription));
         }
 
         private void SaveArticle(RssArticle article)
         {
-            using var connection = OpenConnection();
-            using var command = connection.CreateCommand();
-            command.CommandText = """
-INSERT INTO rss_articles(id, subscription_id, feed_title, title, link, summary, html_content, image_url, local_image_path, published_ticks)
-VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent, $imageUrl, $localImagePath, $publishedTicks)
-ON CONFLICT(id) DO UPDATE SET
-    subscription_id = excluded.subscription_id,
-    feed_title = excluded.feed_title,
-    title = excluded.title,
-    link = excluded.link,
-    summary = excluded.summary,
-    html_content = excluded.html_content,
-    image_url = excluded.image_url,
-    local_image_path = excluded.local_image_path,
-    published_ticks = excluded.published_ticks;
-""";
-            command.Parameters.AddWithValue("$id", article.Id ?? "");
-            command.Parameters.AddWithValue("$subscriptionId", article.SubscriptionId ?? "");
-            command.Parameters.AddWithValue("$feedTitle", ProtectValue(article.FeedTitle));
-            command.Parameters.AddWithValue("$title", ProtectValue(article.Title));
-            command.Parameters.AddWithValue("$link", ProtectValue(article.Link));
-            command.Parameters.AddWithValue("$summary", ProtectValue(article.Summary));
-            command.Parameters.AddWithValue("$htmlContent", ProtectValue(article.HtmlContent));
-            command.Parameters.AddWithValue("$imageUrl", ProtectValue(article.ImageUrl));
-            command.Parameters.AddWithValue("$localImagePath", article.LocalImagePath ?? "");
-            command.Parameters.AddWithValue("$publishedTicks", ToTicks(article.PublishedAt));
-            command.ExecuteNonQuery();
+            Repository.UpsertArticle(ToArticleWriteRecord(article));
         }
 
         private void SaveRefresh(RssSubscription subscription, IEnumerable<RssArticle> articles)
@@ -1544,47 +1484,31 @@ ON CONFLICT(id) DO UPDATE SET
             transaction.Commit();
         }
 
-        private void DeleteById(string tableName, string id)
-        {
-            using var connection = OpenConnection();
-            using var command = connection.CreateCommand();
-            command.CommandText = $"DELETE FROM {tableName} WHERE id = $id;";
-            command.Parameters.AddWithValue("$id", id);
-            command.ExecuteNonQuery();
-        }
-
-        private void DeleteArticlesForSubscription(string subscriptionId)
-        {
-            using var connection = OpenConnection();
-            using var command = connection.CreateCommand();
-            command.CommandText = "DELETE FROM rss_articles WHERE subscription_id = $subscriptionId;";
-            command.Parameters.AddWithValue("$subscriptionId", subscriptionId);
-            command.ExecuteNonQuery();
-        }
-
-        private void CheckpointDeletedData()
-        {
-            try
-            {
-                using var connection = OpenConnection();
-                ExecuteNonQuery(connection, "PRAGMA wal_checkpoint(TRUNCATE);");
-            }
-            catch
-            {
-                // A checkpoint can be busy while another RSS operation is reading. The
-                // secure-delete setting still applies, and a later write can checkpoint.
-            }
-        }
-
         private void UpdateArticleFeedTitle(string subscriptionId, string title)
-        {
-            using var connection = OpenConnection();
-            using var command = connection.CreateCommand();
-            command.CommandText = "UPDATE rss_articles SET feed_title = $title WHERE subscription_id = $subscriptionId;";
-            command.Parameters.AddWithValue("$title", ProtectValue(title));
-            command.Parameters.AddWithValue("$subscriptionId", subscriptionId);
-            command.ExecuteNonQuery();
-        }
+            => Repository.UpdateArticleFeedTitle(subscriptionId, title);
+
+        private static RssSubscriptionRecord ToSubscriptionRecord(RssSubscription subscription)
+            => new(
+                subscription.Id ?? "",
+                subscription.Title ?? "",
+                subscription.Url ?? "",
+                subscription.FolderId ?? "",
+                subscription.ImageUrl ?? "",
+                subscription.LocalImagePath ?? "",
+                ToTicks(subscription.LastFetchedAt));
+
+        private static RssArticleWriteRecord ToArticleWriteRecord(RssArticle article)
+            => new(
+                article.Id ?? "",
+                article.SubscriptionId ?? "",
+                article.FeedTitle ?? "",
+                article.Title ?? "",
+                article.Link ?? "",
+                article.Summary ?? "",
+                article.HtmlContent ?? "",
+                article.ImageUrl ?? "",
+                article.LocalImagePath ?? "",
+                ToTicks(article.PublishedAt));
 
         private void TrimDatabaseArticles()
         {

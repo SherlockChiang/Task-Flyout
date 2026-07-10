@@ -16,6 +16,29 @@ namespace Task_Flyout.Services
         string LocalImagePath,
         long PublishedUtcTicks);
 
+    internal sealed record RssFolderRecord(string Id, string Name, int SortOrder);
+
+    internal sealed record RssSubscriptionRecord(
+        string Id,
+        string Title,
+        string Url,
+        string FolderId,
+        string ImageUrl,
+        string LocalImagePath,
+        long LastFetchedUtcTicks);
+
+    internal sealed record RssArticleWriteRecord(
+        string Id,
+        string SubscriptionId,
+        string FeedTitle,
+        string Title,
+        string Link,
+        string Summary,
+        string HtmlContent,
+        string ImageUrl,
+        string LocalImagePath,
+        long PublishedUtcTicks);
+
     internal sealed class RssSqliteRepository
     {
         private const int SchemaVersion = 1;
@@ -154,6 +177,146 @@ LIMIT $take OFFSET $skip;
             command.CommandText = "SELECT html_content FROM rss_articles WHERE id = $id LIMIT 1;";
             command.Parameters.AddWithValue("$id", articleId);
             return RssSensitiveDataProtector.Unprotect(command.ExecuteScalar() as string ?? "");
+        }
+
+        public void UpsertFolder(RssFolderRecord folder)
+        {
+            Initialize();
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+INSERT INTO rss_folders(id, name, sort_order) VALUES ($id, $name, $sortOrder)
+ON CONFLICT(id) DO UPDATE SET name = excluded.name, sort_order = excluded.sort_order;
+""";
+            command.Parameters.AddWithValue("$id", folder.Id);
+            command.Parameters.AddWithValue("$name", RssSensitiveDataProtector.Protect(folder.Name));
+            command.Parameters.AddWithValue("$sortOrder", folder.SortOrder);
+            command.ExecuteNonQuery();
+        }
+
+        public void UpsertSubscription(RssSubscriptionRecord subscription)
+        {
+            Initialize();
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            WriteSubscription(command, subscription);
+            command.ExecuteNonQuery();
+        }
+
+        public void UpsertArticle(RssArticleWriteRecord article)
+        {
+            Initialize();
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            WriteArticle(command, article);
+            command.ExecuteNonQuery();
+        }
+
+        public void RemoveFolder(string folderId)
+        {
+            Initialize();
+            using var connection = OpenConnection();
+            using var transaction = connection.BeginTransaction();
+            using (var update = connection.CreateCommand())
+            {
+                update.Transaction = transaction;
+                update.CommandText = "UPDATE rss_subscriptions SET folder_id = '' WHERE folder_id = $folderId;";
+                update.Parameters.AddWithValue("$folderId", folderId);
+                update.ExecuteNonQuery();
+            }
+            using (var delete = connection.CreateCommand())
+            {
+                delete.Transaction = transaction;
+                delete.CommandText = "DELETE FROM rss_folders WHERE id = $folderId;";
+                delete.Parameters.AddWithValue("$folderId", folderId);
+                delete.ExecuteNonQuery();
+            }
+            transaction.Commit();
+        }
+
+        public void RemoveSubscription(string subscriptionId)
+        {
+            Initialize();
+            using var connection = OpenConnection();
+            using var transaction = connection.BeginTransaction();
+            using (var deleteArticles = connection.CreateCommand())
+            {
+                deleteArticles.Transaction = transaction;
+                deleteArticles.CommandText = "DELETE FROM rss_articles WHERE subscription_id = $subscriptionId;";
+                deleteArticles.Parameters.AddWithValue("$subscriptionId", subscriptionId);
+                deleteArticles.ExecuteNonQuery();
+            }
+            using (var deleteSubscription = connection.CreateCommand())
+            {
+                deleteSubscription.Transaction = transaction;
+                deleteSubscription.CommandText = "DELETE FROM rss_subscriptions WHERE id = $subscriptionId;";
+                deleteSubscription.Parameters.AddWithValue("$subscriptionId", subscriptionId);
+                deleteSubscription.ExecuteNonQuery();
+            }
+            transaction.Commit();
+            try { ExecuteNonQuery(connection, "PRAGMA wal_checkpoint(TRUNCATE);"); }
+            catch (SqliteException) { }
+        }
+
+        public void UpdateArticleFeedTitle(string subscriptionId, string title)
+        {
+            Initialize();
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE rss_articles SET feed_title = $title WHERE subscription_id = $subscriptionId;";
+            command.Parameters.AddWithValue("$title", RssSensitiveDataProtector.Protect(title));
+            command.Parameters.AddWithValue("$subscriptionId", subscriptionId);
+            command.ExecuteNonQuery();
+        }
+
+        private static void WriteSubscription(SqliteCommand command, RssSubscriptionRecord subscription)
+        {
+            command.CommandText = """
+INSERT INTO rss_subscriptions(id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks)
+VALUES ($id, $title, $url, $folderId, $imageUrl, $localImagePath, $lastFetchedTicks)
+ON CONFLICT(id) DO UPDATE SET
+    title = excluded.title,
+    url = excluded.url,
+    folder_id = excluded.folder_id,
+    image_url = excluded.image_url,
+    local_image_path = excluded.local_image_path,
+    last_fetched_ticks = excluded.last_fetched_ticks;
+""";
+            command.Parameters.AddWithValue("$id", subscription.Id);
+            command.Parameters.AddWithValue("$title", RssSensitiveDataProtector.Protect(subscription.Title));
+            command.Parameters.AddWithValue("$url", RssSensitiveDataProtector.Protect(subscription.Url));
+            command.Parameters.AddWithValue("$folderId", subscription.FolderId);
+            command.Parameters.AddWithValue("$imageUrl", RssSensitiveDataProtector.Protect(subscription.ImageUrl));
+            command.Parameters.AddWithValue("$localImagePath", subscription.LocalImagePath);
+            command.Parameters.AddWithValue("$lastFetchedTicks", subscription.LastFetchedUtcTicks);
+        }
+
+        private static void WriteArticle(SqliteCommand command, RssArticleWriteRecord article)
+        {
+            command.CommandText = """
+INSERT INTO rss_articles(id, subscription_id, feed_title, title, link, summary, html_content, image_url, local_image_path, published_ticks)
+VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent, $imageUrl, $localImagePath, $publishedTicks)
+ON CONFLICT(id) DO UPDATE SET
+    subscription_id = excluded.subscription_id,
+    feed_title = excluded.feed_title,
+    title = excluded.title,
+    link = excluded.link,
+    summary = excluded.summary,
+    html_content = excluded.html_content,
+    image_url = excluded.image_url,
+    local_image_path = excluded.local_image_path,
+    published_ticks = excluded.published_ticks;
+""";
+            command.Parameters.AddWithValue("$id", article.Id);
+            command.Parameters.AddWithValue("$subscriptionId", article.SubscriptionId);
+            command.Parameters.AddWithValue("$feedTitle", RssSensitiveDataProtector.Protect(article.FeedTitle));
+            command.Parameters.AddWithValue("$title", RssSensitiveDataProtector.Protect(article.Title));
+            command.Parameters.AddWithValue("$link", RssSensitiveDataProtector.Protect(article.Link));
+            command.Parameters.AddWithValue("$summary", RssSensitiveDataProtector.Protect(article.Summary));
+            command.Parameters.AddWithValue("$htmlContent", RssSensitiveDataProtector.Protect(article.HtmlContent));
+            command.Parameters.AddWithValue("$imageUrl", RssSensitiveDataProtector.Protect(article.ImageUrl));
+            command.Parameters.AddWithValue("$localImagePath", article.LocalImagePath);
+            command.Parameters.AddWithValue("$publishedTicks", article.PublishedUtcTicks);
         }
 
         internal SqliteConnection OpenConnection()

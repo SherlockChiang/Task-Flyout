@@ -69,6 +69,61 @@ VALUES ($id, 'sub-a', $feedTitle, $title, $link, $summary, $html, $imageUrl, '',
         repository.Initialize();
     }
 
+    [Fact]
+    public void Upserts_encrypt_sensitive_values_and_round_trip()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertFolder(new RssFolderRecord("folder", "Private folder", 2));
+        repository.UpsertSubscription(new RssSubscriptionRecord(
+            "subscription", "Private feed", "https://example.test/private?token=secret", "folder", "https://example.test/image", "local.png", 10));
+        repository.UpsertArticle(new RssArticleWriteRecord(
+            "article", "subscription", "Private feed", "Private title", "https://example.test/article", "Private summary", "<p>Private body</p>", "https://example.test/article.png", "article.png", 20));
+
+        using (var connection = Open(databasePath))
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT title FROM rss_subscriptions WHERE id = 'subscription';";
+            var storedTitle = Assert.IsType<string>(command.ExecuteScalar());
+            Assert.True(RssSensitiveDataProtector.IsProtected(storedTitle));
+            Assert.DoesNotContain("Private feed", storedTitle, StringComparison.Ordinal);
+        }
+
+        var article = Assert.Single(repository.QueryArticlesPage("subscription", null, 0, 10));
+        Assert.Equal("Private title", article.Title);
+        Assert.Equal("<p>Private body</p>", repository.GetArticleHtml("article"));
+    }
+
+    [Fact]
+    public void Removing_folder_atomically_unassigns_subscriptions()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertFolder(new RssFolderRecord("folder", "Folder", 0));
+        repository.UpsertSubscription(new RssSubscriptionRecord("subscription", "Feed", "https://example.test", "folder", "", "", 0));
+
+        repository.RemoveFolder("folder");
+
+        using var connection = Open(databasePath);
+        Assert.Equal(0L, ScalarInt64(connection, "SELECT COUNT(*) FROM rss_folders WHERE id = 'folder';"));
+        Assert.Equal("", ScalarString(connection, "SELECT folder_id FROM rss_subscriptions WHERE id = 'subscription';"));
+    }
+
+    [Fact]
+    public void Removing_subscription_atomically_deletes_its_articles()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertSubscription(new RssSubscriptionRecord("subscription", "Feed", "https://example.test", "", "", "", 0));
+        repository.UpsertArticle(new RssArticleWriteRecord("article", "subscription", "Feed", "Title", "", "", "", "", "", 0));
+
+        repository.RemoveSubscription("subscription");
+
+        using var connection = Open(databasePath);
+        Assert.Equal(0L, ScalarInt64(connection, "SELECT COUNT(*) FROM rss_subscriptions WHERE id = 'subscription';"));
+        Assert.Equal(0L, ScalarInt64(connection, "SELECT COUNT(*) FROM rss_articles WHERE subscription_id = 'subscription';"));
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
@@ -88,5 +143,19 @@ VALUES ($id, 'sub-a', $feedTitle, $title, $link, $summary, $html, $imageUrl, '',
         using var command = connection.CreateCommand();
         command.CommandText = sql;
         command.ExecuteNonQuery();
+    }
+
+    private static long ScalarInt64(SqliteConnection connection, string sql)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        return (long)command.ExecuteScalar()!;
+    }
+
+    private static string ScalarString(SqliteConnection connection, string sql)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        return (string)command.ExecuteScalar()!;
     }
 }
