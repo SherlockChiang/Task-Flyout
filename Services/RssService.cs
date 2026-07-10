@@ -233,7 +233,7 @@ namespace Task_Flyout.Services
                 SortOrder = _cache.Folders.Count == 0 ? 0 : _cache.Folders.Max(item => item.SortOrder) + 1
             };
             _cache.Folders.Add(folder);
-            Save();
+            SaveFolder(folder);
             return folder;
         }
 
@@ -242,8 +242,11 @@ namespace Task_Flyout.Services
             EnsureLoaded();
             _cache.Folders.RemoveAll(folder => folder.Id == folderId);
             foreach (var subscription in _cache.Subscriptions.Where(item => item.FolderId == folderId))
+            {
                 subscription.FolderId = "";
-            Save();
+                SaveSubscription(subscription);
+            }
+            DeleteById("rss_folders", folderId);
         }
 
         public void SaveFolderOrder(IEnumerable<string> folderIds)
@@ -256,7 +259,8 @@ namespace Task_Flyout.Services
                 if (folder != null)
                     folder.SortOrder = index++;
             }
-            Save();
+            foreach (var folder in _cache.Folders)
+                SaveFolder(folder);
         }
 
         public void MoveSubscriptionToFolder(string subscriptionId, string folderId)
@@ -265,7 +269,7 @@ namespace Task_Flyout.Services
             var subscription = _cache.Subscriptions.FirstOrDefault(item => item.Id == subscriptionId);
             if (subscription == null) return;
             subscription.FolderId = _cache.Folders.Any(folder => folder.Id == folderId) ? folderId : "";
-            Save();
+            SaveSubscription(subscription);
         }
 
         public void RenameFolder(string folderId, string name)
@@ -274,7 +278,7 @@ namespace Task_Flyout.Services
             var folder = _cache.Folders.FirstOrDefault(item => item.Id == folderId);
             if (folder == null) return;
             folder.Name = string.IsNullOrWhiteSpace(name) ? folder.Name : name.Trim();
-            Save();
+            SaveFolder(folder);
         }
 
         public void RenameSubscription(string subscriptionId, string title)
@@ -285,7 +289,8 @@ namespace Task_Flyout.Services
             subscription.Title = string.IsNullOrWhiteSpace(title) ? subscription.Title : title.Trim();
             foreach (var article in _cache.Articles.Where(item => item.SubscriptionId == subscriptionId))
                 article.FeedTitle = subscription.Title;
-            Save();
+            SaveSubscription(subscription);
+            UpdateArticleFeedTitle(subscriptionId, subscription.Title);
         }
 
         public async Task<RssSubscription> AddSubscriptionAsync(string url, string folderId = "")
@@ -298,7 +303,7 @@ namespace Task_Flyout.Services
                 if (!string.IsNullOrWhiteSpace(folderId))
                 {
                     existing.FolderId = folderId;
-                    Save();
+                    SaveSubscription(existing);
                 }
                 return existing;
             }
@@ -310,8 +315,8 @@ namespace Task_Flyout.Services
                 FolderId = _cache.Folders.Any(folder => folder.Id == folderId) ? folderId : ""
             };
             _cache.Subscriptions.Add(subscription);
+            SaveSubscription(subscription);
             await RefreshSubscriptionAsync(subscription, force: true);
-            Save();
             return subscription;
         }
 
@@ -321,7 +326,8 @@ namespace Task_Flyout.Services
             _cache.Subscriptions.RemoveAll(item => item.Id == subscriptionId);
             _cache.Articles.RemoveAll(item => item.SubscriptionId == subscriptionId);
             PruneOrphanedImageCache(force: true);
-            Save();
+            DeleteById("rss_subscriptions", subscriptionId);
+            DeleteArticlesForSubscription(subscriptionId);
         }
 
         public Task<List<RssArticle>> LoadMoreArticlesAsync(string? subscriptionId, string? folderId, int skip, int take)
@@ -370,7 +376,8 @@ namespace Task_Flyout.Services
 
             subscription.LastFetchedAt = DateTimeOffset.Now;
             TrimCache();
-            Save();
+            SaveRefresh(subscription, parsed.Articles);
+            TrimDatabaseArticles();
         }
 
         private bool ShouldRefresh(RssSubscription subscription)
@@ -1341,6 +1348,169 @@ LIMIT $take OFFSET $skip;
                 LocalImagePath = reader.GetString(7),
                 PublishedAt = FromTicks(reader.GetInt64(8))
             };
+
+        private void SaveFolder(RssFolder folder)
+        {
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+INSERT INTO rss_folders(id, name, sort_order) VALUES ($id, $name, $sortOrder)
+ON CONFLICT(id) DO UPDATE SET name = excluded.name, sort_order = excluded.sort_order;
+""";
+            command.Parameters.AddWithValue("$id", folder.Id ?? "");
+            command.Parameters.AddWithValue("$name", folder.Name ?? "");
+            command.Parameters.AddWithValue("$sortOrder", folder.SortOrder);
+            command.ExecuteNonQuery();
+        }
+
+        private void SaveSubscription(RssSubscription subscription)
+        {
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+INSERT INTO rss_subscriptions(id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks)
+VALUES ($id, $title, $url, $folderId, $imageUrl, $localImagePath, $lastFetchedTicks)
+ON CONFLICT(id) DO UPDATE SET
+    title = excluded.title,
+    url = excluded.url,
+    folder_id = excluded.folder_id,
+    image_url = excluded.image_url,
+    local_image_path = excluded.local_image_path,
+    last_fetched_ticks = excluded.last_fetched_ticks;
+""";
+            command.Parameters.AddWithValue("$id", subscription.Id ?? "");
+            command.Parameters.AddWithValue("$title", subscription.Title ?? "");
+            command.Parameters.AddWithValue("$url", subscription.Url ?? "");
+            command.Parameters.AddWithValue("$folderId", subscription.FolderId ?? "");
+            command.Parameters.AddWithValue("$imageUrl", subscription.ImageUrl ?? "");
+            command.Parameters.AddWithValue("$localImagePath", subscription.LocalImagePath ?? "");
+            command.Parameters.AddWithValue("$lastFetchedTicks", ToTicks(subscription.LastFetchedAt));
+            command.ExecuteNonQuery();
+        }
+
+        private void SaveArticle(RssArticle article)
+        {
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+INSERT INTO rss_articles(id, subscription_id, feed_title, title, link, summary, html_content, image_url, local_image_path, published_ticks)
+VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent, $imageUrl, $localImagePath, $publishedTicks)
+ON CONFLICT(id) DO UPDATE SET
+    subscription_id = excluded.subscription_id,
+    feed_title = excluded.feed_title,
+    title = excluded.title,
+    link = excluded.link,
+    summary = excluded.summary,
+    html_content = excluded.html_content,
+    image_url = excluded.image_url,
+    local_image_path = excluded.local_image_path,
+    published_ticks = excluded.published_ticks;
+""";
+            command.Parameters.AddWithValue("$id", article.Id ?? "");
+            command.Parameters.AddWithValue("$subscriptionId", article.SubscriptionId ?? "");
+            command.Parameters.AddWithValue("$feedTitle", article.FeedTitle ?? "");
+            command.Parameters.AddWithValue("$title", article.Title ?? "");
+            command.Parameters.AddWithValue("$link", article.Link ?? "");
+            command.Parameters.AddWithValue("$summary", article.Summary ?? "");
+            command.Parameters.AddWithValue("$htmlContent", article.HtmlContent ?? "");
+            command.Parameters.AddWithValue("$imageUrl", article.ImageUrl ?? "");
+            command.Parameters.AddWithValue("$localImagePath", article.LocalImagePath ?? "");
+            command.Parameters.AddWithValue("$publishedTicks", ToTicks(article.PublishedAt));
+            command.ExecuteNonQuery();
+        }
+
+        private void SaveRefresh(RssSubscription subscription, IEnumerable<RssArticle> articles)
+        {
+            using var connection = OpenConnection();
+            using var transaction = connection.BeginTransaction();
+            using (var subscriptionCommand = connection.CreateCommand())
+            {
+                subscriptionCommand.Transaction = transaction;
+                subscriptionCommand.CommandText = """
+INSERT INTO rss_subscriptions(id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks)
+VALUES ($id, $title, $url, $folderId, $imageUrl, $localImagePath, $lastFetchedTicks)
+ON CONFLICT(id) DO UPDATE SET
+    title = excluded.title, url = excluded.url, folder_id = excluded.folder_id,
+    image_url = excluded.image_url, local_image_path = excluded.local_image_path,
+    last_fetched_ticks = excluded.last_fetched_ticks;
+""";
+                subscriptionCommand.Parameters.AddWithValue("$id", subscription.Id ?? "");
+                subscriptionCommand.Parameters.AddWithValue("$title", subscription.Title ?? "");
+                subscriptionCommand.Parameters.AddWithValue("$url", subscription.Url ?? "");
+                subscriptionCommand.Parameters.AddWithValue("$folderId", subscription.FolderId ?? "");
+                subscriptionCommand.Parameters.AddWithValue("$imageUrl", subscription.ImageUrl ?? "");
+                subscriptionCommand.Parameters.AddWithValue("$localImagePath", subscription.LocalImagePath ?? "");
+                subscriptionCommand.Parameters.AddWithValue("$lastFetchedTicks", ToTicks(subscription.LastFetchedAt));
+                subscriptionCommand.ExecuteNonQuery();
+            }
+
+            foreach (var article in articles)
+            {
+                using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = """
+INSERT INTO rss_articles(id, subscription_id, feed_title, title, link, summary, html_content, image_url, local_image_path, published_ticks)
+VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent, $imageUrl, $localImagePath, $publishedTicks)
+ON CONFLICT(id) DO UPDATE SET
+    subscription_id = excluded.subscription_id, feed_title = excluded.feed_title,
+    title = excluded.title, link = excluded.link, summary = excluded.summary,
+    html_content = excluded.html_content, image_url = excluded.image_url,
+    local_image_path = excluded.local_image_path, published_ticks = excluded.published_ticks;
+""";
+                command.Parameters.AddWithValue("$id", article.Id ?? "");
+                command.Parameters.AddWithValue("$subscriptionId", article.SubscriptionId ?? "");
+                command.Parameters.AddWithValue("$feedTitle", article.FeedTitle ?? "");
+                command.Parameters.AddWithValue("$title", article.Title ?? "");
+                command.Parameters.AddWithValue("$link", article.Link ?? "");
+                command.Parameters.AddWithValue("$summary", article.Summary ?? "");
+                command.Parameters.AddWithValue("$htmlContent", article.HtmlContent ?? "");
+                command.Parameters.AddWithValue("$imageUrl", article.ImageUrl ?? "");
+                command.Parameters.AddWithValue("$localImagePath", article.LocalImagePath ?? "");
+                command.Parameters.AddWithValue("$publishedTicks", ToTicks(article.PublishedAt));
+                command.ExecuteNonQuery();
+            }
+
+            transaction.Commit();
+        }
+
+        private void DeleteById(string tableName, string id)
+        {
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = $"DELETE FROM {tableName} WHERE id = $id;";
+            command.Parameters.AddWithValue("$id", id);
+            command.ExecuteNonQuery();
+        }
+
+        private void DeleteArticlesForSubscription(string subscriptionId)
+        {
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM rss_articles WHERE subscription_id = $subscriptionId;";
+            command.Parameters.AddWithValue("$subscriptionId", subscriptionId);
+            command.ExecuteNonQuery();
+        }
+
+        private void UpdateArticleFeedTitle(string subscriptionId, string title)
+        {
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE rss_articles SET feed_title = $title WHERE subscription_id = $subscriptionId;";
+            command.Parameters.AddWithValue("$title", title ?? "");
+            command.Parameters.AddWithValue("$subscriptionId", subscriptionId);
+            command.ExecuteNonQuery();
+        }
+
+        private void TrimDatabaseArticles()
+        {
+            using var connection = OpenConnection();
+            ExecuteNonQuery(connection, """
+DELETE FROM rss_articles
+WHERE id NOT IN (
+    SELECT id FROM rss_articles ORDER BY published_ticks DESC LIMIT 1000
+);
+""");
+        }
 
         private void SaveToDatabase()
         {
