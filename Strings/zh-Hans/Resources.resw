@@ -1479,6 +1479,15 @@
   <data name="MailPage_ComposeConsentHint.Text" xml:space="preserve">
     <value>Gmail 可能请求发送权限；Outlook 可能请求邮件读写和发送权限，以创建可追踪草稿并避免重复发送。</value>
   </data>
+  <data name="MailPage_SendComposeButton.AutomationProperties.Name" xml:space="preserve">
+    <value>发送邮件</value>
+  </data>
+  <data name="MailPage_SendComposeButton.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Gmail 可能请求发送权限；Outlook 可能请求邮件读写和发送权限，以创建可追踪草稿并避免重复发送。</value>
+  </data>
+  <data name="MailPage_SendComposeButton.ToolTipService.ToolTip" xml:space="preserve">
+    <value>发送邮件</value>
+  </data>
   <data name="WeatherPage_LocationPrivacyDesc.Text" xml:space="preserve">
     <value>使用当前位置或自动跟随定位会调用 Windows 位置权限；坐标仅保存在本机，并只用于向所选天气源请求天气。</value>
   </data>

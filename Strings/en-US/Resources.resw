@@ -1479,6 +1479,15 @@
   <data name="MailPage_ComposeConsentHint.Text" xml:space="preserve">
     <value>Gmail may request send access. Outlook may request mail read/write and send access to create a tracked draft and avoid duplicate sends.</value>
   </data>
+  <data name="MailPage_SendComposeButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Send email</value>
+  </data>
+  <data name="MailPage_SendComposeButton.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Gmail may request send access. Outlook may request mail read/write and send access to create a tracked draft and avoid duplicate sends.</value>
+  </data>
+  <data name="MailPage_SendComposeButton.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Send email</value>
+  </data>
   <data name="WeatherPage_LocationPrivacyDesc.Text" xml:space="preserve">
     <value>Use current location or auto-follow asks Windows for location permission. Coordinates stay on this device and are only used to request weather from the selected provider.</value>
   </data>
