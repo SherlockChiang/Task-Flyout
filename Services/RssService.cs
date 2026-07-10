@@ -157,6 +157,8 @@ namespace Task_Flyout.Services
         private const int MaxRedirects = 5;
         private const int MaxFeedUrlLength = 4096;
         private const string ImageCacheDirectoryName = "RssImages";
+        private const string ProtectedValuePrefix = "dpapi:v1:";
+        private static readonly byte[] SensitiveDataEntropy = Encoding.UTF8.GetBytes("TaskFlyout.RssSensitiveData.v1");
         // This flows only while fetching a user-entered local source. Redirects always
         // clear it so a public feed cannot pivot into a private network address.
         private static readonly AsyncLocal<bool> AllowCurrentLocalNetworkRequest = new();
@@ -1022,6 +1024,7 @@ namespace Task_Flyout.Services
                 try
                 {
                     InitializeDatabase();
+                    MigrateSensitiveData();
                     loaded = LoadFromDatabase();
                 }
                 catch
@@ -1267,9 +1270,9 @@ CREATE TABLE IF NOT EXISTS rss_articles (
                     {
                         Id = reader.GetString(0),
                         Title = reader.GetString(1),
-                        Url = reader.GetString(2),
+                        Url = UnprotectValue(reader.GetString(2)),
                         FolderId = reader.GetString(3),
-                        ImageUrl = reader.GetString(4),
+                        ImageUrl = UnprotectValue(reader.GetString(4)),
                         LocalImagePath = reader.GetString(5),
                         LastFetchedAt = FromTicks(reader.GetInt64(6))
                     });
@@ -1343,7 +1346,7 @@ LIMIT $take OFFSET $skip;
                 command.CommandText = "SELECT html_content FROM rss_articles WHERE id = $id LIMIT 1;";
                 command.Parameters.AddWithValue("$id", articleId);
                 var value = command.ExecuteScalar();
-                return value as string ?? "";
+                return UnprotectValue(value as string ?? "");
             }
             catch (Exception ex)
             {
@@ -1360,10 +1363,10 @@ LIMIT $take OFFSET $skip;
                 SubscriptionId = reader.GetString(1),
                 FeedTitle = reader.GetString(2),
                 Title = reader.GetString(3),
-                Link = reader.GetString(4),
-                Summary = reader.GetString(5),
+                Link = UnprotectValue(reader.GetString(4)),
+                Summary = UnprotectValue(reader.GetString(5)),
                 HtmlContent = "",
-                ImageUrl = reader.GetString(6),
+                ImageUrl = UnprotectValue(reader.GetString(6)),
                 LocalImagePath = reader.GetString(7),
                 PublishedAt = FromTicks(reader.GetInt64(8))
             };
@@ -1399,9 +1402,9 @@ ON CONFLICT(id) DO UPDATE SET
 """;
             command.Parameters.AddWithValue("$id", subscription.Id ?? "");
             command.Parameters.AddWithValue("$title", subscription.Title ?? "");
-            command.Parameters.AddWithValue("$url", subscription.Url ?? "");
+            command.Parameters.AddWithValue("$url", ProtectValue(subscription.Url));
             command.Parameters.AddWithValue("$folderId", subscription.FolderId ?? "");
-            command.Parameters.AddWithValue("$imageUrl", subscription.ImageUrl ?? "");
+            command.Parameters.AddWithValue("$imageUrl", ProtectValue(subscription.ImageUrl));
             command.Parameters.AddWithValue("$localImagePath", subscription.LocalImagePath ?? "");
             command.Parameters.AddWithValue("$lastFetchedTicks", ToTicks(subscription.LastFetchedAt));
             command.ExecuteNonQuery();
@@ -1429,10 +1432,10 @@ ON CONFLICT(id) DO UPDATE SET
             command.Parameters.AddWithValue("$subscriptionId", article.SubscriptionId ?? "");
             command.Parameters.AddWithValue("$feedTitle", article.FeedTitle ?? "");
             command.Parameters.AddWithValue("$title", article.Title ?? "");
-            command.Parameters.AddWithValue("$link", article.Link ?? "");
-            command.Parameters.AddWithValue("$summary", article.Summary ?? "");
-            command.Parameters.AddWithValue("$htmlContent", article.HtmlContent ?? "");
-            command.Parameters.AddWithValue("$imageUrl", article.ImageUrl ?? "");
+            command.Parameters.AddWithValue("$link", ProtectValue(article.Link));
+            command.Parameters.AddWithValue("$summary", ProtectValue(article.Summary));
+            command.Parameters.AddWithValue("$htmlContent", ProtectValue(article.HtmlContent));
+            command.Parameters.AddWithValue("$imageUrl", ProtectValue(article.ImageUrl));
             command.Parameters.AddWithValue("$localImagePath", article.LocalImagePath ?? "");
             command.Parameters.AddWithValue("$publishedTicks", ToTicks(article.PublishedAt));
             command.ExecuteNonQuery();
@@ -1455,9 +1458,9 @@ ON CONFLICT(id) DO UPDATE SET
 """;
                 subscriptionCommand.Parameters.AddWithValue("$id", subscription.Id ?? "");
                 subscriptionCommand.Parameters.AddWithValue("$title", subscription.Title ?? "");
-                subscriptionCommand.Parameters.AddWithValue("$url", subscription.Url ?? "");
+                subscriptionCommand.Parameters.AddWithValue("$url", ProtectValue(subscription.Url));
                 subscriptionCommand.Parameters.AddWithValue("$folderId", subscription.FolderId ?? "");
-                subscriptionCommand.Parameters.AddWithValue("$imageUrl", subscription.ImageUrl ?? "");
+                subscriptionCommand.Parameters.AddWithValue("$imageUrl", ProtectValue(subscription.ImageUrl));
                 subscriptionCommand.Parameters.AddWithValue("$localImagePath", subscription.LocalImagePath ?? "");
                 subscriptionCommand.Parameters.AddWithValue("$lastFetchedTicks", ToTicks(subscription.LastFetchedAt));
                 subscriptionCommand.ExecuteNonQuery();
@@ -1480,10 +1483,10 @@ ON CONFLICT(id) DO UPDATE SET
                 command.Parameters.AddWithValue("$subscriptionId", article.SubscriptionId ?? "");
                 command.Parameters.AddWithValue("$feedTitle", article.FeedTitle ?? "");
                 command.Parameters.AddWithValue("$title", article.Title ?? "");
-                command.Parameters.AddWithValue("$link", article.Link ?? "");
-                command.Parameters.AddWithValue("$summary", article.Summary ?? "");
-                command.Parameters.AddWithValue("$htmlContent", article.HtmlContent ?? "");
-                command.Parameters.AddWithValue("$imageUrl", article.ImageUrl ?? "");
+                command.Parameters.AddWithValue("$link", ProtectValue(article.Link));
+                command.Parameters.AddWithValue("$summary", ProtectValue(article.Summary));
+                command.Parameters.AddWithValue("$htmlContent", ProtectValue(article.HtmlContent));
+                command.Parameters.AddWithValue("$imageUrl", ProtectValue(article.ImageUrl));
                 command.Parameters.AddWithValue("$localImagePath", article.LocalImagePath ?? "");
                 command.Parameters.AddWithValue("$publishedTicks", ToTicks(article.PublishedAt));
                 command.ExecuteNonQuery();
@@ -1531,6 +1534,94 @@ WHERE id NOT IN (
 """);
         }
 
+        private void MigrateSensitiveData()
+        {
+            using var connection = OpenConnection();
+            using var transaction = connection.BeginTransaction();
+
+            using (var command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = "SELECT id, url, image_url FROM rss_subscriptions;";
+                using var reader = command.ExecuteReader();
+                var rows = new List<(string Id, string Url, string ImageUrl)>();
+                while (reader.Read())
+                    rows.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+                reader.Close();
+
+                foreach (var row in rows)
+                {
+                    if (IsProtectedValue(row.Url) && IsProtectedValue(row.ImageUrl)) continue;
+                    using var update = connection.CreateCommand();
+                    update.Transaction = transaction;
+                    update.CommandText = "UPDATE rss_subscriptions SET url = $url, image_url = $imageUrl WHERE id = $id;";
+                    update.Parameters.AddWithValue("$id", row.Id);
+                    update.Parameters.AddWithValue("$url", ProtectValue(UnprotectValue(row.Url)));
+                    update.Parameters.AddWithValue("$imageUrl", ProtectValue(UnprotectValue(row.ImageUrl)));
+                    update.ExecuteNonQuery();
+                }
+            }
+
+            using (var command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = "SELECT id, link, summary, html_content, image_url FROM rss_articles;";
+                using var reader = command.ExecuteReader();
+                var rows = new List<(string Id, string Link, string Summary, string Html, string ImageUrl)>();
+                while (reader.Read())
+                    rows.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4)));
+                reader.Close();
+
+                foreach (var row in rows)
+                {
+                    if (IsProtectedValue(row.Link) && IsProtectedValue(row.Summary) && IsProtectedValue(row.Html) && IsProtectedValue(row.ImageUrl)) continue;
+                    using var update = connection.CreateCommand();
+                    update.Transaction = transaction;
+                    update.CommandText = """
+UPDATE rss_articles
+SET link = $link, summary = $summary, html_content = $htmlContent, image_url = $imageUrl
+WHERE id = $id;
+""";
+                    update.Parameters.AddWithValue("$id", row.Id);
+                    update.Parameters.AddWithValue("$link", ProtectValue(UnprotectValue(row.Link)));
+                    update.Parameters.AddWithValue("$summary", ProtectValue(UnprotectValue(row.Summary)));
+                    update.Parameters.AddWithValue("$htmlContent", ProtectValue(UnprotectValue(row.Html)));
+                    update.Parameters.AddWithValue("$imageUrl", ProtectValue(UnprotectValue(row.ImageUrl)));
+                    update.ExecuteNonQuery();
+                }
+            }
+
+            transaction.Commit();
+        }
+
+        private static bool IsProtectedValue(string value)
+            => value.StartsWith(ProtectedValuePrefix, StringComparison.Ordinal);
+
+        private static string ProtectValue(string? value)
+        {
+            value ??= "";
+            if (IsProtectedValue(value)) return value;
+            var bytes = Encoding.UTF8.GetBytes(value);
+            var encrypted = ProtectedData.Protect(bytes, SensitiveDataEntropy, DataProtectionScope.CurrentUser);
+            return ProtectedValuePrefix + Convert.ToBase64String(encrypted);
+        }
+
+        private static string UnprotectValue(string value)
+        {
+            if (!IsProtectedValue(value)) return value;
+
+            try
+            {
+                var encrypted = Convert.FromBase64String(value[ProtectedValuePrefix.Length..]);
+                var decrypted = ProtectedData.Unprotect(encrypted, SensitiveDataEntropy, DataProtectionScope.CurrentUser);
+                return Encoding.UTF8.GetString(decrypted);
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
         private void SaveToDatabase()
         {
             using var connection = OpenConnection();
@@ -1563,9 +1654,9 @@ VALUES ($id, $title, $url, $folderId, $imageUrl, $localImagePath, $lastFetchedTi
 """;
                 command.Parameters.AddWithValue("$id", subscription.Id ?? "");
                 command.Parameters.AddWithValue("$title", subscription.Title ?? "");
-                command.Parameters.AddWithValue("$url", subscription.Url ?? "");
+                command.Parameters.AddWithValue("$url", ProtectValue(subscription.Url));
                 command.Parameters.AddWithValue("$folderId", subscription.FolderId ?? "");
-                command.Parameters.AddWithValue("$imageUrl", subscription.ImageUrl ?? "");
+                command.Parameters.AddWithValue("$imageUrl", ProtectValue(subscription.ImageUrl));
                 command.Parameters.AddWithValue("$localImagePath", subscription.LocalImagePath ?? "");
                 command.Parameters.AddWithValue("$lastFetchedTicks", ToTicks(subscription.LastFetchedAt));
                 command.ExecuteNonQuery();
@@ -1588,10 +1679,10 @@ VALUES ($id, $subscriptionId, $feedTitle, $title, $link, $summary, $htmlContent,
                 command.Parameters.AddWithValue("$subscriptionId", article.SubscriptionId ?? "");
                 command.Parameters.AddWithValue("$feedTitle", article.FeedTitle ?? "");
                 command.Parameters.AddWithValue("$title", article.Title ?? "");
-                command.Parameters.AddWithValue("$link", article.Link ?? "");
-                command.Parameters.AddWithValue("$summary", article.Summary ?? "");
-                command.Parameters.AddWithValue("$htmlContent", article.HtmlContent ?? "");
-                command.Parameters.AddWithValue("$imageUrl", article.ImageUrl ?? "");
+                command.Parameters.AddWithValue("$link", ProtectValue(article.Link));
+                command.Parameters.AddWithValue("$summary", ProtectValue(article.Summary));
+                command.Parameters.AddWithValue("$htmlContent", ProtectValue(article.HtmlContent));
+                command.Parameters.AddWithValue("$imageUrl", ProtectValue(article.ImageUrl));
                 command.Parameters.AddWithValue("$localImagePath", article.LocalImagePath ?? "");
                 command.Parameters.AddWithValue("$publishedTicks", ToTicks(article.PublishedAt));
                 command.ExecuteNonQuery();
