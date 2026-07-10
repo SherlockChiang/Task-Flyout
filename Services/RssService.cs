@@ -160,6 +160,7 @@ namespace Task_Flyout.Services
         private static readonly AsyncLocal<bool> AllowCurrentLocalNetworkRequest = new();
         private static readonly object InstancesLock = new();
         private static readonly List<WeakReference<RssService>> Instances = new();
+        private static readonly SemaphoreSlim GlobalDataClearGate = new(1, 1);
         private static volatile bool GlobalDataClearInProgress;
         private static readonly HttpClient HttpClient = new(new SocketsHttpHandler
         {
@@ -177,9 +178,7 @@ namespace Task_Flyout.Services
         private DateTimeOffset _lastImageCachePrunedAt = DateTimeOffset.MinValue;
         private readonly object _loadLock = new();
         private RssSqliteRepository? _repository;
-        private CancellationTokenSource _dataLifecycleCts = new();
-        private long _dataGeneration;
-        private bool _dataClearInProgress;
+        private readonly RssDataLifecycle _dataLifecycle = new();
 
         public static event EventHandler? LocalDataCleared;
 
@@ -192,35 +191,45 @@ namespace Task_Flyout.Services
             }
         }
 
-        public static Task ClearLocalDataAsync()
-            => Task.Run(() =>
+        public static async Task ClearLocalDataAsync()
+        {
+            await GlobalDataClearGate.WaitAsync();
+            try
             {
-                GlobalDataClearInProgress = true;
-                var instances = GetLiveInstances();
-                foreach (var instance in instances)
-                    instance.BeginDataClear();
-
-                bool clearedSuccessfully = false;
-                try
+                await Task.Run(() =>
                 {
-                    var databasePath = AppDataPathHelper.ResolveLocal("rss_cache.db");
-                    var imageCachePath = AppDataPathHelper.ResolveLocal(ImageCacheDirectoryName);
-                    RssStorageCleanup.DeleteAll(
-                        databasePath,
-                        AppDataPathHelper.ResolveLocal("rss_cache.json"),
-                        imageCachePath);
-                    clearedSuccessfully = true;
-                }
-                finally
-                {
+                    GlobalDataClearInProgress = true;
+                    var instances = GetLiveInstances();
                     foreach (var instance in instances)
-                        instance.EndDataClear();
-                    GlobalDataClearInProgress = false;
-                }
+                        instance.BeginDataClear();
 
-                if (clearedSuccessfully)
-                    RaiseLocalDataCleared();
-            });
+                    bool clearedSuccessfully = false;
+                    try
+                    {
+                        var databasePath = AppDataPathHelper.ResolveLocal("rss_cache.db");
+                        var imageCachePath = AppDataPathHelper.ResolveLocal(ImageCacheDirectoryName);
+                        RssStorageCleanup.DeleteAll(
+                            databasePath,
+                            AppDataPathHelper.ResolveLocal("rss_cache.json"),
+                            imageCachePath);
+                        clearedSuccessfully = true;
+                    }
+                    finally
+                    {
+                        foreach (var instance in instances)
+                            instance.EndDataClear();
+                        GlobalDataClearInProgress = false;
+                    }
+
+                    if (clearedSuccessfully)
+                        RaiseLocalDataCleared();
+                });
+            }
+            finally
+            {
+                GlobalDataClearGate.Release();
+            }
+        }
 
         private static void RaiseLocalDataCleared()
         {
@@ -252,11 +261,7 @@ namespace Task_Flyout.Services
         {
             lock (_loadLock)
             {
-                _dataClearInProgress = true;
-                _dataGeneration++;
-                try { _dataLifecycleCts.Cancel(); }
-                catch (AggregateException ex) { System.Diagnostics.Debug.WriteLine($"RSS refresh cancellation failed: {ex.Message}"); }
-                _dataLifecycleCts = new CancellationTokenSource();
+                _dataLifecycle.BeginClear();
                 _cache = new RssCache();
                 _loaded = false;
                 _repository = null;
@@ -267,7 +272,7 @@ namespace Task_Flyout.Services
         private void EndDataClear()
         {
             lock (_loadLock)
-                _dataClearInProgress = false;
+                _dataLifecycle.EndClear();
         }
 
         public IReadOnlyList<RssSubscription> GetSubscriptions()
@@ -430,14 +435,13 @@ namespace Task_Flyout.Services
             EnsureLoaded();
             if (!force && !ShouldRefresh(subscription)) return;
 
-            CancellationToken cancellationToken;
-            long generation;
+            RssDataLease lease;
             lock (_loadLock)
             {
                 if (!_cache.Subscriptions.Any(item => ReferenceEquals(item, subscription))) return;
-                cancellationToken = _dataLifecycleCts.Token;
-                generation = _dataGeneration;
+                lease = _dataLifecycle.Capture();
             }
+            var cancellationToken = lease.CancellationToken;
 
             var xml = await FetchFeedAsync(subscription.Url, cancellationToken);
             var parsed = ParseFeed(subscription, xml);
@@ -452,7 +456,7 @@ namespace Task_Flyout.Services
             cancellationToken.ThrowIfCancellationRequested();
             lock (_loadLock)
             {
-                if (generation != _dataGeneration || cancellationToken.IsCancellationRequested) return;
+                if (!_dataLifecycle.IsCurrent(lease)) return;
 
                 if (!string.IsNullOrWhiteSpace(parsed.FeedTitle))
                     subscription.Title = parsed.FeedTitle;
@@ -1109,7 +1113,7 @@ namespace Task_Flyout.Services
 
             lock (_loadLock)
             {
-                if (_dataClearInProgress || GlobalDataClearInProgress)
+                if (_dataLifecycle.IsClearInProgress || GlobalDataClearInProgress)
                     throw new InvalidOperationException("RSS local data is being cleared.");
                 if (_loaded) return;
 
@@ -1472,7 +1476,7 @@ namespace Task_Flyout.Services
         private RssSqliteRepository Repository
             => _repository ??= new RssSqliteRepository(
                 GetDatabasePath(),
-                () => _dataClearInProgress || GlobalDataClearInProgress);
+                () => _dataLifecycle.IsClearInProgress || GlobalDataClearInProgress);
 
         private static long ToTicks(DateTimeOffset value)
             => value == default ? 0 : value.UtcTicks;
