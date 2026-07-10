@@ -180,6 +180,14 @@ namespace Task_Flyout.Services
         }
     }
 
+    public sealed class MailReadSyncQueuedException : Exception
+    {
+        public MailReadSyncQueuedException(Exception innerException)
+            : base("The read-state update was queued for a later retry.", innerException)
+        {
+        }
+    }
+
     public class MailService
     {
         private readonly ResourceLoader _loader = new();
@@ -722,7 +730,8 @@ namespace Task_Flyout.Services
                 catch (Exception ex) when (!cancellationToken.IsCancellationRequested &&
                                            IsTransientReadStateFailure(ex, timeoutCts.IsCancellationRequested))
                 {
-                    EnqueuePendingReadMutation(account, item);
+                    if (EnqueuePendingReadMutation(account, item))
+                        throw new MailReadSyncQueuedException(ex);
                     throw;
                 }
             }
@@ -782,16 +791,16 @@ namespace Task_Flyout.Services
             return false;
         }
 
-        private void EnqueuePendingReadMutation(MailAccount account, MailItem item)
+        private bool EnqueuePendingReadMutation(MailAccount account, MailItem item)
         {
             // IMAP UIDs are unsafe to replay after reconnect unless the original UIDVALIDITY
             // is also known. The current list item does not carry it, so never persist that write.
-            if (account.Kind == MailAccountKind.Imap) return;
+            if (account.Kind == MailAccountKind.Imap) return false;
 
             EnsurePersistentCacheLoaded();
             lock (_mailCacheLock)
             {
-                if (_persistentCache == null) return;
+                if (_persistentCache == null) return false;
                 var pending = _persistentCache.PendingMutations.FirstOrDefault(mutation =>
                     mutation.AccountId == account.Id &&
                     mutation.FolderId == item.FolderId &&
@@ -820,6 +829,7 @@ namespace Task_Flyout.Services
                 }
             }
             SavePersistentCache();
+            return true;
         }
 
         public async Task FetchMessageBodyAsync(MailAccount account, MailItem item, CancellationToken cancellationToken = default)

@@ -990,6 +990,11 @@ namespace Task_Flyout.Views
             {
                 await remoteSyncTask;
             }
+            catch (MailReadSyncQueuedException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Mark as read queued: {ex.Message}");
+                SetMessageListStatus(_loader.GetStringOrDefault("TextReadSyncQueued") ?? "Read status will sync automatically when the account is available.");
+            }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Mark as read failed: {ex.Message}");

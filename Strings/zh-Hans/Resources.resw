@@ -789,6 +789,9 @@
   <data name="TextSendStatusUnknown" xml:space="preserve">
     <value>发送操作已超时。再次尝试前，请先检查“已发送”文件夹。</value>
   </data>
+  <data name="TextReadSyncQueued" xml:space="preserve">
+    <value>已读状态将在账户恢复可用后自动同步。</value>
+  </data>
   <data name="MailPage_SelectFolderPrompt.AutomationProperties.Name" xml:space="preserve">
     <value>邮件列表状态</value>
   </data>

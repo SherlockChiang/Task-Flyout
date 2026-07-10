@@ -789,6 +789,9 @@
   <data name="TextSendStatusUnknown" xml:space="preserve">
     <value>Sending timed out. Check your Sent folder before trying again.</value>
   </data>
+  <data name="TextReadSyncQueued" xml:space="preserve">
+    <value>Read status will sync automatically when the account is available.</value>
+  </data>
   <data name="MailPage_SelectFolderPrompt.AutomationProperties.Name" xml:space="preserve">
     <value>Mail list status</value>
   </data>
