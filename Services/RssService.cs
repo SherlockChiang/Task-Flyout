@@ -156,7 +156,6 @@ namespace Task_Flyout.Services
         private const int MaxRedirects = 5;
         private const int MaxFeedUrlLength = 4096;
         private const string ImageCacheDirectoryName = "RssImages";
-        private const string SensitiveDataMigrationKey = "sensitive_data_dpapi_v1";
         // This flows only while fetching a user-entered local source. Redirects always
         // clear it so a public feed cannot pivot into a private network address.
         private static readonly AsyncLocal<bool> AllowCurrentLocalNetworkRequest = new();
@@ -1142,7 +1141,7 @@ namespace Task_Flyout.Services
                 try
                 {
                     InitializeDatabase();
-                    MigrateSensitiveData();
+                    Repository.MigrateSensitiveData();
                     loaded = LoadFromDatabase();
                 }
                 catch
@@ -1470,115 +1469,8 @@ WHERE id NOT IN (
 """);
         }
 
-        private void MigrateSensitiveData()
-        {
-            using var connection = OpenConnection();
-            using (var migrationCheck = connection.CreateCommand())
-            {
-                migrationCheck.CommandText = "SELECT value FROM metadata WHERE key = $key LIMIT 1;";
-                migrationCheck.Parameters.AddWithValue("$key", SensitiveDataMigrationKey);
-                if (string.Equals(migrationCheck.ExecuteScalar() as string, "complete", StringComparison.Ordinal))
-                    return;
-            }
-
-            using var transaction = connection.BeginTransaction();
-
-            using (var command = connection.CreateCommand())
-            {
-                command.Transaction = transaction;
-                command.CommandText = "SELECT id, name FROM rss_folders;";
-                using var reader = command.ExecuteReader();
-                var rows = new List<(string Id, string Name)>();
-                while (reader.Read())
-                    rows.Add((reader.GetString(0), reader.GetString(1)));
-                reader.Close();
-
-                foreach (var row in rows)
-                {
-                    if (IsProtectedValue(row.Name)) continue;
-                    using var update = connection.CreateCommand();
-                    update.Transaction = transaction;
-                    update.CommandText = "UPDATE rss_folders SET name = $name WHERE id = $id;";
-                    update.Parameters.AddWithValue("$id", row.Id);
-                    update.Parameters.AddWithValue("$name", ProtectValue(UnprotectValue(row.Name)));
-                    update.ExecuteNonQuery();
-                }
-            }
-
-            using (var command = connection.CreateCommand())
-            {
-                command.Transaction = transaction;
-                command.CommandText = "SELECT id, title, url, image_url FROM rss_subscriptions;";
-                using var reader = command.ExecuteReader();
-                var rows = new List<(string Id, string Title, string Url, string ImageUrl)>();
-                while (reader.Read())
-                    rows.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
-                reader.Close();
-
-                foreach (var row in rows)
-                {
-                    if (IsProtectedValue(row.Title) && IsProtectedValue(row.Url) && IsProtectedValue(row.ImageUrl)) continue;
-                    using var update = connection.CreateCommand();
-                    update.Transaction = transaction;
-                    update.CommandText = "UPDATE rss_subscriptions SET title = $title, url = $url, image_url = $imageUrl WHERE id = $id;";
-                    update.Parameters.AddWithValue("$id", row.Id);
-                    update.Parameters.AddWithValue("$title", ProtectValue(UnprotectValue(row.Title)));
-                    update.Parameters.AddWithValue("$url", ProtectValue(UnprotectValue(row.Url)));
-                    update.Parameters.AddWithValue("$imageUrl", ProtectValue(UnprotectValue(row.ImageUrl)));
-                    update.ExecuteNonQuery();
-                }
-            }
-
-            using (var command = connection.CreateCommand())
-            {
-                command.Transaction = transaction;
-                command.CommandText = "SELECT id, feed_title, title, link, summary, html_content, image_url FROM rss_articles;";
-                using var reader = command.ExecuteReader();
-                var rows = new List<(string Id, string FeedTitle, string Title, string Link, string Summary, string Html, string ImageUrl)>();
-                while (reader.Read())
-                    rows.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6)));
-                reader.Close();
-
-                foreach (var row in rows)
-                {
-                    if (IsProtectedValue(row.FeedTitle) && IsProtectedValue(row.Title) && IsProtectedValue(row.Link) && IsProtectedValue(row.Summary) && IsProtectedValue(row.Html) && IsProtectedValue(row.ImageUrl)) continue;
-                    using var update = connection.CreateCommand();
-                    update.Transaction = transaction;
-                    update.CommandText = """
-UPDATE rss_articles
-SET feed_title = $feedTitle, title = $title, link = $link, summary = $summary, html_content = $htmlContent, image_url = $imageUrl
-WHERE id = $id;
-""";
-                    update.Parameters.AddWithValue("$id", row.Id);
-                    update.Parameters.AddWithValue("$feedTitle", ProtectValue(UnprotectValue(row.FeedTitle)));
-                    update.Parameters.AddWithValue("$title", ProtectValue(UnprotectValue(row.Title)));
-                    update.Parameters.AddWithValue("$link", ProtectValue(UnprotectValue(row.Link)));
-                    update.Parameters.AddWithValue("$summary", ProtectValue(UnprotectValue(row.Summary)));
-                    update.Parameters.AddWithValue("$htmlContent", ProtectValue(UnprotectValue(row.Html)));
-                    update.Parameters.AddWithValue("$imageUrl", ProtectValue(UnprotectValue(row.ImageUrl)));
-                    update.ExecuteNonQuery();
-                }
-            }
-
-            using (var migrationComplete = connection.CreateCommand())
-            {
-                migrationComplete.Transaction = transaction;
-                migrationComplete.CommandText = "INSERT OR REPLACE INTO metadata(key, value) VALUES ($key, 'complete');";
-                migrationComplete.Parameters.AddWithValue("$key", SensitiveDataMigrationKey);
-                migrationComplete.ExecuteNonQuery();
-            }
-
-            transaction.Commit();
-        }
-
-        private static bool IsProtectedValue(string value)
-            => RssSensitiveDataProtector.IsProtected(value);
-
         private static string ProtectValue(string? value)
             => RssSensitiveDataProtector.Protect(value);
-
-        private static string UnprotectValue(string value)
-            => RssSensitiveDataProtector.Unprotect(value);
 
         private void SaveToDatabase()
         {

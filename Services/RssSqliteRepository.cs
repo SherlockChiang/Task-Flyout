@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace Task_Flyout.Services
 {
@@ -42,6 +43,7 @@ namespace Task_Flyout.Services
     internal sealed class RssSqliteRepository
     {
         private const int SchemaVersion = 1;
+        private const string SensitiveDataMigrationKey = "sensitive_data_dpapi_v1";
         private readonly string _connectionString;
         private readonly Func<bool> _isUnavailable;
         private readonly object _initializationLock = new();
@@ -235,6 +237,31 @@ ON CONFLICT(id) DO UPDATE SET name = excluded.name, sort_order = excluded.sort_o
             transaction.Commit();
         }
 
+        public void MigrateSensitiveData()
+        {
+            Initialize();
+            using var connection = OpenConnection();
+            using (var migrationCheck = connection.CreateCommand())
+            {
+                migrationCheck.CommandText = "SELECT value FROM metadata WHERE key = $key LIMIT 1;";
+                migrationCheck.Parameters.AddWithValue("$key", SensitiveDataMigrationKey);
+                if (string.Equals(migrationCheck.ExecuteScalar() as string, "complete", StringComparison.Ordinal))
+                    return;
+            }
+
+            using var transaction = connection.BeginTransaction();
+            ProtectColumns(connection, transaction, "rss_folders", new[] { "name" });
+            ProtectColumns(connection, transaction, "rss_subscriptions", new[] { "title", "url", "image_url" });
+            ProtectColumns(connection, transaction, "rss_articles", new[] { "feed_title", "title", "link", "summary", "html_content", "image_url" });
+
+            using var migrationComplete = connection.CreateCommand();
+            migrationComplete.Transaction = transaction;
+            migrationComplete.CommandText = "INSERT OR REPLACE INTO metadata(key, value) VALUES ($key, 'complete');";
+            migrationComplete.Parameters.AddWithValue("$key", SensitiveDataMigrationKey);
+            migrationComplete.ExecuteNonQuery();
+            transaction.Commit();
+        }
+
         public void RemoveFolder(string folderId)
         {
             Initialize();
@@ -340,6 +367,46 @@ ON CONFLICT(id) DO UPDATE SET
             command.Parameters.AddWithValue("$imageUrl", RssSensitiveDataProtector.Protect(article.ImageUrl));
             command.Parameters.AddWithValue("$localImagePath", article.LocalImagePath);
             command.Parameters.AddWithValue("$publishedTicks", article.PublishedUtcTicks);
+        }
+
+        private static void ProtectColumns(
+            SqliteConnection connection,
+            SqliteTransaction transaction,
+            string table,
+            IReadOnlyList<string> columns)
+        {
+            using var select = connection.CreateCommand();
+            select.Transaction = transaction;
+            select.CommandText = $"SELECT id, {string.Join(", ", columns)} FROM {table};";
+            using var reader = select.ExecuteReader();
+            var rows = new List<(string Id, string[] Values)>();
+            while (reader.Read())
+            {
+                var values = new string[columns.Count];
+                for (int index = 0; index < columns.Count; index++)
+                    values[index] = reader.GetString(index + 1);
+                rows.Add((reader.GetString(0), values));
+            }
+            reader.Close();
+
+            foreach (var row in rows)
+            {
+                if (row.Values.All(RssSensitiveDataProtector.IsProtected)) continue;
+
+                using var update = connection.CreateCommand();
+                update.Transaction = transaction;
+                var assignments = new string[columns.Count];
+                for (int index = 0; index < columns.Count; index++)
+                {
+                    string parameter = $"$value{index}";
+                    assignments[index] = $"{columns[index]} = {parameter}";
+                    update.Parameters.AddWithValue(parameter, RssSensitiveDataProtector.Protect(
+                        RssSensitiveDataProtector.Unprotect(row.Values[index])));
+                }
+                update.CommandText = $"UPDATE {table} SET {string.Join(", ", assignments)} WHERE id = $id;";
+                update.Parameters.AddWithValue("$id", row.Id);
+                update.ExecuteNonQuery();
+            }
         }
 
         internal SqliteConnection OpenConnection()

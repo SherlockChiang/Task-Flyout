@@ -165,6 +165,69 @@ VALUES ($id, 'sub-a', $feedTitle, $title, $link, $summary, $html, $imageUrl, '',
         Assert.Equal(0L, ScalarInt64(connection, "SELECT COUNT(*) FROM rss_articles;"));
     }
 
+    [Fact]
+    public void Sensitive_data_migration_encrypts_legacy_plaintext_and_is_idempotent()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.Initialize();
+        using (var connection = Open(databasePath))
+        {
+            Execute(connection, "INSERT INTO rss_folders(id, name) VALUES ('folder', 'Legacy folder');");
+            Execute(connection, "INSERT INTO rss_subscriptions(id, title, url, image_url) VALUES ('subscription', 'Legacy feed', 'https://example.test/private', 'https://example.test/feed.png');");
+            Execute(connection, """
+INSERT INTO rss_articles(id, subscription_id, feed_title, title, link, summary, html_content, image_url, local_image_path)
+VALUES ('article', 'subscription', 'Legacy feed', 'Legacy title', 'https://example.test/article', 'Legacy summary', '<p>Legacy body</p>', 'https://example.test/article.png', '');
+""");
+        }
+
+        repository.MigrateSensitiveData();
+
+        string protectedFolder;
+        using (var connection = Open(databasePath))
+        {
+            protectedFolder = ScalarString(connection, "SELECT name FROM rss_folders WHERE id = 'folder';");
+            Assert.True(RssSensitiveDataProtector.IsProtected(protectedFolder));
+            Assert.Equal("Legacy folder", RssSensitiveDataProtector.Unprotect(protectedFolder));
+            Assert.True(RssSensitiveDataProtector.IsProtected(ScalarString(connection, "SELECT url FROM rss_subscriptions WHERE id = 'subscription';")));
+            Assert.True(RssSensitiveDataProtector.IsProtected(ScalarString(connection, "SELECT html_content FROM rss_articles WHERE id = 'article';")));
+            Assert.Equal("complete", ScalarString(connection, "SELECT value FROM metadata WHERE key = 'sensitive_data_dpapi_v1';"));
+        }
+
+        repository.MigrateSensitiveData();
+
+        using var verification = Open(databasePath);
+        Assert.Equal(protectedFolder, ScalarString(verification, "SELECT name FROM rss_folders WHERE id = 'folder';"));
+    }
+
+    [Fact]
+    public void Sensitive_data_migration_rolls_back_and_does_not_mark_failure_complete()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.Initialize();
+        using (var connection = Open(databasePath))
+        {
+            Execute(connection, "INSERT INTO rss_folders(id, name) VALUES ('folder', 'Legacy folder');");
+            Execute(connection, "INSERT INTO rss_subscriptions(id, title, url) VALUES ('subscription', 'Legacy feed', 'https://example.test');");
+            Execute(connection, """
+CREATE TRIGGER fail_sensitive_migration
+BEFORE UPDATE OF title ON rss_subscriptions
+WHEN NEW.title LIKE 'dpapi:v1:%'
+BEGIN
+    SELECT RAISE(ABORT, 'injected migration failure');
+END;
+""");
+        }
+
+        Assert.Throws<SqliteException>(() => repository.MigrateSensitiveData());
+
+        using var verification = Open(databasePath);
+        Assert.Equal("Legacy folder", ScalarString(verification, "SELECT name FROM rss_folders WHERE id = 'folder';"));
+        Assert.Equal("Legacy feed", ScalarString(verification, "SELECT title FROM rss_subscriptions WHERE id = 'subscription';"));
+        Assert.Equal(0L, ScalarInt64(verification, "SELECT COUNT(*) FROM metadata WHERE key = 'sensitive_data_dpapi_v1';"));
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
