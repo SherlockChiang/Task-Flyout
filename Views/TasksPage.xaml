@@ -211,9 +211,10 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <CheckBox Grid.Column="0"
-                                                  IsChecked="{x:Bind IsCompleted, Mode=TwoWay}"
-                                                  Click="TaskCheckBox_Click"
+                                         <CheckBox Grid.Column="0"
+                                                   IsChecked="{x:Bind IsCompleted, Mode=TwoWay}"
+                                                   Click="TaskCheckBox_Click"
+                                                   AutomationProperties.Name="{x:Bind Title}"
                                                   VerticalAlignment="Top"
                                                   MinWidth="0"
                                                   Padding="0"
@@ -289,9 +290,10 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <CheckBox Grid.Column="0"
-                                                  IsChecked="{x:Bind IsCompleted, Mode=TwoWay}"
-                                                  Click="TaskCheckBox_Click"
+                                         <CheckBox Grid.Column="0"
+                                                   IsChecked="{x:Bind IsCompleted, Mode=TwoWay}"
+                                                   Click="TaskCheckBox_Click"
+                                                   AutomationProperties.Name="{x:Bind Title}"
                                                   VerticalAlignment="Top"
                                                   MinWidth="0"
                                                   Padding="0"

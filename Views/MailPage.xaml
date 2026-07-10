@@ -111,8 +111,8 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock x:Uid="MailPage_InboxHeader" x:Name="MessageListTitle" Text="收件箱" FontWeight="SemiBold"/>
-                            <TextBlock x:Uid="MailPage_SelectFolderPrompt" x:Name="MessageListSubtitle" Text="请选择左侧文件夹" FontSize="12"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                             <TextBlock x:Uid="MailPage_SelectFolderPrompt" x:Name="MessageListSubtitle" Text="请选择左侧文件夹" FontSize="12"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.LiveSetting="Polite"/>
                         </StackPanel>
                         <ProgressRing x:Name="LoadingRing" Grid.Column="1" IsActive="False" Width="24" Height="24"/>
                     </Grid>
@@ -385,9 +385,9 @@
                                 <TextBox x:Name="ComposeSubjectBox" x:Uid="MailPage_ComposeSubject" Header="标题"/>
                                 <TextBox x:Name="ComposeBodyBox" x:Uid="MailPage_ComposeBody" Header="内容" AcceptsReturn="True"
                                          TextWrapping="Wrap" MinHeight="220"/>
-                                <TextBlock x:Name="ComposeStatusText" FontSize="13"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                           TextWrapping="WrapWholeWords"/>
+                                 <TextBlock x:Name="ComposeStatusText" FontSize="13"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            TextWrapping="WrapWholeWords" AutomationProperties.LiveSetting="Polite"/>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>

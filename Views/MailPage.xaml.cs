@@ -53,6 +53,7 @@ namespace Task_Flyout.Views
         private bool _isLoadingMessages;
         private bool _suppressSelectionClear;
         private bool _suppressUnreadToggle;
+        private int _messageLoadVersion;
         private DateTimeOffset? _lastMessageLoadSucceededAt;
         private Task? _refreshAccountsTask;
         internal bool IsOpeningFromNotification { get; set; }
@@ -87,6 +88,7 @@ namespace Task_Flyout.Views
 
         public void DisposeLikeCleanup()
         {
+            _messageLoadVersion++;
             ReleaseMessageBodies();
             _selectedItem = null;
             _selectedAccount = null;
@@ -442,6 +444,10 @@ namespace Task_Flyout.Views
         {
             if (_mailService == null || _selectedAccount == null || _selectedFolder == null) return;
 
+            var loadVersion = ++_messageLoadVersion;
+            var account = _selectedAccount;
+            var folder = _selectedFolder;
+
             // A fresh load (folder switch, refresh, toggle) starts from the base page
             // size again; only "Load more" keeps the grown window.
             if (!loadMore)
@@ -453,19 +459,21 @@ namespace Task_Flyout.Views
             RefreshButton.IsEnabled = false;
             LoadMoreButton.IsEnabled = false;
             UnreadOnlyToggle.IsEnabled = false;
-            MessageListTitle.Text = _selectedFolder.DisplayName;
-            SetMessageListStatus($"{_selectedAccount.DisplayTitle} · {(_loader.GetStringOrDefault("TextLoading") ?? "Loading")}");
+            MessageListTitle.Text = folder.DisplayName;
+            SetMessageListStatus($"{account.DisplayTitle} · {(_loader.GetStringOrDefault("TextLoading") ?? "Loading")}");
 
             try
             {
-                var messages = await _mailService.FetchMessagesAsync(_selectedAccount, _selectedFolder, UnreadOnlyToggle.IsOn, pageSize: _loadedCount, forceRefresh: forceRefresh || loadMore);
+                var messages = await _mailService.FetchMessagesAsync(account, folder, UnreadOnlyToggle.IsOn, pageSize: _loadedCount, forceRefresh: forceRefresh || loadMore);
+                if (loadVersion != _messageLoadVersion || !ReferenceEquals(account, _selectedAccount) || !ReferenceEquals(folder, _selectedFolder))
+                    return;
                 var previousSelectedId = !string.IsNullOrWhiteSpace(preferredMessageId) ? preferredMessageId : _selectedItem?.Id;
                 _items.Clear();
                 foreach (var item in messages.OrderByDescending(item => item.RawReceivedTime))
                     _items.Add(item);
 
                 _lastMessageLoadSucceededAt = DateTimeOffset.Now;
-                SetMessageListStatus($"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}");
+                SetMessageListStatus($"{account.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}");
 
                 // Offer "Load more" only while the server filled the whole window (so older
                 // messages likely remain) and we haven't hit the fetch ceiling.
@@ -492,11 +500,14 @@ namespace Task_Flyout.Views
             }
             finally
             {
-                _isLoadingMessages = false;
-                LoadingRing.IsActive = false;
-                RefreshButton.IsEnabled = true;
-                LoadMoreButton.IsEnabled = true;
-                UnreadOnlyToggle.IsEnabled = true;
+                if (loadVersion == _messageLoadVersion)
+                {
+                    _isLoadingMessages = false;
+                    LoadingRing.IsActive = false;
+                    RefreshButton.IsEnabled = true;
+                    LoadMoreButton.IsEnabled = true;
+                    UnreadOnlyToggle.IsEnabled = true;
+                }
             }
         }
 
@@ -1297,8 +1308,25 @@ body { background-color: {{background}} !important; }
             return false;
         }
 
-        private void CancelComposeButton_Click(object sender, RoutedEventArgs e)
+        private async void CancelComposeButton_Click(object sender, RoutedEventArgs e)
         {
+            if (!string.IsNullOrWhiteSpace(ComposeToBox.Text) ||
+                !string.IsNullOrWhiteSpace(ComposeSubjectBox.Text) ||
+                !string.IsNullOrWhiteSpace(ComposeBodyBox.Text))
+            {
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = XamlRoot,
+                    Title = _loader.GetStringOrDefault("TextDiscardDraftTitle") ?? "Discard draft?",
+                    Content = _loader.GetStringOrDefault("TextDiscardDraftContent") ?? "Your unsent message will be lost.",
+                    PrimaryButtonText = _loader.GetStringOrDefault("TextDiscard") ?? "Discard",
+                    CloseButtonText = _loader.GetStringOrDefault("TextContinueEditing") ?? "Keep editing",
+                    DefaultButton = ContentDialogButton.Close
+                };
+                if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+                    return;
+            }
+
             ComposePanel.Visibility = Visibility.Collapsed;
             ClearDetail();
         }

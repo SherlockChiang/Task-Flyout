@@ -722,9 +722,9 @@ namespace Task_Flyout.Views
             return null;
         }
 
-        private void Article_Tapped(object sender, TappedRoutedEventArgs e)
+        private void ArticleList_ItemClick(object sender, ItemClickEventArgs e)
         {
-            if (sender is not FrameworkElement element || element.DataContext is not RssArticle article) return;
+            if (e.ClickedItem is not RssArticle article) return;
             _ = OpenArticleReaderAsync(article);
         }
 
