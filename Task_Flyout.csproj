@@ -14,6 +14,7 @@
         <WinUISDKReferences>false</WinUISDKReferences>
         <EnableMsixTooling>true</EnableMsixTooling>
         <Nullable>enable</Nullable>
+        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 		<ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
 		<!-- The unit-test project lives under Tests\; keep its sources (and its xUnit
 		     global usings) out of the app's default **/*.cs globbing. -->

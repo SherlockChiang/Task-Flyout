@@ -84,8 +84,8 @@ jobs:
       - name: Restore dependencies
         shell: pwsh
         run: |
-          dotnet restore $env:PROJECT_FILE
-          dotnet restore $env:TEST_PROJECT_FILE
+          dotnet restore $env:PROJECT_FILE --locked-mode
+          dotnet restore $env:TEST_PROJECT_FILE --locked-mode
 
       - name: Run tests
         shell: pwsh
