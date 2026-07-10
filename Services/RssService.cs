@@ -185,6 +185,8 @@ namespace Task_Flyout.Services
         private long _dataGeneration;
         private bool _dataClearInProgress;
 
+        public static event EventHandler? LocalDataCleared;
+
         public RssService()
         {
             lock (InstancesLock)
@@ -202,6 +204,7 @@ namespace Task_Flyout.Services
                 foreach (var instance in instances)
                     instance.BeginDataClear();
 
+                bool clearedSuccessfully = false;
                 try
                 {
                     SqliteConnection.ClearAllPools();
@@ -231,6 +234,7 @@ namespace Task_Flyout.Services
 
                     if (errors.Count > 0)
                         throw new IOException("One or more RSS data files could not be removed.", new AggregateException(errors));
+                    clearedSuccessfully = true;
                 }
                 finally
                 {
@@ -238,7 +242,21 @@ namespace Task_Flyout.Services
                         instance.EndDataClear();
                     GlobalDataClearInProgress = false;
                 }
+
+                if (clearedSuccessfully)
+                    RaiseLocalDataCleared();
             });
+
+        private static void RaiseLocalDataCleared()
+        {
+            if (LocalDataCleared == null) return;
+
+            foreach (EventHandler handler in LocalDataCleared.GetInvocationList())
+            {
+                try { handler(null, EventArgs.Empty); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"RSS data-cleared handler failed: {ex.Message}"); }
+            }
+        }
 
         private static List<RssService> GetLiveInstances()
         {

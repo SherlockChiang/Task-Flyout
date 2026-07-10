@@ -58,6 +58,7 @@ namespace Task_Flyout.Views
 
         public void DisposeLikeCleanup()
         {
+            RssService.LocalDataCleared -= RssService_LocalDataCleared;
             _selectedArticle = null;
             CancelRssResourceRequests();
             _selectedSubscriptionId = null;
@@ -85,6 +86,8 @@ namespace Task_Flyout.Views
 
         private async void RssPage_Loaded(object sender, RoutedEventArgs e)
         {
+            RssService.LocalDataCleared -= RssService_LocalDataCleared;
+            RssService.LocalDataCleared += RssService_LocalDataCleared;
             try
             {
                 LoadFolders();
@@ -680,6 +683,27 @@ namespace Task_Flyout.Views
                 SetLoading(false);
                 _isRefreshing = false;
             }
+        }
+
+        private void RssService_LocalDataCleared(object? sender, EventArgs e)
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (!IsLoaded) return;
+
+                _selectedArticle = null;
+                _selectedSubscriptionId = null;
+                _selectedFolderId = null;
+                _lastArticleLoadSucceededAt = null;
+                CancelRssResourceRequests();
+                ReleaseRssWebView();
+                ShowArticleList();
+                ArticleListTitle.Text = _loader.GetStringOrDefault("TextAllArticles") ?? "All Articles";
+                LoadFolders();
+                LoadSubscriptions();
+                BuildSubscriptionTree();
+                ResetAndLoadCachedArticles();
+            });
         }
 
         private static string FormatRssRefreshError(Exception ex)

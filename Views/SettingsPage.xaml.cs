@@ -560,7 +560,7 @@ namespace Task_Flyout.Views
             try
             {
                 await RssService.ClearLocalDataAsync();
-                WebViewCacheStatusText.Text = GetSafeString("TextRssDataCleared", "RSS local data cleared. Restart the RSS page to reload it.");
+                WebViewCacheStatusText.Text = GetSafeString("TextRssDataCleared", "RSS local data cleared.");
             }
             catch
             {
