@@ -789,6 +789,15 @@
   <data name="TextSendStatusUnknown" xml:space="preserve">
     <value>发送操作已超时。再次尝试前，请先检查“已发送”文件夹。</value>
   </data>
+  <data name="MailPage_SelectFolderPrompt.AutomationProperties.Name" xml:space="preserve">
+    <value>邮件列表状态</value>
+  </data>
+  <data name="MailPage_ComposeStatus.AutomationProperties.Name" xml:space="preserve">
+    <value>邮件发送状态</value>
+  </data>
+  <data name="RssPage_ArticleStatus.AutomationProperties.Name" xml:space="preserve">
+    <value>RSS 文章状态</value>
+  </data>
   <data name="TextClearRssDataTitle" xml:space="preserve">
     <value>清除 RSS 本地数据？</value>
   </data>

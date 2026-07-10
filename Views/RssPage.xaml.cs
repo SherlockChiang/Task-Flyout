@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.Web.WebView2.Core;
@@ -720,6 +721,9 @@ namespace Task_Flyout.Views
             if (ArticleListSubtitle == null) return;
 
             ArticleListSubtitle.Text = StatusMessageFormatter.Format(message, _lastArticleLoadSucceededAt, isError);
+            var peer = FrameworkElementAutomationPeer.FromElement(ArticleListSubtitle) ??
+                       FrameworkElementAutomationPeer.CreatePeerForElement(ArticleListSubtitle);
+            peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
         }
 
         private void AttachArticleScrollViewer()

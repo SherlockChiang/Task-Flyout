@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.Web.WebView2.Core;
 using System;
@@ -707,7 +708,7 @@ namespace Task_Flyout.Views
             ComposeToBox.Text = replyTo == null ? "" : GetReplyRecipient(replyTo);
             ComposeSubjectBox.Text = replyTo == null ? "" : CreateReplySubject(replyTo.Subject);
             ComposeBodyBox.Text = replyTo == null ? "" : CreateReplyBody(replyTo);
-            ComposeStatusText.Text = accounts.Count == 0 ? (_loader.GetStringOrDefault("TextAddMailAccountFirst") ?? "Please add an email account first.") : "";
+            SetComposeStatus(accounts.Count == 0 ? (_loader.GetStringOrDefault("TextAddMailAccountFirst") ?? "Please add an email account first.") : "");
 
             ComposePanel.Visibility = Visibility.Visible;
             AddAccountPanel.Visibility = Visibility.Collapsed;
@@ -1000,6 +1001,21 @@ namespace Task_Flyout.Views
         {
             if (MessageListSubtitle == null) return;
             MessageListSubtitle.Text = StatusMessageFormatter.Format(message, _lastMessageLoadSucceededAt, isError);
+            RaiseLiveRegionChanged(MessageListSubtitle);
+        }
+
+        private void SetComposeStatus(string message)
+        {
+            if (ComposeStatusText == null) return;
+            ComposeStatusText.Text = message;
+            RaiseLiveRegionChanged(ComposeStatusText);
+        }
+
+        private static void RaiseLiveRegionChanged(FrameworkElement element)
+        {
+            var peer = FrameworkElementAutomationPeer.FromElement(element) ??
+                       FrameworkElementAutomationPeer.CreatePeerForElement(element);
+            peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
         }
 
         private void ClearDetail()
@@ -1494,50 +1510,52 @@ body { background-color: {{background}} !important; }
 
             if (ComposeFromBox.SelectedItem is not ComboBoxItem selectedFrom)
             {
-                ComposeStatusText.Text = _loader.GetStringOrDefault("TextSelectSender") ?? "Please select a sender.";
+                SetComposeStatus(_loader.GetStringOrDefault("TextSelectSender") ?? "Please select a sender.");
                 return;
             }
 
             var account = _mailService.GetAccounts().FirstOrDefault(a => a.Id == selectedFrom.Tag?.ToString());
             if (account == null)
             {
-                ComposeStatusText.Text = _loader.GetStringOrDefault("TextSenderNotFound") ?? "Sender account not found.";
+                SetComposeStatus(_loader.GetStringOrDefault("TextSenderNotFound") ?? "Sender account not found.");
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(ComposeToBox.Text))
             {
-                ComposeStatusText.Text = _loader.GetStringOrDefault("TextEnterRecipient") ?? "Please enter a recipient.";
+                SetComposeStatus(_loader.GetStringOrDefault("TextEnterRecipient") ?? "Please enter a recipient.");
                 return;
             }
 
             _isSendingMail = true;
             SendComposeButton.IsEnabled = false;
             CancelComposeButton.IsEnabled = false;
-            ComposeStatusText.Text = _loader.GetStringOrDefault("TextSending") ?? "Sending...";
+            SetComposeStatus(_loader.GetStringOrDefault("TextSending") ?? "Sending...");
 
             try
             {
                 await _mailService.SendMailAsync(account, ComposeToBox.Text, ComposeSubjectBox.Text, ComposeBodyBox.Text);
-                ComposeStatusText.Text = _loader.GetStringOrDefault("TextMailSent") ?? "Email sent.";
+                SetComposeStatus(_loader.GetStringOrDefault("TextMailSent") ?? "Email sent.");
                 ComposePanel.Visibility = Visibility.Collapsed;
                 ClearDetail();
             }
             catch (MailSendStatusUnknownException ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Send mail status unknown: {ex.Message}");
-                ComposeStatusText.Text = _loader.GetStringOrDefault("TextSendStatusUnknown") ?? "Sending timed out. Check your Sent folder before trying again.";
+                SetComposeStatus(_loader.GetStringOrDefault("TextSendStatusUnknown") ?? "Sending timed out. Check your Sent folder before trying again.");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Send mail failed: {ex.Message}");
-                ComposeStatusText.Text = _loader.GetStringOrDefault("TextSendFailed") ?? "Failed to send email. Please check network and account settings.";
+                SetComposeStatus(_loader.GetStringOrDefault("TextSendFailed") ?? "Failed to send email. Please check network and account settings.");
             }
             finally
             {
                 _isSendingMail = false;
                 SendComposeButton.IsEnabled = true;
                 CancelComposeButton.IsEnabled = true;
+                if (ComposePanel.Visibility == Visibility.Visible)
+                    SendComposeButton.Focus(FocusState.Programmatic);
             }
         }
 

@@ -385,7 +385,7 @@
                                 <TextBox x:Name="ComposeSubjectBox" x:Uid="MailPage_ComposeSubject" Header="标题"/>
                                 <TextBox x:Name="ComposeBodyBox" x:Uid="MailPage_ComposeBody" Header="内容" AcceptsReturn="True"
                                          TextWrapping="Wrap" MinHeight="220"/>
-                                 <TextBlock x:Name="ComposeStatusText" FontSize="13"
+                                 <TextBlock x:Name="ComposeStatusText" x:Uid="MailPage_ComposeStatus" FontSize="13"
                                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                             TextWrapping="WrapWholeWords" AutomationProperties.LiveSetting="Polite"/>
                             </StackPanel>

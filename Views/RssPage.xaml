@@ -132,7 +132,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock x:Name="ArticleListTitle" x:Uid="RssPage_AllArticles" Text="全部文章" FontSize="18" FontWeight="SemiBold"/>
-                            <TextBlock x:Name="ArticleListSubtitle" Text="向下滚动加载更多" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.LiveSetting="Polite"/>
+                            <TextBlock x:Name="ArticleListSubtitle" x:Uid="RssPage_ArticleStatus" Text="向下滚动加载更多" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.LiveSetting="Polite"/>
                         </StackPanel>
                         <Button x:Name="RefreshButton" Grid.Column="1" Click="RefreshButton_Click"
                                 AutomationProperties.Name="刷新 RSS 文章" ToolTipService.ToolTip="刷新 RSS 文章">
