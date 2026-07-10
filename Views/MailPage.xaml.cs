@@ -471,9 +471,23 @@ namespace Task_Flyout.Views
                 if (loadVersion != _messageLoadVersion || !ReferenceEquals(account, _selectedAccount) || !ReferenceEquals(folder, _selectedFolder))
                     return;
                 var previousSelectedId = !string.IsNullOrWhiteSpace(preferredMessageId) ? preferredMessageId : _selectedItem?.Id;
-                _items.Clear();
-                foreach (var item in messages.OrderByDescending(item => item.RawReceivedTime))
-                    _items.Add(item);
+                if (loadMore)
+                {
+                    // Providers currently return an expanded window rather than a cursor
+                    // page. Keep realized rows intact and append only the newly exposed IDs.
+                    var existingIds = _items.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
+                    foreach (var item in messages.OrderByDescending(item => item.RawReceivedTime))
+                    {
+                        if (existingIds.Add(item.Id))
+                            _items.Add(item);
+                    }
+                }
+                else
+                {
+                    _items.Clear();
+                    foreach (var item in messages.OrderByDescending(item => item.RawReceivedTime))
+                        _items.Add(item);
+                }
 
                 _lastMessageLoadSucceededAt = DateTimeOffset.Now;
                 SetMessageListStatus($"{account.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}");
