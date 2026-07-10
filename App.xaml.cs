@@ -98,7 +98,7 @@ namespace Task_Flyout
             _uiSettings.ColorValuesChanged += UiSettings_ColorValuesChanged;
             UpdateTrayIconTheme();
             _trayIcon.ForceCreate(enablesEfficiencyMode: EfficiencyModeEnabledSetting);
-            MailService.StartMailPolling();
+            QueueMailPollingStart();
             startup.Mark("tray-mail");
 
             _trayIcon.LeftClickCommand = new RelayCommand(() => EnsureFlyoutWindow().ToggleFlyout());
@@ -202,6 +202,22 @@ namespace Task_Flyout
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"Initial notification check failed: {ex.Message}");
+                }
+            });
+        }
+
+        private void QueueMailPollingStart()
+        {
+            MainDispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, async () =>
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(3));
+                    MailService.StartMailPolling();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Deferred mail polling start failed: {ex.Message}");
                 }
             });
         }
