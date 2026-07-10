@@ -13,6 +13,9 @@ namespace Task_Flyout.Services
         private static readonly object InitLock = new();
         private static bool _initialized;
         private static string? _connectionString;
+#if TASKFLYOUT_TESTS
+        private static string? _testDataPath;
+#endif
 
         public static string? ReadProtectedText(string scope, string key)
         {
@@ -132,6 +135,24 @@ CREATE TABLE IF NOT EXISTS protected_store (
         }
 
         private static string GetAppDataPath()
-            => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TaskFlyout");
+        {
+#if TASKFLYOUT_TESTS
+            if (!string.IsNullOrWhiteSpace(_testDataPath)) return _testDataPath;
+#endif
+            return AppDataPathHelper.RoamingRoot;
+        }
+
+#if TASKFLYOUT_TESTS
+        internal static void SetDataPathForTests(string? path)
+        {
+            lock (InitLock)
+            {
+                SqliteConnection.ClearAllPools();
+                _testDataPath = path;
+                _connectionString = null;
+                _initialized = false;
+            }
+        }
+#endif
     }
 }

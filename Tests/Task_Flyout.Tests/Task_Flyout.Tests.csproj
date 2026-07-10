@@ -10,6 +10,7 @@
     <IsPackable>false</IsPackable>
     <EnableMsixTooling>false</EnableMsixTooling>
     <UseWinUI>false</UseWinUI>
+    <DefineConstants>$(DefineConstants);TASKFLYOUT_TESTS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -51,6 +52,8 @@
     <Compile Include="..\..\Services\SyncItemMappingPolicy.cs" Link="Source\SyncItemMappingPolicy.cs" />
     <Compile Include="..\..\Services\SyncPaginationPolicy.cs" Link="Source\SyncPaginationPolicy.cs" />
     <Compile Include="..\..\Services\RecurrencePolicy.cs" Link="Source\RecurrencePolicy.cs" />
+    <Compile Include="..\..\Services\AppDataPathHelper.cs" Link="Source\AppDataPathHelper.cs" />
+    <Compile Include="..\..\Services\LocalSqliteStore.cs" Link="Source\LocalSqliteStore.cs" />
   </ItemGroup>
 
 </Project>
