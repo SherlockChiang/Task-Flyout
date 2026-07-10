@@ -80,4 +80,22 @@ public class WebResourcePolicyTests
     {
         Assert.False(WebResourcePolicy.IsAllowedRssRemoteResource(uri));
     }
+
+    [Theory]
+    [InlineData("https://example.com/image.png")]
+    [InlineData("https://8.8.8.8/image.png")]
+    public void Mail_remote_image_policy_allows_public_https(string uri)
+    {
+        Assert.True(WebResourcePolicy.ShouldProxyMailRemoteImage(uri));
+    }
+
+    [Theory]
+    [InlineData("http://example.com/image.png")]
+    [InlineData("https://localhost/image.png")]
+    [InlineData("https://10.0.0.1/image.png")]
+    [InlineData("file:///c:/image.png")]
+    public void Mail_remote_image_policy_blocks_non_public_https(string uri)
+    {
+        Assert.False(WebResourcePolicy.ShouldProxyMailRemoteImage(uri));
+    }
 }

@@ -9,10 +9,13 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Microsoft.Windows.ApplicationModel.Resources;
 using Windows.System;
+using Windows.Storage.Streams;
+using System.Runtime.InteropServices.WindowsRuntime;
 
 namespace Task_Flyout.Views
 {
@@ -946,6 +949,7 @@ namespace Task_Flyout.Views
         private bool _webView2Configured;
         private bool _isInternalMailHtmlNavigation;
         private WebView2? _detailHtmlView;
+        private CancellationTokenSource? _mailResourceCts;
 
         // Per-message "show images this once" override for the remote-image privacy block.
         private bool _showRemoteImagesForCurrentMessage;
@@ -1005,6 +1009,8 @@ namespace Task_Flyout.Views
                             coreWebView.WebResourceRequested += MailHtml_WebResourceRequested;
                         }
                         if (_selectedItem?.Id != itemId) return;
+                        CancelMailResourceRequests();
+                        _mailResourceCts = new CancellationTokenSource();
                         _isInternalMailHtmlNavigation = true;
                         htmlView.NavigateToString(htmlDocument);
                         return;
@@ -1051,11 +1057,58 @@ namespace Task_Flyout.Views
             OpenSafeExternalUri(args.Uri);
         }
 
-        private void MailHtml_WebResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs args)
+        private async void MailHtml_WebResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs args)
         {
-            if (sender is CoreWebView2 coreWebView)
-                WebView2RuntimeService.BlockUnsafeEmbeddedResource(coreWebView, args);
+            if (sender is not CoreWebView2 coreWebView) return;
+            var uri = args.Request?.Uri;
+
+            if (WebView2RuntimeService.IsAllowedMailNonRemoteResource(uri))
+                return;
+
+            if (args.ResourceContext == CoreWebView2WebResourceContext.Image &&
+                WebView2RuntimeService.ShouldProxyMailRemoteImage(uri))
+            {
+                var deferral = args.GetDeferral();
+                try
+                {
+                    var cts = _mailResourceCts;
+                    if (cts == null || cts.IsCancellationRequested)
+                    {
+                        args.Response = BlockedMailResponse(coreWebView);
+                        return;
+                    }
+
+                    var fetched = await new RssService().FetchRemoteImageSafelyAsync(uri!, cts.Token);
+                    if (fetched != null)
+                    {
+                        var stream = new InMemoryRandomAccessStream();
+                        await stream.WriteAsync(fetched.Value.Bytes.AsBuffer());
+                        stream.Seek(0);
+                        args.Response = coreWebView.Environment.CreateWebResourceResponse(
+                            stream, 200, "OK", $"Content-Type: {fetched.Value.ContentType}");
+                    }
+                    else
+                    {
+                        args.Response = BlockedMailResponse(coreWebView);
+                    }
+                }
+                catch
+                {
+                    args.Response = BlockedMailResponse(coreWebView);
+                }
+                finally
+                {
+                    deferral.Complete();
+                }
+                return;
+            }
+
+            args.Response = BlockedMailResponse(coreWebView);
         }
+
+        private static CoreWebView2WebResourceResponse BlockedMailResponse(CoreWebView2 coreWebView)
+            => coreWebView.Environment.CreateWebResourceResponse(
+                new InMemoryRandomAccessStream(), 403, "Blocked", "Content-Type: text/plain");
 
         private WebView2 EnsureDetailHtmlView()
         {
@@ -1077,6 +1130,7 @@ namespace Task_Flyout.Views
 
         private void ReleaseMailWebView()
         {
+            CancelMailResourceRequests();
             var webView = _detailHtmlView;
             if (webView == null) return;
 
@@ -1098,6 +1152,14 @@ namespace Task_Flyout.Views
             DetailHtmlViewHost.Children.Clear();
             _detailHtmlView = null;
             _webView2Configured = false;
+        }
+
+        private void CancelMailResourceRequests()
+        {
+            try { _mailResourceCts?.Cancel(); }
+            catch { }
+            _mailResourceCts?.Dispose();
+            _mailResourceCts = null;
         }
 
         private void ShowPlainTextMailBody(MailItem item)

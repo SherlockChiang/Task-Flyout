@@ -53,5 +53,13 @@ namespace Task_Flyout.Services
 
             return !NetworkSafety.IsUnsafeHost(uri);
         }
+
+        public static bool IsAllowedMailNonRemoteResource(string? uriText)
+            => IsAllowedRssNonRemoteResource(uriText);
+
+        // Mail remote content is deliberately stricter than generic embedded content: it
+        // must be an HTTPS image and is fetched by the app rather than by WebView2.
+        public static bool ShouldProxyMailRemoteImage(string? uriText)
+            => IsAllowedRssRemoteResource(uriText);
     }
 }

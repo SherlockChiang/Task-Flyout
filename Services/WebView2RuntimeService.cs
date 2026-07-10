@@ -78,6 +78,12 @@ namespace Task_Flyout.Services
             return WebResourcePolicy.IsAllowedRssRemoteResource(uriText);
         }
 
+        public static bool IsAllowedMailNonRemoteResource(string? uriText)
+            => WebResourcePolicy.IsAllowedMailNonRemoteResource(uriText);
+
+        public static bool ShouldProxyMailRemoteImage(string? uriText)
+            => WebResourcePolicy.ShouldProxyMailRemoteImage(uriText);
+
         private static void PruneCacheIfNeeded(string path)
         {
             try
