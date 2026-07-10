@@ -157,9 +157,7 @@ namespace Task_Flyout.Services
         private const int MaxRedirects = 5;
         private const int MaxFeedUrlLength = 4096;
         private const string ImageCacheDirectoryName = "RssImages";
-        private const string ProtectedValuePrefix = "dpapi:v1:";
         private const string SensitiveDataMigrationKey = "sensitive_data_dpapi_v1";
-        private static readonly byte[] SensitiveDataEntropy = Encoding.UTF8.GetBytes("TaskFlyout.RssSensitiveData.v1");
         // This flows only while fetching a user-entered local source. Redirects always
         // clear it so a public feed cannot pivot into a private network address.
         private static readonly AsyncLocal<bool> AllowCurrentLocalNetworkRequest = new();
@@ -1257,7 +1255,7 @@ CREATE TABLE IF NOT EXISTS rss_articles (
                     cache.Folders.Add(new RssFolder
                     {
                         Id = reader.GetString(0),
-                        Name = UnprotectValue(reader.GetString(1)),
+                        Name = RssSensitiveDataProtector.Unprotect(reader.GetString(1)),
                         SortOrder = reader.GetInt32(2)
                     });
                 }
@@ -1272,10 +1270,10 @@ CREATE TABLE IF NOT EXISTS rss_articles (
                     cache.Subscriptions.Add(new RssSubscription
                     {
                         Id = reader.GetString(0),
-                        Title = UnprotectValue(reader.GetString(1)),
-                        Url = UnprotectValue(reader.GetString(2)),
+                        Title = RssSensitiveDataProtector.Unprotect(reader.GetString(1)),
+                        Url = RssSensitiveDataProtector.Unprotect(reader.GetString(2)),
                         FolderId = reader.GetString(3),
-                        ImageUrl = UnprotectValue(reader.GetString(4)),
+                        ImageUrl = RssSensitiveDataProtector.Unprotect(reader.GetString(4)),
                         LocalImagePath = reader.GetString(5),
                         LastFetchedAt = FromTicks(reader.GetInt64(6))
                     });
@@ -1349,7 +1347,7 @@ LIMIT $take OFFSET $skip;
                 command.CommandText = "SELECT html_content FROM rss_articles WHERE id = $id LIMIT 1;";
                 command.Parameters.AddWithValue("$id", articleId);
                 var value = command.ExecuteScalar();
-                return UnprotectValue(value as string ?? "");
+                return RssSensitiveDataProtector.Unprotect(value as string ?? "");
             }
             catch (Exception ex)
             {
@@ -1364,12 +1362,12 @@ LIMIT $take OFFSET $skip;
             {
                 Id = reader.GetString(0),
                 SubscriptionId = reader.GetString(1),
-                FeedTitle = UnprotectValue(reader.GetString(2)),
-                Title = UnprotectValue(reader.GetString(3)),
-                Link = UnprotectValue(reader.GetString(4)),
-                Summary = UnprotectValue(reader.GetString(5)),
+                FeedTitle = RssSensitiveDataProtector.Unprotect(reader.GetString(2)),
+                Title = RssSensitiveDataProtector.Unprotect(reader.GetString(3)),
+                Link = RssSensitiveDataProtector.Unprotect(reader.GetString(4)),
+                Summary = RssSensitiveDataProtector.Unprotect(reader.GetString(5)),
                 HtmlContent = "",
-                ImageUrl = UnprotectValue(reader.GetString(6)),
+                ImageUrl = RssSensitiveDataProtector.Unprotect(reader.GetString(6)),
                 LocalImagePath = reader.GetString(7),
                 PublishedAt = FromTicks(reader.GetInt64(8))
             };
@@ -1653,32 +1651,13 @@ WHERE id = $id;
         }
 
         private static bool IsProtectedValue(string value)
-            => value.StartsWith(ProtectedValuePrefix, StringComparison.Ordinal);
+            => RssSensitiveDataProtector.IsProtected(value);
 
         private static string ProtectValue(string? value)
-        {
-            value ??= "";
-            if (IsProtectedValue(value)) return value;
-            var bytes = Encoding.UTF8.GetBytes(value);
-            var encrypted = ProtectedData.Protect(bytes, SensitiveDataEntropy, DataProtectionScope.CurrentUser);
-            return ProtectedValuePrefix + Convert.ToBase64String(encrypted);
-        }
+            => RssSensitiveDataProtector.Protect(value);
 
         private static string UnprotectValue(string value)
-        {
-            if (!IsProtectedValue(value)) return value;
-
-            try
-            {
-                var encrypted = Convert.FromBase64String(value[ProtectedValuePrefix.Length..]);
-                var decrypted = ProtectedData.Unprotect(encrypted, SensitiveDataEntropy, DataProtectionScope.CurrentUser);
-                return Encoding.UTF8.GetString(decrypted);
-            }
-            catch
-            {
-                return "";
-            }
-        }
+            => RssSensitiveDataProtector.Unprotect(value);
 
         private void SaveToDatabase()
         {
