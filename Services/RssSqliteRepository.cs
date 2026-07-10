@@ -48,6 +48,7 @@ namespace Task_Flyout.Services
     internal sealed class RssSqliteRepository
     {
         private const int SchemaVersion = 1;
+        private const int BusyTimeoutMilliseconds = 5000;
         private const string SensitiveDataMigrationKey = "sensitive_data_dpapi_v1";
         private readonly string _connectionString;
         private readonly Func<bool> _isUnavailable;
@@ -56,7 +57,11 @@ namespace Task_Flyout.Services
 
         public RssSqliteRepository(string databasePath, Func<bool>? isUnavailable = null)
         {
-            _connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString();
+            _connectionString = new SqliteConnectionStringBuilder
+            {
+                DataSource = databasePath,
+                DefaultTimeout = BusyTimeoutMilliseconds / 1000
+            }.ToString();
             _isUnavailable = isUnavailable ?? (() => false);
         }
 
@@ -557,6 +562,7 @@ LIMIT $take OFFSET $skip;
             var connection = new SqliteConnection(_connectionString);
             connection.Open();
             ExecuteNonQuery(connection, "PRAGMA secure_delete=ON;");
+            ExecuteNonQuery(connection, $"PRAGMA busy_timeout={BusyTimeoutMilliseconds};");
             return connection;
         }
 

@@ -21,6 +21,8 @@ public class RssSqliteRepositoryTests : IDisposable
         Assert.Equal("1", command.ExecuteScalar());
         command.CommandText = "PRAGMA secure_delete;";
         Assert.Equal(1L, command.ExecuteScalar());
+        command.CommandText = "PRAGMA busy_timeout;";
+        Assert.Equal(5000L, command.ExecuteScalar());
     }
 
     [Fact]
@@ -286,6 +288,67 @@ END;
         var article = Assert.Single(snapshot.Articles);
         Assert.Equal("new", article.Id);
         Assert.Equal("Private feed", article.FeedTitle);
+    }
+
+    [Fact]
+    public async Task Writer_waits_for_short_lock_contention_and_then_commits()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.Initialize();
+        using var blocker = repository.OpenConnection();
+        using var transaction = blocker.BeginTransaction();
+        using (var command = blocker.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = "INSERT INTO rss_folders(id, name) VALUES ('blocking', 'blocking');";
+            command.ExecuteNonQuery();
+        }
+
+        var pendingWrite = Task.Run(() => repository.UpsertFolder(new RssFolderRecord("waiting", "Waiting", 0)));
+        await Task.Delay(150);
+        Assert.False(pendingWrite.IsCompleted);
+        transaction.Commit();
+        await pendingWrite.WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var verification = Open(databasePath);
+        Assert.Equal(1L, ScalarInt64(verification, "SELECT COUNT(*) FROM rss_folders WHERE id = 'waiting';"));
+    }
+
+    [Fact]
+    public void Wal_reader_does_not_block_refresh_transaction()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertSubscription(new RssSubscriptionRecord("subscription", "Feed", "https://example.test", "", "", "", 0));
+        repository.UpsertArticle(new RssArticleWriteRecord("existing", "subscription", "Feed", "Existing", "", "", "", "", "", 10));
+
+        using var readerConnection = repository.OpenConnection();
+        using var readerTransaction = readerConnection.BeginTransaction(deferred: true);
+        using var readerCommand = readerConnection.CreateCommand();
+        readerCommand.Transaction = readerTransaction;
+        readerCommand.CommandText = "SELECT title FROM rss_articles WHERE id = 'existing';";
+        using var reader = readerCommand.ExecuteReader();
+        Assert.True(reader.Read());
+
+        repository.SaveRefresh(
+            new RssSubscriptionRecord("subscription", "Updated", "https://example.test", "", "", "", 20),
+            new[] { new RssArticleWriteRecord("new", "subscription", "Updated", "New", "", "", "", "", "", 20) });
+
+        Assert.Equal("New", Assert.Single(repository.QueryArticlesPage("subscription", null, 0, 1)).Title);
+    }
+
+    [Fact]
+    public void Active_repository_operations_honor_data_clear_barrier()
+    {
+        bool unavailable = false;
+        var repository = new RssSqliteRepository(Path.Combine(_root, "rss.db"), () => unavailable);
+        repository.Initialize();
+        unavailable = true;
+
+        Assert.Throws<InvalidOperationException>(() => repository.QueryArticlesPage(null, null, 0, 10));
+        Assert.Throws<InvalidOperationException>(() => repository.UpsertFolder(new RssFolderRecord("folder", "Folder", 0)));
+        Assert.Throws<InvalidOperationException>(() => repository.SaveSnapshot(Array.Empty<RssFolderRecord>(), Array.Empty<RssSubscriptionRecord>(), Array.Empty<RssArticleWriteRecord>(), 1000));
     }
 
     public void Dispose()
