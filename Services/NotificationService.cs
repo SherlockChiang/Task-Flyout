@@ -273,12 +273,12 @@ namespace Task_Flyout.Services
         public static void OpenFromActivationArguments(string argument)
         {
             var arguments = NotificationActivationParser.ParseArguments(argument);
-            App.MainDispatcherQueue?.TryEnqueue(() =>
+            App.MainDispatcherQueue?.TryEnqueue(async () =>
             {
                 if (arguments.TryGetValue("action", out var copyAction) &&
                     copyAction == "copyCode" &&
                     arguments.TryGetValue("codeToken", out var codeToken) &&
-                    VerificationCodeStore.Take(codeToken) is { } code)
+                    await VerificationCodeStore.TakeAsync(codeToken) is { } code)
                 {
                     CopyVerificationCodeToClipboard(code);
                     return;

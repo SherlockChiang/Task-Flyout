@@ -12,15 +12,16 @@ namespace Task_Flyout.Services
         {
             var token = Guid.NewGuid().ToString("N");
             LocalSqliteStore.WriteProtectedText(Scope, token, $"{DateTimeOffset.UtcNow.UtcTicks}|{code}");
+            _ = RemoveExpiredTokenAsync(token);
             return token;
         }
 
-        public static string? Take(string? token)
+        public static async Task<string?> TakeAsync(string? token)
         {
             if (!NotificationActivationParser.IsSafeIdToken(token)) return null;
 
             var value = LocalSqliteStore.ReadProtectedText(Scope, token!);
-            _ = LocalSqliteStore.DeleteProtectedTextAsync(Scope, token!);
+            await LocalSqliteStore.DeleteProtectedTextAsync(Scope, token!);
             if (string.IsNullOrWhiteSpace(value)) return null;
 
             var separator = value.IndexOf('|');
@@ -31,6 +32,18 @@ namespace Task_Flyout.Services
 
             var code = value[(separator + 1)..];
             return NotificationActivationParser.IsVerificationCode(code) ? code : null;
+        }
+
+        private static async Task RemoveExpiredTokenAsync(string token)
+        {
+            try
+            {
+                await Task.Delay(Lifetime);
+                await LocalSqliteStore.DeleteProtectedTextAsync(Scope, token);
+            }
+            catch
+            {
+            }
         }
     }
 }
