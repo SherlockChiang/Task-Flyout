@@ -675,33 +675,37 @@ namespace Task_Flyout.Services
             UpdateCachedReadState(item);
         }
 
-        public async Task MarkAsReadAsync(MailAccount account, MailItem item, bool forceRemoteSync = false)
+        public async Task MarkAsReadAsync(MailAccount account, MailItem item, bool forceRemoteSync = false, CancellationToken cancellationToken = default)
         {
             if (item.IsRead && !forceRemoteSync) return;
 
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            var operationToken = operationCts.Token;
+
             if (account.Kind == MailAccountKind.Outlook)
             {
-                await EnsureOutlookMailWriteAuthorizedAsync();
+                await EnsureOutlookMailWriteAuthorizedAsync(operationToken);
                 if (_outlookClient != null)
-                    await _outlookClient.Me.Messages[item.Id].PatchAsync(new GraphMessage { IsRead = true });
+                    await _outlookClient.Me.Messages[item.Id].PatchAsync(new GraphMessage { IsRead = true }, cancellationToken: operationToken);
             }
             else if (account.Kind == MailAccountKind.Google)
             {
-                var gmail = await EnsureGoogleMailModifyAuthorizedAsync();
+                var gmail = await EnsureGoogleMailModifyAuthorizedAsync(operationToken);
                 await gmail.Users.Messages.Modify(new ModifyMessageRequest
                 {
                     RemoveLabelIds = new List<string> { "UNREAD" }
-                }, "me", item.Id).ExecuteAsync();
+                }, "me", item.Id).ExecuteAsync(operationToken);
             }
             else if (account.Kind == MailAccountKind.Imap)
             {
                 using var client = new ImapClient();
-                await ConnectImapAsync(client, account, GetImapPassword(account.Id));
-                var folder = await client.GetFolderAsync(item.FolderId);
-                await folder.OpenAsync(FolderAccess.ReadWrite);
+                await ConnectImapAsync(client, account, GetImapPassword(account.Id), operationToken);
+                var folder = await client.GetFolderAsync(item.FolderId, operationToken);
+                await folder.OpenAsync(FolderAccess.ReadWrite, operationToken);
                 if (uint.TryParse(item.Id, out var uidValue))
-                    await folder.AddFlagsAsync(new UniqueId(uidValue), MessageFlags.Seen, true);
-                await client.DisconnectAsync(true);
+                    await folder.AddFlagsAsync(new UniqueId(uidValue), MessageFlags.Seen, true, operationToken);
+                await client.DisconnectAsync(true, operationToken);
             }
 
             item.IsRead = true;
@@ -1189,9 +1193,9 @@ namespace Task_Flyout.Services
             return await EnsureGoogleMailAuthorizedAsync(requireModify: false, requireSend: false, cancellationToken);
         }
 
-        private async Task<GmailService> EnsureGoogleMailModifyAuthorizedAsync()
+        private async Task<GmailService> EnsureGoogleMailModifyAuthorizedAsync(CancellationToken cancellationToken = default)
         {
-            return await EnsureGoogleMailAuthorizedAsync(requireModify: true, requireSend: false);
+            return await EnsureGoogleMailAuthorizedAsync(requireModify: true, requireSend: false, cancellationToken);
         }
 
         private async Task<GmailService> EnsureGoogleMailSendAuthorizedAsync()
@@ -1633,9 +1637,9 @@ namespace Task_Flyout.Services
             await EnsureOutlookMailAuthorizedAsync(requireWrite: false, requireSend: false, cancellationToken);
         }
 
-        private async Task EnsureOutlookMailWriteAuthorizedAsync()
+        private async Task EnsureOutlookMailWriteAuthorizedAsync(CancellationToken cancellationToken = default)
         {
-            await EnsureOutlookMailAuthorizedAsync(requireWrite: true, requireSend: false);
+            await EnsureOutlookMailAuthorizedAsync(requireWrite: true, requireSend: false, cancellationToken);
         }
 
         private async Task EnsureOutlookMailSendAuthorizedAsync()
