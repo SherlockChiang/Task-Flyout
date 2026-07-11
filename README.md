@@ -13,7 +13,7 @@ A modern Windows 11 tray companion for your calendar, tasks, mail, RSS, and weat
 
 [Website](https://sherlockchiang.github.io/Task-Flyout/) ·
 [Download](https://github.com/SherlockChiang/Task-Flyout/releases/latest) ·
-[Privacy Policy](https://sherlockchiang.github.io/Task-Flyout/#privacy)
+[Privacy Policy](https://sherlockchiang.github.io/Task-Flyout/privacy.html)
 
 English · [简体中文](README.zh-CN.md)
 
@@ -55,7 +55,7 @@ your machine. To continue, click **Advanced** at the bottom of the page, then
 
 Task Flyout runs locally as a public OAuth client. All credentials, mail, and
 calendar data stay on your device and are never collected, stored, or uploaded to
-any third-party server. See the full [Privacy Policy](https://sherlockchiang.github.io/Task-Flyout/#privacy).
+any third-party server. See the full [Privacy Policy](https://sherlockchiang.github.io/Task-Flyout/privacy.html).
 
 The app declares the `runFullTrust` capability for desktop integration that
 packaged WinUI apps cannot achieve through UWP-only APIs: the tray icon, startup

@@ -31,6 +31,7 @@
     </PropertyGroup>
     
     <ItemGroup>
+        <Content Remove="Assets\StoreLogo.backup.png" />
         <None Remove="AppIcon.ico" />
         <None Remove="credentials.json" />
         <None Remove="FlyoutWindow.xaml" />
@@ -127,12 +128,14 @@
         <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
         <PublishTrimmed>False</PublishTrimmed>
         <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
-        <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
-        <PackageCertificateThumbprint>51EF1A1BF48722B18E478687EBDAEC31D241102D</PackageCertificateThumbprint>
+        <!-- Store upload packages are unsigned locally and signed by Microsoft after certification.
+             CI/local sideload builds may override this and supply a certificate explicitly. -->
+        <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
         <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
         <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
         <GenerateTestArtifacts>True</GenerateTestArtifacts>
-        <AppxBundle>Never</AppxBundle>
+        <AppxBundle>Always</AppxBundle>
+        <AppxBundlePlatforms>x86|x64|ARM64</AppxBundlePlatforms>
         <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
     </PropertyGroup>
 </Project>

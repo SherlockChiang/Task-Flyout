@@ -3,6 +3,8 @@ bin/
 obj/
 pics/
 AppPackages/
+BundleArtifacts/
+StorePackages/
 pixel-icon-provider/
 credentials.json
 Secrets.cs

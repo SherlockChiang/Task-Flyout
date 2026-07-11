@@ -28,14 +28,14 @@ Requested scopes:
 - `User.Read`: required by Microsoft Graph sign-in/profile bootstrap.
 - `Mail.Read`: requested when Outlook mail is used; required for listing and reading Outlook messages.
 - `Mail.ReadWrite`: requested only when marking Outlook messages as read.
-- `Mail.Send`: requested only when sending Outlook replies/new messages from Task Flyout.
+- `Mail.ReadWrite` and `Mail.Send`: requested only when sending Outlook mail. Task Flyout creates an immutable-ID draft so a timed-out send can be confirmed without sending a duplicate.
 
 Local cleanup on account removal:
 
 - Removes the connected account entry.
 - Removes cached calendar/task ranges for the provider.
 - Deletes the DPAPI-protected Microsoft authentication record file `ms_auth_record.bin`.
-- Azure Identity also owns the platform token cache created with `TokenCachePersistenceOptions { Name = "TaskFlyout_MSAL_Cache" }`. The current Azure Identity API used here does not expose a targeted delete operation for that cache, so the app clears its local authentication record and forces re-authentication on the next connection. If a supported targeted cache removal API becomes available, wire it into `MicrosoftSyncProvider.ClearLocalAuthorizationAsync()`.
+- Azure Identity owns normal and CAE platform token caches created from `TokenCachePersistenceOptions { Name = "TaskFlyout_MSAL_Cache" }`. Account removal registers both stores with MSAL and calls `RemoveAsync` for every cached account, then deletes the local authentication record. If any authorization cleanup step fails, the app keeps the business account so the user can retry.
 
 ## Mail Accounts
 

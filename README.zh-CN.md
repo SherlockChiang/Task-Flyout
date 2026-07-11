@@ -13,7 +13,7 @@
 
 [官网](https://sherlockchiang.github.io/Task-Flyout/) ·
 [下载](https://github.com/SherlockChiang/Task-Flyout/releases/latest) ·
-[隐私政策](https://sherlockchiang.github.io/Task-Flyout/#privacy)
+[隐私政策](https://sherlockchiang.github.io/Task-Flyout/privacy.html)
 
 [English](README.md) · 简体中文
 
@@ -47,7 +47,7 @@ Task Flyout 仍在 Google 的应用验证流程中，因此授权页面可能出
 
 ## 隐私与安全
 
-Task Flyout 作为公共 OAuth 客户端在本地运行。所有凭证、邮件与日程数据均保存在你的设备上，绝不会被收集、存储或上传至任何第三方服务器。完整内容见[隐私政策](https://sherlockchiang.github.io/Task-Flyout/#privacy)。
+Task Flyout 作为公共 OAuth 客户端在本地运行。所有凭证、邮件与日程数据均保存在你的设备上，绝不会被收集、存储或上传至任何第三方服务器。完整内容见[隐私政策](https://sherlockchiang.github.io/Task-Flyout/privacy.html)。
 
 应用声明 `runFullTrust` 能力，是为了实现纯 UWP API 无法覆盖的桌面集成：托盘图标、开机启动任务、任务栏天气栏定位，以及通知激活路由。它不会用于后台安装程序、提权或执行下载的代码。
 
