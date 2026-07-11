@@ -108,6 +108,55 @@ public class LocalSqliteStoreTests
         }
     }
 
+    [Fact]
+    public async Task Sensitive_delete_defers_checkpoint_while_reader_is_active_and_retries_on_access()
+    {
+        var testRoot = CreateIsolatedStore();
+        try
+        {
+            LocalSqliteStore.WriteProtectedText("mail", "cache", new string('x', 20_000));
+            var databasePath = Path.Combine(testRoot, "taskflyout_store.db");
+            using (var readerConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={databasePath}"))
+            {
+                readerConnection.Open();
+                using var transaction = readerConnection.BeginTransaction(deferred: true);
+                using var command = readerConnection.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = "SELECT value FROM protected_store WHERE scope = 'mail' AND key = 'cache';";
+                using var reader = command.ExecuteReader();
+                Assert.True(reader.Read());
+
+                await LocalSqliteStore.DeleteProtectedTextAsync("mail", "cache").WaitAsync(TimeSpan.FromSeconds(1));
+                Assert.Null(LocalSqliteStore.ReadProtectedText("mail", "cache"));
+            }
+
+            Assert.Null(LocalSqliteStore.ReadProtectedText("mail", "cache"));
+            var walPath = databasePath + "-wal";
+            Assert.True(!File.Exists(walPath) || new FileInfo(walPath).Length == 0);
+        }
+        finally
+        {
+            DeleteIsolatedStore(testRoot);
+        }
+    }
+
+    [Fact]
+    public async Task Explicit_checkpoint_flush_does_not_initialize_unused_store()
+    {
+        var testRoot = Path.Combine(Path.GetTempPath(), "taskflyout-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(testRoot);
+        LocalSqliteStore.SetDataPathForTests(testRoot);
+        try
+        {
+            await LocalSqliteStore.FlushPendingCheckpointAsync();
+            Assert.False(File.Exists(Path.Combine(testRoot, "taskflyout_store.db")));
+        }
+        finally
+        {
+            DeleteIsolatedStore(testRoot);
+        }
+    }
+
     private static string CreateIsolatedStore()
     {
         var testRoot = Path.Combine(Path.GetTempPath(), "taskflyout-tests", Guid.NewGuid().ToString("N"));

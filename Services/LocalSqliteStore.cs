@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Task_Flyout.Services
@@ -12,8 +13,9 @@ namespace Task_Flyout.Services
         private const int BusyTimeoutMilliseconds = 5000;
         private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("TaskFlyout.LocalCache.v1");
         private static readonly object InitLock = new();
-        private static bool _initialized;
+        private static volatile bool _initialized;
         private static string? _connectionString;
+        private static int _checkpointPending;
 #if TASKFLYOUT_TESTS
         private static string? _testDataPath;
 #endif
@@ -113,6 +115,7 @@ CREATE TABLE IF NOT EXISTS protected_store (
 );
 """);
                 _initialized = true;
+                TryTruncateWal(connection);
             }
         }
 
@@ -122,6 +125,8 @@ CREATE TABLE IF NOT EXISTS protected_store (
             connection.Open();
             ExecuteNonQuery(connection, "PRAGMA secure_delete=ON;");
             ExecuteNonQuery(connection, $"PRAGMA busy_timeout={BusyTimeoutMilliseconds};");
+            if (Volatile.Read(ref _checkpointPending) != 0)
+                TryTruncateWal(connection);
             return connection;
         }
 
@@ -134,6 +139,8 @@ CREATE TABLE IF NOT EXISTS protected_store (
                 await using var command = connection.CreateCommand();
                 command.CommandText = $"PRAGMA secure_delete=ON; PRAGMA busy_timeout={BusyTimeoutMilliseconds};";
                 await command.ExecuteNonQueryAsync();
+                if (Volatile.Read(ref _checkpointPending) != 0)
+                    TryTruncateWal(connection);
                 return connection;
             }
             catch
@@ -143,11 +150,41 @@ CREATE TABLE IF NOT EXISTS protected_store (
             }
         }
 
-        private static async Task TruncateWalAsync(SqliteConnection connection)
+        private static Task TruncateWalAsync(SqliteConnection connection)
         {
-            await using var command = connection.CreateCommand();
-            command.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
-            await command.ExecuteNonQueryAsync();
+            TryTruncateWal(connection);
+            return Task.CompletedTask;
+        }
+
+        public static Task FlushPendingCheckpointAsync()
+            => Task.Run(() =>
+            {
+                if (!_initialized) return;
+                using var connection = OpenConnection();
+                TryTruncateWal(connection);
+            });
+
+        private static void TryTruncateWal(SqliteConnection connection)
+        {
+            bool completed = false;
+            try
+            {
+                ExecuteNonQuery(connection, "PRAGMA busy_timeout=0;");
+                using var command = connection.CreateCommand();
+                command.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+                using var reader = command.ExecuteReader();
+                completed = reader.Read() && reader.GetInt32(0) == 0;
+            }
+            catch (SqliteException)
+            {
+            }
+            finally
+            {
+                try { ExecuteNonQuery(connection, $"PRAGMA busy_timeout={BusyTimeoutMilliseconds};"); }
+                catch (SqliteException) { }
+            }
+
+            Interlocked.Exchange(ref _checkpointPending, completed ? 0 : 1);
         }
 
         private static SqliteConnection CreateConnection()
@@ -184,6 +221,7 @@ CREATE TABLE IF NOT EXISTS protected_store (
                 _testDataPath = path;
                 _connectionString = null;
                 _initialized = false;
+                _checkpointPending = 0;
             }
         }
 #endif

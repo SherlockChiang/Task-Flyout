@@ -561,7 +561,8 @@ namespace Task_Flyout
                 await Task.WhenAll(
                     SyncManager.AccountManager.FlushPendingSavesAsync(),
                     MailService.FlushPendingSavesAsync(),
-                    RssService.FlushPendingCheckpointsAsync())
+                    RssService.FlushPendingCheckpointsAsync(),
+                    LocalSqliteStore.FlushPendingCheckpointAsync())
                     .WaitAsync(TimeSpan.FromSeconds(2));
             }
             catch (Exception ex)
