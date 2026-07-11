@@ -64,6 +64,8 @@
     <Compile Include="..\..\Services\MailMutationRetryPolicy.cs" Link="Source\MailMutationRetryPolicy.cs" />
     <Compile Include="..\..\Services\MailPendingMutationPolicy.cs" Link="Source\MailPendingMutationPolicy.cs" />
     <Compile Include="..\..\Services\MailCacheRepository.cs" Link="Source\MailCacheRepository.cs" />
+    <Compile Include="..\..\Services\MailCacheModels.cs" Link="Source\MailCacheModels.cs" />
+    <Compile Include="..\..\Services\MailPersistentCachePolicy.cs" Link="Source\MailPersistentCachePolicy.cs" />
     <Compile Include="..\..\Services\MailSendConfirmationPolicy.cs" Link="Source\MailSendConfirmationPolicy.cs" />
   </ItemGroup>
 

@@ -73,82 +73,6 @@ namespace Task_Flyout.Services
         public string SetupText => IsSetupComplete ? "" : (_accountLoader.GetStringOrDefault("TextSetupIncomplete") ?? "Setup required");
     }
 
-    public class MailFolder
-    {
-        public string AccountId { get; set; } = "";
-        public string Id { get; set; } = "";
-        public string DisplayName { get; set; } = "";
-        public int? UnreadCount { get; set; }
-        public bool IsPlaceholder { get; set; }
-        public string CountText => UnreadCount.HasValue && UnreadCount.Value > 0 ? UnreadCount.Value.ToString() : "";
-    }
-
-    public class MailItem : INotifyPropertyChanged
-    {
-        private bool _isRead;
-
-        public string AccountId { get; set; } = "";
-        public string FolderId { get; set; } = "";
-        public string Id { get; set; } = "";
-        public uint? ImapUidValidity { get; set; }
-        public string Subject { get; set; } = "";
-        public string Sender { get; set; } = "";
-        public string SenderAddress { get; set; } = "";
-        public string Recipient { get; set; } = "";
-        public string Preview { get; set; } = "";
-        public string BodyText { get; set; } = "";
-        public string HtmlBody { get; set; } = "";
-        public string ReceivedTime { get; set; } = "";
-        public DateTimeOffset? RawReceivedTime { get; set; }
-        public bool IsRead
-        {
-            get => _isRead;
-            set
-            {
-                if (_isRead == value) return;
-                _isRead = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(ReadMarker));
-            }
-        }
-        public bool HasAttachments { get; set; }
-        public string Importance { get; set; } = "";
-        public string WebLink { get; set; } = "";
-        public string ReadMarker => IsRead ? "" : "●";
-        public string AttachmentMarker => HasAttachments ? "📎" : "";
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-    public class MailPersistentCache
-    {
-        public Dictionary<string, List<MailFolder>> Folders { get; set; } = new();
-        public Dictionary<string, List<MailItem>> Messages { get; set; } = new();
-        public Dictionary<string, MailCursor> MessageCursors { get; set; } = new();
-        public Dictionary<string, bool> MessageHasMore { get; set; } = new();
-        public List<PendingMailMutation> PendingMutations { get; set; } = new();
-        public Dictionary<string, long> LastSeenInboxTicks { get; set; } = new();
-        public List<string> AccountOrder { get; set; } = new();
-        public Dictionary<string, List<string>> FolderOrder { get; set; } = new();
-    }
-
-    public sealed class MailCursor
-    {
-        public MailAccountKind ProviderKind { get; set; }
-        public string Value { get; set; } = "";
-        public uint? UidValidity { get; set; }
-        public uint? BeforeUid { get; set; }
-    }
-
-    public sealed class MailMessageWindow
-    {
-        public List<MailItem> Items { get; set; } = new();
-        public bool HasMore { get; set; }
-    }
-
     public sealed class NewMailNotificationEventArgs : EventArgs
     {
         public required MailAccount Account { get; init; }
@@ -691,7 +615,7 @@ namespace Task_Flyout.Services
             string cacheKey = GetMessageCacheKey(account.Id, folder.Id, unreadOnly);
             if (!forceRefresh && !loadMore && TryGetCachedMessages(cacheKey, out var cachedWindow))
             {
-                if (account.Kind != MailAccountKind.Imap || cachedWindow.Items.All(item => item.ImapUidValidity.HasValue))
+                if (MailPersistentCachePolicy.CanUseWindow(account.Kind, cachedWindow.Items))
                     return cachedWindow;
             }
 
@@ -2517,47 +2441,9 @@ namespace Task_Flyout.Services
                 }
 
                 _persistentCache ??= new MailPersistentCache();
-                _persistentCache.Folders ??= new Dictionary<string, List<MailFolder>>();
-                _persistentCache.Messages ??= new Dictionary<string, List<MailItem>>();
-                _persistentCache.MessageCursors ??= new Dictionary<string, MailCursor>();
-                _persistentCache.MessageHasMore ??= new Dictionary<string, bool>();
-                _persistentCache.PendingMutations ??= new List<PendingMailMutation>();
-                bool removedExpiredMutations = MailPendingMutationPolicy.RemoveExpired(
-                    _persistentCache.PendingMutations, DateTimeOffset.UtcNow) > 0;
-                _persistentCache.LastSeenInboxTicks ??= new Dictionary<string, long>();
-                _persistentCache.AccountOrder ??= new List<string>();
-                _persistentCache.FolderOrder ??= new Dictionary<string, List<string>>();
-                MigrateLegacyMessageCacheKeys();
-                TrimPersistentCacheForMemory();
-                if (removedExpiredMutations)
+                if (MailPersistentCachePolicy.Normalize(_persistentCache, DateTimeOffset.UtcNow, MaxPageSize))
                     SavePersistentCache();
             }
-        }
-
-        private void MigrateLegacyMessageCacheKeys()
-        {
-            if (_persistentCache == null) return;
-
-            bool changed = false;
-            foreach (var key in _persistentCache.Messages.Keys.ToList())
-            {
-                if (!MailCacheKeyPolicy.TryCanonicalizeLegacy(key, out var canonicalKey)) continue;
-
-                var combined = _persistentCache.Messages.TryGetValue(canonicalKey, out var existing)
-                    ? existing.Concat(_persistentCache.Messages[key])
-                    : _persistentCache.Messages[key];
-                _persistentCache.Messages[canonicalKey] = combined
-                    .GroupBy(item => item.Id, StringComparer.Ordinal)
-                    .Select(group => group.OrderByDescending(item => item.RawReceivedTime).First())
-                    .OrderByDescending(item => item.RawReceivedTime)
-                    .Take(MaxPageSize)
-                    .ToList();
-                _persistentCache.Messages.Remove(key);
-                changed = true;
-            }
-
-            if (changed)
-                SavePersistentCache();
         }
 
         private void SavePersistentCache()
@@ -2733,20 +2619,6 @@ namespace Task_Flyout.Services
 
         private static List<MailItem> StripBodies(List<MailItem> messages)
             => CloneMailItems(messages, includeBodies: false);
-
-        private void TrimPersistentCacheForMemory()
-        {
-            if (_persistentCache == null) return;
-
-            foreach (var key in _persistentCache.Messages.Keys.ToList())
-            {
-                var messages = StripBodies(_persistentCache.Messages[key]);
-                _persistentCache.Messages[key] = messages
-                    .OrderByDescending(item => item.RawReceivedTime)
-                    .Take(MaxPageSize)
-                    .ToList();
-            }
-        }
 
         private void UpdatePersistentMessageBody(MailItem item)
         {
