@@ -470,13 +470,6 @@ namespace Task_Flyout.Services
             var xml = await FetchFeedAsync(subscription.Url, refreshCancellationToken);
             var parsed = ParseFeed(subscription, xml);
 
-            string localFeedImagePath = subscription.LocalImagePath;
-            if (!string.IsNullOrWhiteSpace(parsed.FeedImageUrl))
-                localFeedImagePath = await CacheImageAsync(parsed.FeedImageUrl, refreshCancellationToken);
-
-            foreach (var article in parsed.Articles)
-                article.LocalImagePath = await CacheImageAsync(article.ImageUrl, refreshCancellationToken);
-
             refreshCancellationToken.ThrowIfCancellationRequested();
             lock (_loadLock)
             {
@@ -487,7 +480,6 @@ namespace Task_Flyout.Services
                 if (!string.IsNullOrWhiteSpace(parsed.FeedImageUrl))
                 {
                     subscription.ImageUrl = parsed.FeedImageUrl;
-                    subscription.LocalImagePath = localFeedImagePath;
                 }
 
                 foreach (var article in parsed.Articles)
@@ -1019,66 +1011,6 @@ namespace Task_Flyout.Services
             return reader.ReadToEnd();
         }
 
-        private async Task<string> CacheImageAsync(string imageUrl, CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrWhiteSpace(imageUrl) || !Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri))
-                return "";
-            if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
-                return "";
-
-            if (!await IsSafeToFetchAsync(uri))
-                return "";
-
-            try
-            {
-                var imagesPath = GetImageCacheRoot();
-                var extension = Path.GetExtension(uri.AbsolutePath);
-                if (string.IsNullOrWhiteSpace(extension) || extension.Length > 8)
-                    extension = ".img";
-                var path = AppDataPathHelper.ResolveUnderRoot(imagesPath, HashText(imageUrl) + extension);
-                if (File.Exists(path))
-                {
-                    if (IsPlausibleCachedImageFile(path)) return path;
-                    try { File.Delete(path); } catch { return ""; }
-                }
-
-                using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-                request.Headers.Accept.ParseAdd("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
-                using var response = await SendWithRedirectsAsync(request, cancellationToken);
-                response.EnsureSuccessStatusCode();
-
-                var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
-                if (!IsAllowedImageContentType(contentType))
-                    return "";
-
-                if (response.Content.Headers.ContentLength is > MaxImageBytes)
-                    return "";
-
-                using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                using var buffer = new MemoryStream();
-                var chunk = new byte[81920];
-                int bytesRead;
-                while ((bytesRead = await stream.ReadAsync(chunk, cancellationToken)) > 0)
-                {
-                    if (buffer.Length + bytesRead > MaxImageBytes)
-                        return "";
-                    buffer.Write(chunk, 0, bytesRead);
-                }
-
-                var bytes = buffer.ToArray();
-                if (!IsPlausibleImageBytes(bytes))
-                    return "";
-
-                await File.WriteAllBytesAsync(path, bytes, cancellationToken);
-                return path;
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-            catch
-            {
-                return "";
-            }
-        }
-
         internal static bool IsPlausibleCachedImageFile(string path)
         {
             try
@@ -1099,17 +1031,6 @@ namespace Task_Flyout.Services
                 return false;
             }
         }
-
-        private static bool IsAllowedImageContentType(string contentType)
-        {
-            if (string.IsNullOrWhiteSpace(contentType)) return true;
-            if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return true;
-            return contentType.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase)
-                   || contentType.Equals("binary/octet-stream", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool IsPlausibleImageBytes(byte[] bytes)
-            => bytes.Length > 8 && IsPlausibleImageHeader(bytes.AsSpan(0, Math.Min(bytes.Length, 16)));
 
         private static bool IsPlausibleImageHeader(ReadOnlySpan<byte> bytes)
         {

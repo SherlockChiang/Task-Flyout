@@ -304,6 +304,30 @@ END;
     }
 
     [Fact]
+    public void Refresh_upserts_preserve_existing_local_image_paths()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertSubscription(new RssSubscriptionRecord(
+            "subscription", "Feed", "https://example.test", "", "https://example.test/old.png", "feed.png", 10));
+        repository.UpsertArticle(new RssArticleWriteRecord(
+            "article", "subscription", "Feed", "Title", "", "", "", "https://example.test/old.png", "article.png", 10));
+
+        repository.SaveRefresh(
+            new RssSubscriptionRecord(
+                "subscription", "Updated feed", "https://example.test", "", "https://example.test/new.png", "", 20),
+            new[]
+            {
+                new RssArticleWriteRecord(
+                    "article", "subscription", "Updated feed", "Updated title", "", "", "", "https://example.test/new.png", "", 20)
+            });
+
+        var snapshot = repository.LoadSnapshot(1);
+        Assert.Equal("feed.png", Assert.Single(snapshot.Subscriptions).LocalImagePath);
+        Assert.Equal("article.png", Assert.Single(snapshot.Articles).LocalImagePath);
+    }
+
+    [Fact]
     public async Task Writer_waits_for_short_lock_contention_and_then_commits()
     {
         var databasePath = Path.Combine(_root, "rss.db");

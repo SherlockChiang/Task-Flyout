@@ -419,7 +419,10 @@ ON CONFLICT(id) DO UPDATE SET
     url = excluded.url,
     folder_id = excluded.folder_id,
     image_url = excluded.image_url,
-    local_image_path = excluded.local_image_path,
+    local_image_path = CASE
+        WHEN excluded.local_image_path = '' THEN rss_subscriptions.local_image_path
+        ELSE excluded.local_image_path
+    END,
     last_fetched_ticks = excluded.last_fetched_ticks;
 """;
             command.Parameters.AddWithValue("$id", subscription.Id);
@@ -455,7 +458,10 @@ ON CONFLICT(id) DO UPDATE SET
     summary = excluded.summary,
     html_content = excluded.html_content,
     image_url = excluded.image_url,
-    local_image_path = excluded.local_image_path,
+    local_image_path = CASE
+        WHEN excluded.local_image_path = '' THEN rss_articles.local_image_path
+        ELSE excluded.local_image_path
+    END,
     published_ticks = excluded.published_ticks;
 """;
             command.Parameters.AddWithValue("$id", article.Id);
