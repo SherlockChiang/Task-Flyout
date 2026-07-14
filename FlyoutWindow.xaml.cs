@@ -305,7 +305,9 @@ namespace Task_Flyout
         private static IEnumerable<string> GetVisibleCacheDateKeys(DateTime anchorDate)
         {
             var firstOfMonth = new DateTime(anchorDate.Year, anchorDate.Month, 1);
-            var visibleStart = firstOfMonth.AddDays(-(int)firstOfMonth.DayOfWeek);
+            var visibleStart = LocalizationHelper.GetWeekStart(
+                firstOfMonth,
+                LocalizationHelper.AppCulture.DateTimeFormat.FirstDayOfWeek);
             var visibleEnd = visibleStart.AddDays(42 + VisibleCacheFutureDays);
 
             for (var day = visibleStart.Date; day < visibleEnd.Date; day = day.AddDays(1))
@@ -1239,12 +1241,7 @@ namespace Task_Flyout
         }
 
         private static string GetWeatherLang()
-        {
-            string? appLang = Windows.Storage.ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
-            if (string.IsNullOrEmpty(appLang))
-                appLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
-            return appLang.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "en" : "zh";
-        }
+            => LocalizationHelper.SupportedLanguageCode;
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {

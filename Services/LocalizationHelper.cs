@@ -43,5 +43,19 @@ namespace Task_Flyout.Services
                 }
             }
         }
+
+        public static string SupportedLanguageCode
+            => GetSupportedLanguageCode(AppCulture.Name);
+
+        internal static string GetSupportedLanguageCode(string? language)
+            => !string.IsNullOrWhiteSpace(language) && language.StartsWith("zh", StringComparison.OrdinalIgnoreCase)
+                ? "zh"
+                : "en";
+
+        internal static int GetDayOffset(DayOfWeek day, DayOfWeek firstDayOfWeek)
+            => ((int)day - (int)firstDayOfWeek + 7) % 7;
+
+        internal static DateTime GetWeekStart(DateTime date, DayOfWeek firstDayOfWeek)
+            => date.Date.AddDays(-GetDayOffset(date.DayOfWeek, firstDayOfWeek));
     }
 }

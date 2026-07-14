@@ -50,7 +50,7 @@ Status values:
 | P2-09 | TODO | Performance | Bound RSS host-gate retention and reduce payload copies. | Host coordination storage is bounded; image/feed transfer avoids unnecessary full-buffer copies. | |
 | P2-10 | TODO | Startup | Remove protected SQLite work from the synchronous startup path. | Startup diagnostics include the full launch path; account hydration is deferred or asynchronous. | |
 | P2-11 | DONE | Efficiency | Rotate diagnostics and batch notification-state writes. | Notification checks persist state at most once; long-running diagnostic logs rotate at a fixed size limit. | `perf: batch notification state writes`, `diagnostics: bound log retention` |
-| P2-12 | TODO | Localization | Respect culture first-day-of-week and consistent language fallback. | Calendar follows locale or user override; unsupported languages fall back to English. | |
+| P2-12 | DONE | Localization | Respect culture first-day-of-week and consistent language fallback. | Calendar follows the selected culture; unsupported weather languages fall back to English. | `localization: respect culture calendar layout` |
 | P2-13 | TODO | Architecture | Extract shared mutation, account-removal, status, and remote-image coordinators. | Duplicated page behavior uses testable shared components without a wholesale UI rewrite. | |
 | P2-14 | TODO | Testing | Add localization, accessibility, responsive UI, lifecycle, and soak coverage. | Resource parity is automated; packaged smoke tests cover keyboard/narrow layouts; soak checks track handles and memory. | |
 

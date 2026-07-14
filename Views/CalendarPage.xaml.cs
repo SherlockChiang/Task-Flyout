@@ -119,21 +119,23 @@ namespace Task_Flyout.Views
             };
         }
 
-        // Fill the column headers (Sunday-first, matching the grid layout) from the
-        // app-language culture's abbreviated day names so they follow the in-app
-        // language rather than the OS locale or a missing resw entry.
         private void SetWeekdayHeaders()
         {
             var headers = new[] { WeekHeader0, WeekHeader1, WeekHeader2, WeekHeader3, WeekHeader4, WeekHeader5, WeekHeader6 };
-            var dayNames = LocalizationHelper.AppCulture.DateTimeFormat.AbbreviatedDayNames; // index 0 == Sunday
-            for (int i = 0; i < headers.Length && i < dayNames.Length; i++)
-                headers[i].Text = dayNames[i];
+            var dateFormat = LocalizationHelper.AppCulture.DateTimeFormat;
+            for (int i = 0; i < headers.Length; i++)
+            {
+                int dayIndex = ((int)dateFormat.FirstDayOfWeek + i) % 7;
+                headers[i].Text = dateFormat.AbbreviatedDayNames[dayIndex];
+            }
         }
 
         private void LoadCache(DateTime date)
         {
             var firstOfMonth = new DateTime(date.Year, date.Month, 1);
-            var start = firstOfMonth.AddDays(-(int)firstOfMonth.DayOfWeek);
+            var start = LocalizationHelper.GetWeekStart(
+                firstOfMonth,
+                LocalizationHelper.AppCulture.DateTimeFormat.FirstDayOfWeek);
             var end = start.AddDays(42 + 90);
             _localCache = _syncManager?.GetRangeCacheSnapshot(start, end) ?? new AppCache();
         }
@@ -147,7 +149,9 @@ namespace Task_Flyout.Views
             BtnMonthYear.Content = date.ToString("Y", LocalizationHelper.AppCulture);
 
             DateTime firstOfEntry = new DateTime(date.Year, date.Month, 1);
-            int offset = (int)firstOfEntry.DayOfWeek;
+            int offset = LocalizationHelper.GetDayOffset(
+                firstOfEntry.DayOfWeek,
+                LocalizationHelper.AppCulture.DateTimeFormat.FirstDayOfWeek);
             DateTime startDate = firstOfEntry.AddDays(-offset);
 
             int daysInMonth = DateTime.DaysInMonth(date.Year, date.Month);

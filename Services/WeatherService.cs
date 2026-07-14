@@ -1164,12 +1164,7 @@ namespace Task_Flyout.Services
         }
 
         private static string GetCurrentLanguage()
-        {
-            string? appLang = ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
-            if (string.IsNullOrEmpty(appLang))
-                appLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
-            return appLang.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "en" : "zh";
-        }
+            => LocalizationHelper.SupportedLanguageCode;
 
         private static string OpenMeteoCodeToIcon(int code, string fontFamily)
         {

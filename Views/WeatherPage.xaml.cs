@@ -353,12 +353,7 @@ namespace Task_Flyout.Views
         }
 
         private static string GetCurrentLang()
-        {
-            string? appLang = Windows.Storage.ApplicationData.Current.LocalSettings.Values["AppLang"] as string;
-            if (string.IsNullOrEmpty(appLang))
-                appLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
-            return appLang.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "en" : "zh";
-        }
+            => LocalizationHelper.SupportedLanguageCode;
 
         #endregion
 
