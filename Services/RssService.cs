@@ -429,8 +429,8 @@ namespace Task_Flyout.Services
             EnsureLoaded();
             _cache.Subscriptions.RemoveAll(item => item.Id == subscriptionId);
             _cache.Articles.RemoveAll(item => item.SubscriptionId == subscriptionId);
-            PruneOrphanedImageCache(force: true);
             Repository.RemoveSubscription(subscriptionId);
+            PruneOrphanedImageCache(force: true);
         }
 
         public Task<List<RssArticle>> LoadMoreArticlesAsync(string? subscriptionId, string? folderId, int skip, int take)
@@ -1244,7 +1244,7 @@ namespace Task_Flyout.Services
 
                 var referencedPaths = _cache.Subscriptions
                     .Select(subscription => subscription.LocalImagePath)
-                    .Concat(_cache.Articles.Select(article => article.LocalImagePath))
+                    .Concat(Repository.LoadArticleImagePaths())
                     .Where(path => !string.IsNullOrWhiteSpace(path))
                     .Select(path =>
                     {
@@ -1302,7 +1302,7 @@ namespace Task_Flyout.Services
 
         private RssCache LoadFromDatabase()
         {
-            var snapshot = Repository.LoadSnapshot(1000);
+            var snapshot = Repository.LoadSnapshot(0);
             return new RssCache
             {
                 Folders = snapshot.Folders.Select(folder => new RssFolder

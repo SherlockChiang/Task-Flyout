@@ -182,6 +182,19 @@ CREATE TABLE IF NOT EXISTS rss_articles (
                 ReadArticles(connection, null, null, 0, maximumArticleCount));
         }
 
+        public List<string> LoadArticleImagePaths()
+        {
+            Initialize();
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT local_image_path FROM rss_articles WHERE local_image_path <> '';";
+            using var reader = command.ExecuteReader();
+            var paths = new List<string>();
+            while (reader.Read())
+                paths.Add(reader.GetString(0));
+            return paths;
+        }
+
         public string GetArticleHtml(string articleId)
         {
             if (string.IsNullOrWhiteSpace(articleId)) return "";

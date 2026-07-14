@@ -291,6 +291,19 @@ END;
     }
 
     [Fact]
+    public void Loads_only_non_empty_article_image_paths()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertArticle(new RssArticleWriteRecord("with-image", "subscription", "Feed", "With image", "", "", "", "", "cached.png", 20));
+        repository.UpsertArticle(new RssArticleWriteRecord("without-image", "subscription", "Feed", "Without image", "", "", "", "", "", 10));
+
+        var paths = repository.LoadArticleImagePaths();
+
+        Assert.Equal(new[] { "cached.png" }, paths);
+    }
+
+    [Fact]
     public async Task Writer_waits_for_short_lock_contention_and_then_commits()
     {
         var databasePath = Path.Combine(_root, "rss.db");
