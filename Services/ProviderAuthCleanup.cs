@@ -9,6 +9,18 @@ namespace Task_Flyout.Services
 
         public static string GoogleLegacyTokenPath => Path.Combine(AppDataRoot, "GoogleToken");
 
+        public static void DeleteGoogleLegacyTokenStore(
+            string tokenPath,
+            Func<string, bool>? directoryExists = null,
+            Action<string, bool>? deleteDirectory = null)
+        {
+            directoryExists ??= Directory.Exists;
+            deleteDirectory ??= Directory.Delete;
+
+            if (directoryExists(tokenPath))
+                deleteDirectory(tokenPath, true);
+        }
+
         public static string MicrosoftAuthRecordPath
         {
             get

@@ -55,15 +55,7 @@ namespace Task_Flyout.Services
             await new ProtectedGoogleDataStore().ClearAsync();
 
             string legacyTokenPath = ProviderAuthCleanup.GoogleLegacyTokenPath;
-            try
-            {
-                if (Directory.Exists(legacyTokenPath))
-                    Directory.Delete(legacyTokenPath, recursive: true);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Google token cleanup failed: {ex.Message}");
-            }
+            ProviderAuthCleanup.DeleteGoogleLegacyTokenStore(legacyTokenPath);
         }
 
         public async Task EnsureAuthorizedAsync(CancellationToken cancellationToken = default)
