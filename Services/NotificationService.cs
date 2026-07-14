@@ -100,6 +100,7 @@ namespace Task_Flyout.Services
                 var tomorrowKey = now.AddDays(1).ToString("yyyy-MM-dd");
 
                 var keysToCheck = new[] { todayKey, tomorrowKey };
+                bool notifiedIdsChanged = false;
 
                 foreach (var dateKey in keysToCheck)
                 {
@@ -122,12 +123,14 @@ namespace Task_Flyout.Services
                         {
                             SendNotification(item, eventStart.Value);
                             _notifiedIds[notifKey] = DateTimeOffset.UtcNow;
-                            SaveNotifiedIds();
+                            notifiedIdsChanged = true;
                         }
                     }
                 }
 
-                PruneNotifiedIds();
+                notifiedIdsChanged |= PruneNotifiedIds();
+                if (notifiedIdsChanged)
+                    SaveNotifiedIds();
             }
             catch (Exception ex)
             {
@@ -211,7 +214,7 @@ namespace Task_Flyout.Services
         private static string BuildNotificationKey(AgendaItem item, string dateKey, DateTime eventStart)
             => $"{item.Provider}|{item.Id}|{dateKey}|{eventStart:HHmm}";
 
-        private void PruneNotifiedIds()
+        private bool PruneNotifiedIds()
         {
             var cutoff = DateTimeOffset.UtcNow.AddDays(-14);
             var removed = false;
@@ -235,8 +238,7 @@ namespace Task_Flyout.Services
                 }
             }
 
-            if (removed)
-                SaveNotifiedIds();
+            return removed;
         }
 
         private Dictionary<string, List<AgendaItem>>? LoadCacheItems()
