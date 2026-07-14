@@ -56,6 +56,7 @@
     <Compile Include="..\..\Services\SyncEventTimePolicy.cs" Link="Source\SyncEventTimePolicy.cs" />
     <Compile Include="..\..\Services\SyncItemMappingPolicy.cs" Link="Source\SyncItemMappingPolicy.cs" />
     <Compile Include="..\..\Services\SyncPaginationPolicy.cs" Link="Source\SyncPaginationPolicy.cs" />
+    <Compile Include="..\..\Services\SyncRetryPolicy.cs" Link="Source\SyncRetryPolicy.cs" />
     <Compile Include="..\..\Services\RecurrencePolicy.cs" Link="Source\RecurrencePolicy.cs" />
     <Compile Include="..\..\Services\AppDataPathHelper.cs" Link="Source\AppDataPathHelper.cs" />
     <Compile Include="..\..\Services\LocalSqliteStore.cs" Link="Source\LocalSqliteStore.cs" />

@@ -9,6 +9,7 @@ using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
@@ -300,8 +301,20 @@ namespace Task_Flyout.Services
                 calendars.Add(new SubscribedCalendarInfo { Id = "primary", Name = "Primary" });
             }
 
+            using var calendarGate = new SemaphoreSlim(4);
             var calendarTasks = calendars
-                .Select(cal => FetchCalendarEventsAsync(calendarSvc, cal, min, max, cancellationToken))
+                .Select(async cal =>
+                {
+                    await calendarGate.WaitAsync(cancellationToken);
+                    try
+                    {
+                        return await FetchCalendarEventsAsync(calendarSvc, cal, min, max, cancellationToken);
+                    }
+                    finally
+                    {
+                        calendarGate.Release();
+                    }
+                })
                 .ToList();
             var tasksTask = FetchGoogleTasksAsync(tasksSvc, min, max, cancellationToken);
 
@@ -331,7 +344,9 @@ namespace Task_Flyout.Services
                     req.SingleEvents = true;
                     req.MaxResults = 2500;
                     req.PageToken = pageToken;
-                    var events = await req.ExecuteAsync(cancellationToken).ConfigureAwait(false);
+                    var events = await ExecuteGoogleRequestAsync(
+                        ct => req.ExecuteAsync(ct),
+                        cancellationToken).ConfigureAwait(false);
                     if (events?.Items != null)
                         allEvents.AddRange(events.Items);
                     pageToken = SyncPaginationPolicy.GetNextPageToken(pageToken, events?.NextPageToken, seenPageTokens);
@@ -565,7 +580,9 @@ namespace Task_Flyout.Services
                 await gate.WaitAsync(cancellationToken);
                 try
                 {
-                    var master = await calendarSvc.Events.Get(calendarId, eventId).ExecuteAsync(cancellationToken);
+                    var master = await ExecuteGoogleRequestAsync(
+                        ct => calendarSvc.Events.Get(calendarId, eventId).ExecuteAsync(ct),
+                        cancellationToken);
                     return (EventId: eventId, Kind: GetGoogleRecurrenceKind(master.Recurrence));
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
@@ -586,6 +603,33 @@ namespace Task_Flyout.Services
         private static string GetGoogleRecurrenceKind(IList<string>? recurrence)
         {
             return RecurrencePolicy.ToDisplayKindFromGoogleRRules(recurrence);
+        }
+
+        private static async Task<T> ExecuteGoogleRequestAsync<T>(
+            Func<CancellationToken, Task<T>> operation,
+            CancellationToken cancellationToken)
+        {
+            int retriesCompleted = 0;
+            while (true)
+            {
+                try
+                {
+                    return await operation(cancellationToken).ConfigureAwait(false);
+                }
+                catch (Google.GoogleApiException ex) when (
+                    SyncRetryPolicy.ShouldRetryHttpStatus((int)ex.HttpStatusCode, retriesCompleted))
+                {
+                    await Task.Delay(SyncRetryPolicy.GetDelay(retriesCompleted), cancellationToken).ConfigureAwait(false);
+                    retriesCompleted++;
+                }
+                catch (HttpRequestException ex) when (
+                    ex.StatusCode.HasValue &&
+                    SyncRetryPolicy.ShouldRetryHttpStatus((int)ex.StatusCode.Value, retriesCompleted))
+                {
+                    await Task.Delay(SyncRetryPolicy.GetDelay(retriesCompleted), cancellationToken).ConfigureAwait(false);
+                    retriesCompleted++;
+                }
+            }
         }
 
         private static List<string> ClampGoogleRecurrence(IList<string>? recurrence, DateTime untilDate)
