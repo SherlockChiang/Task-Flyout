@@ -13,19 +13,46 @@ concurrency:
   group: beta-release-${{ github.ref }}
   cancel-in-progress: false
 
-jobs:
-  beta-release:
-    name: Build and publish beta
-    runs-on: windows-latest
-    permissions:
-      contents: write
+env:
+  CONFIGURATION: Release
+  PLATFORM: x64
+  PROJECT_FILE: Task_Flyout.csproj
+  TEST_PROJECT_FILE: Tests\Task_Flyout.Tests\Task_Flyout.Tests.csproj
 
-    env:
-      CONFIGURATION: Release
-      PLATFORM: x64
-      PROJECT_FILE: Task_Flyout.csproj
-      TEST_PROJECT_FILE: Tests\Task_Flyout.Tests\Task_Flyout.Tests.csproj
-      CERTIFICATE_PATH: ${{ github.workspace }}\ci-signing-certificate.pfx
+jobs:
+  verify:
+    name: Restore and test
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        # v4.2.2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up .NET SDK
+        # v4.3.1
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        shell: pwsh
+        run: |
+          dotnet restore $env:PROJECT_FILE --locked-mode
+          dotnet restore $env:TEST_PROJECT_FILE --locked-mode
+
+      - name: Run tests
+        shell: pwsh
+        run: dotnet test $env:TEST_PROJECT_FILE -c Debug --no-restore
+
+  package:
+    name: Build unsigned package
+    needs: verify
+    runs-on: windows-latest
+    outputs:
+      package_version: ${{ steps.version.outputs.package_version }}
+      beta_tag: ${{ steps.version.outputs.beta_tag }}
+      short_sha: ${{ steps.version.outputs.short_sha }}
 
     steps:
       - name: Check out repository
@@ -42,34 +69,21 @@ jobs:
         # v2.0.0
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce
 
-      - name: Prepare build secrets
+      - name: Prepare OAuth build input
         shell: pwsh
         env:
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.TASK_FLYOUT_GOOGLE_CREDENTIALS_JSON }}
-          CERTIFICATE_BASE64: ${{ secrets.TASK_FLYOUT_CERTIFICATE_BASE64 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.TASK_FLYOUT_CERTIFICATE_PASSWORD }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:GOOGLE_CREDENTIALS_JSON)) {
             throw "Missing secret: TASK_FLYOUT_GOOGLE_CREDENTIALS_JSON"
           }
-          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_BASE64)) {
-            throw "Missing secret: TASK_FLYOUT_CERTIFICATE_BASE64"
-          }
-          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_PASSWORD)) {
-            throw "Missing secret: TASK_FLYOUT_CERTIFICATE_PASSWORD"
-          }
 
-          [System.IO.File]::WriteAllText((Join-Path $env:GITHUB_WORKSPACE "credentials.json"), $env:GOOGLE_CREDENTIALS_JSON)
-          [System.IO.File]::WriteAllBytes($env:CERTIFICATE_PATH, [Convert]::FromBase64String($env:CERTIFICATE_BASE64))
-
-          $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
-            $env:CERTIFICATE_PATH,
-            $env:CERTIFICATE_PASSWORD,
-            [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
-
-          "PACKAGE_CERTIFICATE_THUMBPRINT=$($certificate.Thumbprint)" >> $env:GITHUB_ENV
+          [System.IO.File]::WriteAllText(
+            (Join-Path $env:GITHUB_WORKSPACE "credentials.json"),
+            $env:GOOGLE_CREDENTIALS_JSON)
 
       - name: Compute beta version
+        id: version
         shell: pwsh
         run: |
           [xml]$manifest = Get-Content -LiteralPath "Package.appxmanifest"
@@ -77,31 +91,23 @@ jobs:
           $shortSha = $env:GITHUB_SHA.Substring(0, 7)
           $tag = "beta-v$version-$env:GITHUB_RUN_NUMBER.$env:GITHUB_RUN_ATTEMPT"
 
-          "PACKAGE_VERSION=$version" >> $env:GITHUB_ENV
-          "SHORT_SHA=$shortSha" >> $env:GITHUB_ENV
-          "BETA_TAG=$tag" >> $env:GITHUB_ENV
+          "package_version=$version" >> $env:GITHUB_OUTPUT
+          "short_sha=$shortSha" >> $env:GITHUB_OUTPUT
+          "beta_tag=$tag" >> $env:GITHUB_OUTPUT
 
-      - name: Restore dependencies
+      - name: Restore application dependencies
+        shell: pwsh
+        run: dotnet restore $env:PROJECT_FILE --locked-mode
+
+      - name: Build unsigned MSIX package
         shell: pwsh
         run: |
-          dotnet restore $env:PROJECT_FILE --locked-mode
-          dotnet restore $env:TEST_PROJECT_FILE --locked-mode
-
-      - name: Run tests
-        shell: pwsh
-        run: dotnet test $env:TEST_PROJECT_FILE -c Debug --no-restore
-
-      - name: Build MSIX package
-        shell: pwsh
-        env:
-          CERTIFICATE_PASSWORD: ${{ secrets.TASK_FLYOUT_CERTIFICATE_PASSWORD }}
-        run: |
-          $packageDir = Join-Path $env:GITHUB_WORKSPACE "AppPackages"
+          $packageDir = Join-Path $env:GITHUB_WORKSPACE "unsigned-package"
           New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
 
           msbuild $env:PROJECT_FILE `
-            /restore `
             /m `
+            /p:RestoreLockedMode=true `
             /p:Configuration=$env:CONFIGURATION `
             /p:Platform=$env:PLATFORM `
             /p:RuntimeIdentifier=win-x64 `
@@ -109,34 +115,102 @@ jobs:
             /p:GenerateAppxPackageOnBuild=true `
             /p:AppxBundle=Never `
             /p:AppxPackageDir="$packageDir\" `
-            /p:AppxPackageSigningEnabled=true `
-            /p:PackageCertificateKeyFile="$env:CERTIFICATE_PATH" `
-            /p:PackageCertificatePassword="$env:CERTIFICATE_PASSWORD" `
-            /p:PackageCertificateThumbprint="$env:PACKAGE_CERTIFICATE_THUMBPRINT"
+            /p:AppxPackageSigningEnabled=false
+
+          $packages = @(Get-ChildItem -LiteralPath $packageDir -Recurse -File -Filter "*.msix")
+          if ($packages.Count -eq 0) {
+            throw "No unsigned MSIX package was produced."
+          }
+
+      - name: Remove OAuth build input
+        if: always()
+        shell: pwsh
+        run: Remove-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE "credentials.json") -Force -ErrorAction SilentlyContinue
+
+      - name: Upload unsigned package
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: TaskFlyout-unsigned-${{ github.run_id }}-${{ github.run_attempt }}
+          path: unsigned-package/**/*.msix
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Sign and publish beta
+    needs: package
+    runs-on: windows-latest
+    environment: beta-release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download unsigned package
+        # v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: TaskFlyout-unsigned-${{ github.run_id }}-${{ github.run_attempt }}
+          path: unsigned-package
+
+      - name: Sign MSIX package
+        shell: pwsh
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.TASK_FLYOUT_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.TASK_FLYOUT_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_BASE64)) {
+            throw "Missing secret: TASK_FLYOUT_CERTIFICATE_BASE64"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_PASSWORD)) {
+            throw "Missing secret: TASK_FLYOUT_CERTIFICATE_PASSWORD"
+          }
+
+          $certificatePath = Join-Path $env:RUNNER_TEMP "task-flyout-signing.pfx"
+          [System.IO.File]::WriteAllBytes(
+            $certificatePath,
+            [Convert]::FromBase64String($env:CERTIFICATE_BASE64))
+
+          try {
+            $signTool = Get-ChildItem -LiteralPath "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -File -Filter "signtool.exe" |
+              Where-Object { $_.FullName -match "\\x64\\signtool\.exe$" } |
+              Sort-Object FullName -Descending |
+              Select-Object -First 1
+            if ($null -eq $signTool) {
+              throw "Windows SDK signtool.exe was not found."
+            }
+
+            $packages = @(Get-ChildItem -LiteralPath "unsigned-package" -Recurse -File -Filter "*.msix")
+            if ($packages.Count -eq 0) {
+              throw "No unsigned MSIX package was downloaded."
+            }
+
+            foreach ($package in $packages) {
+              & $signTool.FullName sign /fd SHA256 /f $certificatePath /p $env:CERTIFICATE_PASSWORD $package.FullName
+              if ($LASTEXITCODE -ne 0) {
+                throw "Signing failed for $($package.Name)."
+              }
+
+              & $signTool.FullName verify /pa /v $package.FullName
+              if ($LASTEXITCODE -ne 0) {
+                throw "Signature verification failed for $($package.Name)."
+              }
+            }
+          }
+          finally {
+            Remove-Item -LiteralPath $certificatePath -Force -ErrorAction SilentlyContinue
+          }
 
       - name: Collect release assets
         shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ needs.package.outputs.package_version }}
         run: |
           $artifactDir = Join-Path $env:GITHUB_WORKSPACE "release-artifacts"
-          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-
-          $packageFiles = @()
-          foreach ($root in @("AppPackages", "bin")) {
-            if (Test-Path -LiteralPath $root) {
-              $packageFiles += Get-ChildItem -LiteralPath $root -Recurse -File |
-                Where-Object { $_.Extension -in @(".msix", ".msixbundle", ".appinstaller", ".cer", ".ps1", ".bat") }
-            }
-          }
-
-          if ($packageFiles.Count -eq 0) {
-            throw "No release package files were produced."
-          }
-
           $stagingDir = Join-Path $artifactDir "TaskFlyout-beta-$env:PACKAGE_VERSION-$env:GITHUB_RUN_NUMBER"
           New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
-          foreach ($file in $packageFiles) {
-            Copy-Item -LiteralPath $file.FullName -Destination $stagingDir -Force
-          }
+
+          Get-ChildItem -LiteralPath "unsigned-package" -Recurse -File -Filter "*.msix" |
+            Copy-Item -Destination $stagingDir -Force
 
           $zipPath = Join-Path $artifactDir "TaskFlyout-beta-$env:PACKAGE_VERSION-$env:GITHUB_RUN_NUMBER-win-x64.zip"
           Compress-Archive -Path (Join-Path $stagingDir "*") -DestinationPath $zipPath -Force
@@ -151,7 +225,7 @@ jobs:
           ) -join "`n"
           Set-Content -LiteralPath (Join-Path $artifactDir "release-notes.md") -Value $notes -Encoding UTF8
 
-      - name: Upload workflow artifact
+      - name: Upload signed workflow artifact
         # v4.6.2
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -163,6 +237,9 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          BETA_TAG: ${{ needs.package.outputs.beta_tag }}
+          PACKAGE_VERSION: ${{ needs.package.outputs.package_version }}
+          SHORT_SHA: ${{ needs.package.outputs.short_sha }}
         run: |
           gh release create $env:BETA_TAG `
             "release-artifacts\TaskFlyout-beta-$env:PACKAGE_VERSION-$env:GITHUB_RUN_NUMBER-win-x64.zip" `
@@ -170,10 +247,3 @@ jobs:
             --notes-file "release-artifacts\release-notes.md" `
             --target "$env:GITHUB_SHA" `
             --prerelease
-
-      - name: Remove build secrets
-        if: always()
-        shell: pwsh
-        run: |
-          Remove-Item -LiteralPath $env:CERTIFICATE_PATH -Force -ErrorAction SilentlyContinue
-          Remove-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE "credentials.json") -Force -ErrorAction SilentlyContinue
