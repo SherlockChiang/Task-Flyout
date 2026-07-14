@@ -45,15 +45,10 @@ namespace Task_Flyout
 
         private bool ShouldShowOnboardingOnLaunch()
         {
-            if (ApplicationData.Current.LocalSettings.Values["OnboardingChecklistCompleted"] as bool? == true)
-                return false;
-
-            if (App.Current is not App app) return false;
-
-            bool hasCalendarAccounts = app.SyncManager.AccountManager.Accounts.Count > 0;
-            bool hasMailAccounts = app.MailService.HasSetupCompleteAccounts();
-            bool hasWeather = app.WeatherService.IsEnabled;
-            return !hasCalendarAccounts && !hasMailAccounts && !hasWeather;
+            var values = ApplicationData.Current.LocalSettings.Values;
+            return OnboardingPolicy.ShouldShow(
+                values[OnboardingPolicy.CompletedVersionKey],
+                values[OnboardingPolicy.LegacyCompletedKey]);
         }
 
         private string GetSafeString(string key, string fallbackText)

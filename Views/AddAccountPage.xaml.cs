@@ -42,22 +42,19 @@ namespace Task_Flyout.Views
             var mgr = GetAccountManager();
             if (mgr == null || ChecklistText == null) return;
 
-            var google = mgr.IsConnected("Google") ? "Ready" : "Connect Google for Calendar, Tasks, and Gmail.";
-            var microsoft = mgr.IsConnected("Microsoft") ? "Ready" : "Connect Microsoft for Outlook Calendar and To Do.";
+            string ready = _loader.GetStringOrDefault("AddAccount_Ready") ?? "Ready";
+            var google = mgr.IsConnected("Google") ? ready : (_loader.GetStringOrDefault("AddAccount_ConnectGoogle") ?? "Connect Google for Calendar, Tasks, and Gmail.");
+            var microsoft = mgr.IsConnected("Microsoft") ? ready : (_loader.GetStringOrDefault("AddAccount_ConnectMicrosoft") ?? "Connect Microsoft for Outlook Calendar and To Do.");
             var mail = App.Current is App app && app.MailService.HasSetupCompleteAccounts()
-                ? "Ready"
-                : "Add Gmail, Outlook, or IMAP from the Mail page.";
+                ? ready
+                : (_loader.GetStringOrDefault("AddAccount_ConnectMail") ?? "Add Gmail, Outlook, or IMAP from the Mail page.");
             var weather = App.Current is App app2 && app2.WeatherService.IsEnabled
-                ? "Ready"
-                : "Enable weather and choose a city from the Weather page.";
-            bool allReady = google == "Ready" && microsoft == "Ready" && mail == "Ready" && weather == "Ready";
-            if (allReady)
-                Windows.Storage.ApplicationData.Current.LocalSettings.Values["OnboardingChecklistCompleted"] = true;
+                ? ready
+                : (_loader.GetStringOrDefault("AddAccount_ConnectWeather") ?? "Enable weather and choose a city from the Weather page.");
 
-            var completeText = allReady ? "\nSetup complete." : "";
-            ChecklistText.Text = $"Google: {google}\nMicrosoft: {microsoft}\nMail: {mail}\nWeather: {weather}{completeText}";
-            OpenMailSetupButton.Visibility = mail == "Ready" ? Visibility.Collapsed : Visibility.Visible;
-            OpenWeatherSetupButton.Visibility = weather == "Ready" ? Visibility.Collapsed : Visibility.Visible;
+            ChecklistText.Text = $"Google: {google}\nMicrosoft: {microsoft}\nMail: {mail}\nWeather: {weather}";
+            OpenMailSetupButton.Visibility = App.Current is App mailApp && mailApp.MailService.HasSetupCompleteAccounts() ? Visibility.Collapsed : Visibility.Visible;
+            OpenWeatherSetupButton.Visibility = App.Current is App weatherApp && weatherApp.WeatherService.IsEnabled ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private void OpenMailSetupButton_Click(object sender, RoutedEventArgs e)
@@ -68,6 +65,18 @@ namespace Task_Flyout.Views
         private void OpenWeatherSetupButton_Click(object sender, RoutedEventArgs e)
         {
             Frame?.Navigate(typeof(WeatherPage));
+        }
+
+        private void SkipButton_Click(object sender, RoutedEventArgs e)
+            => CompleteOnboarding();
+
+        private void FinishButton_Click(object sender, RoutedEventArgs e)
+            => CompleteOnboarding();
+
+        private void CompleteOnboarding()
+        {
+            Windows.Storage.ApplicationData.Current.LocalSettings.Values[OnboardingPolicy.CompletedVersionKey] = OnboardingPolicy.CurrentVersion;
+            Frame?.Navigate(typeof(CalendarPage));
         }
 
         private StackPanel CreateDisabledContent(string name, string color, string status)
@@ -136,6 +145,7 @@ namespace Task_Flyout.Views
                 }
 
                 mgr.AddAccount(account);
+                Windows.Storage.ApplicationData.Current.LocalSettings.Values[OnboardingPolicy.CompletedVersionKey] = OnboardingPolicy.CurrentVersion;
 
                 // Refresh the MainWindow pane
                 if (App.MyMainWindow is MainWindow mainWin)

@@ -429,6 +429,36 @@
   <data name="AddAccount_AlreadyConnected" xml:space="preserve">
     <value>Already connected</value>
   </data>
+  <data name="AddAccount_ChecklistTitle.Text" xml:space="preserve">
+    <value>Optional setup</value>
+  </data>
+  <data name="AddAccount_OpenMailSetup.Text" xml:space="preserve">
+    <value>Open Mail setup</value>
+  </data>
+  <data name="AddAccount_OpenWeatherSetup.Text" xml:space="preserve">
+    <value>Open Weather setup</value>
+  </data>
+  <data name="AddAccount_Skip.Content" xml:space="preserve">
+    <value>Skip for now</value>
+  </data>
+  <data name="AddAccount_Finish.Content" xml:space="preserve">
+    <value>Finish setup</value>
+  </data>
+  <data name="AddAccount_Ready" xml:space="preserve">
+    <value>Ready</value>
+  </data>
+  <data name="AddAccount_ConnectGoogle" xml:space="preserve">
+    <value>Connect Google for Calendar, Tasks, and Gmail.</value>
+  </data>
+  <data name="AddAccount_ConnectMicrosoft" xml:space="preserve">
+    <value>Connect Microsoft for Outlook Calendar and To Do.</value>
+  </data>
+  <data name="AddAccount_ConnectMail" xml:space="preserve">
+    <value>Add Gmail, Outlook, or IMAP from the Mail page.</value>
+  </data>
+  <data name="AddAccount_ConnectWeather" xml:space="preserve">
+    <value>Enable weather and choose a city from the Weather page.</value>
+  </data>
   <data name="TextRemoveAccountTitle" xml:space="preserve">
     <value>Remove Account</value>
   </data>

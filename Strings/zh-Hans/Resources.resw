@@ -429,6 +429,36 @@
   <data name="AddAccount_AlreadyConnected" xml:space="preserve">
     <value>已连接</value>
   </data>
+  <data name="AddAccount_ChecklistTitle.Text" xml:space="preserve">
+    <value>可选设置</value>
+  </data>
+  <data name="AddAccount_OpenMailSetup.Text" xml:space="preserve">
+    <value>打开邮件设置</value>
+  </data>
+  <data name="AddAccount_OpenWeatherSetup.Text" xml:space="preserve">
+    <value>打开天气设置</value>
+  </data>
+  <data name="AddAccount_Skip.Content" xml:space="preserve">
+    <value>暂时跳过</value>
+  </data>
+  <data name="AddAccount_Finish.Content" xml:space="preserve">
+    <value>完成设置</value>
+  </data>
+  <data name="AddAccount_Ready" xml:space="preserve">
+    <value>已就绪</value>
+  </data>
+  <data name="AddAccount_ConnectGoogle" xml:space="preserve">
+    <value>连接 Google 以使用日历、任务和 Gmail。</value>
+  </data>
+  <data name="AddAccount_ConnectMicrosoft" xml:space="preserve">
+    <value>连接 Microsoft 以使用 Outlook 日历和 To Do。</value>
+  </data>
+  <data name="AddAccount_ConnectMail" xml:space="preserve">
+    <value>从邮件页面添加 Gmail、Outlook 或 IMAP。</value>
+  </data>
+  <data name="AddAccount_ConnectWeather" xml:space="preserve">
+    <value>从天气页面启用天气并选择城市。</value>
+  </data>
   <data name="TextRemoveAccountTitle" xml:space="preserve">
     <value>移除账户</value>
   </data>
