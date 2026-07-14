@@ -14,10 +14,13 @@ namespace Task_Flyout.Services
     {
         private readonly List<ISyncProvider> _providers = new();
         private AppCache _cache = new();
-        private AppCache _publishedCache = new();
+        private PublishedCacheSnapshot _publishedCache = new(0, new AppCache());
         private int _cacheLoaded;
+        private long _cacheVersion;
         private readonly ReaderWriterLockSlim _cacheLock = new(LockRecursionPolicy.NoRecursion);
         private readonly SharedRequestCoordinator<List<AgendaItem>> _dataRequests = new();
+        private readonly VersionedAsyncWriter<string> _cacheWriter = new(
+            json => LocalSqliteStore.WriteProtectedTextAsync(StoreScope, CacheKey, json));
         private const string StoreScope = "calendar";
         private const string CacheKey = "local_cache_winui3";
         private const int RetainedTaskPastYears = 1;
@@ -82,7 +85,7 @@ namespace Task_Flyout.Services
         public AppCache GetLocalCache()
         {
             EnsureCacheLoaded();
-            return CloneCache(Volatile.Read(ref _publishedCache));
+            return CloneCache(Volatile.Read(ref _publishedCache).Cache);
         }
 
         public Dictionary<string, List<AgendaItem>> GetDayItemsSnapshot(IEnumerable<string> dateKeys)
@@ -93,7 +96,7 @@ namespace Task_Flyout.Services
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
 
-            var cache = Volatile.Read(ref _publishedCache);
+            var cache = Volatile.Read(ref _publishedCache).Cache;
             var result = new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal);
             foreach (var key in keys)
             {
@@ -110,7 +113,7 @@ namespace Task_Flyout.Services
             min = min.Date;
             max = max.Date;
 
-            var cache = Volatile.Read(ref _publishedCache);
+            var cache = Volatile.Read(ref _publishedCache).Cache;
             var dayItems = new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal);
             for (var day = min; day < max; day = day.AddDays(1))
             {
@@ -136,7 +139,7 @@ namespace Task_Flyout.Services
         {
             EnsureCacheLoaded();
 
-            var cache = Volatile.Read(ref _publishedCache);
+            var cache = Volatile.Read(ref _publishedCache).Cache;
             var dayItems = cache.DayItems
                 .Select(kvp => new
                 {
@@ -386,8 +389,6 @@ namespace Task_Flyout.Services
         {
             if (Volatile.Read(ref _cacheLoaded) != 0) return;
 
-            AppCache? compactedSnapshot = null;
-
             _cacheLock.EnterWriteLock();
             try
             {
@@ -419,7 +420,7 @@ namespace Task_Flyout.Services
                 _cache = loaded;
 
                 if (CompactCache(DateTime.Today))
-                    compactedSnapshot = CloneCache(_cache);
+                    SaveCacheSync(CloneCache(_cache));
                 PublishCacheSnapshotNoLock();
 
                 Volatile.Write(ref _cacheLoaded, 1);
@@ -428,9 +429,6 @@ namespace Task_Flyout.Services
             {
                 _cacheLock.ExitWriteLock();
             }
-
-            if (compactedSnapshot != null)
-                SaveCacheSync(compactedSnapshot);
         }
 
         private void RemoveProviderFromCache(string providerName)
@@ -459,11 +457,14 @@ namespace Task_Flyout.Services
         {
             try
             {
-                var snapshot = CloneCache(Volatile.Read(ref _publishedCache));
-                string json = JsonSerializer.Serialize(snapshot, AppJsonContext.Default.AppCache);
-                await LocalSqliteStore.WriteProtectedTextAsync(StoreScope, CacheKey, json);
+                var published = Volatile.Read(ref _publishedCache);
+                string json = JsonSerializer.Serialize(published.Cache, AppJsonContext.Default.AppCache);
+                await _cacheWriter.WriteAsync(published.Version, json);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Calendar cache save failed: {ex.Message}");
+            }
         }
 
         private bool IsRangeCached(DateTime min, DateTime max, IEnumerable<string> providerNames)
@@ -477,7 +478,7 @@ namespace Task_Flyout.Services
 
             if (providers.Count == 0) return false;
 
-            var cache = Volatile.Read(ref _publishedCache);
+            var cache = Volatile.Read(ref _publishedCache).Cache;
             return providers.All(provider => cache.CachedRanges.Any(range =>
                 string.Equals(range.ProviderName, provider, StringComparison.OrdinalIgnoreCase) &&
                 string.Compare(range.StartDateKey, start, StringComparison.Ordinal) <= 0 &&
@@ -489,7 +490,7 @@ namespace Task_Flyout.Services
             string start = min.ToString("yyyy-MM-dd");
             string end = max.AddDays(-1).ToString("yyyy-MM-dd");
 
-            var cache = Volatile.Read(ref _publishedCache);
+            var cache = Volatile.Read(ref _publishedCache).Cache;
             return cache.DayItems
                 .Where(kvp =>
                     string.Compare(kvp.Key, start, StringComparison.Ordinal) >= 0 &&
@@ -755,7 +756,11 @@ namespace Task_Flyout.Services
                 out date);
 
         private void PublishCacheSnapshotNoLock()
-            => Volatile.Write(ref _publishedCache, CloneCache(_cache));
+            => Volatile.Write(
+                ref _publishedCache,
+                new PublishedCacheSnapshot(++_cacheVersion, CloneCache(_cache)));
+
+        private sealed record PublishedCacheSnapshot(long Version, AppCache Cache);
 
         private static void SaveCacheSync(AppCache snapshot)
         {
