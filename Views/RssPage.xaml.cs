@@ -47,6 +47,7 @@ namespace Task_Flyout.Views
         private WebView2? _rssArticleWebView;
         private CancellationTokenSource? _rssResourceCts;
         private DateTimeOffset? _lastArticleLoadSucceededAt;
+        private int _pageGeneration;
 
         public RssPage()
         {
@@ -59,6 +60,7 @@ namespace Task_Flyout.Views
 
         public void DisposeLikeCleanup()
         {
+            _pageGeneration++;
             RssService.LocalDataCleared -= RssService_LocalDataCleared;
             _selectedArticle = null;
             CancelRssResourceRequests();
@@ -87,20 +89,31 @@ namespace Task_Flyout.Views
 
         private async void RssPage_Loaded(object sender, RoutedEventArgs e)
         {
+            int generation = ++_pageGeneration;
             RssService.LocalDataCleared -= RssService_LocalDataCleared;
             RssService.LocalDataCleared += RssService_LocalDataCleared;
             try
             {
+                SetLoading(true);
+                await _rssService.InitializeAsync();
+                if (generation != _pageGeneration || !IsLoaded) return;
+
                 LoadFolders();
                 LoadSubscriptions();
                 BuildSubscriptionTree();
                 AttachArticleScrollViewer();
-                ResetAndLoadCachedArticles();
+                await ResetAndLoadArticlesAsync(generation);
             }
             catch (Exception ex)
             {
+                if (generation != _pageGeneration || !IsLoaded) return;
                 LogRssError(ex);
                 ArticleListSubtitle.Text = string.Format(_loader.GetStringOrDefault("TextRssInitFailed") ?? "RSS initialization failed: {0}", UserSafeErrorMessage.FromException(ex));
+            }
+            finally
+            {
+                if (generation == _pageGeneration && IsLoaded)
+                    SetLoading(false);
             }
         }
 
@@ -191,12 +204,12 @@ namespace Task_Flyout.Views
                 : string.Format(_loader.GetStringOrDefault("TextNSubscriptions") ?? "{0} subscriptions, {1} folders", Subscriptions.Count, Folders.Count);
         }
 
-        private async Task ResetAndLoadArticlesAsync()
+        private async Task ResetAndLoadArticlesAsync(int? pageGeneration = null)
         {
             Articles.Clear();
             _loadedCount = 0;
             _hasMore = true;
-            await LoadMoreArticlesAsync();
+            await LoadMoreArticlesAsync(pageGeneration);
         }
 
         private void ResetAndLoadCachedArticles()
@@ -224,7 +237,7 @@ namespace Task_Flyout.Views
             }
         }
 
-        private async Task LoadMoreArticlesAsync()
+        private async Task LoadMoreArticlesAsync(int? pageGeneration = null)
         {
             if (_isLoading || !_hasMore) return;
 
@@ -233,6 +246,9 @@ namespace Task_Flyout.Views
                 _isLoading = true;
                 SetLoading(true);
                 var items = await _rssService.LoadMoreArticlesAsync(_selectedSubscriptionId, _selectedFolderId, _loadedCount, PageSize);
+                if (pageGeneration.HasValue && (pageGeneration.Value != _pageGeneration || !IsLoaded))
+                    return;
+
                 foreach (var item in items)
                     Articles.Add(item);
 
@@ -245,12 +261,16 @@ namespace Task_Flyout.Views
             }
             catch (Exception ex)
             {
+                if (pageGeneration.HasValue && (pageGeneration.Value != _pageGeneration || !IsLoaded))
+                    return;
+
                 LogRssError(ex);
                 SetArticleListStatus(string.Format(_loader.GetStringOrDefault("TextLoadFailed") ?? "Load failed: {0}", UserSafeErrorMessage.FromException(ex)), isError: true);
             }
             finally
             {
-                SetLoading(false);
+                if (!pageGeneration.HasValue || (pageGeneration.Value == _pageGeneration && IsLoaded))
+                    SetLoading(false);
                 _isLoading = false;
             }
         }

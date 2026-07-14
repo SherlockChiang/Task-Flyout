@@ -440,6 +440,13 @@ namespace Task_Flyout.Services
             return Task.Run(() => GetCachedArticlesPage(subscriptionId, folderId, skip, take).ToList());
         }
 
+        public Task InitializeAsync()
+        {
+            // Initialization includes SQLite setup, migration, and DPAPI work. Keep it off
+            // the dispatcher while preserving EnsureLoaded's existing single-loader lock.
+            return Task.Run(EnsureLoaded);
+        }
+
         public async Task RefreshSubscriptionAsync(RssSubscription subscription, bool force)
         {
             EnsureLoaded();

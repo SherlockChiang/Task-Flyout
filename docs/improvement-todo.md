@@ -22,7 +22,7 @@ Status values:
 
 | ID | Status | Area | Work item | Acceptance criteria | Commit |
 | --- | --- | --- | --- | --- | --- |
-| P1-01 | TODO | Performance | Move RSS initialization and article hydration off the UI thread. | First page load does not synchronously initialize/query/decrypt the full RSS cache; the first page is loaded asynchronously. | |
+| P1-01 | DONE | Performance | Move RSS initialization and first-page loading off the UI thread. | First page load does not synchronously initialize/query/decrypt the full RSS cache; the first page is loaded asynchronously. | `perf: move RSS initialization off the UI thread` |
 | P1-02 | TODO | Performance | Stop loading 1,000 RSS articles before SQL paging. | RSS service keeps subscriptions/folders in memory and queries article pages directly; startup allocations are reduced. | |
 | P1-03 | TODO | Lifecycle | Cancel RSS refresh when the page unloads. | Feed, image, and database work observe page cancellation; unloaded pages receive no UI updates. | |
 | P1-04 | TODO | Performance | Replace serial eager RSS image downloads with lazy bounded downloads. | Feed metadata appears before images; global/per-host concurrency is bounded; duplicate URLs are coalesced. | |
