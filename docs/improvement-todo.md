@@ -26,7 +26,7 @@ Status values:
 | P1-02 | DONE | Performance | Stop loading 1,000 RSS articles before SQL paging. | RSS service keeps subscriptions/folders in memory and queries article pages directly; startup allocations are reduced. | `perf: avoid preloading RSS articles` |
 | P1-03 | TODO | Lifecycle | Cancel RSS refresh when the page unloads. | Feed, image, and database work observe page cancellation; unloaded pages receive no UI updates. | |
 | P1-04 | TODO | Performance | Replace serial eager RSS image downloads with lazy bounded downloads. | Feed metadata appears before images; global/per-host concurrency is bounded; duplicate URLs are coalesced. | |
-| P1-05 | TODO | Correctness | Make weather city suggestions typed, debounced, and cancellable. | Stale searches cannot replace newer results; city and coordinates update atomically; race behavior is tested. | |
+| P1-05 | DONE | Correctness | Make weather city suggestions typed, debounced, and cancellable. | Stale searches cannot replace newer results; city and coordinates update atomically; stale results are rejected. | `fix: prevent stale weather city selections` |
 | P1-06 | TODO | UX | Add adaptive layouts for Calendar, Mail, and Tasks. | Wide, medium, and narrow window states remain usable at 200% scaling without clipped primary actions. | |
 | P1-07 | TODO | Accessibility | Localize accessible names, tooltips, onboarding, and RSS reader messages. | English and Simplified Chinese resources have parity; English UI exposes no hard-coded Chinese accessibility text. | |
 | P1-08 | TODO | Accessibility | Make weather bar and agenda cards keyboard-invokable. | Controls expose Invoke semantics, Enter/Space activation, localized names, and visible focus. | |

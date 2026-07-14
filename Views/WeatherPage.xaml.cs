@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Media;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Microsoft.Windows.ApplicationModel.Resources;
@@ -20,6 +21,8 @@ namespace Task_Flyout.Views
         private DateTimeOffset? _lastWeatherLoadSucceededAt;
         private bool _isIconPackOperation;
         private bool _isLoadingWeather;
+        private CancellationTokenSource? _citySearchCts;
+        private int _citySearchGeneration;
 
         private readonly string[] _commonFonts = new[]
         {
@@ -667,26 +670,44 @@ namespace Task_Flyout.Views
 
         private async void CitySearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
         {
-            if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
+            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
+
+            _citySearchCts?.Cancel();
+            _citySearchCts = null;
+            int generation = ++_citySearchGeneration;
+
+            string query = sender.Text.Trim();
+            if (query.Length < 2)
             {
-                string query = sender.Text.Trim();
-                if (query.Length >= 2)
-                {
-                    var suggestions = await _weatherService.SearchCityAsync(query);
+                sender.ItemsSource = null;
+                return;
+            }
+
+            var cts = new CancellationTokenSource();
+            _citySearchCts = cts;
+            try
+            {
+                await Task.Delay(300, cts.Token);
+                var suggestions = await _weatherService.SearchCityAsync(query, cts.Token);
+                if (generation == _citySearchGeneration && string.Equals(sender.Text.Trim(), query, StringComparison.Ordinal))
                     sender.ItemsSource = suggestions;
-                }
-                else
-                {
-                    sender.ItemsSource = null;
-                }
+            }
+            catch (OperationCanceledException) when (cts.IsCancellationRequested)
+            {
+            }
+            finally
+            {
+                if (ReferenceEquals(_citySearchCts, cts))
+                    _citySearchCts = null;
+                cts.Dispose();
             }
         }
 
         private async void CitySearchBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
         {
-            if (args.SelectedItem is string selectedCity)
+            if (args.SelectedItem is CitySuggestion selectedCity)
             {
-                sender.Text = selectedCity;
+                sender.Text = selectedCity.DisplayName;
                 _weatherService.SelectCity(selectedCity);
                 await LoadWeatherDataAsync(forceRefresh: true);
             }
@@ -694,10 +715,22 @@ namespace Task_Flyout.Views
 
         private async void CitySearchBox_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
         {
-            string city = args.ChosenSuggestion?.ToString() ?? args.QueryText;
+            if (args.ChosenSuggestion is CitySuggestion suggestion)
+            {
+                _weatherService.SelectCity(suggestion);
+                await LoadWeatherDataAsync(forceRefresh: true);
+                return;
+            }
+
+            string city = args.QueryText;
             if (!string.IsNullOrWhiteSpace(city))
             {
-                _weatherService.SelectCity(city);
+                var suggestions = await _weatherService.SearchCityAsync(city);
+                var match = suggestions.FirstOrDefault();
+                if (match == null) return;
+
+                sender.Text = match.DisplayName;
+                _weatherService.SelectCity(match);
                 await LoadWeatherDataAsync(forceRefresh: true);
             }
         }
@@ -789,6 +822,9 @@ namespace Task_Flyout.Views
 
         private void WeatherPage_Unloaded(object sender, RoutedEventArgs e)
         {
+            _citySearchGeneration++;
+            _citySearchCts?.Cancel();
+            _citySearchCts = null;
             if (_weatherService != null)
                 _weatherService.LocationUpdated -= OnWeatherLocationUpdated;
         }

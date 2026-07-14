@@ -138,6 +138,11 @@ namespace Task_Flyout.Services
         public WeatherInfo? Info { get; set; }
     }
 
+    public sealed record CitySuggestion(string DisplayName, double Latitude, double Longitude)
+    {
+        public override string ToString() => DisplayName;
+    }
+
     public class WeatherService
     {
         private static readonly ResourceLoader _loader = new();
@@ -146,7 +151,6 @@ namespace Task_Flyout.Services
         private string? _cachedWeatherKey;
         private DateTime _lastFetchTime = DateTime.MinValue;
         private readonly TimeSpan _cacheExpiry = TimeSpan.FromMinutes(30);
-        private Dictionary<string, (double Lat, double Lon)> _lastSearchCoords = new();
         // Coalesce concurrent weather fetches: the bar timer, flyout, nav icon and
         // settings page can all ask at once (especially on a city change). Without this
         // each hits the provider independently (OpenMeteo = 2 requests apiece).
@@ -503,15 +507,8 @@ namespace Task_Flyout.Services
             EnabledFlyoutFields = string.Join(",", fields);
         }
 
-        public void SelectCity(string cityName)
-        {
-            City = cityName;
-            if (_lastSearchCoords.TryGetValue(cityName, out var coords))
-            {
-                CityLat = coords.Lat;
-                CityLon = coords.Lon;
-            }
-        }
+        public void SelectCity(CitySuggestion suggestion)
+            => SetCoordinates(suggestion.Latitude, suggestion.Longitude, suggestion.DisplayName);
 
         /// <summary>Set the weather location directly from coordinates (e.g. device GPS),
         /// with a display label. Open-Meteo uses the coordinates directly.</summary>
@@ -698,19 +695,18 @@ namespace Task_Flyout.Services
             }
         }
 
-        public async Task<List<string>> SearchCityAsync(string query)
+        public async Task<List<CitySuggestion>> SearchCityAsync(string query, CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(query)) return new List<string>();
+            if (string.IsNullOrWhiteSpace(query)) return new List<CitySuggestion>();
             try
             {
                 string url = $"https://geocoding-api.open-meteo.com/v1/search?name={Uri.EscapeDataString(query)}&count=5&language=zh";
 
-                var response = await GetStringWithAgentAsync(url, "TaskFlyout/1.0");
+                var response = await GetStringWithAgentAsync(url, "TaskFlyout/1.0", cancellationToken);
                 using var doc = JsonDocument.Parse(response);
                 if (doc.RootElement.TryGetProperty("results", out var results))
                 {
-                    var list = new List<string>();
-                    _lastSearchCoords.Clear();
+                    var list = new List<CitySuggestion>();
                     foreach (var item in results.EnumerateArray())
                     {
                         string name = item.GetProperty("name").GetString() ?? "";
@@ -720,14 +716,14 @@ namespace Task_Flyout.Services
                         double lon = item.GetProperty("longitude").GetDouble();
 
                         string fullName = $"{name}, {admin1}, {country}".Replace(", ,", ",").TrimEnd(',', ' ');
-                        _lastSearchCoords[fullName] = (lat, lon);
-                        list.Add(fullName);
+                        list.Add(new CitySuggestion(fullName, lat, lon));
                     }
                     return list;
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch { }
-            return new List<string>();
+            return new List<CitySuggestion>();
         }
 
         public async Task<WeatherInfo?> GetWeatherAsync(bool forceRefresh = false)
