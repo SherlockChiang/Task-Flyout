@@ -44,7 +44,7 @@ Status values:
 | P2-03 | TODO | Security | Default RSS to HTTPS and block silent downgrade redirects. | HTTP requires per-subscription approval; HTTPS-to-HTTP downgrade is rejected or explicitly confirmed. | |
 | P2-04 | TODO | Security | Make local-network RSS permission subscription-specific. | Local access is scoped, visible, and revalidated when the destination changes. | |
 | P2-05 | TODO | Security | Replace exception-string logging with structured diagnostics. | External URLs omit query/fragment; sensitive fields are allowlisted; logs rotate by age and size. | |
-| P2-06 | TODO | Supply chain | Allowlist NuGet sources and enforce locked restore for release builds. | Restore sources are explicit; every CI/release restore uses locked mode; vulnerability checks remain clean. | |
+| P2-06 | DONE | Supply chain | Allowlist NuGet sources and enforce locked restore for release builds. | Restore sources are explicit; every CI/release restore uses locked mode; vulnerability checks remain clean. | `security: lock release package restore` |
 | P2-07 | TODO | Performance | Bound Google calendar request concurrency and add throttling retries. | Calendar fan-out has a configured limit and handles 429/transient failures with bounded backoff. | |
 | P2-08 | TODO | Performance | Reduce calendar cache deep cloning. | Unchanged day buckets are shared or persisted incrementally; allocation benchmark shows improvement. | |
 | P2-09 | TODO | Performance | Bound RSS host-gate retention and reduce payload copies. | Host coordination storage is bounded; image/feed transfer avoids unnecessary full-buffer copies. | |
