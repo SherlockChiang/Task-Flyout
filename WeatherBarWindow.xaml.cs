@@ -929,6 +929,7 @@ namespace Task_Flyout
 
                 lock (ThemeDiagnosticsLogLock)
                 {
+                    DiagnosticLogRetention.RotateIfNeeded(path);
                     bool writeHeader = !System.IO.File.Exists(path);
                     using var writer = new System.IO.StreamWriter(path, append: true, Encoding.UTF8);
                     if (writeHeader)

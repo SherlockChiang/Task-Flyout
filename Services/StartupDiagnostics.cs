@@ -43,6 +43,7 @@ namespace Task_Flyout.Services
                 var markText = string.Join(';', marks.Select(mark => $"{mark.Name}={mark.ElapsedMs}"));
                 lock (LogLock)
                 {
+                    DiagnosticLogRetention.RotateIfNeeded(path);
                     bool writeHeader = !File.Exists(path);
                     using var writer = new StreamWriter(path, append: true);
                     if (writeHeader)

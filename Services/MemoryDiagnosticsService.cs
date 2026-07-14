@@ -109,7 +109,18 @@ namespace Task_Flyout.Services
                 _pendingWrite = _pendingWrite.ContinueWith(
                     _ =>
                     {
-                        try { File.AppendAllText(path, line, Encoding.UTF8); }
+                        try
+                        {
+                            DiagnosticLogRetention.RotateIfNeeded(path);
+                            if (!File.Exists(path))
+                            {
+                                File.WriteAllText(
+                                    path,
+                                    "timestamp,working_set_mb,private_memory_mb,managed_heap_mb,gc0,gc1,gc2,handle_count,threads,current_page,has_webview2,main_window_created,flyout_created,weather_bar_created" + Environment.NewLine,
+                                    Encoding.UTF8);
+                            }
+                            File.AppendAllText(path, line, Encoding.UTF8);
+                        }
                         catch { }
                     },
                     TaskScheduler.Default);
