@@ -48,6 +48,7 @@ namespace Task_Flyout.Views
         private CancellationTokenSource? _rssResourceCts;
         private DateTimeOffset? _lastArticleLoadSucceededAt;
         private int _pageGeneration;
+        private CancellationTokenSource? _pageLifetimeCts;
 
         public RssPage()
         {
@@ -61,6 +62,9 @@ namespace Task_Flyout.Views
         public void DisposeLikeCleanup()
         {
             _pageGeneration++;
+            _pageLifetimeCts?.Cancel();
+            _pageLifetimeCts?.Dispose();
+            _pageLifetimeCts = null;
             RssService.LocalDataCleared -= RssService_LocalDataCleared;
             _selectedArticle = null;
             CancelRssResourceRequests();
@@ -90,6 +94,9 @@ namespace Task_Flyout.Views
         private async void RssPage_Loaded(object sender, RoutedEventArgs e)
         {
             int generation = ++_pageGeneration;
+            _pageLifetimeCts?.Cancel();
+            _pageLifetimeCts?.Dispose();
+            _pageLifetimeCts = new CancellationTokenSource();
             RssService.LocalDataCleared -= RssService_LocalDataCleared;
             RssService.LocalDataCleared += RssService_LocalDataCleared;
             try
@@ -666,6 +673,8 @@ namespace Task_Flyout.Views
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
             if (_isRefreshing || _isLoading) return;
+            var pageLifetime = _pageLifetimeCts;
+            if (pageLifetime == null) return;
 
             try
             {
@@ -678,17 +687,22 @@ namespace Task_Flyout.Views
                         visibleSubscriptions = visibleSubscriptions.Where(subscription => subscription.FolderId == _selectedFolderId);
 
                     foreach (var subscription in visibleSubscriptions.Take(10))
-                        await _rssService.RefreshSubscriptionAsync(subscription, force: true);
+                        await _rssService.RefreshSubscriptionAsync(subscription, force: true, pageLifetime.Token);
                 }
                 else if (_rssService.GetSubscriptions().FirstOrDefault(item => item.Id == _selectedSubscriptionId) is { } subscription)
                 {
-                    await _rssService.RefreshSubscriptionAsync(subscription, force: true);
+                    await _rssService.RefreshSubscriptionAsync(subscription, force: true, pageLifetime.Token);
                 }
 
+                if (pageLifetime.IsCancellationRequested || !IsLoaded) return;
                 LoadSubscriptions();
                 ResetAndLoadCachedArticles();
                 _lastArticleLoadSucceededAt = DateTimeOffset.Now;
                 SetArticleListStatus(ArticleListSubtitle.Text);
+            }
+            catch (OperationCanceledException) when (pageLifetime.IsCancellationRequested)
+            {
+                // The page was unloaded while its refresh was still in flight.
             }
             catch (OperationCanceledException)
             {
@@ -701,7 +715,8 @@ namespace Task_Flyout.Views
             }
             finally
             {
-                SetLoading(false);
+                if (!pageLifetime.IsCancellationRequested && IsLoaded)
+                    SetLoading(false);
                 _isRefreshing = false;
             }
         }

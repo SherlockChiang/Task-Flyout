@@ -447,9 +447,13 @@ namespace Task_Flyout.Services
             return Task.Run(EnsureLoaded);
         }
 
-        public async Task RefreshSubscriptionAsync(RssSubscription subscription, bool force)
+        public async Task RefreshSubscriptionAsync(
+            RssSubscription subscription,
+            bool force,
+            CancellationToken cancellationToken = default)
         {
             EnsureLoaded();
+            cancellationToken.ThrowIfCancellationRequested();
             if (!force && !ShouldRefresh(subscription)) return;
 
             RssDataLease lease;
@@ -458,22 +462,25 @@ namespace Task_Flyout.Services
                 if (!_cache.Subscriptions.Any(item => ReferenceEquals(item, subscription))) return;
                 lease = _dataLifecycle.Capture();
             }
-            var cancellationToken = lease.CancellationToken;
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                lease.CancellationToken,
+                cancellationToken);
+            var refreshCancellationToken = linkedCancellation.Token;
 
-            var xml = await FetchFeedAsync(subscription.Url, cancellationToken);
+            var xml = await FetchFeedAsync(subscription.Url, refreshCancellationToken);
             var parsed = ParseFeed(subscription, xml);
 
             string localFeedImagePath = subscription.LocalImagePath;
             if (!string.IsNullOrWhiteSpace(parsed.FeedImageUrl))
-                localFeedImagePath = await CacheImageAsync(parsed.FeedImageUrl, cancellationToken);
+                localFeedImagePath = await CacheImageAsync(parsed.FeedImageUrl, refreshCancellationToken);
 
             foreach (var article in parsed.Articles)
-                article.LocalImagePath = await CacheImageAsync(article.ImageUrl, cancellationToken);
+                article.LocalImagePath = await CacheImageAsync(article.ImageUrl, refreshCancellationToken);
 
-            cancellationToken.ThrowIfCancellationRequested();
+            refreshCancellationToken.ThrowIfCancellationRequested();
             lock (_loadLock)
             {
-                if (!_dataLifecycle.IsCurrent(lease)) return;
+                if (!_dataLifecycle.IsCurrent(lease) || cancellationToken.IsCancellationRequested) return;
 
                 if (!string.IsNullOrWhiteSpace(parsed.FeedTitle))
                     subscription.Title = parsed.FeedTitle;

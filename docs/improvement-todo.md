@@ -24,7 +24,7 @@ Status values:
 | --- | --- | --- | --- | --- | --- |
 | P1-01 | DONE | Performance | Move RSS initialization and first-page loading off the UI thread. | First page load does not synchronously initialize/query/decrypt the full RSS cache; the first page is loaded asynchronously. | `perf: move RSS initialization off the UI thread` |
 | P1-02 | DONE | Performance | Stop loading 1,000 RSS articles before SQL paging. | RSS service keeps subscriptions/folders in memory and queries article pages directly; startup allocations are reduced. | `perf: avoid preloading RSS articles` |
-| P1-03 | TODO | Lifecycle | Cancel RSS refresh when the page unloads. | Feed, image, and database work observe page cancellation; unloaded pages receive no UI updates. | |
+| P1-03 | DONE | Lifecycle | Cancel RSS refresh when the page unloads. | Feed and image work observe page cancellation; unloaded pages receive no refresh UI updates. | `fix: cancel RSS refresh on page unload` |
 | P1-04 | TODO | Performance | Replace serial eager RSS image downloads with lazy bounded downloads. | Feed metadata appears before images; global/per-host concurrency is bounded; duplicate URLs are coalesced. | |
 | P1-05 | DONE | Correctness | Make weather city suggestions typed, debounced, and cancellable. | Stale searches cannot replace newer results; city and coordinates update atomically; stale results are rejected. | `fix: prevent stale weather city selections` |
 | P1-06 | TODO | UX | Add adaptive layouts for Calendar, Mail, and Tasks. | Wide, medium, and narrow window states remain usable at 200% scaling without clipped primary actions. | |
