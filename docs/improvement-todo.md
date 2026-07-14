@@ -30,7 +30,7 @@ Status values:
 | P1-06 | TODO | UX | Add adaptive layouts for Calendar, Mail, and Tasks. | Wide, medium, and narrow window states remain usable at 200% scaling without clipped primary actions. | |
 | P1-07 | TODO | Accessibility | Localize accessible names, tooltips, onboarding, and RSS reader messages. | English and Simplified Chinese resources have parity; English UI exposes no hard-coded Chinese accessibility text. | |
 | P1-08 | TODO | Accessibility | Make weather bar and agenda cards keyboard-invokable. | Controls expose Invoke semantics, Enter/Space activation, localized names, and visible focus. | |
-| P1-09 | TODO | UX | Enable scrolling in constrained flyout content and zoom in mail HTML. | All flyout controls remain reachable at high scaling; mail supports touch and keyboard zoom. | |
+| P1-09 | DONE | UX | Enable scrolling in constrained flyout content and zoom in mail HTML. | All flyout controls remain reachable at high scaling; mail supports touch and keyboard zoom. | `accessibility: enable flyout scrolling and mail zoom` |
 | P1-10 | TODO | Reliability | Unify task mutation states and visible retry behavior. | Calendar, Tasks, and Flyout consistently show pending, failed, queued, and retry states instead of silent rollback. | |
 | P1-11 | TODO | UX | Preserve quick-create input when submission fails. | The form or draft remains available; errors are localized and redacted; retry is direct. | |
 | P1-12 | TODO | Security | Define provider-wide mail/calendar authorization lifecycle. | Removing one feature does not silently retain or invalidate shared authorization; complete disconnect is available. | |

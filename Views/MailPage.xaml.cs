@@ -1108,7 +1108,7 @@ namespace Task_Flyout.Views
                             settings.AreDefaultContextMenusEnabled = false;
                             settings.AreDevToolsEnabled = false;
                             settings.IsStatusBarEnabled = false;
-                            settings.IsPinchZoomEnabled = false;
+                            settings.IsPinchZoomEnabled = true;
                             settings.IsSwipeNavigationEnabled = false;
                             coreWebView.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
                             coreWebView.NavigationStarting += MailHtml_NavigationStarting;
