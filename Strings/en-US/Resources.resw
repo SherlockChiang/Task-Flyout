@@ -1623,4 +1623,10 @@ Weather: {3}</value></data>
   <data name="TextClearWeatherDataTitle" xml:space="preserve"><value>Clear weather and location data?</value></data>
   <data name="TextClearWeatherDataContent" xml:space="preserve"><value>This stops location tracking and removes the saved city, precise coordinates, and cached weather from this device.</value></data>
   <data name="TextWeatherDataCleared" xml:space="preserve"><value>Weather and location data cleared.</value></data>
+  <data name="TextTaskMutationQueued" xml:space="preserve"><value>Task change queued...</value></data>
+  <data name="TextTaskMutationPending" xml:space="preserve"><value>Saving task change...</value></data>
+  <data name="TextTaskMutationFailed" xml:space="preserve"><value>Task change failed. Retry is available.</value></data>
+  <data name="TextTaskMutationSucceeded" xml:space="preserve"><value>Task change saved.</value></data>
+  <data name="TaskMutation_Retry.Content" xml:space="preserve"><value>Retry</value></data>
+  <data name="TaskMutation_Retry.AutomationProperties.Name" xml:space="preserve"><value>Retry failed task change</value></data>
 </root>

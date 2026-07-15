@@ -91,6 +91,8 @@ namespace Task_Flyout
         private ScrollViewer? _activeScrollViewer;
         private List<CalendarViewDayItem>? _visibleDayItemCache;
         private bool _visibleDayItemCacheDirty = true;
+        private string? _failedTaskMutationKey;
+        private Func<Task>? _retryTaskMutationSucceeded;
         private readonly List<DotSpec> _dotSpecs = new();
         private readonly Dictionary<uint, SolidColorBrush> _dotBrushCache = new();
 
@@ -1022,15 +1024,88 @@ namespace Task_Flyout
         {
             if (sender is CheckBox cb && cb.DataContext is AgendaItem item && item.IsTask)
             {
+                var newValue = cb.IsChecked == true;
+                var oldValue = !newValue;
                 try
                 {
                     cb.IsEnabled = false;
-                    item.IsCompleted = (cb.IsChecked == true);
-                    await _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, item.IsCompleted);
+                    item.IsCompleted = newValue;
+                    if (App.Current is App app)
+                    {
+                        var key = $"{item.Provider}|{item.Id}|complete";
+                        var result = await app.TaskMutations.ExecuteAsync(
+                            key,
+                            () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue),
+                            ShowTaskMutationState);
+                        if (result.Phase == TaskMutationPhase.Failed)
+                        {
+                            item.IsCompleted = oldValue;
+                            _failedTaskMutationKey = key;
+                            _retryTaskMutationSucceeded = async () =>
+                            {
+                                item.IsCompleted = newValue;
+                                await _syncManager.SetCachedTaskCompletionAsync(item, newValue);
+                                ReloadFilters();
+                            };
+                            RetryTaskMutationButton.Visibility = Visibility.Visible;
+                            return;
+                        }
+                    }
                     _ = SyncAllDataAsync(silent: true);
                 }
-                catch { item.IsCompleted = !item.IsCompleted; }
+                catch
+                {
+                    item.IsCompleted = oldValue;
+                    ShowTaskMutationState(new TaskMutationState("", TaskMutationPhase.Failed));
+                }
                 finally { cb.IsEnabled = true; }
+            }
+        }
+
+        private void ShowTaskMutationState(TaskMutationState state)
+        {
+            TaskMutationStatusText.Text = state.Phase switch
+            {
+                TaskMutationPhase.Queued => _loader.GetStringOrDefault("TextTaskMutationQueued") ?? "Task change queued...",
+                TaskMutationPhase.Pending => _loader.GetStringOrDefault("TextTaskMutationPending") ?? "Saving task change...",
+                TaskMutationPhase.Failed => _loader.GetStringOrDefault("TextTaskMutationFailed") ?? "Task change failed. Retry is available.",
+                _ => _loader.GetStringOrDefault("TextTaskMutationSucceeded") ?? "Task change saved."
+            };
+            TaskMutationStatusText.Foreground = state.Phase == TaskMutationPhase.Failed
+                ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]
+                : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+        }
+
+        private async void RetryTaskMutationButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_failedTaskMutationKey == null || App.Current is not App app) return;
+            RetryTaskMutationButton.IsEnabled = false;
+            try
+            {
+                var result = await app.TaskMutations.RetryAsync(_failedTaskMutationKey, ShowTaskMutationState);
+                if (result == null)
+                {
+                    _failedTaskMutationKey = null;
+                    _retryTaskMutationSucceeded = null;
+                    RetryTaskMutationButton.Visibility = Visibility.Collapsed;
+                }
+                else if (result.Phase == TaskMutationPhase.Succeeded && _retryTaskMutationSucceeded != null)
+                {
+                    await _retryTaskMutationSucceeded();
+                    _failedTaskMutationKey = null;
+                    _retryTaskMutationSucceeded = null;
+                    RetryTaskMutationButton.Visibility = Visibility.Collapsed;
+                    ShowTaskMutationState(result);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Flyout task retry refresh failed: {ex.Message}");
+                ShowTaskMutationState(new TaskMutationState("", TaskMutationPhase.Failed));
+            }
+            finally
+            {
+                RetryTaskMutationButton.IsEnabled = true;
             }
         }
 

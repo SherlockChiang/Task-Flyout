@@ -20,6 +20,8 @@ namespace Task_Flyout.Views
         private AppCache _localCache = new();
         private ResourceLoader _loader = new();
         private bool _isAccountPaneCollapsed;
+        private string? _failedMutationKey;
+        private Func<Task>? _retrySucceeded;
         private const int TaskWindowPastDays = 365;
         private const int TaskWindowFutureDays = 365 * 3;
 
@@ -129,6 +131,8 @@ namespace Task_Flyout.Views
             TaskSummaryText.Text = PendingTasks.Count == 0
                 ? string.Format(_loader.GetStringOrDefault("TextAllDone") ?? "All done, {0} completed", CompletedTasks.Count)
                 : string.Format(_loader.GetStringOrDefault("TextTaskSummary") ?? "{0} pending, {1} completed", PendingTasks.Count, CompletedTasks.Count);
+            if (RetryTaskMutationButton.Visibility != Visibility.Visible)
+                TaskSummaryText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
             PendingTasksList.Visibility = PendingTasks.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
             PendingEmptyText.Visibility = PendingTasks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -169,8 +173,30 @@ namespace Task_Flyout.Views
                 await _syncManager.SetCachedTaskCompletionAsync(item, newValue);
                 ReloadTasks();
 
-                if (!string.IsNullOrWhiteSpace(item.Provider) && !string.IsNullOrWhiteSpace(item.Id))
-                    await _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue);
+                if (!string.IsNullOrWhiteSpace(item.Provider) && !string.IsNullOrWhiteSpace(item.Id)
+                    && App.Current is App app)
+                {
+                    var key = BuildMutationKey(item, "complete");
+                    var result = await app.TaskMutations.ExecuteAsync(
+                        key,
+                        () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue),
+                        ShowMutationState);
+                    if (result.Phase == TaskMutationPhase.Failed)
+                    {
+                        SetTaskCompletionInCache(item, oldValue);
+                        await _syncManager.SetCachedTaskCompletionAsync(item, oldValue);
+                        ReloadTasks();
+                        SetRetry(key, async () =>
+                        {
+                            SetTaskCompletionInCache(item, newValue);
+                            await _syncManager.SetCachedTaskCompletionAsync(item, newValue);
+                            ReloadTasks();
+                            App.MyFlyoutWindow?.ReloadFilters();
+                        });
+                        ShowMutationState(result);
+                        return;
+                    }
+                }
 
                 App.MyFlyoutWindow?.ReloadFilters();
                 if (App.MyMainWindow?.Content is FrameworkElement)
@@ -178,15 +204,74 @@ namespace Task_Flyout.Views
                     // Calendar and task views share the same cache; opened pages refresh when re-entered.
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Task completion update failed: {ex.Message}");
                 SetTaskCompletionInCache(item, oldValue);
-                await _syncManager.SetCachedTaskCompletionAsync(item, oldValue);
+                try { await _syncManager.SetCachedTaskCompletionAsync(item, oldValue); } catch { }
                 ReloadTasks();
+                ShowMutationState(new TaskMutationState("", TaskMutationPhase.Failed));
             }
             finally
             {
                 cb.IsEnabled = true;
+            }
+        }
+
+        private static string BuildMutationKey(AgendaItem item, string operation)
+            => $"{item.Provider}|{item.Id}|{operation}";
+
+        private void ShowMutationState(TaskMutationState state)
+        {
+            TaskSummaryText.Text = state.Phase switch
+            {
+                TaskMutationPhase.Queued => _loader.GetStringOrDefault("TextTaskMutationQueued") ?? "Task change queued...",
+                TaskMutationPhase.Pending => _loader.GetStringOrDefault("TextTaskMutationPending") ?? "Saving task change...",
+                TaskMutationPhase.Failed => _loader.GetStringOrDefault("TextTaskMutationFailed") ?? "Task change failed. Retry is available.",
+                _ => _loader.GetStringOrDefault("TextTaskMutationSucceeded") ?? "Task change saved."
+            };
+            TaskSummaryText.Foreground = state.Phase == TaskMutationPhase.Failed
+                ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]
+                : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+        }
+
+        private void SetRetry(string key, Func<Task> succeeded)
+        {
+            _failedMutationKey = key;
+            _retrySucceeded = succeeded;
+            RetryTaskMutationButton.Visibility = Visibility.Visible;
+        }
+
+        private async void RetryTaskMutationButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_failedMutationKey == null || App.Current is not App app) return;
+            RetryTaskMutationButton.IsEnabled = false;
+            try
+            {
+                var result = await app.TaskMutations.RetryAsync(_failedMutationKey, ShowMutationState);
+                if (result == null)
+                {
+                    _failedMutationKey = null;
+                    _retrySucceeded = null;
+                    RetryTaskMutationButton.Visibility = Visibility.Collapsed;
+                }
+                else if (result.Phase == TaskMutationPhase.Succeeded && _retrySucceeded != null)
+                {
+                    await _retrySucceeded();
+                    _failedMutationKey = null;
+                    _retrySucceeded = null;
+                    RetryTaskMutationButton.Visibility = Visibility.Collapsed;
+                    ShowMutationState(result);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Task mutation retry refresh failed: {ex.Message}");
+                ShowMutationState(new TaskMutationState("", TaskMutationPhase.Failed));
+            }
+            finally
+            {
+                RetryTaskMutationButton.IsEnabled = true;
             }
         }
 
@@ -300,13 +385,37 @@ namespace Task_Flyout.Views
             {
                 button.IsEnabled = false;
 
-                if (!string.IsNullOrWhiteSpace(item.Provider) && !string.IsNullOrWhiteSpace(item.Id))
-                    await _syncManager.DeleteItemAsync(item.Provider, item.Id, isEvent: false);
+                if (!string.IsNullOrWhiteSpace(item.Provider) && !string.IsNullOrWhiteSpace(item.Id)
+                    && App.Current is App app)
+                {
+                    var key = BuildMutationKey(item, "delete");
+                    var mutation = await app.TaskMutations.ExecuteAsync(
+                        key,
+                        () => _syncManager.DeleteItemAsync(item.Provider, item.Id, isEvent: false),
+                        ShowMutationState);
+                    if (mutation.Phase == TaskMutationPhase.Failed)
+                    {
+                        SetRetry(key, async () =>
+                        {
+                            RemoveTaskFromCache(item);
+                            await _syncManager.RemoveCachedItemAsync(item);
+                            ReloadTasks();
+                            App.MyFlyoutWindow?.ReloadFilters();
+                        });
+                        return;
+                    }
+                }
 
                 RemoveTaskFromCache(item);
                 await _syncManager.RemoveCachedItemAsync(item);
                 ReloadTasks();
+                ShowMutationState(new TaskMutationState(BuildMutationKey(item, "delete"), TaskMutationPhase.Succeeded));
                 App.MyFlyoutWindow?.ReloadFilters();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Task deletion failed: {ex.Message}");
+                ShowMutationState(new TaskMutationState("", TaskMutationPhase.Failed));
             }
             finally
             {

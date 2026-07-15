@@ -47,6 +47,7 @@ namespace Task_Flyout
         public NotificationService NotificationService { get; private set; } = null!;
         public WeatherService WeatherService { get; } = new WeatherService();
         public MailService MailService { get; } = new MailService();
+        internal TaskMutationCoordinator TaskMutations { get; } = new();
         public MemoryDiagnosticsService MemoryDiagnostics { get; } = new MemoryDiagnosticsService();
 
         public App()

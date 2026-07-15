@@ -1623,4 +1623,10 @@ Microsoft：{1}
   <data name="TextClearWeatherDataTitle" xml:space="preserve"><value>清除天气和位置数据？</value></data>
   <data name="TextClearWeatherDataContent" xml:space="preserve"><value>此操作会停止位置跟踪，并从本设备删除已保存的城市、精确坐标和天气缓存。</value></data>
   <data name="TextWeatherDataCleared" xml:space="preserve"><value>已清除天气和位置数据。</value></data>
+  <data name="TextTaskMutationQueued" xml:space="preserve"><value>任务更改已排队...</value></data>
+  <data name="TextTaskMutationPending" xml:space="preserve"><value>正在保存任务更改...</value></data>
+  <data name="TextTaskMutationFailed" xml:space="preserve"><value>任务更改失败，可以重试。</value></data>
+  <data name="TextTaskMutationSucceeded" xml:space="preserve"><value>任务更改已保存。</value></data>
+  <data name="TaskMutation_Retry.Content" xml:space="preserve"><value>重试</value></data>
+  <data name="TaskMutation_Retry.AutomationProperties.Name" xml:space="preserve"><value>重试失败的任务更改</value></data>
 </root>

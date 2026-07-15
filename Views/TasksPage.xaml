@@ -151,10 +151,12 @@
                     </Button>
                     <StackPanel Spacing="2">
                         <TextBlock x:Uid="TasksPage_Title" Text="任务" FontSize="28" FontWeight="SemiBold"/>
-                        <TextBlock x:Uid="TasksPage_Loading" x:Name="TaskSummaryText"
+                         <TextBlock x:Uid="TasksPage_Loading" x:Name="TaskSummaryText"
                                    Text="正在加载任务"
                                    FontSize="13"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <Button x:Uid="TaskMutation_Retry" x:Name="RetryTaskMutationButton" Content="Retry" Visibility="Collapsed"
+                                HorizontalAlignment="Left" Click="RetryTaskMutationButton_Click"/>
                     </StackPanel>
                 </StackPanel>
                 <ProgressRing x:Name="SyncProgress"
