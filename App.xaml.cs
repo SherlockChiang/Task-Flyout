@@ -38,6 +38,7 @@ namespace Task_Flyout
         private ResourceLoader _loader = new();
         private string _trayToolTipText = "Task Flyout";
         private string? _currentTrayIconName;
+        private readonly DeferredStartupWork _accountHydration = new();
         public static FlyoutWindow? MyFlyoutWindow { get; private set; }
         public static MainWindow? MyMainWindow { get; private set; }
         public static WeatherBarWindow? MyWeatherBar { get; private set; }
@@ -75,7 +76,6 @@ namespace Task_Flyout
             };
             SyncManager.RegisterProvider(new GoogleSyncProvider());
             SyncManager.RegisterProvider(new Services.MicrosoftSyncProvider());
-            SyncManager.AccountManager.Load();
         }
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -87,8 +87,6 @@ namespace Task_Flyout
 
             NotificationService = new NotificationService(SyncManager);
             NotificationService.Initialize();
-            if (NotificationService.IsEnabled)
-                NotificationService.StartPeriodicCheck();
             MailService.NewMailArrived += MailService_NewMailArrived;
             MemoryDiagnostics.StartIfEnabled();
             startup.Mark("services");
@@ -98,10 +96,15 @@ namespace Task_Flyout
             _uiSettings.ColorValuesChanged += UiSettings_ColorValuesChanged;
             UpdateTrayIconTheme();
             _trayIcon.ForceCreate(enablesEfficiencyMode: EfficiencyModeEnabledSetting);
+            _ = EnsureAccountsHydratedAsync();
             QueueMailPollingStart();
             startup.Mark("tray-mail");
 
-            _trayIcon.LeftClickCommand = new RelayCommand(() => EnsureFlyoutWindow().ToggleFlyout());
+            _trayIcon.LeftClickCommand = new RelayCommand(async () =>
+            {
+                await EnsureAccountsHydratedAsync();
+                EnsureFlyoutWindow().ToggleFlyout();
+            });
 
             // Initialize weather bar if enabled
             InitWeatherBar();
@@ -182,6 +185,7 @@ namespace Task_Flyout
                     await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(8));
                     if (MyFlyoutWindow != null) return;
 
+                    await EnsureAccountsHydratedAsync();
                     EnsureFlyoutWindow();
                 }
                 catch { }
@@ -197,6 +201,8 @@ namespace Task_Flyout
                 try
                 {
                     await Task.Delay(TimeSpan.FromSeconds(2));
+                    await EnsureAccountsHydratedAsync();
+                    NotificationService.StartPeriodicCheck();
                     NotificationService.CheckUpcomingEvents();
                 }
                 catch (Exception ex)
@@ -213,6 +219,7 @@ namespace Task_Flyout
                 try
                 {
                     await Task.Delay(TimeSpan.FromSeconds(3));
+                    await EnsureAccountsHydratedAsync();
                     MailService.StartMailPolling();
                 }
                 catch (Exception ex)
@@ -347,6 +354,20 @@ namespace Task_Flyout
             return MyFlyoutWindow;
         }
 
+        private Task EnsureAccountsHydratedAsync()
+            => _accountHydration.RunAsync(() =>
+            {
+                try
+                {
+                    SyncManager.AccountManager.Load();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Deferred account hydration failed: {ex.Message}");
+                }
+                return Task.CompletedTask;
+            });
+
         private void OnWeatherLocationUpdated(object? sender, EventArgs e)
         {
             MainDispatcherQueue?.TryEnqueue(() =>
@@ -456,8 +477,10 @@ namespace Task_Flyout
 
         public static void OpenMainWindowInternal(Action<MainWindow>? onOpened = null)
         {
-            MainDispatcherQueue.TryEnqueue(() =>
+            MainDispatcherQueue.TryEnqueue(async () =>
             {
+                if (Current is App app)
+                    await app.EnsureAccountsHydratedAsync();
                 if (MyMainWindow == null)
                 {
                     MyMainWindow = new MainWindow();
