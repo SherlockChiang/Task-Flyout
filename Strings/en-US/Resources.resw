@@ -1629,4 +1629,10 @@ Weather: {3}</value></data>
   <data name="TextTaskMutationSucceeded" xml:space="preserve"><value>Task change saved.</value></data>
   <data name="TaskMutation_Retry.Content" xml:space="preserve"><value>Retry</value></data>
   <data name="TaskMutation_Retry.AutomationProperties.Name" xml:space="preserve"><value>Retry failed task change</value></data>
+  <data name="TextProviderRemovalContent" xml:space="preserve"><value>Remove {0} from Calendar and Tasks only, or disconnect it completely from Calendar, Tasks, and Mail? Removing only this feature preserves the shared provider authorization.</value></data>
+  <data name="TextMailProviderRemovalContent" xml:space="preserve"><value>Remove {0} - {1} from Mail only, or disconnect the provider completely from Mail, Calendar, and Tasks? Removing Mail only preserves the shared provider authorization. Embedded browser data is cleared either way.</value></data>
+  <data name="TextRemoveAgendaOnly" xml:space="preserve"><value>Remove Calendar/Tasks only</value></data>
+  <data name="TextRemoveMailOnly" xml:space="preserve"><value>Remove Mail only</value></data>
+  <data name="TextDisconnectProvider" xml:space="preserve"><value>Disconnect completely</value></data>
+  <data name="TextDisconnectProviderFailed" xml:space="preserve"><value>The account change did not finish. Existing local data may remain; try again.</value></data>
 </root>

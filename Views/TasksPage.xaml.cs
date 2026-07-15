@@ -490,19 +490,23 @@ namespace Task_Flyout.Views
             var dialog = new ContentDialog
             {
                 Title = _loader.GetStringOrDefault("TextRemoveAccount") ?? "Remove Account",
-                Content = string.Format(_loader.GetStringOrDefault("TextRemoveAccountConfirm") ?? "Remove {0} account?", providerName),
-                PrimaryButtonText = _loader.GetStringOrDefault("TextConfirm") ?? "Confirm",
+                Content = string.Format(_loader.GetStringOrDefault("TextProviderRemovalContent") ?? "Remove {0} from Calendar and Tasks only, or disconnect it completely from Calendar, Tasks, and Mail?", providerName),
+                PrimaryButtonText = _loader.GetStringOrDefault("TextRemoveAgendaOnly") ?? "Remove Calendar/Tasks only",
+                SecondaryButtonText = _loader.GetStringOrDefault("TextDisconnectProvider") ?? "Disconnect completely",
                 CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 XamlRoot = XamlRoot,
                 DefaultButton = ContentDialogButton.Close
             };
 
             var result = await dialog.ShowAsync();
-            if (result != ContentDialogResult.Primary) return;
+            if (result is not (ContentDialogResult.Primary or ContentDialogResult.Secondary)) return;
 
             try
             {
-                await _syncManager.RemoveAccountAsync(providerName);
+                if (result == ContentDialogResult.Secondary && App.Current is App app)
+                    await app.DisconnectProviderCompletelyAsync(providerName);
+                else
+                    await _syncManager.RemoveAgendaAccountAsync(providerName);
             }
             catch (Exception ex)
             {
@@ -510,7 +514,7 @@ namespace Task_Flyout.Views
                 var errorDialog = new ContentDialog
                 {
                     Title = _loader.GetStringOrDefault("TextRemoveAccountFailedTitle") ?? "Account Not Removed",
-                    Content = _loader.GetStringOrDefault("TextRemoveAccountFailedContent") ?? "Authorization data could not be completely removed. The account was kept so you can try again.",
+                    Content = _loader.GetStringOrDefault("TextDisconnectProviderFailed") ?? "The account change could not be completed. Existing account data was preserved so you can try again.",
                     CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Close",
                     XamlRoot = XamlRoot
                 };

@@ -357,13 +357,15 @@ namespace Task_Flyout.Services
             }
         }
 
-        public async Task RemoveAccountAsync(string providerName)
+        public async Task RemoveAgendaAccountAsync(string providerName)
         {
-            await ClearProviderAuthorizationAsync(providerName);
             AccountManager.RemoveAccount(providerName);
             RemoveProviderFromCache(providerName);
             await SaveCacheAsync();
         }
+
+        internal Task ClearProviderAuthorizationForDisconnectAsync(string providerName)
+            => ClearProviderAuthorizationAsync(providerName);
 
         private async Task ClearProviderAuthorizationAsync(string providerName)
         {

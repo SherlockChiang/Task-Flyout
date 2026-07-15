@@ -798,6 +798,39 @@ namespace Task_Flyout.Services
             return true;
         }
 
+        public int RemoveAccountsForProvider(string providerName)
+        {
+            EnsureAccountsLoaded();
+            providerName = ProviderAuthorizationLifecycle.NormalizeProviderName(providerName);
+            var kind = providerName switch
+            {
+                "Google" => MailAccountKind.Google,
+                "Microsoft" => MailAccountKind.Outlook,
+                _ => (MailAccountKind?)null
+            };
+            if (!kind.HasValue) return 0;
+
+            if (kind.Value == MailAccountKind.Outlook)
+                _outlookClient = null;
+
+            var accounts = _accounts.Where(account => account.Kind == kind.Value).ToList();
+            foreach (var account in accounts)
+            {
+                DisconnectPollImapClient(account.Id);
+                ClearAccountBackoff(account.Id);
+                ClearAccountCache(account.Id);
+                RemoveKnownUnreadForAccount(account.Id);
+                _accounts.Remove(account);
+            }
+
+            if (accounts.Count > 0)
+            {
+                SaveAccounts();
+                UpdateMailPollingSettings();
+            }
+            return accounts.Count;
+        }
+
         public async Task FetchMessageBodyAsync(MailAccount account, MailItem item, CancellationToken cancellationToken = default)
         {
             if (!string.IsNullOrWhiteSpace(item.BodyText) || !string.IsNullOrWhiteSpace(item.HtmlBody))

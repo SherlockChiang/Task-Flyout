@@ -48,6 +48,23 @@ namespace Task_Flyout
         public WeatherService WeatherService { get; } = new WeatherService();
         public MailService MailService { get; } = new MailService();
         internal TaskMutationCoordinator TaskMutations { get; } = new();
+
+        public async Task DisconnectProviderCompletelyAsync(string providerName)
+        {
+            providerName = ProviderAuthorizationLifecycle.NormalizeProviderName(providerName);
+            await ProviderAuthorizationLifecycle.DisconnectCompletelyAsync(
+                () => SyncManager.ClearProviderAuthorizationForDisconnectAsync(providerName),
+                () => SyncManager.RemoveAgendaAccountAsync(providerName),
+                () =>
+                {
+                    MailService.RemoveAccountsForProvider(providerName);
+                    return Task.CompletedTask;
+                },
+                WebView2RuntimeService.ClearSensitiveBrowsingDataAsync);
+            if (MyMainWindow != null)
+                await MyMainWindow.RefreshAccountListAsync();
+            MyFlyoutWindow?.ReloadFilters();
+        }
         public MemoryDiagnosticsService MemoryDiagnostics { get; } = new MemoryDiagnosticsService();
 
         public App()

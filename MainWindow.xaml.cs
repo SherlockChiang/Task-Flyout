@@ -266,6 +266,12 @@ namespace Task_Flyout
                     return;
                 }
 
+                if (ContentFrame.Content is MailPage mailPage)
+                {
+                    await mailPage.RefreshAfterProviderDisconnectAsync();
+                    return;
+                }
+
                 if (App.Current is App app)
                     await app.SyncManager.SyncAllCalendarsAsync();
             }
@@ -287,20 +293,26 @@ namespace Task_Flyout
                 var dialog = new ContentDialog
                 {
                     Title = GetSafeString("TextRemoveAccountTitle", "Remove Account"),
-                    Content = string.Format(GetSafeString("TextRemoveAccountContent", "Are you sure you want to remove the {0} account?"), providerName),
-                    PrimaryButtonText = GetSafeString("TextConfirm", "Confirm"),
+                    Content = string.Format(GetSafeString("TextProviderRemovalContent", "Remove {0} from Calendar and Tasks only, or disconnect it completely from Calendar, Tasks, and Mail?"), providerName),
+                    PrimaryButtonText = GetSafeString("TextRemoveAgendaOnly", "Remove Calendar/Tasks only"),
+                    SecondaryButtonText = GetSafeString("TextDisconnectProvider", "Disconnect completely"),
                     CloseButtonText = GetSafeString("CalendarDialog.CloseButtonText", "Cancel"),
                     XamlRoot = this.Content.XamlRoot,
                     DefaultButton = ContentDialogButton.Close
                 };
 
                 var result = await dialog.ShowAsync();
-                if (result == ContentDialogResult.Primary)
+                if (result is ContentDialogResult.Primary or ContentDialogResult.Secondary)
                 {
                     try
                     {
                         if (App.Current is App app)
-                            await app.SyncManager.RemoveAccountAsync(providerName);
+                        {
+                            if (result == ContentDialogResult.Secondary)
+                                await app.DisconnectProviderCompletelyAsync(providerName);
+                            else
+                                await app.SyncManager.RemoveAgendaAccountAsync(providerName);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -308,7 +320,7 @@ namespace Task_Flyout
                         var errorDialog = new ContentDialog
                         {
                             Title = GetSafeString("TextRemoveAccountFailedTitle", "Account Not Removed"),
-                            Content = GetSafeString("TextRemoveAccountFailedContent", "Authorization data could not be completely removed. The account was kept so you can try again."),
+                            Content = GetSafeString("TextDisconnectProviderFailed", "The account change could not be completed. Existing account data was preserved so you can try again."),
                             CloseButtonText = GetSafeString("CalendarDialog.CloseButtonText", "Close"),
                             XamlRoot = this.Content.XamlRoot
                         };

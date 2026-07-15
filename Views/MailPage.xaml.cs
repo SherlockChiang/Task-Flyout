@@ -641,20 +641,54 @@ namespace Task_Flyout.Views
             {
                 XamlRoot = XamlRoot,
                 Title = GetResourceStringOrDefault("TextDeleteMailAccount", "Delete Email Account"),
-                Content = string.Format(GetResourceStringOrDefault("TextDeleteMailAccountContent", "Remove {0} - {1} from Task Flyout? This will not delete emails on the server. Mail and RSS share an embedded browser profile, so its site data, history, and disk cache will also be cleared for both readers."), account.ProviderName, account.Subtitle),
-                PrimaryButtonText = GetResourceStringOrDefault("CalendarDialog.SecondaryButtonText", "Delete"),
+                Content = ProviderAuthorizationLifecycle.HasSharedAuthorization(account.ProviderName)
+                    ? string.Format(GetResourceStringOrDefault("TextMailProviderRemovalContent", "Remove {0} - {1} from Mail only, or disconnect the provider completely from Mail, Calendar, and Tasks? Embedded browser data is cleared either way."), account.ProviderName, account.Subtitle)
+                    : string.Format(GetResourceStringOrDefault("TextDeleteMailAccountContent", "Remove {0} - {1} from Task Flyout? This will not delete emails on the server. Mail and RSS share an embedded browser profile, so its site data, history, and disk cache will also be cleared for both readers."), account.ProviderName, account.Subtitle),
+                PrimaryButtonText = ProviderAuthorizationLifecycle.HasSharedAuthorization(account.ProviderName)
+                    ? GetResourceStringOrDefault("TextRemoveMailOnly", "Remove Mail only")
+                    : GetResourceStringOrDefault("CalendarDialog.SecondaryButtonText", "Delete"),
+                SecondaryButtonText = ProviderAuthorizationLifecycle.HasSharedAuthorization(account.ProviderName)
+                    ? GetResourceStringOrDefault("TextDisconnectProvider", "Disconnect completely")
+                    : "",
                 CloseButtonText = GetResourceStringOrDefault("CalendarDialog.CloseButtonText", "Cancel"),
                 DefaultButton = ContentDialogButton.Close
             };
 
             var result = await dialog.ShowAsync();
-            if (result != ContentDialogResult.Primary) return;
+            if (result is not (ContentDialogResult.Primary or ContentDialogResult.Secondary)) return;
 
-            if (!_mailService.RemoveAccount(account.Id))
+            if (result == ContentDialogResult.Secondary && App.Current is App app)
+            {
+                try
+                {
+                    await app.DisconnectProviderCompletelyAsync(account.ProviderName);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Complete provider disconnect failed: {ex.Message}");
+                    SetMessageListStatus(GetResourceStringOrDefault("TextDisconnectProviderFailed", "The account change did not finish. Existing local data may remain; try again."), isError: true);
+                    return;
+                }
+            }
+            else if (!_mailService.RemoveAccount(account.Id))
+            {
                 return;
+            }
 
             ReleaseMailWebView();
             await WebView2RuntimeService.ClearSensitiveBrowsingDataAsync();
+            _items.Clear();
+            _selectedAccount = null;
+            _selectedFolder = null;
+            _selectedItem = null;
+            _selectedAccountForRemoval = null;
+            RemoveMailButton.IsEnabled = false;
+            ClearDetail();
+            await RefreshAccountsAsync();
+        }
+
+        public async Task RefreshAfterProviderDisconnectAsync()
+        {
             _items.Clear();
             _selectedAccount = null;
             _selectedFolder = null;

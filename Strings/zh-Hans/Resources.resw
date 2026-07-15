@@ -1629,4 +1629,10 @@ Microsoft：{1}
   <data name="TextTaskMutationSucceeded" xml:space="preserve"><value>任务更改已保存。</value></data>
   <data name="TaskMutation_Retry.Content" xml:space="preserve"><value>重试</value></data>
   <data name="TaskMutation_Retry.AutomationProperties.Name" xml:space="preserve"><value>重试失败的任务更改</value></data>
+  <data name="TextProviderRemovalContent" xml:space="preserve"><value>仅从日历和任务中移除 {0}，还是从日历、任务和邮件中完全断开？仅移除此功能会保留共享的服务商授权。</value></data>
+  <data name="TextMailProviderRemovalContent" xml:space="preserve"><value>仅从邮件中移除 {0} - {1}，还是从邮件、日历和任务中完全断开此服务商？仅移除邮件会保留共享授权。两种方式都会清除嵌入式浏览器数据。</value></data>
+  <data name="TextRemoveAgendaOnly" xml:space="preserve"><value>仅移除日历/任务</value></data>
+  <data name="TextRemoveMailOnly" xml:space="preserve"><value>仅移除邮件</value></data>
+  <data name="TextDisconnectProvider" xml:space="preserve"><value>完全断开</value></data>
+  <data name="TextDisconnectProviderFailed" xml:space="preserve"><value>账户更改未完成，部分本地数据可能仍然保留，请重试。</value></data>
 </root>
