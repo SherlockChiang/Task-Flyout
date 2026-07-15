@@ -16,6 +16,8 @@ using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Microsoft.Windows.ApplicationModel.Resources;
 using Windows.System;
+using Windows.Storage;
+using Windows.Storage.Pickers;
 using Windows.Storage.Streams;
 
 namespace Task_Flyout.Views
@@ -426,6 +428,154 @@ namespace Task_Flyout.Views
             };
 
             await dialog.ShowAsync();
+        }
+
+        private async void ImportOpml_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading || _isRefreshing) return;
+            try
+            {
+                var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.Downloads };
+                picker.FileTypeFilter.Add(".opml");
+                picker.FileTypeFilter.Add(".xml");
+                InitializePicker(picker);
+                var file = await picker.PickSingleFileAsync();
+                if (file == null) return;
+
+                if ((await file.GetBasicPropertiesAsync()).Size > RssOpmlService.MaximumDocumentCharacters)
+                    throw new InvalidOperationException(_loader.GetStringOrDefault("TextOpmlTooLarge") ?? "The OPML file is larger than 5 MB.");
+                var entries = RssOpmlService.Parse(await FileIO.ReadTextAsync(file));
+                var preview = RssOpmlService.Preview(entries, _rssService.GetSubscriptions().Select(item => item.Url));
+
+                var allowHttp = new CheckBox
+                {
+                    Content = _loader.GetStringOrDefault("TextOpmlAllowHttp") ?? "Allow the imported unencrypted HTTP feeds",
+                    IsChecked = false,
+                    Visibility = preview.InsecureHttpCount > 0 ? Visibility.Visible : Visibility.Collapsed
+                };
+                var previewText = new TextBlock
+                {
+                    Text = string.Format(
+                        _loader.GetStringOrDefault("TextOpmlPreview") ?? "New subscriptions: {0}\nDuplicates skipped: {1}\nFolders to map: {2}\nUnencrypted HTTP feeds: {3}",
+                        preview.NewEntries.Count,
+                        preview.DuplicateCount,
+                        preview.FolderCount,
+                        preview.InsecureHttpCount),
+                    TextWrapping = TextWrapping.Wrap
+                };
+                var panel = new StackPanel { Spacing = 12 };
+                panel.Children.Add(previewText);
+                panel.Children.Add(allowHttp);
+                var dialog = new ContentDialog
+                {
+                    Title = _loader.GetStringOrDefault("TextOpmlImportTitle") ?? "Import OPML subscriptions",
+                    Content = panel,
+                    PrimaryButtonText = _loader.GetStringOrDefault("TextImport") ?? "Import",
+                    CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
+                    DefaultButton = ContentDialogButton.Primary,
+                    IsPrimaryButtonEnabled = preview.NewEntries.Count > 0,
+                    XamlRoot = XamlRoot
+                };
+                if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+                SetLoading(true);
+                int imported = 0;
+                int failed = 0;
+                var folders = _rssService.GetFolders()
+                    .GroupBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                    .ToDictionary(group => group.Key, group => group.First(), StringComparer.CurrentCultureIgnoreCase);
+                foreach (var entry in preview.NewEntries)
+                {
+                    try
+                    {
+                        var isHttp = Uri.TryCreate(entry.Url, UriKind.Absolute, out var uri)
+                            && uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase);
+                        if (isHttp && allowHttp.IsChecked != true)
+                        {
+                            failed++;
+                            continue;
+                        }
+
+                        var subscription = await _rssService.AddSubscriptionAsync(
+                            entry.Url, allowInsecureHttp: isHttp, allowLocalNetwork: false, refreshImmediately: false);
+                        if (!string.IsNullOrWhiteSpace(entry.FolderName))
+                        {
+                            if (!folders.TryGetValue(entry.FolderName, out var folder))
+                            {
+                                folder = _rssService.AddFolder(entry.FolderName);
+                                folders[folder.Name] = folder;
+                            }
+                            _rssService.MoveSubscriptionToFolder(subscription.Id, folder.Id);
+                        }
+                        _rssService.RenameSubscription(subscription.Id, entry.Title);
+                        imported++;
+                    }
+                    catch
+                    {
+                        failed++;
+                    }
+                }
+
+                LoadFolders();
+                LoadSubscriptions();
+                BuildSubscriptionTree();
+                SubscriptionStatusText.Text = string.Format(
+                    _loader.GetStringOrDefault("TextOpmlImportResult") ?? "Imported {0} subscriptions; skipped {1}; failed {2}. Refresh to download articles.",
+                    imported,
+                    preview.DuplicateCount,
+                    failed);
+            }
+            catch (Exception ex)
+            {
+                SubscriptionStatusText.Text = string.Format(
+                    _loader.GetStringOrDefault("TextOpmlImportFailed") ?? "OPML import failed: {0}",
+                    UserSafeErrorMessage.FromException(ex));
+            }
+            finally
+            {
+                SetLoading(false);
+            }
+        }
+
+        private async void ExportOpml_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading || _isRefreshing) return;
+            try
+            {
+                var folderNames = _rssService.GetFolders().ToDictionary(item => item.Id, item => item.Name);
+                var entries = _rssService.GetSubscriptions().Select(subscription => new RssOpmlEntry(
+                    subscription.Title,
+                    subscription.Url,
+                    folderNames.GetValueOrDefault(subscription.FolderId, "")));
+                var picker = new FileSavePicker
+                {
+                    SuggestedStartLocation = PickerLocationId.Downloads,
+                    SuggestedFileName = "task-flyout-subscriptions"
+                };
+                picker.FileTypeChoices.Add(_loader.GetStringOrDefault("TextOpmlFileType") ?? "OPML subscription list", new List<string> { ".opml" });
+                InitializePicker(picker);
+                var file = await picker.PickSaveFileAsync();
+                if (file == null) return;
+
+                await FileIO.WriteTextAsync(file, RssOpmlService.Export(entries));
+                SubscriptionStatusText.Text = string.Format(
+                    _loader.GetStringOrDefault("TextOpmlExportResult") ?? "Exported {0} subscriptions to {1}.",
+                    Subscriptions.Count,
+                    file.Name);
+            }
+            catch (Exception ex)
+            {
+                SubscriptionStatusText.Text = string.Format(
+                    _loader.GetStringOrDefault("TextOpmlExportFailed") ?? "OPML export failed: {0}",
+                    UserSafeErrorMessage.FromException(ex));
+            }
+        }
+
+        private static void InitializePicker(object picker)
+        {
+            var window = App.MyMainWindow;
+            if (window == null) throw new InvalidOperationException("The application window is unavailable.");
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(window));
         }
 
         private async void DeleteSubscriptionButton_Click(object sender, RoutedEventArgs e)

@@ -1639,4 +1639,17 @@ Weather: {3}</value></data>
   <data name="MailPage_AccountsButton.ToolTipService.ToolTip" xml:space="preserve"><value>Mail accounts and folders</value></data>
   <data name="MailPage_BackButton.AutomationProperties.Name" xml:space="preserve"><value>Back to previous mail pane</value></data>
   <data name="MailPage_BackButton.ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
+  <data name="RssPage_OpmlButton.AutomationProperties.Name" xml:space="preserve"><value>Import or export subscriptions</value></data>
+  <data name="RssPage_ImportOpml.Text" xml:space="preserve"><value>Import OPML...</value></data>
+  <data name="RssPage_ExportOpml.Text" xml:space="preserve"><value>Export OPML...</value></data>
+  <data name="TextOpmlTooLarge" xml:space="preserve"><value>The OPML file is larger than 5 MB.</value></data>
+  <data name="TextOpmlAllowHttp" xml:space="preserve"><value>Allow the imported unencrypted HTTP feeds</value></data>
+  <data name="TextOpmlPreview" xml:space="preserve"><value>New subscriptions: {0}&#xA;Duplicates skipped: {1}&#xA;Folders to map: {2}&#xA;Unencrypted HTTP feeds: {3}</value></data>
+  <data name="TextOpmlImportTitle" xml:space="preserve"><value>Import OPML subscriptions</value></data>
+  <data name="TextImport" xml:space="preserve"><value>Import</value></data>
+  <data name="TextOpmlImportResult" xml:space="preserve"><value>Imported {0} subscriptions; skipped {1}; failed {2}. Refresh to download articles.</value></data>
+  <data name="TextOpmlImportFailed" xml:space="preserve"><value>OPML import failed: {0}</value></data>
+  <data name="TextOpmlFileType" xml:space="preserve"><value>OPML subscription list</value></data>
+  <data name="TextOpmlExportResult" xml:space="preserve"><value>Exported {0} subscriptions to {1}.</value></data>
+  <data name="TextOpmlExportFailed" xml:space="preserve"><value>OPML export failed: {0}</value></data>
 </root>

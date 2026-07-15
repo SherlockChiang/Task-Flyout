@@ -438,7 +438,8 @@ namespace Task_Flyout.Services
             string url,
             string folderId = "",
             bool allowInsecureHttp = false,
-            bool allowLocalNetwork = false)
+            bool allowLocalNetwork = false,
+            bool refreshImmediately = true)
         {
             EnsureLoaded();
             url = NormalizeFeedUrl(url);
@@ -474,7 +475,8 @@ namespace Task_Flyout.Services
             };
             _cache.Subscriptions.Add(subscription);
             SaveSubscription(subscription);
-            await RefreshSubscriptionAsync(subscription, force: true);
+            if (refreshImmediately)
+                await RefreshSubscriptionAsync(subscription, force: true);
             return subscription;
         }
 

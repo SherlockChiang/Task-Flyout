@@ -1639,4 +1639,17 @@ Microsoft：{1}
   <data name="MailPage_AccountsButton.ToolTipService.ToolTip" xml:space="preserve"><value>邮件账户和文件夹</value></data>
   <data name="MailPage_BackButton.AutomationProperties.Name" xml:space="preserve"><value>返回上一个邮件面板</value></data>
   <data name="MailPage_BackButton.ToolTipService.ToolTip" xml:space="preserve"><value>返回</value></data>
+  <data name="RssPage_OpmlButton.AutomationProperties.Name" xml:space="preserve"><value>导入或导出订阅</value></data>
+  <data name="RssPage_ImportOpml.Text" xml:space="preserve"><value>导入 OPML...</value></data>
+  <data name="RssPage_ExportOpml.Text" xml:space="preserve"><value>导出 OPML...</value></data>
+  <data name="TextOpmlTooLarge" xml:space="preserve"><value>OPML 文件大于 5 MB。</value></data>
+  <data name="TextOpmlAllowHttp" xml:space="preserve"><value>允许导入未加密的 HTTP 订阅</value></data>
+  <data name="TextOpmlPreview" xml:space="preserve"><value>新增订阅：{0}&#xA;跳过重复项：{1}&#xA;映射文件夹：{2}&#xA;未加密 HTTP 订阅：{3}</value></data>
+  <data name="TextOpmlImportTitle" xml:space="preserve"><value>导入 OPML 订阅</value></data>
+  <data name="TextImport" xml:space="preserve"><value>导入</value></data>
+  <data name="TextOpmlImportResult" xml:space="preserve"><value>已导入 {0} 个订阅；跳过 {1} 个；失败 {2} 个。刷新以下载文章。</value></data>
+  <data name="TextOpmlImportFailed" xml:space="preserve"><value>OPML 导入失败：{0}</value></data>
+  <data name="TextOpmlFileType" xml:space="preserve"><value>OPML 订阅列表</value></data>
+  <data name="TextOpmlExportResult" xml:space="preserve"><value>已将 {0} 个订阅导出到 {1}。</value></data>
+  <data name="TextOpmlExportFailed" xml:space="preserve"><value>OPML 导出失败：{0}</value></data>
 </root>
