@@ -15,6 +15,8 @@ using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Microsoft.Windows.ApplicationModel.Resources;
 using Windows.System;
+using Windows.Storage;
+using Windows.Storage.Pickers;
 using Windows.Storage.Streams;
 
 namespace Task_Flyout.Views
@@ -23,6 +25,7 @@ namespace Task_Flyout.Views
     {
         private readonly ObservableCollection<MailItem> _items = new();
         private readonly ObservableCollection<MailItem> _displayedItems = new();
+        public ObservableCollection<MailAttachmentData> ComposeAttachments { get; } = new();
         private readonly Dictionary<string, MailAccount> _accountsById = new();
         private readonly Dictionary<TreeViewNode, MailAccount> _accountNodes = new();
         private readonly Dictionary<TreeViewNode, (MailAccount Account, MailFolder Folder)> _folderNodes = new();
@@ -124,6 +127,8 @@ namespace Task_Flyout.Views
             _isInternalMailHtmlNavigation = false;
             MailListView.ItemsSource = null;
             _items.Clear();
+            _displayedItems.Clear();
+            ComposeAttachments.Clear();
             _accountsById.Clear();
             _accountNodes.Clear();
             _folderNodes.Clear();
@@ -862,6 +867,8 @@ namespace Task_Flyout.Views
             if (_mailService == null) return;
 
             _suppressDraftChanges = true;
+            ComposeAttachments.Clear();
+            UpdateAttachmentSummary();
             ComposeTitleText.Text = replyTo == null ? (_loader.GetStringOrDefault("TextCompose") ?? "Compose") : (_loader.GetStringOrDefault("TextReply") ?? "Reply");
             ComposeFromBox.Items.Clear();
             var accounts = _mailService.GetAccounts().Where(account => account.IsSetupComplete).ToList();
@@ -994,11 +1001,103 @@ namespace Task_Flyout.Views
             ComposeToBox.Text = "";
             ComposeSubjectBox.Text = "";
             ComposeBodyBox.Text = "";
+            ComposeAttachments.Clear();
+            UpdateAttachmentSummary();
             ComposeFromBox.IsEnabled = true;
             ComposeToBox.IsEnabled = true;
             ComposeSubjectBox.IsEnabled = true;
             ComposeBodyBox.IsEnabled = true;
             _suppressDraftChanges = false;
+        }
+
+        private async void AddAttachmentsButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isSendingMail) return;
+            try
+            {
+                var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
+                picker.FileTypeFilter.Add("*");
+                var window = App.MyMainWindow ?? throw new InvalidOperationException("The application window is unavailable.");
+                WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(window));
+                var files = await picker.PickMultipleFilesAsync();
+                if (files.Count == 0) return;
+
+                long currentTotal = ComposeAttachments.Sum(item => item.Size);
+                foreach (var file in files)
+                {
+                    if (ComposeAttachments.Count >= MailAttachmentPolicy.MaximumCount)
+                        throw new InvalidOperationException(_loader.GetStringOrDefault("TextAttachmentCountLimit") ?? "You can attach up to 10 files.");
+                    var properties = await file.GetBasicPropertiesAsync();
+                    if (properties.Size == 0 || properties.Size > MailAttachmentPolicy.MaximumFileBytes)
+                        throw new InvalidOperationException(_loader.GetStringOrDefault("TextAttachmentFileLimit") ?? "Each attachment must be between 1 byte and 3 MB.");
+                    if (currentTotal + (long)properties.Size > MailAttachmentPolicy.MaximumTotalBytes)
+                        throw new InvalidOperationException(_loader.GetStringOrDefault("TextAttachmentTotalLimit") ?? "Attachments may total up to 10 MB.");
+
+                    var safeName = MailAttachmentPolicy.NormalizeFileName(file.Name);
+                    if (ComposeAttachments.Any(item => item.FileName.Equals(safeName, StringComparison.CurrentCultureIgnoreCase) && item.Size == (long)properties.Size))
+                        continue;
+                    var content = await ReadAttachmentAsync(file);
+                    if (currentTotal + content.LongLength > MailAttachmentPolicy.MaximumTotalBytes)
+                        throw new InvalidOperationException(_loader.GetStringOrDefault("TextAttachmentTotalLimit") ?? "Attachments may total up to 10 MB.");
+                    var attachment = new MailAttachmentData(safeName, "application/octet-stream", content);
+                    ComposeAttachments.Add(attachment);
+                    currentTotal += attachment.Size;
+                    UpdateAttachmentSummary();
+                }
+            }
+            catch (Exception ex)
+            {
+                SetComposeStatus(string.Format(
+                    _loader.GetStringOrDefault("TextAttachmentAddFailed") ?? "Could not add attachment: {0}",
+                    UserSafeErrorMessage.FromException(ex)));
+            }
+        }
+
+        private static async Task<byte[]> ReadAttachmentAsync(StorageFile file)
+        {
+            await using var source = await file.OpenStreamForReadAsync();
+            using var destination = new MemoryStream();
+            var buffer = new byte[64 * 1024];
+            while (true)
+            {
+                int read = await source.ReadAsync(buffer.AsMemory(0, buffer.Length));
+                if (read == 0) break;
+                if (destination.Length + read > MailAttachmentPolicy.MaximumFileBytes)
+                    throw new InvalidOperationException("The attachment exceeds the per-file limit.");
+                await destination.WriteAsync(buffer.AsMemory(0, read));
+            }
+            if (destination.Length == 0)
+                throw new InvalidOperationException("Empty attachments are not supported.");
+            return destination.ToArray();
+        }
+
+        private void RemoveAttachmentButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isSendingMail || sender is not Button { DataContext: MailAttachmentData attachment }) return;
+            ComposeAttachments.Remove(attachment);
+            UpdateAttachmentSummary();
+        }
+
+        private void UpdateAttachmentSummary()
+        {
+            if (AttachmentSummaryText == null) return;
+            AttachmentSummaryText.Text = string.Format(
+                _loader.GetStringOrDefault("TextAttachmentSummary") ?? "{0} files · {1} of 10 MB",
+                ComposeAttachments.Count,
+                MailAttachmentPolicy.FormatSize(ComposeAttachments.Sum(item => item.Size)));
+        }
+
+        private void ReportMailSendProgress(MailSendProgress progress)
+        {
+            AttachmentProgress.Visibility = progress.TotalFiles > 0 ? Visibility.Visible : Visibility.Collapsed;
+            var status = progress.Stage switch
+            {
+                MailSendStage.Preparing => _loader.GetStringOrDefault("TextPreparingAttachments") ?? "Preparing attachments...",
+                MailSendStage.UploadingAttachments => _loader.GetStringOrDefault("TextUploadingAttachments") ?? "Uploading attachments...",
+                MailSendStage.Confirming => _loader.GetStringOrDefault("TextConfirmingSend") ?? "Confirming send status...",
+                _ => _loader.GetStringOrDefault("TextSending") ?? "Sending..."
+            };
+            SetComposeStatus(status);
         }
 
         private async void AddOutlookButton_Click(object sender, RoutedEventArgs e)
@@ -1768,7 +1867,8 @@ body { background-color: {{background}} !important; }
             if (_isSendingMail) return;
             if (!string.IsNullOrWhiteSpace(ComposeToBox.Text) ||
                 !string.IsNullOrWhiteSpace(ComposeSubjectBox.Text) ||
-                !string.IsNullOrWhiteSpace(ComposeBodyBox.Text))
+                !string.IsNullOrWhiteSpace(ComposeBodyBox.Text) ||
+                ComposeAttachments.Count > 0)
             {
                 var dialog = new ContentDialog
                 {
@@ -1829,6 +1929,14 @@ body { background-color: {{background}} !important; }
             _isSendingMail = true;
             bool sentButCleanupFailed = false;
             var submitted = CaptureComposeDraft();
+            var submittedAttachments = ComposeAttachments.ToList();
+            var attachmentError = MailAttachmentPolicy.Validate(submittedAttachments);
+            if (attachmentError != null)
+            {
+                _isSendingMail = false;
+                SetComposeStatus(attachmentError);
+                return;
+            }
             Drafts?.Schedule(submitted);
             if (Drafts != null) await Drafts.FlushAsync();
             SendComposeButton.IsEnabled = false;
@@ -1837,11 +1945,21 @@ body { background-color: {{background}} !important; }
             ComposeToBox.IsEnabled = false;
             ComposeSubjectBox.IsEnabled = false;
             ComposeBodyBox.IsEnabled = false;
+            AddAttachmentsButton.IsEnabled = false;
+            AttachmentList.IsEnabled = false;
+            AttachmentProgress.Visibility = submittedAttachments.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             SetComposeStatus(_loader.GetStringOrDefault("TextSending") ?? "Sending...");
 
             try
             {
-                await _mailService.SendMailAsync(account, submitted.Recipient, submitted.Subject, submitted.Body);
+                var progress = new Progress<MailSendProgress>(ReportMailSendProgress);
+                await _mailService.SendMailAsync(
+                    account,
+                    submitted.Recipient,
+                    submitted.Subject,
+                    submitted.Body,
+                    submittedAttachments,
+                    progress);
                 try
                 {
                     await ClearComposeDraftAsync();
@@ -1875,6 +1993,9 @@ body { background-color: {{background}} !important; }
                 ComposeToBox.IsEnabled = !sentButCleanupFailed;
                 ComposeSubjectBox.IsEnabled = !sentButCleanupFailed;
                 ComposeBodyBox.IsEnabled = !sentButCleanupFailed;
+                AddAttachmentsButton.IsEnabled = !sentButCleanupFailed;
+                AttachmentList.IsEnabled = !sentButCleanupFailed;
+                AttachmentProgress.Visibility = Visibility.Collapsed;
                 if (ComposePanel.Visibility == Visibility.Visible && !sentButCleanupFailed)
                     SendComposeButton.Focus(FocusState.Programmatic);
             }

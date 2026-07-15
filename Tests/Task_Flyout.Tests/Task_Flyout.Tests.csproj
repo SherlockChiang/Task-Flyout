@@ -41,6 +41,7 @@
     <Compile Include="..\..\Services\LocalSearchMatcher.cs" Link="Source\LocalSearchMatcher.cs" />
     <Compile Include="..\..\Services\TrayStatusPolicy.cs" Link="Source\TrayStatusPolicy.cs" />
     <Compile Include="..\..\Services\ComposeDraftCoordinator.cs" Link="Source\ComposeDraftCoordinator.cs" />
+    <Compile Include="..\..\Services\MailAttachmentPolicy.cs" Link="Source\MailAttachmentPolicy.cs" />
     <Compile Include="..\..\Services\RssFetchPolicy.cs" Link="Source\RssFetchPolicy.cs" />
     <Compile Include="..\..\Services\RssSensitiveDataProtector.cs" Link="Source\RssSensitiveDataProtector.cs" />
     <Compile Include="..\..\Services\RssSqliteRepository.cs" Link="Source\RssSqliteRepository.cs" />

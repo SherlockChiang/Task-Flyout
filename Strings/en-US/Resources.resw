@@ -1686,4 +1686,14 @@ Weather: {3}</value></data>
   <data name="TextContinueEditing" xml:space="preserve"><value>Keep editing</value></data>
   <data name="TextDiscardDraftFailed" xml:space="preserve"><value>The protected draft could not be deleted. Try again.</value></data>
   <data name="TextMailSentDraftCleanupFailed" xml:space="preserve"><value>Email sent, but the protected recovery copy could not be deleted. Discard it before composing again.</value></data>
+  <data name="MailPage_AddAttachments.Content" xml:space="preserve"><value>Add attachments</value></data>
+  <data name="MailPage_RemoveAttachment.AutomationProperties.Name" xml:space="preserve"><value>Remove attachment</value></data>
+  <data name="TextAttachmentCountLimit" xml:space="preserve"><value>You can attach up to 10 files.</value></data>
+  <data name="TextAttachmentFileLimit" xml:space="preserve"><value>Each attachment must be between 1 byte and 3 MB.</value></data>
+  <data name="TextAttachmentTotalLimit" xml:space="preserve"><value>Attachments may total up to 10 MB.</value></data>
+  <data name="TextAttachmentAddFailed" xml:space="preserve"><value>Could not add attachment: {0}</value></data>
+  <data name="TextAttachmentSummary" xml:space="preserve"><value>{0} files · {1} of 10 MB</value></data>
+  <data name="TextPreparingAttachments" xml:space="preserve"><value>Preparing attachments...</value></data>
+  <data name="TextUploadingAttachments" xml:space="preserve"><value>Uploading attachments...</value></data>
+  <data name="TextConfirmingSend" xml:space="preserve"><value>Confirming send status...</value></data>
 </root>

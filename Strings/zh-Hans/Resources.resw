@@ -1686,4 +1686,14 @@ Microsoft：{1}
   <data name="TextContinueEditing" xml:space="preserve"><value>继续编辑</value></data>
   <data name="TextDiscardDraftFailed" xml:space="preserve"><value>无法删除受保护草稿，请重试。</value></data>
   <data name="TextMailSentDraftCleanupFailed" xml:space="preserve"><value>邮件已发送，但无法删除受保护的恢复副本。再次撰写前请先丢弃该副本。</value></data>
+  <data name="MailPage_AddAttachments.Content" xml:space="preserve"><value>添加附件</value></data>
+  <data name="MailPage_RemoveAttachment.AutomationProperties.Name" xml:space="preserve"><value>移除附件</value></data>
+  <data name="TextAttachmentCountLimit" xml:space="preserve"><value>最多可添加 10 个附件。</value></data>
+  <data name="TextAttachmentFileLimit" xml:space="preserve"><value>每个附件必须大于 0 字节且不超过 3 MB。</value></data>
+  <data name="TextAttachmentTotalLimit" xml:space="preserve"><value>附件总大小不能超过 10 MB。</value></data>
+  <data name="TextAttachmentAddFailed" xml:space="preserve"><value>无法添加附件：{0}</value></data>
+  <data name="TextAttachmentSummary" xml:space="preserve"><value>{0} 个文件 · 已使用 {1}/10 MB</value></data>
+  <data name="TextPreparingAttachments" xml:space="preserve"><value>正在准备附件...</value></data>
+  <data name="TextUploadingAttachments" xml:space="preserve"><value>正在上传附件...</value></data>
+  <data name="TextConfirmingSend" xml:space="preserve"><value>正在确认发送状态...</value></data>
 </root>

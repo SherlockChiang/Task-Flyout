@@ -658,27 +658,38 @@ namespace Task_Flyout.Services
             return CommitMessagePage(cacheKey, page, append: loadMore);
         }
 
-        public async Task SendMailAsync(MailAccount account, string to, string subject, string body, CancellationToken cancellationToken = default)
+        public async Task SendMailAsync(
+            MailAccount account,
+            string to,
+            string subject,
+            string body,
+            IReadOnlyList<MailAttachmentData>? attachments = null,
+            IProgress<MailSendProgress>? progress = null,
+            CancellationToken cancellationToken = default)
         {
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            attachments ??= Array.Empty<MailAttachmentData>();
+            var validationError = MailAttachmentPolicy.Validate(attachments);
+            if (validationError != null) throw new InvalidOperationException(validationError);
+            progress?.Report(new MailSendProgress(MailSendStage.Preparing, 0, attachments.Count));
+            using var timeoutCts = new CancellationTokenSource(attachments.Count == 0 ? TimeSpan.FromSeconds(30) : TimeSpan.FromMinutes(2));
             using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
             var operationToken = operationCts.Token;
 
             if (account.Kind == MailAccountKind.Outlook)
             {
-                await SendOutlookMailAsync(account, to, subject, body, operationToken);
+                await SendOutlookMailAsync(account, to, subject, body, attachments, progress, operationToken);
                 return;
             }
 
             if (account.Kind == MailAccountKind.Google)
             {
-                await SendGoogleMailAsync(account, to, subject, body, operationToken);
+                await SendGoogleMailAsync(account, to, subject, body, attachments, progress, operationToken);
                 return;
             }
 
             if (account.Kind == MailAccountKind.Imap)
             {
-                await SendSmtpMailAsync(account, to, subject, body, operationToken);
+                await SendSmtpMailAsync(account, to, subject, body, attachments, progress, operationToken);
                 return;
             }
 
@@ -1020,7 +1031,7 @@ namespace Task_Flyout.Services
         private static int GetBodyCharCount(MailItem item)
             => (item.BodyText?.Length ?? 0) + (item.HtmlBody?.Length ?? 0);
 
-        private async Task SendOutlookMailAsync(MailAccount account, string to, string subject, string body, CancellationToken cancellationToken)
+        private async Task SendOutlookMailAsync(MailAccount account, string to, string subject, string body, IReadOnlyList<MailAttachmentData> attachments, IProgress<MailSendProgress>? progress, CancellationToken cancellationToken)
         {
             await EnsureOutlookMailAuthorizedAsync(requireWrite: true, requireSend: true, cancellationToken);
             if (_outlookClient == null) return;
@@ -1031,21 +1042,31 @@ namespace Task_Flyout.Services
                 Body = new ItemBody { ContentType = BodyType.Text, Content = body },
                 ToRecipients = ParseRecipients(to)
                     .Select(address => new Recipient { EmailAddress = new EmailAddress { Address = address } })
-                    .ToList()
+                    .ToList(),
+                Attachments = attachments.Select(attachment => (Attachment)new FileAttachment
+                {
+                    Name = attachment.FileName,
+                    ContentType = attachment.ContentType,
+                    ContentBytes = attachment.Content
+                }).ToList()
             };
+            progress?.Report(new MailSendProgress(MailSendStage.UploadingAttachments, 0, attachments.Count));
 
             var draft = await _outlookClient.Me.Messages.PostAsync(message, request =>
                 request.Headers.Add("Prefer", "IdType=\"ImmutableId\""), cancellationToken);
             if (string.IsNullOrWhiteSpace(draft?.Id))
                 throw new InvalidOperationException("Microsoft Graph did not return a draft identifier.");
+            progress?.Report(new MailSendProgress(MailSendStage.UploadingAttachments, attachments.Count, attachments.Count));
 
             try
             {
+                progress?.Report(new MailSendProgress(MailSendStage.Sending, attachments.Count, attachments.Count));
                 await _outlookClient.Me.Messages[draft.Id].Send.PostAsync(request =>
                     request.Headers.Add("Prefer", "IdType=\"ImmutableId\""), cancellationToken);
             }
             catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
             {
+                progress?.Report(new MailSendProgress(MailSendStage.Confirming, attachments.Count, attachments.Count));
                 if (await TryConfirmOutlookSentMessageAsync(draft.Id))
                     return;
                 throw new MailSendStatusUnknownException(ex);
@@ -1102,15 +1123,16 @@ namespace Task_Flyout.Services
             }
         }
 
-        private async Task SendGoogleMailAsync(MailAccount account, string to, string subject, string body, CancellationToken cancellationToken)
+        private async Task SendGoogleMailAsync(MailAccount account, string to, string subject, string body, IReadOnlyList<MailAttachmentData> attachments, IProgress<MailSendProgress>? progress, CancellationToken cancellationToken)
         {
             var gmail = await EnsureGoogleMailSendAuthorizedAsync(cancellationToken);
-            var mime = CreateMimeMessage(account, to, subject, body);
+            var mime = CreateMimeMessage(account, to, subject, body, attachments);
             using var stream = new MemoryStream();
             await mime.WriteToAsync(stream, cancellationToken);
 
             try
             {
+                progress?.Report(new MailSendProgress(MailSendStage.Sending, attachments.Count, attachments.Count));
                 await gmail.Users.Messages.Send(new GmailMessage
                 {
                     Raw = ToBase64Url(stream.ToArray())
@@ -1118,19 +1140,20 @@ namespace Task_Flyout.Services
             }
             catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
             {
+                progress?.Report(new MailSendProgress(MailSendStage.Confirming, attachments.Count, attachments.Count));
                 if (await TryConfirmGoogleSentMessageAsync(gmail, mime.MessageId))
                     return;
                 throw new MailSendStatusUnknownException(ex);
             }
         }
 
-        private async Task SendSmtpMailAsync(MailAccount account, string to, string subject, string body, CancellationToken cancellationToken)
+        private async Task SendSmtpMailAsync(MailAccount account, string to, string subject, string body, IReadOnlyList<MailAttachmentData> attachments, IProgress<MailSendProgress>? progress, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(account.SmtpHost))
                 throw new InvalidOperationException("SMTP server is required for IMAP mail sending.");
 
             var password = GetImapPassword(account.Id);
-            var message = CreateMimeMessage(account, to, subject, body);
+            var message = CreateMimeMessage(account, to, subject, body, attachments);
 
             using var client = new MailKit.Net.Smtp.SmtpClient { Timeout = MailNetworkTimeoutMs };
             var socketOptions = GetSmtpSocketOptions(account);
@@ -1138,10 +1161,12 @@ namespace Task_Flyout.Services
             await client.AuthenticateAsync(string.IsNullOrWhiteSpace(account.SmtpUserName) ? account.ImapUserName : account.SmtpUserName, password, cancellationToken);
             try
             {
+                progress?.Report(new MailSendProgress(MailSendStage.Sending, attachments.Count, attachments.Count));
                 await client.SendAsync(message, cancellationToken);
             }
             catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
             {
+                progress?.Report(new MailSendProgress(MailSendStage.Confirming, attachments.Count, attachments.Count));
                 if (await TryConfirmImapSentMessageAsync(account, password, message.MessageId))
                     return;
                 throw new MailSendStatusUnknownException(ex);
@@ -2149,7 +2174,7 @@ namespace Task_Flyout.Services
             };
         }
 
-        private static MimeMessage CreateMimeMessage(MailAccount account, string to, string subject, string body)
+        private static MimeMessage CreateMimeMessage(MailAccount account, string to, string subject, string body, IReadOnlyList<MailAttachmentData> attachments)
         {
             var message = new MimeMessage();
             message.MessageId = MimeKit.Utils.MimeUtils.GenerateMessageId();
@@ -2158,7 +2183,10 @@ namespace Task_Flyout.Services
                 message.To.Add(MailboxAddress.Parse(address));
 
             message.Subject = subject;
-            message.Body = new TextPart("plain") { Text = body };
+            var builder = new BodyBuilder { TextBody = body };
+            foreach (var attachment in attachments)
+                builder.Attachments.Add(attachment.FileName, attachment.Content, MimeKit.ContentType.Parse(attachment.ContentType));
+            message.Body = builder.ToMessageBody();
             return message;
         }
 

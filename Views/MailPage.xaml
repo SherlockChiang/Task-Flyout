@@ -381,6 +381,37 @@
                                 <TextBox x:Name="ComposeSubjectBox" x:Uid="MailPage_ComposeSubject" Header="标题" TextChanged="ComposeField_Changed"/>
                                 <TextBox x:Name="ComposeBodyBox" x:Uid="MailPage_ComposeBody" Header="内容" AcceptsReturn="True"
                                          TextWrapping="Wrap" MinHeight="220" TextChanged="ComposeField_Changed"/>
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Uid="MailPage_AddAttachments" x:Name="AddAttachmentsButton" Content="Add attachments" Click="AddAttachmentsButton_Click"/>
+                                        <TextBlock x:Name="AttachmentSummaryText" Grid.Column="1" VerticalAlignment="Center"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    </Grid>
+                                    <ItemsControl x:Name="AttachmentList" ItemsSource="{x:Bind ComposeAttachments}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="models:MailAttachmentData">
+                                                <Grid ColumnSpacing="8" Padding="4">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{x:Bind FileName}" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind SizeText}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                                    <Button x:Uid="MailPage_RemoveAttachment" Grid.Column="2" Width="28" Height="28" Padding="0" DataContext="{x:Bind}"
+                                                            Click="RemoveAttachmentButton_Click" AutomationProperties.Name="Remove attachment">
+                                                        <FontIcon Glyph="&#xE711;" FontSize="12"/>
+                                                    </Button>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <ProgressBar x:Name="AttachmentProgress" Visibility="Collapsed" IsIndeterminate="True"/>
+                                </StackPanel>
                                  <TextBlock x:Name="ComposeStatusText" x:Uid="MailPage_ComposeStatus" FontSize="13"
                                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                             TextWrapping="WrapWholeWords" AutomationProperties.LiveSetting="Polite"/>
