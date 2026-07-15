@@ -64,7 +64,7 @@ Status values:
 | P3-04 | DONE | Feature | Add RSS read/unread and starred states. | Opening marks articles read, list actions toggle read and starred state, state survives refresh, and SQLite paging supports All, Unread, and Starred filters. | `feat: add RSS article states and filters` |
 | P3-05 | TODO | Feature | Add complete task editing. | Users can edit supported title, date/time, notes, recurrence, provider/list, completion, and deletion fields. | |
 | P3-06 | TODO | Feature | Add toast actions for snooze, complete, and open. | Arguments are validated; actions use the shared mutation path; privacy-safe variants remain available. | |
-| P3-07 | TODO | Feature | Add protected compose draft recovery. | Unsent drafts survive navigation/process exit and can be discarded securely. | |
+| P3-07 | DONE | Feature | Add protected compose draft recovery. | DPAPI-protected drafts autosave across navigation and exit, offer restore/discard, survive send failures, and are securely deleted after success or account removal. | `feat: add protected compose draft recovery` |
 | P3-08 | TODO | Feature | Add mail attachments. | File and total size limits, removal, progress, and provider errors are handled. | |
 | P3-09 | DONE | Feature | Add concise tray quick actions and status. | The flat tray menu exposes new item, sync, compose, weather, open, and exit with one privacy-safe status line. | `feat: add tray quick actions and status` |
 

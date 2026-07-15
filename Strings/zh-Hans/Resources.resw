@@ -1676,4 +1676,14 @@ Microsoft：{1}
   <data name="TrayStatus_Finished" xml:space="preserve"><value>同步完成</value></data>
   <data name="TrayStatus_NeedsAttention" xml:space="preserve"><value>需要处理</value></data>
   <data name="TrayStatus_NewMail" xml:space="preserve"><value>有新邮件</value></data>
+  <data name="TextRecoverDraftTitle" xml:space="preserve"><value>恢复未发送的草稿？</value></data>
+  <data name="TextRecoverDraftContent" xml:space="preserve"><value>存在一份保存于 {0} 的受保护草稿。</value></data>
+  <data name="TextRestore" xml:space="preserve"><value>恢复</value></data>
+  <data name="TextNotNow" xml:space="preserve"><value>暂不处理</value></data>
+  <data name="TextDiscardDraftTitle" xml:space="preserve"><value>丢弃草稿？</value></data>
+  <data name="TextDiscardDraftContent" xml:space="preserve"><value>未发送的邮件将被安全删除。</value></data>
+  <data name="TextDiscard" xml:space="preserve"><value>丢弃</value></data>
+  <data name="TextContinueEditing" xml:space="preserve"><value>继续编辑</value></data>
+  <data name="TextDiscardDraftFailed" xml:space="preserve"><value>无法删除受保护草稿，请重试。</value></data>
+  <data name="TextMailSentDraftCleanupFailed" xml:space="preserve"><value>邮件已发送，但无法删除受保护的恢复副本。再次撰写前请先丢弃该副本。</value></data>
 </root>

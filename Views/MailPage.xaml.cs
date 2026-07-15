@@ -67,7 +67,10 @@ namespace Task_Flyout.Views
         private string _searchText = "";
         private bool _suppressSearchRefresh;
         private bool _isSendingMail;
+        private bool _suppressDraftChanges;
+        private Task<bool>? _draftRecoveryTask;
         internal bool IsOpeningFromNotification { get; set; }
+        private ComposeDraftCoordinator? Drafts => (App.Current as App)?.ComposeDrafts;
 
         private enum MailPane { Accounts, Messages, Detail }
 
@@ -108,6 +111,7 @@ namespace Task_Flyout.Views
             _accountAuthCts?.Cancel();
             _imapSetupCts?.Cancel();
             _searchCts?.Cancel();
+            ScheduleComposeDraft();
             _messageLoadVersion++;
             ReleaseMessageBodies();
             _selectedItem = null;
@@ -136,6 +140,8 @@ namespace Task_Flyout.Views
             MailListView.ItemsSource = _displayedItems;
             _isInitializing = false;
             await RefreshAccountsAsync(autoSelect: !IsOpeningFromNotification);
+            if (!IsOpeningFromNotification)
+                await OfferDraftRecoveryAsync();
             if (IsOpeningFromNotification && _layoutMode == ResponsiveLayoutMode.Narrow)
             {
                 _narrowMailPane = MailPane.Detail;
@@ -728,9 +734,20 @@ namespace Task_Flyout.Views
                     return;
                 }
             }
-            else if (!_mailService.RemoveAccount(account.Id))
+            else
             {
-                return;
+                try
+                {
+                    if (Drafts != null)
+                        await Drafts.DiscardForAccountAsync(account.Id);
+                }
+                catch
+                {
+                    SetMessageListStatus(_loader.GetStringOrDefault("TextDiscardDraftFailed") ?? "The protected draft could not be deleted. Try again.", isError: true);
+                    return;
+                }
+                if (!_mailService.RemoveAccount(account.Id))
+                    return;
             }
 
             ReleaseMailWebView();
@@ -769,10 +786,10 @@ namespace Task_Flyout.Views
             ImapSettingsPanel.Visibility = Visibility.Collapsed;
         }
 
-        private void ComposeButton_Click(object sender, RoutedEventArgs e)
+        private async void ComposeButton_Click(object sender, RoutedEventArgs e)
         {
             ShowMailPane(MailPane.Detail);
-            ShowComposePanel();
+            await StartComposeAsync();
         }
 
         private void ShowMailPane(MailPane pane)
@@ -844,6 +861,7 @@ namespace Task_Flyout.Views
         {
             if (_mailService == null) return;
 
+            _suppressDraftChanges = true;
             ComposeTitleText.Text = replyTo == null ? (_loader.GetStringOrDefault("TextCompose") ?? "Compose") : (_loader.GetStringOrDefault("TextReply") ?? "Reply");
             ComposeFromBox.Items.Clear();
             var accounts = _mailService.GetAccounts().Where(account => account.IsSetupComplete).ToList();
@@ -875,6 +893,8 @@ namespace Task_Flyout.Views
             AddAccountPanel.Visibility = Visibility.Collapsed;
             DetailPanel.Visibility = Visibility.Collapsed;
             EmptyDetailPanel.Visibility = Visibility.Collapsed;
+            _suppressDraftChanges = false;
+            ScheduleComposeDraft();
         }
 
         public async Task StartComposeAsync()
@@ -882,7 +902,103 @@ namespace Task_Flyout.Views
             if (!IsLoaded)
                 await WaitUntilLoadedAsync();
             _mailService ??= (App.Current as App)?.MailService;
+            if (ComposePanel.Visibility == Visibility.Visible)
+            {
+                ComposeToBox.Focus(FocusState.Programmatic);
+                return;
+            }
+            if (await OfferDraftRecoveryAsync()) return;
             ShowComposePanel();
+        }
+
+        private void ComposeField_Changed(object sender, RoutedEventArgs e)
+            => ScheduleComposeDraft();
+
+        private void ScheduleComposeDraft()
+        {
+            if (_suppressDraftChanges || ComposePanel?.Visibility != Visibility.Visible || Drafts == null) return;
+            Drafts.Schedule(CaptureComposeDraft());
+        }
+
+        private ComposeDraft CaptureComposeDraft()
+            => new(
+                ComposeDraft.CurrentSchemaVersion,
+                (ComposeFromBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "",
+                ComposeToBox?.Text ?? "",
+                ComposeSubjectBox?.Text ?? "",
+                ComposeBodyBox?.Text ?? "",
+                DateTimeOffset.UtcNow);
+
+        private async Task<bool> OfferDraftRecoveryAsync()
+        {
+            if (_draftRecoveryTask != null) return await _draftRecoveryTask;
+            var task = OfferDraftRecoveryCoreAsync();
+            _draftRecoveryTask = task;
+            try { return await task; }
+            finally
+            {
+                if (ReferenceEquals(_draftRecoveryTask, task))
+                    _draftRecoveryTask = null;
+            }
+        }
+
+        private async Task<bool> OfferDraftRecoveryCoreAsync()
+        {
+            if (Drafts == null || XamlRoot == null) return false;
+            var draft = await Drafts.LoadAsync();
+            if (draft == null) return false;
+
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = _loader.GetStringOrDefault("TextRecoverDraftTitle") ?? "Recover unsent draft?",
+                Content = string.Format(
+                    _loader.GetStringOrDefault("TextRecoverDraftContent") ?? "A protected draft from {0} is available.",
+                    draft.UpdatedAt.ToLocalTime().ToString("g")),
+                PrimaryButtonText = _loader.GetStringOrDefault("TextRestore") ?? "Restore",
+                SecondaryButtonText = _loader.GetStringOrDefault("TextDiscard") ?? "Discard",
+                CloseButtonText = _loader.GetStringOrDefault("TextNotNow") ?? "Not now",
+                DefaultButton = ContentDialogButton.Primary
+            };
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Secondary)
+            {
+                try { await Drafts.DiscardAsync(); }
+                catch
+                {
+                    SetMessageListStatus(_loader.GetStringOrDefault("TextDiscardDraftFailed") ?? "The protected draft could not be deleted. Try again.", isError: true);
+                    return true;
+                }
+                return false;
+            }
+            if (result != ContentDialogResult.Primary) return true;
+
+            ShowMailPane(MailPane.Detail);
+            ShowComposePanel();
+            _suppressDraftChanges = true;
+            ComposeFromBox.SelectedItem = ComposeFromBox.Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(item => item.Tag?.ToString() == draft.AccountId);
+            ComposeToBox.Text = draft.Recipient;
+            ComposeSubjectBox.Text = draft.Subject;
+            ComposeBodyBox.Text = draft.Body;
+            _suppressDraftChanges = false;
+            ScheduleComposeDraft();
+            ComposeToBox.Focus(FocusState.Programmatic);
+            return true;
+        }
+
+        private async Task ClearComposeDraftAsync()
+        {
+            if (Drafts != null) await Drafts.DiscardAsync();
+            _suppressDraftChanges = true;
+            ComposeToBox.Text = "";
+            ComposeSubjectBox.Text = "";
+            ComposeBodyBox.Text = "";
+            ComposeFromBox.IsEnabled = true;
+            ComposeToBox.IsEnabled = true;
+            ComposeSubjectBox.IsEnabled = true;
+            ComposeBodyBox.IsEnabled = true;
+            _suppressDraftChanges = false;
         }
 
         private async void AddOutlookButton_Click(object sender, RoutedEventArgs e)
@@ -1667,13 +1783,23 @@ body { background-color: {{background}} !important; }
                     return;
             }
 
+            try
+            {
+                await ClearComposeDraftAsync();
+            }
+            catch
+            {
+                SetComposeStatus(_loader.GetStringOrDefault("TextDiscardDraftFailed") ?? "The protected draft could not be deleted. Try again.");
+                return;
+            }
             ComposePanel.Visibility = Visibility.Collapsed;
             ClearDetail();
         }
 
-        private void ReplyButton_Click(object sender, RoutedEventArgs e)
+        private async void ReplyButton_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedItem == null) return;
+            if (ComposePanel.Visibility != Visibility.Visible && await OfferDraftRecoveryAsync()) return;
             ShowComposePanel(_selectedItem);
         }
 
@@ -1701,13 +1827,31 @@ body { background-color: {{background}} !important; }
             }
 
             _isSendingMail = true;
+            bool sentButCleanupFailed = false;
+            var submitted = CaptureComposeDraft();
+            Drafts?.Schedule(submitted);
+            if (Drafts != null) await Drafts.FlushAsync();
             SendComposeButton.IsEnabled = false;
             CancelComposeButton.IsEnabled = false;
+            ComposeFromBox.IsEnabled = false;
+            ComposeToBox.IsEnabled = false;
+            ComposeSubjectBox.IsEnabled = false;
+            ComposeBodyBox.IsEnabled = false;
             SetComposeStatus(_loader.GetStringOrDefault("TextSending") ?? "Sending...");
 
             try
             {
-                await _mailService.SendMailAsync(account, ComposeToBox.Text, ComposeSubjectBox.Text, ComposeBodyBox.Text);
+                await _mailService.SendMailAsync(account, submitted.Recipient, submitted.Subject, submitted.Body);
+                try
+                {
+                    await ClearComposeDraftAsync();
+                }
+                catch
+                {
+                    sentButCleanupFailed = true;
+                    SetComposeStatus(_loader.GetStringOrDefault("TextMailSentDraftCleanupFailed") ?? "Email sent, but the protected recovery copy could not be deleted. Discard it before composing again.");
+                    return;
+                }
                 SetComposeStatus(_loader.GetStringOrDefault("TextMailSent") ?? "Email sent.");
                 ComposePanel.Visibility = Visibility.Collapsed;
                 ClearDetail();
@@ -1725,9 +1869,13 @@ body { background-color: {{background}} !important; }
             finally
             {
                 _isSendingMail = false;
-                SendComposeButton.IsEnabled = true;
+                SendComposeButton.IsEnabled = !sentButCleanupFailed;
                 CancelComposeButton.IsEnabled = true;
-                if (ComposePanel.Visibility == Visibility.Visible)
+                ComposeFromBox.IsEnabled = !sentButCleanupFailed;
+                ComposeToBox.IsEnabled = !sentButCleanupFailed;
+                ComposeSubjectBox.IsEnabled = !sentButCleanupFailed;
+                ComposeBodyBox.IsEnabled = !sentButCleanupFailed;
+                if (ComposePanel.Visibility == Visibility.Visible && !sentButCleanupFailed)
                     SendComposeButton.Focus(FocusState.Programmatic);
             }
         }

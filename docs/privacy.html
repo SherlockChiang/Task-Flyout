@@ -98,7 +98,7 @@
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">1. How each type of data is stored</h2>
                     <ul class="list-disc pl-6 space-y-2">
-                        <li><strong>Mail:</strong> Account configuration and message metadata (sender, subject, preview) are cached locally, encrypted with the Windows Data Protection API (DPAPI). Full message bodies are loaded on demand from your mail server and are generally not persisted.</li>
+                        <li><strong>Mail:</strong> Account configuration and message metadata (sender, subject, preview) are cached locally, encrypted with the Windows Data Protection API (DPAPI). Full message bodies are loaded on demand from your mail server and are generally not persisted. One active unsent compose draft may be stored locally as a DPAPI-protected recovery record until it is sent or discarded.</li>
                         <li><strong>Calendar &amp; tasks:</strong> Synced events and tasks are cached locally, encrypted with DPAPI, for offline viewing.</li>
                         <li><strong>RSS:</strong> Your subscriptions and articles are stored in a local SQLite database. Subscription, folder, and article titles, URLs, summaries, bodies, and remote image URLs are protected with Windows DPAPI (CurrentUser); IDs, publication times, and local image paths remain plaintext to support local association, sorting, and image caching. Deleting a feed removes its records from the app database, but system backups, filesystem snapshots, or SQLite free pages can retain historic data for a period of time.</li>
                         <li><strong>Weather:</strong> Your chosen city, coordinates, and display preferences are stored in local app settings.</li>

@@ -49,6 +49,7 @@ namespace Task_Flyout
         public WeatherService WeatherService { get; } = new WeatherService();
         public MailService MailService { get; } = new MailService();
         internal TaskMutationCoordinator TaskMutations { get; } = new();
+        internal ComposeDraftCoordinator ComposeDrafts { get; } = new();
 
         public async Task DisconnectProviderCompletelyAsync(string providerName)
         {
@@ -56,10 +57,15 @@ namespace Task_Flyout
             await ProviderAuthorizationLifecycle.DisconnectCompletelyAsync(
                 () => SyncManager.ClearProviderAuthorizationForDisconnectAsync(providerName),
                 () => SyncManager.RemoveAgendaAccountAsync(providerName),
-                () =>
+                async () =>
                 {
+                    var affectedIds = MailService.GetAccounts()
+                        .Where(account => ProviderAuthorizationLifecycle.NormalizeProviderName(account.ProviderName) == providerName)
+                        .Select(account => account.Id)
+                        .ToList();
+                    foreach (var accountId in affectedIds)
+                        await ComposeDrafts.DiscardForAccountAsync(accountId);
                     MailService.RemoveAccountsForProvider(providerName);
-                    return Task.CompletedTask;
                 },
                 WebView2RuntimeService.ClearSensitiveBrowsingDataAsync);
             if (MyMainWindow != null)
@@ -644,6 +650,7 @@ namespace Task_Flyout
                 await Task.WhenAll(
                     SyncManager.AccountManager.FlushPendingSavesAsync(),
                     MailService.FlushPendingSavesAsync(),
+                    ComposeDrafts.FlushAsync(),
                     RssService.FlushPendingCheckpointsAsync(),
                     LocalSqliteStore.FlushPendingCheckpointAsync())
                     .WaitAsync(TimeSpan.FromSeconds(2));

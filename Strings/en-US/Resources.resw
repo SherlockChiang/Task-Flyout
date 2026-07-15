@@ -1676,4 +1676,14 @@ Weather: {3}</value></data>
   <data name="TrayStatus_Finished" xml:space="preserve"><value>Sync finished</value></data>
   <data name="TrayStatus_NeedsAttention" xml:space="preserve"><value>Needs attention</value></data>
   <data name="TrayStatus_NewMail" xml:space="preserve"><value>New mail</value></data>
+  <data name="TextRecoverDraftTitle" xml:space="preserve"><value>Recover unsent draft?</value></data>
+  <data name="TextRecoverDraftContent" xml:space="preserve"><value>A protected draft from {0} is available.</value></data>
+  <data name="TextRestore" xml:space="preserve"><value>Restore</value></data>
+  <data name="TextNotNow" xml:space="preserve"><value>Not now</value></data>
+  <data name="TextDiscardDraftTitle" xml:space="preserve"><value>Discard draft?</value></data>
+  <data name="TextDiscardDraftContent" xml:space="preserve"><value>Your unsent message will be securely deleted.</value></data>
+  <data name="TextDiscard" xml:space="preserve"><value>Discard</value></data>
+  <data name="TextContinueEditing" xml:space="preserve"><value>Keep editing</value></data>
+  <data name="TextDiscardDraftFailed" xml:space="preserve"><value>The protected draft could not be deleted. Try again.</value></data>
+  <data name="TextMailSentDraftCleanupFailed" xml:space="preserve"><value>Email sent, but the protected recovery copy could not be deleted. Discard it before composing again.</value></data>
 </root>
