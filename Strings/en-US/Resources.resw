@@ -1134,9 +1134,6 @@
   <data name="SettingsPage_RssRemote.Header" xml:space="preserve">
     <value>Allow RSS articles to load remote image resources</value>
   </data>
-  <data name="SettingsPage_RssLocalNetwork.Header" xml:space="preserve">
-    <value>Allow RSS feeds to access local network addresses</value>
-  </data>
   <data name="SettingsPage_ClearCache.Content" xml:space="preserve">
     <value>Clear WebView2 Cache</value>
   </data>
@@ -1534,7 +1531,11 @@
 Microsoft: {1}
 Mail: {2}
 Weather: {3}</value></data>
-  <data name="TextRssRefreshBlockedPrivateNetwork" xml:space="preserve"><value>Refresh was blocked because the RSS URL or redirect resolved to a non-public IP address. Only local RSS addresses added directly by the user can access the local network.</value></data>
+  <data name="TextRssRefreshBlockedPrivateNetwork" xml:space="preserve"><value>Refresh was blocked because the RSS URL or redirect resolved to a non-public IP address. Local access must be approved for this subscription's exact host, port, and protocol.</value></data>
+  <data name="TextAllowLocalNetworkRss" xml:space="preserve"><value>Allow this subscription to access its exact local network host and port</value></data>
+  <data name="TextLocalNetworkRssWarning" xml:space="preserve"><value>Enable only for a trusted feed on your home or work network. Redirects to a different local host or port remain blocked.</value></data>
+  <data name="TextLocalNetworkRssTitle" xml:space="preserve"><value>Allow local network RSS access?</value></data>
+  <data name="TextLocalNetworkRssConfirm" xml:space="preserve"><value>Allow only this subscription to connect to {0}? Redirects to another local host, port, or protocol will remain blocked.</value></data>
   <data name="TextRssRefreshFailed" xml:space="preserve"><value>Refresh failed: {0}</value></data>
   <data name="TextRssRemoteImagesProxied" xml:space="preserve"><value>Remote images are proxied through Task Flyout and blocked if they resolve to private networks.</value></data>
   <data name="TextRssRemoteImagesBlockedPrivacy" xml:space="preserve"><value>Remote images are blocked for privacy. Enable RSS remote resources in Settings to load them through the safe proxy.</value></data>

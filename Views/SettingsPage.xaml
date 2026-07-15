@@ -56,7 +56,6 @@
                  <TextBlock x:Uid="SettingsPage_AutoMarkMailAsReadDesc" Text="Gmail/Outlook 需要额外写入权限才能同步已读状态；关闭后，阅读邮件仅使用只读权限。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                  <ToggleSwitch x:Uid="SettingsPage_BlockRemoteImages" x:Name="BlockRemoteImagesToggle" Header="默认阻止未信任发件人的远程图片（防追踪像素）" IsOn="True" Toggled="BlockRemoteImagesToggle_Toggled"/>
                  <ToggleSwitch x:Uid="SettingsPage_RssRemote" x:Name="AllowRssRemoteResourcesToggle" Header="允许 RSS 文章加载远程图片资源" IsOn="False" Toggled="AllowRssRemoteResourcesToggle_Toggled"/>
-                <ToggleSwitch x:Uid="SettingsPage_RssLocalNetwork" x:Name="AllowRssLocalNetworkAccessToggle" Header="允许 RSS 订阅访问本地网络地址" IsOn="False" Toggled="AllowRssLocalNetworkAccessToggle_Toggled"/>
                  <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                      <Button x:Uid="SettingsPage_ClearCache" x:Name="ClearWebViewCacheButton" Content="清理 WebView2 缓存" Click="ClearWebViewCacheButton_Click"/>
                      <TextBlock x:Name="WebViewCacheStatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>

@@ -40,6 +40,7 @@ namespace Task_Flyout.Services
         }
         public DateTimeOffset LastFetchedAt { get; set; }
         public bool AllowInsecureHttp { get; set; }
+        public string ApprovedLocalNetworkAuthority { get; set; } = "";
 
         [System.Text.Json.Serialization.JsonIgnore]
         private Microsoft.UI.Xaml.Media.ImageSource? _imageCache;
@@ -161,7 +162,7 @@ namespace Task_Flyout.Services
         private const string ImageCacheDirectoryName = "RssImages";
         // This flows only while fetching a user-entered local source. Redirects always
         // clear it so a public feed cannot pivot into a private network address.
-        private static readonly AsyncLocal<bool> AllowCurrentLocalNetworkRequest = new();
+        private static readonly AsyncLocal<string?> CurrentLocalNetworkAuthority = new();
         private static readonly object InstancesLock = new();
         private static readonly List<WeakReference<RssService>> Instances = new();
         private static readonly SemaphoreSlim GlobalDataClearGate = new(1, 1);
@@ -188,6 +189,7 @@ namespace Task_Flyout.Services
 
         public RssService()
         {
+            ApplicationData.Current.LocalSettings.Values.Remove("AllowRssLocalNetworkAccess");
             lock (InstancesLock)
             {
                 Instances.RemoveAll(reference => !reference.TryGetTarget(out _));
@@ -415,13 +417,40 @@ namespace Task_Flyout.Services
             SaveSubscription(subscription);
         }
 
-        public async Task<RssSubscription> AddSubscriptionAsync(string url, string folderId = "", bool allowInsecureHttp = false)
+        public void ApproveLocalNetwork(RssSubscription subscription)
+        {
+            EnsureLoaded();
+            if (!_cache.Subscriptions.Any(item => ReferenceEquals(item, subscription)) ||
+                !Uri.TryCreate(subscription.Url, UriKind.Absolute, out var uri)) return;
+
+            subscription.ApprovedLocalNetworkAuthority = RssFetchPolicy.GetLocalNetworkAuthority(uri);
+            SaveSubscription(subscription);
+        }
+
+        public static async Task<bool> RequiresLocalNetworkApprovalAsync(RssSubscription subscription)
+        {
+            if (!Uri.TryCreate(subscription.Url, UriKind.Absolute, out var uri) ||
+                RssFetchPolicy.HasLocalNetworkApproval(uri, subscription.ApprovedLocalNetworkAuthority)) return false;
+            return await IsLocalNetworkUriAsync(uri);
+        }
+
+        public async Task<RssSubscription> AddSubscriptionAsync(
+            string url,
+            string folderId = "",
+            bool allowInsecureHttp = false,
+            bool allowLocalNetwork = false)
         {
             EnsureLoaded();
             url = NormalizeFeedUrl(url);
             if (!Uri.TryCreate(url, UriKind.Absolute, out var feedUri) ||
                 !RssFetchPolicy.CanFetchFeed(feedUri, allowInsecureHttp))
                 throw new InvalidOperationException("HTTP RSS feeds require explicit insecure transport approval.");
+            bool isLocalNetwork = await IsLocalNetworkUriAsync(feedUri);
+            if (isLocalNetwork && !allowLocalNetwork)
+                throw new InvalidOperationException("Local network RSS feeds require per-subscription approval.");
+            string approvedLocalNetworkAuthority = isLocalNetwork && allowLocalNetwork
+                ? RssFetchPolicy.GetLocalNetworkAuthority(feedUri)
+                : "";
             var existing = _cache.Subscriptions.FirstOrDefault(item => string.Equals(item.Url, url, StringComparison.OrdinalIgnoreCase));
             if (existing != null)
             {
@@ -430,6 +459,7 @@ namespace Task_Flyout.Services
                     existing.FolderId = folderId;
                 }
                 existing.AllowInsecureHttp = allowInsecureHttp;
+                existing.ApprovedLocalNetworkAuthority = approvedLocalNetworkAuthority;
                 SaveSubscription(existing);
                 return existing;
             }
@@ -439,7 +469,8 @@ namespace Task_Flyout.Services
                 Url = url,
                 Title = url,
                 FolderId = _cache.Folders.Any(folder => folder.Id == folderId) ? folderId : "",
-                AllowInsecureHttp = allowInsecureHttp
+                AllowInsecureHttp = allowInsecureHttp,
+                ApprovedLocalNetworkAuthority = approvedLocalNetworkAuthority
             };
             _cache.Subscriptions.Add(subscription);
             SaveSubscription(subscription);
@@ -490,7 +521,11 @@ namespace Task_Flyout.Services
                 cancellationToken);
             var refreshCancellationToken = linkedCancellation.Token;
 
-            var xml = await FetchFeedAsync(subscription.Url, subscription.AllowInsecureHttp, refreshCancellationToken);
+            var xml = await FetchFeedAsync(
+                subscription.Url,
+                subscription.AllowInsecureHttp,
+                subscription.ApprovedLocalNetworkAuthority,
+                refreshCancellationToken);
             var parsed = ParseFeed(subscription, xml);
 
             refreshCancellationToken.ThrowIfCancellationRequested();
@@ -751,7 +786,7 @@ namespace Task_Flyout.Services
             var host = context.DnsEndPoint.Host;
             var port = context.DnsEndPoint.Port;
 
-            var addresses = await ResolveConnectAddressesAsync(host, cancellationToken);
+            var addresses = await ResolveConnectAddressesAsync(host, port, cancellationToken);
             if (addresses.Count == 0)
                 throw new InvalidOperationException("URL resolved to a non-public IP address.");
 
@@ -776,7 +811,7 @@ namespace Task_Flyout.Services
 
         private static async Task<bool> IsSafeToFetchAsync(Uri uri)
         {
-            if (AllowCurrentLocalNetworkRequest.Value)
+            if (RssFetchPolicy.HasLocalNetworkApproval(uri, CurrentLocalNetworkAuthority.Value))
                 return true;
 
             if (uri.HostNameType is not (UriHostNameType.IPv4 or UriHostNameType.IPv6))
@@ -798,12 +833,9 @@ namespace Task_Flyout.Services
             return false;
         }
 
-        private static bool AllowRssLocalNetworkAccess
-            => ApplicationData.Current.LocalSettings.Values["AllowRssLocalNetworkAccess"] as bool? ?? false;
-
-        private static async Task<List<IPAddress>> ResolveConnectAddressesAsync(string host, System.Threading.CancellationToken cancellationToken)
+        private static async Task<List<IPAddress>> ResolveConnectAddressesAsync(string host, int port, System.Threading.CancellationToken cancellationToken)
         {
-            if (!AllowCurrentLocalNetworkRequest.Value)
+            if (!RssFetchPolicy.HasLocalNetworkEndpointApproval(host, port, CurrentLocalNetworkAuthority.Value))
                 return await ResolvePublicAddressesAsync(host, cancellationToken);
 
             IPAddress[] addresses = IPAddress.TryParse(host, out var parsed)
@@ -951,22 +983,25 @@ namespace Task_Flyout.Services
 
                 currentUri = location;
                 response.Dispose();
-                AllowCurrentLocalNetworkRequest.Value = false;
                 request = new HttpRequestMessage(HttpMethod.Get, currentUri);
                 foreach (var header in requestHeaders)
                     request.Headers.TryAddWithoutValidation(header.Key, header.Values);
             }
         }
 
-        private async Task<string> FetchFeedAsync(string url, bool allowInsecureHttp, CancellationToken cancellationToken)
+        private async Task<string> FetchFeedAsync(
+            string url,
+            bool allowInsecureHttp,
+            string approvedLocalNetworkAuthority,
+            CancellationToken cancellationToken)
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
                 throw new InvalidOperationException("Invalid feed URL.");
             if (!RssFetchPolicy.CanFetchFeed(uri, allowInsecureHttp))
                 throw new InvalidOperationException("HTTP RSS feeds require explicit insecure transport approval.");
 
-            var priorLocalNetworkPermission = AllowCurrentLocalNetworkRequest.Value;
-            AllowCurrentLocalNetworkRequest.Value = AllowRssLocalNetworkAccess && IsLocalNetworkUri(uri);
+            var priorLocalNetworkAuthority = CurrentLocalNetworkAuthority.Value;
+            CurrentLocalNetworkAuthority.Value = approvedLocalNetworkAuthority;
             try
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, uri);
@@ -991,17 +1026,18 @@ namespace Task_Flyout.Services
             }
             finally
             {
-                AllowCurrentLocalNetworkRequest.Value = priorLocalNetworkPermission;
+                CurrentLocalNetworkAuthority.Value = priorLocalNetworkAuthority;
             }
         }
 
-        private static bool IsLocalNetworkUri(Uri uri)
+        private static async Task<bool> IsLocalNetworkUriAsync(Uri uri)
         {
             if (NetworkSafety.IsUnsafeHost(uri)) return true;
 
             try
             {
-                return Dns.GetHostAddresses(uri.Host).Any(address => !NetworkSafety.IsPublicIpAddress(address));
+                var addresses = await Dns.GetHostAddressesAsync(uri.Host);
+                return addresses.Length > 0 && addresses.Any(address => !NetworkSafety.IsPublicIpAddress(address));
             }
             catch
             {
@@ -1294,7 +1330,8 @@ namespace Task_Flyout.Services
                     ImageUrl = subscription.ImageUrl,
                     LocalImagePath = subscription.LocalImagePath,
                     LastFetchedAt = FromTicks(subscription.LastFetchedUtcTicks),
-                    AllowInsecureHttp = subscription.AllowInsecureHttp
+                    AllowInsecureHttp = subscription.AllowInsecureHttp,
+                    ApprovedLocalNetworkAuthority = subscription.ApprovedLocalNetworkAuthority
                 }).ToList(),
                 Articles = snapshot.Articles.Select(ToArticleListItem).ToList()
             };
@@ -1383,7 +1420,8 @@ namespace Task_Flyout.Services
                 subscription.ImageUrl ?? "",
                 subscription.LocalImagePath ?? "",
                 ToTicks(subscription.LastFetchedAt),
-                subscription.AllowInsecureHttp);
+                subscription.AllowInsecureHttp,
+                subscription.ApprovedLocalNetworkAuthority ?? "");
 
         private static RssArticleWriteRecord ToArticleWriteRecord(RssArticle article)
             => new(

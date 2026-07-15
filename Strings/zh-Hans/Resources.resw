@@ -1134,9 +1134,6 @@
   <data name="SettingsPage_RssRemote.Header" xml:space="preserve">
     <value>允许 RSS 文章加载远程图片资源</value>
   </data>
-  <data name="SettingsPage_RssLocalNetwork.Header" xml:space="preserve">
-    <value>允许 RSS 订阅访问本地网络地址</value>
-  </data>
   <data name="SettingsPage_ClearCache.Content" xml:space="preserve">
     <value>清理 WebView2 缓存</value>
   </data>
@@ -1534,7 +1531,11 @@
 Microsoft：{1}
 邮件：{2}
 天气：{3}</value></data>
-  <data name="TextRssRefreshBlockedPrivateNetwork" xml:space="preserve"><value>刷新被安全策略拦截：RSS 地址或重定向解析到了非公网 IP。仅用户直接添加的本地 RSS 地址可以访问本地网络。</value></data>
+  <data name="TextRssRefreshBlockedPrivateNetwork" xml:space="preserve"><value>刷新被安全策略拦截：RSS 地址或重定向解析到了非公网 IP。必须为此订阅的指定主机、端口和协议单独批准本地网络访问。</value></data>
+  <data name="TextAllowLocalNetworkRss" xml:space="preserve"><value>允许此订阅访问其指定的本地网络主机和端口</value></data>
+  <data name="TextLocalNetworkRssWarning" xml:space="preserve"><value>仅对家庭或工作网络中可信的 RSS 源启用。重定向到其他本地主机或端口仍会被阻止。</value></data>
+  <data name="TextLocalNetworkRssTitle" xml:space="preserve"><value>允许 RSS 访问本地网络？</value></data>
+  <data name="TextLocalNetworkRssConfirm" xml:space="preserve"><value>仅允许此订阅连接到 {0}？重定向到其他本地主机、端口或协议仍会被阻止。</value></data>
   <data name="TextRssRefreshFailed" xml:space="preserve"><value>刷新失败：{0}</value></data>
   <data name="TextRssRemoteImagesProxied" xml:space="preserve"><value>远程图片由 Task Flyout 安全代理加载；解析到私有网络的资源会被阻止。</value></data>
   <data name="TextRssRemoteImagesBlockedPrivacy" xml:space="preserve"><value>远程图片已按隐私设置阻止。可在设置中启用 RSS 远程资源，通过安全代理加载。</value></data>

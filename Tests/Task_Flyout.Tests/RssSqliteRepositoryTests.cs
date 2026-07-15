@@ -304,6 +304,24 @@ END;
     }
 
     [Fact]
+    public void Subscription_local_network_authority_round_trips_encrypted()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertSubscription(new RssSubscriptionRecord(
+            "subscription", "Local feed", "http://192.168.1.10/feed", "", "", "", 0,
+            AllowInsecureHttp: true,
+            ApprovedLocalNetworkAuthority: "http://192.168.1.10"));
+
+        var subscription = Assert.Single(repository.LoadSnapshot(0).Subscriptions);
+
+        Assert.Equal("http://192.168.1.10", subscription.ApprovedLocalNetworkAuthority);
+        using var connection = Open(databasePath);
+        Assert.DoesNotContain("192.168.1.10", ScalarString(connection,
+            "SELECT approved_local_network_authority FROM rss_subscriptions LIMIT 1;"));
+    }
+
+    [Fact]
     public void Existing_schema_migrates_insecure_http_approval_to_disabled()
     {
         var databasePath = Path.Combine(_root, "rss.db");
@@ -329,6 +347,7 @@ INSERT INTO rss_subscriptions(id, title, url) VALUES ('legacy', '', '');
         var subscription = Assert.Single(repository.LoadSnapshot(0).Subscriptions);
 
         Assert.False(subscription.AllowInsecureHttp);
+        Assert.Empty(subscription.ApprovedLocalNetworkAuthority);
     }
 
     [Fact]

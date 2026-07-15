@@ -354,11 +354,25 @@ namespace Task_Flyout.Views
                 FontSize = 12,
                 Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
             };
+            var localNetworkCheckBox = new CheckBox
+            {
+                Content = _loader.GetStringOrDefault("TextAllowLocalNetworkRss") ?? "Allow this subscription to access its exact local network host and port",
+                IsChecked = false
+            };
+            var localNetworkWarning = new TextBlock
+            {
+                Text = _loader.GetStringOrDefault("TextLocalNetworkRssWarning") ?? "Enable only for a trusted feed on your home or work network. Redirects to a different local host or port remain blocked.",
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 12,
+                Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+            };
             var panel = new StackPanel { Spacing = 12 };
             panel.Children.Add(urlBox);
             panel.Children.Add(folderBox);
             panel.Children.Add(insecureHttpCheckBox);
             panel.Children.Add(insecureHttpWarning);
+            panel.Children.Add(localNetworkCheckBox);
+            panel.Children.Add(localNetworkWarning);
 
             var dialog = new ContentDialog
             {
@@ -385,7 +399,11 @@ namespace Task_Flyout.Views
                 {
                     SetLoading(true);
                     var folderId = (folderBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "";
-                    await _rssService.AddSubscriptionAsync(url, folderId, insecureHttpCheckBox.IsChecked == true);
+                    await _rssService.AddSubscriptionAsync(
+                        url,
+                        folderId,
+                        insecureHttpCheckBox.IsChecked == true,
+                        localNetworkCheckBox.IsChecked == true);
                     LoadSubscriptions();
                     LoadFolders();
                     BuildSubscriptionTree();
@@ -702,11 +720,16 @@ namespace Task_Flyout.Views
                     foreach (var subscription in visibleSubscriptions
                                  .Where(subscription => !RssService.RequiresInsecureHttpApproval(subscription))
                                  .Take(10))
+                    {
+                        if (await RssService.RequiresLocalNetworkApprovalAsync(subscription)) continue;
                         await _rssService.RefreshSubscriptionAsync(subscription, force: true, pageLifetime.Token);
+                    }
                 }
                 else if (_rssService.GetSubscriptions().FirstOrDefault(item => item.Id == _selectedSubscriptionId) is { } subscription)
                 {
                     if (RssService.RequiresInsecureHttpApproval(subscription) && !await ConfirmInsecureHttpAsync(subscription))
+                        return;
+                    if (await RssService.RequiresLocalNetworkApprovalAsync(subscription) && !await ConfirmLocalNetworkAsync(subscription))
                         return;
                     await _rssService.RefreshSubscriptionAsync(subscription, force: true, pageLifetime.Token);
                 }
@@ -759,6 +782,27 @@ namespace Task_Flyout.Views
             return true;
         }
 
+        private async Task<bool> ConfirmLocalNetworkAsync(RssSubscription subscription)
+        {
+            if (!Uri.TryCreate(subscription.Url, UriKind.Absolute, out var uri)) return false;
+            var authority = RssFetchPolicy.GetLocalNetworkAuthority(uri);
+            var dialog = new ContentDialog
+            {
+                Title = _loader.GetStringOrDefault("TextLocalNetworkRssTitle") ?? "Allow local network RSS access?",
+                Content = string.Format(
+                    _loader.GetStringOrDefault("TextLocalNetworkRssConfirm") ?? "Allow only this subscription to connect to {0}? Redirects to another local host, port, or protocol will remain blocked.",
+                    authority),
+                PrimaryButtonText = _loader.GetStringOrDefault("TextAllow") ?? "Allow",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = XamlRoot
+            };
+
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return false;
+            _rssService.ApproveLocalNetwork(subscription);
+            return true;
+        }
+
         private void RssService_LocalDataCleared(object? sender, EventArgs e)
         {
             DispatcherQueue.TryEnqueue(() =>
@@ -785,7 +829,7 @@ namespace Task_Flyout.Views
             var message = ex.Message ?? "";
             if (message.Contains("non-public IP", StringComparison.OrdinalIgnoreCase))
                 return _loader.GetStringOrDefault("TextRssRefreshBlockedPrivateNetwork")
-                    ?? "Refresh was blocked because the RSS URL or redirect resolved to a non-public IP address.";
+                    ?? "Refresh was blocked because the RSS URL or redirect resolved to a non-public IP address. Local access must be approved for this subscription's exact host, port, and protocol.";
 
             return string.Format(
                 _loader.GetStringOrDefault("TextRssRefreshFailed") ?? "Refresh failed: {0}",

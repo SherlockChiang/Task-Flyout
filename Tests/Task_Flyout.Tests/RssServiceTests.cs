@@ -70,6 +70,35 @@ public class RssServiceTests
     }
 
     [Theory]
+    [InlineData("http://192.168.1.10/feed", "http://192.168.1.10", true)]
+    [InlineData("http://192.168.1.10:8080/feed", "http://192.168.1.10:8080", true)]
+    [InlineData("http://192.168.1.10:8080/feed", "http://192.168.1.10", false)]
+    [InlineData("https://192.168.1.10/feed", "http://192.168.1.10", false)]
+    [InlineData("http://192.168.1.11/feed", "http://192.168.1.10", false)]
+    public void Local_network_approval_is_scoped_to_exact_authority(string uriText, string authority, bool expected)
+    {
+        Assert.Equal(expected, RssFetchPolicy.HasLocalNetworkApproval(new Uri(uriText), authority));
+    }
+
+    [Theory]
+    [InlineData("192.168.1.10", 80, "http://192.168.1.10", true)]
+    [InlineData("192.168.1.10", 8080, "http://192.168.1.10", false)]
+    [InlineData("192.168.1.11", 80, "http://192.168.1.10", false)]
+    [InlineData("::1", 8080, "http://[::1]:8080", true)]
+    public void Socket_permission_is_scoped_to_exact_host_and_port(string host, int port, string authority, bool expected)
+    {
+        Assert.Equal(expected, RssFetchPolicy.HasLocalNetworkEndpointApproval(host, port, authority));
+    }
+
+    [Fact]
+    public void Local_network_authority_omits_url_credentials()
+    {
+        Assert.Equal(
+            "http://192.168.1.10:8080",
+            RssFetchPolicy.GetLocalNetworkAuthority(new Uri("http://user:secret@192.168.1.10:8080/feed")));
+    }
+
+    [Theory]
     [InlineData("https://example.com/feed.xml", "/next.xml", "https://example.com/next.xml")]
     [InlineData("https://example.com/folder/feed.xml", "../next.xml", "https://example.com/next.xml")]
     public void Redirect_policy_resolves_http_relative_and_absolute_locations(string current, string location, string expected)
