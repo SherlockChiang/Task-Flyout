@@ -1,6 +1,5 @@
 using Microsoft.Windows.ApplicationModel.Resources;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -834,8 +833,10 @@ namespace Task_Flyout.Services
         }
 
         private const long MaxRemoteImageBytes = 10L * 1024 * 1024;
+        private const int MaxRemoteImageFetches = 4;
         private const int MaxRemoteImageFetchesPerHost = 2;
-        private static readonly ConcurrentDictionary<string, SemaphoreSlim> RemoteImageHostGates = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly SemaphoreSlim RemoteImageGlobalGate = new(MaxRemoteImageFetches, MaxRemoteImageFetches);
+        private static readonly BoundedHostGatePool RemoteImageHostGates = new(64, MaxRemoteImageFetchesPerHost);
 
         /// <summary>
         /// Downloads a remote RSS article image through the app's SSRF-guarded HTTP client
@@ -852,35 +853,43 @@ namespace Task_Flyout.Services
                     !uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
                     return null;
 
-                var gate = RemoteImageHostGates.GetOrAdd(uri.IdnHost, _ => new SemaphoreSlim(MaxRemoteImageFetchesPerHost, MaxRemoteImageFetchesPerHost));
-                await gate.WaitAsync(cancellationToken);
+                var hostGate = RemoteImageHostGates.GetGate(uri.IdnHost);
+                await RemoteImageGlobalGate.WaitAsync(cancellationToken);
                 try
                 {
-                    using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-                    using var response = await SendWithRedirectsAsync(request, cancellationToken);
-                    if (!response.IsSuccessStatusCode) return null;
-
-                    var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
-                    if (!contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return null;
-                    if (response.Content.Headers.ContentLength is long declared && declared > MaxRemoteImageBytes) return null;
-
-                    await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                    using var buffer = new MemoryStream();
-                    var chunk = new byte[81920];
-                    long total = 0;
-                    int read;
-                    while ((read = await stream.ReadAsync(chunk.AsMemory(0, chunk.Length), cancellationToken)) > 0)
+                    await hostGate.WaitAsync(cancellationToken);
+                    try
                     {
-                        total += read;
-                        if (total > MaxRemoteImageBytes) return null;
-                        buffer.Write(chunk, 0, read);
-                    }
+                        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+                        using var response = await SendWithRedirectsAsync(request, cancellationToken);
+                        if (!response.IsSuccessStatusCode) return null;
 
-                    return (buffer.ToArray(), contentType);
+                        var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
+                        if (!contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return null;
+                        if (response.Content.Headers.ContentLength is long declared && declared > MaxRemoteImageBytes) return null;
+
+                        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                        using var buffer = new MemoryStream();
+                        var chunk = new byte[81920];
+                        long total = 0;
+                        int read;
+                        while ((read = await stream.ReadAsync(chunk.AsMemory(0, chunk.Length), cancellationToken)) > 0)
+                        {
+                            total += read;
+                            if (total > MaxRemoteImageBytes) return null;
+                            buffer.Write(chunk, 0, read);
+                        }
+
+                        return (buffer.ToArray(), contentType);
+                    }
+                    finally
+                    {
+                        hostGate.Release();
+                    }
                 }
                 finally
                 {
-                    gate.Release();
+                    RemoteImageGlobalGate.Release();
                 }
             }
             catch
