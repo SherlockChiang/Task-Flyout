@@ -641,7 +641,7 @@ namespace Task_Flyout.Views
             {
                 XamlRoot = XamlRoot,
                 Title = GetResourceStringOrDefault("TextDeleteMailAccount", "Delete Email Account"),
-                Content = string.Format(GetResourceStringOrDefault("TextDeleteMailAccountContent", "Remove {0} - {1} from Task Flyout? This will not delete emails on the server."), account.ProviderName, account.Subtitle),
+                Content = string.Format(GetResourceStringOrDefault("TextDeleteMailAccountContent", "Remove {0} - {1} from Task Flyout? This will not delete emails on the server. Mail and RSS share an embedded browser profile, so its site data, history, and disk cache will also be cleared for both readers."), account.ProviderName, account.Subtitle),
                 PrimaryButtonText = GetResourceStringOrDefault("CalendarDialog.SecondaryButtonText", "Delete"),
                 CloseButtonText = GetResourceStringOrDefault("CalendarDialog.CloseButtonText", "Cancel"),
                 DefaultButton = ContentDialogButton.Close
@@ -653,6 +653,8 @@ namespace Task_Flyout.Views
             if (!_mailService.RemoveAccount(account.Id))
                 return;
 
+            ReleaseMailWebView();
+            await WebView2RuntimeService.ClearSensitiveBrowsingDataAsync();
             _items.Clear();
             _selectedAccount = null;
             _selectedFolder = null;
@@ -1100,6 +1102,7 @@ namespace Task_Flyout.Views
                             if (coreWebView == null)
                                 throw new InvalidOperationException("Mail WebView2 failed to initialize.");
 
+                            WebView2RuntimeService.RegisterProfile(coreWebView.Profile);
                             _webView2Configured = true;
                             var settings = coreWebView.Settings;
                             settings.IsScriptEnabled = false;

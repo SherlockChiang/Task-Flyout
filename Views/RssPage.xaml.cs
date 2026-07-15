@@ -860,6 +860,7 @@ namespace Task_Flyout.Views
                 await webView.EnsureCoreWebView2Async();
                 if (!_rssWebViewConfigured && webView.CoreWebView2 != null)
                 {
+                    WebView2RuntimeService.RegisterProfile(webView.CoreWebView2.Profile);
                     _rssWebViewConfigured = true;
                     var settings = webView.CoreWebView2.Settings;
                     settings.IsScriptEnabled = false;

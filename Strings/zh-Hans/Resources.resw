@@ -721,7 +721,7 @@
     <value>删除邮箱账户</value>
   </data>
   <data name="TextDeleteMailAccountContent" xml:space="preserve">
-    <value>要从 Task Flyout 删除 {0} - {1} 吗？这不会删除邮箱服务器上的邮件。</value>
+    <value>要从 Task Flyout 删除 {0} - {1} 吗？这不会删除邮箱服务器上的邮件。邮件与 RSS 阅读器共享嵌入式浏览器配置，因此两者的站点数据、历史记录和磁盘缓存也会一并清除。</value>
   </data>
   <data name="TextCompose" xml:space="preserve">
     <value>写邮件</value>
@@ -841,7 +841,7 @@
     <value>清除 RSS 本地数据？</value>
   </data>
   <data name="TextClearRssDataContent" xml:space="preserve">
-    <value>这将删除此设备上缓存的 RSS 订阅、文章和图片，但不会取消来源网站上的订阅，也不会删除系统备份。</value>
+    <value>这将删除此设备上缓存的 RSS 订阅、文章和图片。邮件与 RSS 阅读器共享嵌入式浏览器配置，因此两者的站点数据、历史记录和磁盘缓存也会一并清除。此操作不会取消来源网站上的订阅，也不会删除系统备份。</value>
   </data>
   <data name="TextRssDataCleared" xml:space="preserve">
     <value>RSS 本地数据已清除。</value>

@@ -549,7 +549,7 @@ namespace Task_Flyout.Views
             {
                 XamlRoot = XamlRoot,
                 Title = GetSafeString("TextClearRssDataTitle", "Clear RSS local data?"),
-                Content = GetSafeString("TextClearRssDataContent", "This removes cached RSS subscriptions, articles, and images from this device. It does not cancel subscriptions at the source or remove system backups."),
+                Content = GetSafeString("TextClearRssDataContent", "This removes cached RSS subscriptions, articles, and images from this device. Mail and RSS share an embedded browser profile, so its site data, history, and disk cache will also be cleared for both readers. This does not cancel subscriptions at the source or remove system backups."),
                 PrimaryButtonText = GetSafeString("TextClear", "Clear"),
                 CloseButtonText = GetSafeString("CalendarDialog.CloseButtonText", "Cancel"),
                 DefaultButton = ContentDialogButton.Close

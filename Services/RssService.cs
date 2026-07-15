@@ -228,6 +228,7 @@ namespace Task_Flyout.Services
                     if (clearedSuccessfully)
                         RaiseLocalDataCleared();
                 });
+                await WebView2RuntimeService.ClearSensitiveBrowsingDataAsync();
             }
             finally
             {

@@ -15,6 +15,13 @@ namespace Task_Flyout.Services
         private const long MaxCacheBytes = 300L * 1024 * 1024;
         private const long TargetCacheBytes = 220L * 1024 * 1024;
         private static bool _configured;
+        private static readonly object ProfileLock = new();
+        private static readonly List<WeakReference<CoreWebView2Profile>> Profiles = new();
+
+        private const CoreWebView2BrowsingDataKinds SensitiveBrowsingDataKinds =
+            CoreWebView2BrowsingDataKinds.AllSite |
+            CoreWebView2BrowsingDataKinds.DiskCache |
+            CoreWebView2BrowsingDataKinds.BrowsingHistory;
 
         public static string CachePath =>
             AppDataPathHelper.EnsureDirectory(AppDataPathHelper.ResolveLocal("WebView2Cache"));
@@ -35,14 +42,64 @@ namespace Task_Flyout.Services
             => Task.Run(() => GetDirectorySize(CachePath));
 
         public static Task<long> ClearCacheAsync()
-            => Task.Run(() =>
+            => ClearCacheCoreAsync();
+
+        private static async Task<long> ClearCacheCoreAsync()
+        {
+            var before = await GetCacheSizeBytesAsync();
+            await ClearRegisteredProfilesAsync(CoreWebView2BrowsingDataKinds.DiskCache);
+            await Task.Run(() => DeleteDirectoryChildren(CachePath));
+            var after = await GetCacheSizeBytesAsync();
+            return Math.Max(0, before - after);
+        }
+
+        public static void RegisterProfile(CoreWebView2Profile profile)
+        {
+            ArgumentNullException.ThrowIfNull(profile);
+
+            lock (ProfileLock)
             {
-                var path = CachePath;
-                var before = GetDirectorySize(path);
-                DeleteDirectoryChildren(path);
-                var after = GetDirectorySize(path);
-                return Math.Max(0, before - after);
-            });
+                Profiles.RemoveAll(reference => !reference.TryGetTarget(out _));
+                if (Profiles.Any(reference => reference.TryGetTarget(out var existing)
+                    && ReferenceEquals(existing, profile))) return;
+                Profiles.Add(new WeakReference<CoreWebView2Profile>(profile));
+            }
+        }
+
+        public static async Task ClearSensitiveBrowsingDataAsync()
+        {
+            bool clearedActiveProfile = await ClearRegisteredProfilesAsync(SensitiveBrowsingDataKinds);
+            if (!clearedActiveProfile)
+                await Task.Run(() => DeleteDirectoryChildren(CachePath));
+        }
+
+        private static async Task<bool> ClearRegisteredProfilesAsync(CoreWebView2BrowsingDataKinds kinds)
+        {
+            List<CoreWebView2Profile> profiles;
+            lock (ProfileLock)
+            {
+                profiles = Profiles
+                    .Select(reference => reference.TryGetTarget(out var profile) ? profile : null)
+                    .Where(profile => profile != null)
+                    .Cast<CoreWebView2Profile>()
+                    .ToList();
+                Profiles.RemoveAll(reference => !reference.TryGetTarget(out _));
+            }
+
+            bool cleared = false;
+            foreach (var profile in profiles)
+            {
+                try
+                {
+                    await profile.ClearBrowsingDataAsync(kinds);
+                    cleared = true;
+                }
+                catch
+                {
+                }
+            }
+            return cleared;
+        }
 
         public static void BlockUnsafeEmbeddedResource(CoreWebView2 coreWebView, CoreWebView2WebResourceRequestedEventArgs args)
         {
