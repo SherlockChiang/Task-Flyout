@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -14,6 +15,7 @@ using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
 using Windows.Storage;
+using Windows.Storage.Streams;
 
 namespace Task_Flyout.Services
 {
@@ -145,6 +147,8 @@ namespace Task_Flyout.Services
         public List<RssSubscription> Subscriptions { get; set; } = new();
         public List<RssArticle> Articles { get; set; } = new();
     }
+
+    public sealed record RemoteImageStream(IRandomAccessStream Stream, string ContentType);
 
         public class RssService
         {
@@ -845,7 +849,7 @@ namespace Task_Flyout.Services
         /// (caller should block) on any failure, redirect to a non-public host, non-image
         /// content type, or oversize payload.
         /// </summary>
-        public async Task<(byte[] Bytes, string ContentType)?> FetchRemoteImageSafelyAsync(string url, CancellationToken cancellationToken = default)
+        public async Task<RemoteImageStream?> FetchRemoteImageSafelyAsync(string url, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -869,18 +873,31 @@ namespace Task_Flyout.Services
                         if (response.Content.Headers.ContentLength is long declared && declared > MaxRemoteImageBytes) return null;
 
                         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                        using var buffer = new MemoryStream();
+                        var output = new InMemoryRandomAccessStream();
                         var chunk = new byte[81920];
                         long total = 0;
-                        int read;
-                        while ((read = await stream.ReadAsync(chunk.AsMemory(0, chunk.Length), cancellationToken)) > 0)
+                        try
                         {
-                            total += read;
-                            if (total > MaxRemoteImageBytes) return null;
-                            buffer.Write(chunk, 0, read);
-                        }
+                            int read;
+                            while ((read = await stream.ReadAsync(chunk.AsMemory(0, chunk.Length), cancellationToken)) > 0)
+                            {
+                                total += read;
+                                if (total > MaxRemoteImageBytes)
+                                {
+                                    output.Dispose();
+                                    return null;
+                                }
+                                await output.WriteAsync(chunk.AsBuffer(0, read));
+                            }
 
-                        return (buffer.ToArray(), contentType);
+                            output.Seek(0);
+                            return new RemoteImageStream(output, contentType);
+                        }
+                        catch
+                        {
+                            output.Dispose();
+                            throw;
+                        }
                     }
                     finally
                     {

@@ -17,7 +17,6 @@ using Task_Flyout.Services;
 using Microsoft.Windows.ApplicationModel.Resources;
 using Windows.System;
 using Windows.Storage.Streams;
-using System.Runtime.InteropServices.WindowsRuntime;
 
 namespace Task_Flyout.Views
 {
@@ -978,11 +977,8 @@ namespace Task_Flyout.Views
                     var fetched = await _rssService.FetchRemoteImageSafelyAsync(uri!, cts.Token);
                     if (fetched != null)
                     {
-                        var stream = new InMemoryRandomAccessStream();
-                        await stream.WriteAsync(fetched.Value.Bytes.AsBuffer());
-                        stream.Seek(0);
                         args.Response = coreWebView.Environment.CreateWebResourceResponse(
-                            stream, 200, "OK", $"Content-Type: {fetched.Value.ContentType}");
+                            fetched.Stream, 200, "OK", $"Content-Type: {fetched.ContentType}");
                     }
                     else
                     {
