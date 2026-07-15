@@ -52,4 +52,20 @@ public class NotificationActivationParserTests
     {
         Assert.Equal(expected, NotificationActivationParser.IsVerificationCode(value));
     }
+
+    [Theory]
+    [InlineData("action=openAgenda&token=0123456789abcdef0123456789abcdef", true)]
+    [InlineData("action=snoozeAgenda&token=0123456789abcdef0123456789abcdef", true)]
+    [InlineData("action=completeTask&token=0123456789abcdef0123456789abcdef", true)]
+    [InlineData("action=completeTask&token=ABCDEF0123456789abcdef0123456789", false)]
+    [InlineData("action=openAgenda&token=invalid", false)]
+    [InlineData("action=completeTask&token=0123456789abcdef0123456789abcdef&provider=Google", false)]
+    [InlineData("action=completeTask&action=openAgenda&token=0123456789abcdef0123456789abcdef", false)]
+    [InlineData("prefix----AppNotificationActivated:action=openAgenda&token=0123456789abcdef0123456789abcdef", false)]
+    [InlineData("action=openAgenda;token=0123456789abcdef0123456789abcdef", false)]
+    [InlineData("action=openAgenda&token=%GG", false)]
+    public void Agenda_actions_require_exact_strict_schema(string value, bool expected)
+    {
+        Assert.Equal(expected, NotificationActivationParser.TryParseAgendaAction(value, out _, out _));
+    }
 }

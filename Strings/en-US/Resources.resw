@@ -1696,4 +1696,9 @@ Weather: {3}</value></data>
   <data name="TextPreparingAttachments" xml:space="preserve"><value>Preparing attachments...</value></data>
   <data name="TextUploadingAttachments" xml:space="preserve"><value>Uploading attachments...</value></data>
   <data name="TextConfirmingSend" xml:space="preserve"><value>Confirming send status...</value></data>
+  <data name="Notification_Snooze" xml:space="preserve"><value>Snooze 10 min</value></data>
+  <data name="Notification_Complete" xml:space="preserve"><value>Complete</value></data>
+  <data name="TextTaskReminder" xml:space="preserve"><value>Task Reminder</value></data>
+  <data name="TextTaskDueOneMinute" xml:space="preserve"><value>Due in 1 minute</value></data>
+  <data name="TextTaskDueMinutes" xml:space="preserve"><value>Due in {0} minutes</value></data>
 </root>

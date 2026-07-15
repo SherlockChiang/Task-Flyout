@@ -1696,4 +1696,9 @@ Microsoft：{1}
   <data name="TextPreparingAttachments" xml:space="preserve"><value>正在准备附件...</value></data>
   <data name="TextUploadingAttachments" xml:space="preserve"><value>正在上传附件...</value></data>
   <data name="TextConfirmingSend" xml:space="preserve"><value>正在确认发送状态...</value></data>
+  <data name="Notification_Snooze" xml:space="preserve"><value>推迟 10 分钟</value></data>
+  <data name="Notification_Complete" xml:space="preserve"><value>完成</value></data>
+  <data name="TextTaskReminder" xml:space="preserve"><value>任务提醒</value></data>
+  <data name="TextTaskDueOneMinute" xml:space="preserve"><value>任务将在 1 分钟后到期</value></data>
+  <data name="TextTaskDueMinutes" xml:space="preserve"><value>任务将在 {0} 分钟后到期</value></data>
 </root>

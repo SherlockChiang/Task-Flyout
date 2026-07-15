@@ -59,6 +59,8 @@
     <Compile Include="..\..\Services\UserSafeErrorMessage.cs" Link="Source\UserSafeErrorMessage.cs" />
     <Compile Include="..\..\Services\JsonFallbackPolicy.cs" Link="Source\JsonFallbackPolicy.cs" />
     <Compile Include="..\..\Services\NotificationActivationParser.cs" Link="Source\NotificationActivationParser.cs" />
+    <Compile Include="..\..\Services\NotificationActionPolicy.cs" Link="Source\NotificationActionPolicy.cs" />
+    <Compile Include="..\..\Services\NotificationActionStore.cs" Link="Source\NotificationActionStore.cs" />
     <Compile Include="..\..\Services\WebResourcePolicy.cs" Link="Source\WebResourcePolicy.cs" />
     <Compile Include="..\..\Services\StatusMessageFormatter.cs" Link="Source\StatusMessageFormatter.cs" />
     <Compile Include="..\..\Services\ProviderAuthCleanup.cs" Link="Source\ProviderAuthCleanup.cs" />

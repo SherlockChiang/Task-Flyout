@@ -26,6 +26,9 @@ namespace Task_Flyout.Services
         private Dictionary<string, List<AgendaItem>>? _cachedItems;
         private DateTime _cacheReadTime = DateTime.MinValue;
         private const string NotifiedIdsSettingsKey = "NotificationService.NotifiedIds";
+        private const string SnoozedActionsSettingsKey = "NotificationService.SnoozedActions";
+        private readonly Dictionary<string, DateTimeOffset> _snoozedActions = new(StringComparer.Ordinal);
+        private bool _processingSnoozes;
         private static readonly TimeSpan CacheRefreshInterval = TimeSpan.FromMinutes(5);
 
         public NotificationService(SyncManager syncManager)
@@ -33,6 +36,7 @@ namespace Task_Flyout.Services
             _syncManager = syncManager;
             _reminderMinutes = ApplicationData.Current.LocalSettings.Values["NotifyMinutes"] as int? ?? 15;
             LoadNotifiedIds();
+            LoadSnoozedActions();
         }
 
         public void Initialize()
@@ -102,6 +106,8 @@ namespace Task_Flyout.Services
                 var keysToCheck = new[] { todayKey, tomorrowKey };
                 bool notifiedIdsChanged = false;
 
+                _ = ProcessDueSnoozesAsync(now);
+
                 foreach (var dateKey in keysToCheck)
                 {
                     if (!cache.ContainsKey(dateKey)) continue;
@@ -140,21 +146,10 @@ namespace Task_Flyout.Services
 
         private DateTime? GetEventStartTime(AgendaItem item, string dateKey)
         {
-            if (item.StartDateTime.HasValue)
-                return item.StartDateTime.Value;
-
-            if (!DateTime.TryParse(dateKey, out var date)) return null;
-
-            var subtitle = item.Subtitle?.Trim();
             var allDayText = _loader.GetStringOrDefault("TextAllDay") ?? "All Day";
-            if (string.IsNullOrEmpty(subtitle) || subtitle == "全天" || subtitle == "All day" || subtitle == allDayText)
-                return null;
-
-            var timePart = subtitle.Split('-')[0].Trim();
-            if (TimeSpan.TryParse(timePart, out var timeSpan))
-                return date.Add(timeSpan);
-
-            return null;
+            var subtitle = item.Subtitle?.Trim();
+            if (!item.IsTask && (subtitle == allDayText || subtitle == "全天")) return null;
+            return NotificationActionPolicy.GetReminderTime(item.IsTask, item.IsCompleted, item.StartDateTime, subtitle, dateKey);
         }
 
         private void SendNotification(AgendaItem item, DateTime startTime)
@@ -162,15 +157,40 @@ namespace Task_Flyout.Services
             try
             {
                 var minutesLeft = (int)Math.Ceiling((startTime - DateTime.Now).TotalMinutes);
-                var timeText = minutesLeft <= 1
-                    ? (_loader.GetStringOrDefault("TextOneMinuteLater") ?? "Starts in 1 minute")
-                    : string.Format(_loader.GetStringOrDefault("TextMinutesLater") ?? "Starts in {0} minutes", minutesLeft);
+                var timeText = item.IsTask
+                    ? (minutesLeft <= 1
+                        ? (_loader.GetStringOrDefault("TextTaskDueOneMinute") ?? "Due in 1 minute")
+                        : string.Format(_loader.GetStringOrDefault("TextTaskDueMinutes") ?? "Due in {0} minutes", minutesLeft))
+                    : (minutesLeft <= 1
+                        ? (_loader.GetStringOrDefault("TextOneMinuteLater") ?? "Starts in 1 minute")
+                        : string.Format(_loader.GetStringOrDefault("TextMinutesLater") ?? "Starts in {0} minutes", minutesLeft));
 
                 var builder = new AppNotificationBuilder()
                     .AddText(HideNotificationContent
-                        ? (_loader.GetStringOrDefault("TextEventReminder") ?? "Event Reminder")
+                        ? (item.IsTask
+                            ? (_loader.GetStringOrDefault("TextTaskReminder") ?? "Task Reminder")
+                            : (_loader.GetStringOrDefault("TextEventReminder") ?? "Event Reminder"))
                         : item.Title ?? (_loader.GetStringOrDefault("TextEventReminder") ?? "Event Reminder"))
                     .AddText($"{timeText} · {startTime:HH:mm}");
+
+                var actions = NotificationActionPolicy.GetActions(item.IsTask, item.IsCompleted);
+                if (!string.Equals(item.Provider, "Google", StringComparison.OrdinalIgnoreCase))
+                    actions &= ~NotificationActionMask.Complete;
+                var target = new NotificationActionTarget(
+                    NotificationActionTarget.CurrentSchemaVersion,
+                    item.Provider,
+                    item.Id,
+                    item.DateKey,
+                    actions,
+                    DateTimeOffset.UtcNow.AddDays(2));
+                var token = NotificationActionStore.Store(target);
+                builder.AddArgument("action", "openAgenda").AddArgument("token", token);
+                if (actions.HasFlag(NotificationActionMask.Snooze))
+                    builder.AddButton(new AppNotificationButton(_loader.GetStringOrDefault("Notification_Snooze") ?? "Snooze 10 min")
+                        .AddArgument("action", "snoozeAgenda").AddArgument("token", token));
+                if (actions.HasFlag(NotificationActionMask.Complete))
+                    builder.AddButton(new AppNotificationButton(_loader.GetStringOrDefault("Notification_Complete") ?? "Complete")
+                        .AddArgument("action", "completeTask").AddArgument("token", token));
 
                 if (!HideNotificationContent && !string.IsNullOrEmpty(item.Location))
                     builder.AddText($"\ud83d\udccd {item.Location}");
@@ -178,7 +198,7 @@ namespace Task_Flyout.Services
                 var notification = builder.BuildNotification();
                 AppNotificationManager.Default.Show(notification);
 
-                System.Diagnostics.Debug.WriteLine($"Notification sent: {item.Title} at {startTime:HH:mm}");
+                System.Diagnostics.Debug.WriteLine($"Agenda notification sent at {startTime:HH:mm}");
             }
             catch (Exception ex)
             {
@@ -275,6 +295,16 @@ namespace Task_Flyout.Services
             var arguments = NotificationActivationParser.ParseArguments(argument);
             App.MainDispatcherQueue?.TryEnqueue(async () =>
             {
+                if (NotificationActivationParser.TryParseAgendaAction(argument, out var agendaAction, out var agendaToken))
+                {
+                    if (App.Current is App app)
+                        await app.NotificationService.HandleAgendaActionAsync(agendaAction, agendaToken);
+                    return;
+                }
+                if (argument.Contains("openAgenda", StringComparison.Ordinal)
+                    || argument.Contains("snoozeAgenda", StringComparison.Ordinal)
+                    || argument.Contains("completeTask", StringComparison.Ordinal))
+                    return;
                 if (arguments.TryGetValue("action", out var copyAction) &&
                     copyAction == "copyCode" &&
                     arguments.TryGetValue("codeToken", out var codeToken) &&
@@ -301,6 +331,92 @@ namespace Task_Flyout.Services
                 }
             });
         }
+
+        private async Task HandleAgendaActionAsync(string action, string token)
+        {
+            var required = action switch
+            {
+                "openAgenda" => NotificationActionMask.Open,
+                "snoozeAgenda" => NotificationActionMask.Snooze,
+                "completeTask" => NotificationActionMask.Complete,
+                _ => NotificationActionMask.None
+            };
+            if (required == NotificationActionMask.None) return;
+            var target = await NotificationActionStore.ReadAsync(token, required, consume: action == "completeTask");
+            if (target == null) return;
+
+            if (action == "snoozeAgenda")
+            {
+                _snoozedActions[token] = DateTimeOffset.UtcNow.AddMinutes(10);
+                SaveSnoozedActions();
+                return;
+            }
+
+            var item = ResolveTarget(target);
+            if (item == null || !IsItemVisible(item)) return;
+            if (action == "openAgenda")
+            {
+                if (item.IsTask) App.OpenMainWindowInternal(window => window.NavigateToTasks());
+                else App.OpenMainWindowInternal(window => window.NavigateToCalendarAndEdit(item));
+                return;
+            }
+
+            if (!item.IsTask || item.IsCompleted
+                || !string.Equals(item.Provider, "Google", StringComparison.OrdinalIgnoreCase)
+                || !_syncManager.AccountManager.IsConnected(item.Provider)) return;
+            if (App.Current is not App app) return;
+            var key = $"{item.Provider}|{item.Id}|complete";
+            await app.TaskMutations.ExecuteAsync(key, async () =>
+            {
+                await _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, true);
+                await _syncManager.SetCachedTaskCompletionAsync(item, true);
+            });
+            App.OpenMainWindowInternal(window => window.NavigateToTasks());
+        }
+
+        private AgendaItem? ResolveTarget(NotificationActionTarget target)
+            => _syncManager.GetDayItemsSnapshot(new[] { target.DateKey })
+                .SelectMany(pair => pair.Value)
+                .FirstOrDefault(item => item.Id == target.ItemId && item.Provider == target.Provider && item.DateKey == target.DateKey);
+
+        private async Task ProcessDueSnoozesAsync(DateTime now)
+        {
+            if (_processingSnoozes) return;
+            _processingSnoozes = true;
+            bool changed = false;
+            try
+            {
+                foreach (var entry in _snoozedActions.Where(entry => entry.Value <= DateTimeOffset.UtcNow).ToList())
+                {
+                    var target = await NotificationActionStore.ReadAsync(entry.Key, NotificationActionMask.Snooze, consume: true);
+                    var item = target == null ? null : ResolveTarget(target);
+                    if (item != null && IsItemVisible(item) && !item.IsCompleted)
+                        SendNotification(item, now.AddMinutes(1));
+                    _snoozedActions.Remove(entry.Key);
+                    changed = true;
+                }
+                if (changed) SaveSnoozedActions();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Snoozed notification processing failed: {ex.Message}");
+            }
+            finally { _processingSnoozes = false; }
+        }
+
+        private void LoadSnoozedActions()
+        {
+            var raw = ApplicationData.Current.LocalSettings.Values[SnoozedActionsSettingsKey] as string ?? "";
+            foreach (var line in raw.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = line.Split('|', 2);
+                if (parts.Length == 2 && NotificationActivationParser.IsOpaqueToken(parts[0]) && long.TryParse(parts[1], out var ticks))
+                    _snoozedActions[parts[0]] = new DateTimeOffset(ticks, TimeSpan.Zero);
+            }
+        }
+
+        private void SaveSnoozedActions()
+            => ApplicationData.Current.LocalSettings.Values[SnoozedActionsSettingsKey] = string.Join('\n', _snoozedActions.Select(entry => $"{entry.Key}|{entry.Value.UtcTicks}"));
 
         // Copy a verification code straight to the clipboard from the toast button
         // without opening the main window. Keep it out of clipboard history/roaming when
