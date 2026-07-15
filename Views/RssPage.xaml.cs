@@ -742,13 +742,16 @@ namespace Task_Flyout.Views
             });
         }
 
-        private static string FormatRssRefreshError(Exception ex)
+        private string FormatRssRefreshError(Exception ex)
         {
             var message = ex.Message ?? "";
             if (message.Contains("non-public IP", StringComparison.OrdinalIgnoreCase))
-                return "刷新被安全策略拦截：RSS 地址或重定向解析到了非公网 IP。仅可访问用户直接添加的本地 RSS 地址。";
+                return _loader.GetStringOrDefault("TextRssRefreshBlockedPrivateNetwork")
+                    ?? "Refresh was blocked because the RSS URL or redirect resolved to a non-public IP address.";
 
-            return $"刷新失败：{UserSafeErrorMessage.FromException(ex)}";
+            return string.Format(
+                _loader.GetStringOrDefault("TextRssRefreshFailed") ?? "Refresh failed: {0}",
+                UserSafeErrorMessage.FromException(ex));
         }
 
         private void SetArticleListStatus(string message, bool isError = false)
@@ -806,8 +809,8 @@ namespace Task_Flyout.Views
             ReaderTitleText.Text = article.Title;
             ReaderMetaText.Text = $"{article.FeedTitle} · {article.PublishedText}";
             ReaderPrivacyText.Text = Windows.Storage.ApplicationData.Current.LocalSettings.Values["AllowRssRemoteResources"] as bool? ?? false
-                ? "Remote images are proxied through Task Flyout and blocked if they resolve to private networks."
-                : "Remote images are blocked for privacy. Enable RSS remote resources in Settings to load them through the safe proxy.";
+                ? (_loader.GetStringOrDefault("TextRssRemoteImagesProxied") ?? "Remote images are proxied through Task Flyout and blocked if they resolve to private networks.")
+                : (_loader.GetStringOrDefault("TextRssRemoteImagesBlockedPrivacy") ?? "Remote images are blocked for privacy. Enable RSS remote resources in Settings to load them through the safe proxy.");
             await RenderArticleAsync(article);
         }
 

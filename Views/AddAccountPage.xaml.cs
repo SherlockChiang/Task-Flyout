@@ -52,7 +52,12 @@ namespace Task_Flyout.Views
                 ? ready
                 : (_loader.GetStringOrDefault("AddAccount_ConnectWeather") ?? "Enable weather and choose a city from the Weather page.");
 
-            ChecklistText.Text = $"Google: {google}\nMicrosoft: {microsoft}\nMail: {mail}\nWeather: {weather}";
+            ChecklistText.Text = string.Format(
+                _loader.GetStringOrDefault("AddAccount_ChecklistFormat") ?? "Google: {0}\nMicrosoft: {1}\nMail: {2}\nWeather: {3}",
+                google,
+                microsoft,
+                mail,
+                weather);
             OpenMailSetupButton.Visibility = App.Current is App mailApp && mailApp.MailService.HasSetupCompleteAccounts() ? Visibility.Collapsed : Visibility.Visible;
             OpenWeatherSetupButton.Visibility = App.Current is App weatherApp && weatherApp.WeatherService.IsEnabled ? Visibility.Collapsed : Visibility.Visible;
         }

@@ -58,12 +58,10 @@
                  <ToggleSwitch x:Uid="SettingsPage_RssRemote" x:Name="AllowRssRemoteResourcesToggle" Header="允许 RSS 文章加载远程图片资源" IsOn="False" Toggled="AllowRssRemoteResourcesToggle_Toggled"/>
                 <ToggleSwitch x:Uid="SettingsPage_RssLocalNetwork" x:Name="AllowRssLocalNetworkAccessToggle" Header="允许 RSS 订阅访问本地网络地址" IsOn="False" Toggled="AllowRssLocalNetworkAccessToggle_Toggled"/>
                  <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                     <Button x:Uid="SettingsPage_ClearCache" x:Name="ClearWebViewCacheButton" Content="清理 WebView2 缓存" Click="ClearWebViewCacheButton_Click"
-                             AutomationProperties.Name="清理 WebView2 缓存" ToolTipService.ToolTip="清理 WebView2 缓存"/>
+                     <Button x:Uid="SettingsPage_ClearCache" x:Name="ClearWebViewCacheButton" Content="清理 WebView2 缓存" Click="ClearWebViewCacheButton_Click"/>
                      <TextBlock x:Name="WebViewCacheStatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
                  </StackPanel>
-                 <Button x:Name="ClearRssDataButton" Content="清除 RSS 本地数据" Click="ClearRssDataButton_Click"
-                         AutomationProperties.Name="清除 RSS 本地数据" ToolTipService.ToolTip="清除 RSS 本地数据"/>
+                 <Button x:Uid="SettingsPage_ClearRssData" x:Name="ClearRssDataButton" Content="清除 RSS 本地数据" Click="ClearRssDataButton_Click"/>
                  <InfoBar x:Uid="SettingsPage_CacheWarning"
                          x:Name="WebViewCacheWarningBar"
                          IsOpen="False"

@@ -33,10 +33,9 @@
 
             <Grid Margin="4,0,0,8">
                 <TextBlock x:Uid="TasksPage_AccountHeader" Text="任务账户" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                <Button HorizontalAlignment="Right" Width="40" Height="40" Padding="0"
+                <Button x:Uid="TasksPage_BtnCollapseAccounts" HorizontalAlignment="Right" Width="40" Height="40" Padding="0"
                         Background="Transparent" BorderThickness="0"
-                        Click="ToggleAccountPane_Click"
-                        AutomationProperties.Name="折叠账户" ToolTipService.ToolTip="折叠账户">
+                        Click="ToggleAccountPane_Click">
                     <FontIcon Glyph="&#xE76B;" FontSize="12"/>
                 </Button>
             </Grid>
@@ -80,12 +79,11 @@
                                                    VerticalAlignment="Center"
                                                    Text="{Binding ProviderName}"
                                                    TextTrimming="CharacterEllipsis"/>
-                                        <Button Grid.Column="2" Width="40" Height="40" Padding="0"
+                                        <Button x:Uid="TasksPage_BtnRemoveAccount" Grid.Column="2" Width="40" Height="40" Padding="0"
                                                 Background="Transparent"
                                                 BorderThickness="0"
                                                 Tag="{Binding ProviderName}"
                                                 Click="BtnRemoveAccount_Click"
-                                                AutomationProperties.Name="移除账户" ToolTipService.ToolTip="移除账户"
                                                 VerticalAlignment="Center">
                                             <FontIcon Glyph="&#xE711;" FontSize="12"
                                                       Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
@@ -108,15 +106,14 @@
                                                    TextTrimming="CharacterEllipsis"
                                                    FontSize="13"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                        <ToggleSwitch Grid.Column="2"
+                                        <ToggleSwitch x:Uid="TasksPage_TaskVisibilityToggle" Grid.Column="2"
                                                        IsOn="{Binding ShowTasks, Mode=TwoWay}"
                                                        OffContent=""
                                                        OnContent=""
                                                        MinWidth="0"
                                                        Margin="0"
                                                        Toggled="AccountToggle_Toggled"
-                                                       VerticalAlignment="Center"
-                                                       AutomationProperties.Name="显示或隐藏待办任务"/>
+                                                       VerticalAlignment="Center"/>
                                     </Grid>
                                 </Expander.Content>
                             </Expander>
@@ -143,14 +140,13 @@
 
             <Grid Margin="0,0,0,24">
                 <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                    <Button x:Name="ToggleAccountPaneButton"
+                    <Button x:Uid="TasksPage_BtnExpandAccounts" x:Name="ToggleAccountPaneButton"
                             Width="40"
                             Height="36"
                             Padding="0"
                             Background="Transparent"
                             BorderThickness="0"
-                            Click="ToggleAccountPane_Click"
-                            AutomationProperties.Name="展开账户" ToolTipService.ToolTip="展开账户">
+                            Click="ToggleAccountPane_Click">
                         <FontIcon x:Name="ToggleAccountPaneIcon" Glyph="&#xE76C;" FontSize="14"/>
                     </Button>
                     <StackPanel Spacing="2">
@@ -237,14 +233,13 @@
                                                        Visibility="{x:Bind HasDescription}"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         </StackPanel>
-                                        <Button Grid.Column="3"
+                                        <Button x:Uid="TasksPage_BtnDeleteTask" Grid.Column="3"
                                                 Width="32"
                                                 Height="32"
                                                 Padding="0"
                                                 Background="Transparent"
                                                 BorderThickness="0"
-                                                Click="DeleteTaskButton_Click"
-                                                AutomationProperties.Name="删除任务" ToolTipService.ToolTip="删除任务">
+                                                Click="DeleteTaskButton_Click">
                                             <FontIcon Glyph="&#xE74D;" FontSize="14"/>
                                         </Button>
                                     </Grid>
@@ -321,14 +316,13 @@
                                                        Visibility="{x:Bind HasDescription}"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         </StackPanel>
-                                        <Button Grid.Column="3"
+                                        <Button x:Uid="TasksPage_BtnDeleteTask" Grid.Column="3"
                                                 Width="32"
                                                 Height="32"
                                                 Padding="0"
                                                 Background="Transparent"
                                                 BorderThickness="0"
-                                                Click="DeleteTaskButton_Click"
-                                                AutomationProperties.Name="删除任务" ToolTipService.ToolTip="删除任务">
+                                                Click="DeleteTaskButton_Click">
                                             <FontIcon Glyph="&#xE74D;" FontSize="14"/>
                                         </Button>
                                     </Grid>

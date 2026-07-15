@@ -1530,4 +1530,83 @@
   <data name="SettingsPage_MailPollingDesc.Text" xml:space="preserve">
     <value>新邮件通知只影响邮件轮询；不会改变日程提醒或天气警报设置。</value>
   </data>
+  <data name="AddAccount_ChecklistFormat" xml:space="preserve"><value>Google：{0}
+Microsoft：{1}
+邮件：{2}
+天气：{3}</value></data>
+  <data name="TextRssRefreshBlockedPrivateNetwork" xml:space="preserve"><value>刷新被安全策略拦截：RSS 地址或重定向解析到了非公网 IP。仅用户直接添加的本地 RSS 地址可以访问本地网络。</value></data>
+  <data name="TextRssRefreshFailed" xml:space="preserve"><value>刷新失败：{0}</value></data>
+  <data name="TextRssRemoteImagesProxied" xml:space="preserve"><value>远程图片由 Task Flyout 安全代理加载；解析到私有网络的资源会被阻止。</value></data>
+  <data name="TextRssRemoteImagesBlockedPrivacy" xml:space="preserve"><value>远程图片已按隐私设置阻止。可在设置中启用 RSS 远程资源，通过安全代理加载。</value></data>
+  <data name="Flyout_BtnGoToToday.AutomationProperties.Name" xml:space="preserve"><value>回到今天</value></data>
+  <data name="Flyout_BtnWeather.AutomationProperties.Name" xml:space="preserve"><value>查看天气详情</value></data>
+  <data name="Flyout_BtnSettings.AutomationProperties.Name" xml:space="preserve"><value>打开设置</value></data>
+  <data name="Flyout_BtnRefresh.AutomationProperties.Name" xml:space="preserve"><value>立即同步</value></data>
+  <data name="Flyout_BtnPin.AutomationProperties.Name" xml:space="preserve"><value>置顶窗口</value></data>
+  <data name="CalendarPage_BtnCollapseAccounts.AutomationProperties.Name" xml:space="preserve"><value>折叠账户</value></data>
+  <data name="CalendarPage_BtnRemoveAccount.AutomationProperties.Name" xml:space="preserve"><value>移除账户</value></data>
+  <data name="CalendarPage_TaskVisibilityToggle.AutomationProperties.Name" xml:space="preserve"><value>显示或隐藏待办任务</value></data>
+  <data name="CalendarPage_BtnToggleAccounts.AutomationProperties.Name" xml:space="preserve"><value>显示或隐藏账户</value></data>
+  <data name="CalendarPage_BtnToggleTimeline.AutomationProperties.Name" xml:space="preserve"><value>显示或隐藏日程</value></data>
+  <data name="CalendarPage_BtnCollapseTimeline.AutomationProperties.Name" xml:space="preserve"><value>折叠日程</value></data>
+  <data name="TasksPage_BtnCollapseAccounts.AutomationProperties.Name" xml:space="preserve"><value>折叠账户</value></data>
+  <data name="TasksPage_BtnCollapseAccounts.ToolTipService.ToolTip" xml:space="preserve"><value>折叠账户</value></data>
+  <data name="TasksPage_BtnRemoveAccount.AutomationProperties.Name" xml:space="preserve"><value>移除账户</value></data>
+  <data name="TasksPage_BtnRemoveAccount.ToolTipService.ToolTip" xml:space="preserve"><value>移除账户</value></data>
+  <data name="TasksPage_TaskVisibilityToggle.AutomationProperties.Name" xml:space="preserve"><value>显示或隐藏待办任务</value></data>
+  <data name="TasksPage_BtnExpandAccounts.AutomationProperties.Name" xml:space="preserve"><value>展开账户</value></data>
+  <data name="TasksPage_BtnExpandAccounts.ToolTipService.ToolTip" xml:space="preserve"><value>展开账户</value></data>
+  <data name="TasksPage_BtnDeleteTask.AutomationProperties.Name" xml:space="preserve"><value>删除任务</value></data>
+  <data name="TasksPage_BtnDeleteTask.ToolTipService.ToolTip" xml:space="preserve"><value>删除任务</value></data>
+  <data name="RssPage_BtnAddFolder.AutomationProperties.Name" xml:space="preserve"><value>添加文件夹</value></data>
+  <data name="RssPage_AddSubscriptionButton.AutomationProperties.Name" xml:space="preserve"><value>添加订阅</value></data>
+  <data name="RssPage_AddSubscriptionButton.ToolTipService.ToolTip" xml:space="preserve"><value>添加订阅</value></data>
+  <data name="RssPage_RefreshButton.AutomationProperties.Name" xml:space="preserve"><value>刷新 RSS 文章</value></data>
+  <data name="RssPage_RefreshButton.ToolTipService.ToolTip" xml:space="preserve"><value>刷新 RSS 文章</value></data>
+  <data name="RssPage_BtnBackToList.AutomationProperties.Name" xml:space="preserve"><value>返回列表</value></data>
+  <data name="RssPage_OpenArticleInBrowserButton.AutomationProperties.Name" xml:space="preserve"><value>在浏览器中打开文章</value></data>
+  <data name="RssPage_OpenArticleInBrowserButton.ToolTipService.ToolTip" xml:space="preserve"><value>在浏览器中打开文章</value></data>
+  <data name="MailPage_ComposeButton.AutomationProperties.Name" xml:space="preserve"><value>写邮件</value></data>
+  <data name="MailPage_ComposeButton.ToolTipService.ToolTip" xml:space="preserve"><value>写邮件</value></data>
+  <data name="MailPage_RefreshButton.AutomationProperties.Name" xml:space="preserve"><value>刷新邮件</value></data>
+  <data name="MailPage_RefreshButton.ToolTipService.ToolTip" xml:space="preserve"><value>刷新邮件</value></data>
+  <data name="MailPage_RemoveMailButton.AutomationProperties.Name" xml:space="preserve"><value>删除当前邮箱</value></data>
+  <data name="MailPage_RemoveMailButton.ToolTipService.ToolTip" xml:space="preserve"><value>删除当前邮箱</value></data>
+  <data name="MailPage_AddMailButton.AutomationProperties.Name" xml:space="preserve"><value>添加新邮箱</value></data>
+  <data name="MailPage_AddMailButton.ToolTipService.ToolTip" xml:space="preserve"><value>添加新邮箱</value></data>
+  <data name="MailPage_LoadMoreButton.AutomationProperties.Name" xml:space="preserve"><value>加载更多邮件</value></data>
+  <data name="MailPage_LoadMoreButton.ToolTipService.ToolTip" xml:space="preserve"><value>加载更多邮件</value></data>
+  <data name="MailPage_ShowRemoteImagesButton.AutomationProperties.Name" xml:space="preserve"><value>显示远程图片</value></data>
+  <data name="MailPage_ShowRemoteImagesButton.ToolTipService.ToolTip" xml:space="preserve"><value>显示远程图片</value></data>
+  <data name="MailPage_TrustSenderButton.AutomationProperties.Name" xml:space="preserve"><value>信任此来源</value></data>
+  <data name="MailPage_TrustSenderButton.ToolTipService.ToolTip" xml:space="preserve"><value>信任此来源</value></data>
+  <data name="MailPage_ReplyButton.AutomationProperties.Name" xml:space="preserve"><value>回复邮件</value></data>
+  <data name="MailPage_ReplyButton.ToolTipService.ToolTip" xml:space="preserve"><value>回复邮件</value></data>
+  <data name="MailPage_OpenInBrowserButton.AutomationProperties.Name" xml:space="preserve"><value>在浏览器中打开邮件</value></data>
+  <data name="MailPage_OpenInBrowserButton.ToolTipService.ToolTip" xml:space="preserve"><value>在浏览器中打开邮件</value></data>
+  <data name="MailPage_AddOutlookButton.AutomationProperties.Name" xml:space="preserve"><value>添加 Outlook 邮箱</value></data>
+  <data name="MailPage_AddOutlookButton.ToolTipService.ToolTip" xml:space="preserve"><value>添加 Outlook 邮箱</value></data>
+  <data name="MailPage_AddGmailButton.AutomationProperties.Name" xml:space="preserve"><value>添加 Gmail 邮箱</value></data>
+  <data name="MailPage_AddGmailButton.ToolTipService.ToolTip" xml:space="preserve"><value>添加 Gmail 邮箱</value></data>
+  <data name="MailPage_AddImapButton.AutomationProperties.Name" xml:space="preserve"><value>添加 IMAP 邮箱</value></data>
+  <data name="MailPage_AddImapButton.ToolTipService.ToolTip" xml:space="preserve"><value>添加 IMAP 邮箱</value></data>
+  <data name="MailPage_BtnCancel.AutomationProperties.Name" xml:space="preserve"><value>取消 IMAP 设置</value></data>
+  <data name="MailPage_BtnCancel.ToolTipService.ToolTip" xml:space="preserve"><value>取消 IMAP 设置</value></data>
+  <data name="MailPage_BtnSaveImap.AutomationProperties.Name" xml:space="preserve"><value>连接并保存 IMAP 账户</value></data>
+  <data name="MailPage_BtnSaveImap.ToolTipService.ToolTip" xml:space="preserve"><value>连接并保存 IMAP 账户</value></data>
+  <data name="MailPage_BtnCancelCompose.AutomationProperties.Name" xml:space="preserve"><value>取消写邮件</value></data>
+  <data name="MailPage_BtnCancelCompose.ToolTipService.ToolTip" xml:space="preserve"><value>取消写邮件</value></data>
+  <data name="WeatherPage_UseCurrentLocationButton.AutomationProperties.Name" xml:space="preserve"><value>使用当前位置</value></data>
+  <data name="WeatherPage_UseCurrentLocationButton.ToolTipService.ToolTip" xml:space="preserve"><value>使用当前位置</value></data>
+  <data name="WeatherPage_BtnRefresh.AutomationProperties.Name" xml:space="preserve"><value>刷新天气</value></data>
+  <data name="WeatherPage_BtnRefresh.ToolTipService.ToolTip" xml:space="preserve"><value>刷新天气</value></data>
+  <data name="WeatherPage_BtnImportIconPack.AutomationProperties.Name" xml:space="preserve"><value>导入天气图标包</value></data>
+  <data name="WeatherPage_BtnImportIconPack.ToolTipService.ToolTip" xml:space="preserve"><value>导入天气图标包</value></data>
+  <data name="WeatherPage_BtnDeleteIconPack.AutomationProperties.Name" xml:space="preserve"><value>删除当前天气图标包</value></data>
+  <data name="WeatherPage_BtnDeleteIconPack.ToolTipService.ToolTip" xml:space="preserve"><value>删除当前天气图标包</value></data>
+  <data name="SettingsPage_ClearCache.AutomationProperties.Name" xml:space="preserve"><value>清理 WebView2 缓存</value></data>
+  <data name="SettingsPage_ClearCache.ToolTipService.ToolTip" xml:space="preserve"><value>清理 WebView2 缓存</value></data>
+  <data name="SettingsPage_ClearRssData.Content" xml:space="preserve"><value>清除 RSS 本地数据</value></data>
+  <data name="SettingsPage_ClearRssData.AutomationProperties.Name" xml:space="preserve"><value>清除 RSS 本地数据</value></data>
+  <data name="SettingsPage_ClearRssData.ToolTipService.ToolTip" xml:space="preserve"><value>清除 RSS 本地数据</value></data>
 </root>
