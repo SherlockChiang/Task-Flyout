@@ -756,9 +756,28 @@ namespace Task_Flyout.Services
                 out date);
 
         private void PublishCacheSnapshotNoLock()
-            => Volatile.Write(
-                ref _publishedCache,
-                new PublishedCacheSnapshot(++_cacheVersion, CloneCache(_cache)));
+        {
+            var previous = Volatile.Read(ref _publishedCache).Cache;
+            var snapshot = new AppCache
+            {
+                MarkedDates = _cache.MarkedDates?.ToHashSet(StringComparer.Ordinal) ?? new HashSet<string>(),
+                DayItems = IncrementalBucketSnapshot.Create(
+                    _cache.DayItems,
+                    previous.DayItems,
+                    AreAgendaItemsEqual,
+                    CloneAgendaItem),
+                CachedRanges = _cache.CachedRanges?
+                    .Select(range => new AgendaCacheRange
+                    {
+                        ProviderName = range.ProviderName,
+                        StartDateKey = range.StartDateKey,
+                        EndDateKey = range.EndDateKey
+                    })
+                    .ToList()
+                    ?? new List<AgendaCacheRange>()
+            };
+            Volatile.Write(ref _publishedCache, new PublishedCacheSnapshot(++_cacheVersion, snapshot));
+        }
 
         private sealed record PublishedCacheSnapshot(long Version, AppCache Cache);
 
@@ -849,5 +868,25 @@ namespace Task_Flyout.Services
                 StartDateTime = item.StartDateTime,
                 EndDateTime = item.EndDateTime
             };
+
+        private static bool AreAgendaItemsEqual(AgendaItem left, AgendaItem right)
+            => left.Id == right.Id
+               && left.Title == right.Title
+               && left.Subtitle == right.Subtitle
+               && left.IsTask == right.IsTask
+               && left.IsEvent == right.IsEvent
+               && left.IsCompleted == right.IsCompleted
+               && left.Location == right.Location
+               && left.Description == right.Description
+               && left.Provider == right.Provider
+               && left.CalendarId == right.CalendarId
+               && left.CalendarName == right.CalendarName
+               && left.DateKey == right.DateKey
+               && left.ColorHex == right.ColorHex
+               && left.IsRecurring == right.IsRecurring
+               && left.RecurringEventId == right.RecurringEventId
+               && left.RecurrenceKind == right.RecurrenceKind
+               && left.StartDateTime == right.StartDateTime
+               && left.EndDateTime == right.EndDateTime;
     }
 }
