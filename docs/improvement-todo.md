@@ -66,7 +66,7 @@ Status values:
 | P3-06 | TODO | Feature | Add toast actions for snooze, complete, and open. | Arguments are validated; actions use the shared mutation path; privacy-safe variants remain available. | |
 | P3-07 | TODO | Feature | Add protected compose draft recovery. | Unsent drafts survive navigation/process exit and can be discarded securely. | |
 | P3-08 | TODO | Feature | Add mail attachments. | File and total size limits, removal, progress, and provider errors are handled. | |
-| P3-09 | TODO | Feature | Add concise tray quick actions and status. | New item, sync, compose, weather, and error status are available without making the menu cluttered. | |
+| P3-09 | DONE | Feature | Add concise tray quick actions and status. | The flat tray menu exposes new item, sync, compose, weather, open, and exit with one privacy-safe status line. | `feat: add tray quick actions and status` |
 
 ## Verification Baseline
 

@@ -1666,4 +1666,14 @@ Weather: {3}</value></data>
   <data name="RssPage_Search.AutomationProperties.Name" xml:space="preserve"><value>Search cached articles</value></data>
   <data name="TextSearchMatches" xml:space="preserve"><value>{0} matches of {1} loaded</value></data>
   <data name="TextSearchMatchesSimple" xml:space="preserve"><value>{0} matching tasks</value></data>
+  <data name="TrayMenu_Status.Text" xml:space="preserve"><value>Task Flyout · Ready</value></data>
+  <data name="TrayMenu_NewItem.Text" xml:space="preserve"><value>New item</value></data>
+  <data name="TrayMenu_SyncNow.Text" xml:space="preserve"><value>Sync now</value></data>
+  <data name="TrayMenu_Compose.Text" xml:space="preserve"><value>Compose mail</value></data>
+  <data name="TrayMenu_Weather.Text" xml:space="preserve"><value>Weather</value></data>
+  <data name="TrayStatus_Ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="TrayStatus_Syncing" xml:space="preserve"><value>Syncing...</value></data>
+  <data name="TrayStatus_Finished" xml:space="preserve"><value>Sync finished</value></data>
+  <data name="TrayStatus_NeedsAttention" xml:space="preserve"><value>Needs attention</value></data>
+  <data name="TrayStatus_NewMail" xml:space="preserve"><value>New mail</value></data>
 </root>

@@ -38,6 +38,7 @@ namespace Task_Flyout
         private ResourceLoader _loader = new();
         private string _trayToolTipText = "Task Flyout";
         private string? _currentTrayIconName;
+        private bool _traySyncRunning;
         private readonly DeferredStartupWork _accountHydration = new();
         public static FlyoutWindow? MyFlyoutWindow { get; private set; }
         public static MainWindow? MyMainWindow { get; private set; }
@@ -113,6 +114,7 @@ namespace Task_Flyout
             _uiSettings = new UISettings();
             _uiSettings.ColorValuesChanged += UiSettings_ColorValuesChanged;
             UpdateTrayIconTheme();
+            UpdateTrayStatus(TrayStatus.Idle);
             _trayIcon.ForceCreate(enablesEfficiencyMode: EfficiencyModeEnabledSetting);
             _ = EnsureAccountsHydratedAsync();
             QueueMailPollingStart();
@@ -143,6 +145,22 @@ namespace Task_Flyout
                     if (item.Name == "MenuShowMain")
                     {
                         item.Command = new RelayCommand(() => OpenMainWindowInternal());
+                    }
+                    else if (item.Name == "MenuNewItem")
+                    {
+                        item.Command = new RelayCommand(OpenTrayNewItem);
+                    }
+                    else if (item.Name == "MenuSyncNow")
+                    {
+                        item.Command = new RelayCommand(RunTraySync);
+                    }
+                    else if (item.Name == "MenuCompose")
+                    {
+                        item.Command = new RelayCommand(() => OpenMainWindowInternal(window => window.NavigateToMailCompose()));
+                    }
+                    else if (item.Name == "MenuWeather")
+                    {
+                        item.Command = new RelayCommand(() => OpenMainWindowInternal(window => window.NavigateToWeather()));
                     }
                     else if (item.Name == "MenuExit")
                     {
@@ -324,19 +342,44 @@ namespace Task_Flyout
 
         private void UpdateTrayNewMailHint(NewMailNotificationEventArgs e)
         {
-            if (_trayIcon == null) return;
-
-            var subject = string.IsNullOrWhiteSpace(e.Item.Subject) ? "(No subject)" : e.Item.Subject;
-
-            _trayToolTipText = $"Task Flyout · {(_loader.GetStringOrDefault("TextNewMail") ?? "New Mail")}: {TruncateForTray(subject, 48)}";
-            _trayIcon.ToolTipText = _trayToolTipText;
+            UpdateTrayStatus(TrayStatus.NewMail);
         }
 
-        private static string TruncateForTray(string value, int maxLength)
+        private async void OpenTrayNewItem()
         {
-            if (string.IsNullOrWhiteSpace(value)) return "";
-            value = value.Replace("\r", " ").Replace("\n", " ").Trim();
-            return value.Length <= maxLength ? value : value[..Math.Max(0, maxLength - 3)] + "...";
+            try
+            {
+                await EnsureAccountsHydratedAsync();
+                EnsureFlyoutWindow().ShowNewItem();
+            }
+            catch { UpdateTrayStatus(TrayStatus.NeedsAttention); }
+        }
+
+        private async void RunTraySync()
+        {
+            if (_traySyncRunning) return;
+            _traySyncRunning = true;
+            UpdateTrayStatus(TrayStatus.Syncing);
+            try
+            {
+                await EnsureAccountsHydratedAsync();
+                bool succeeded = await EnsureFlyoutWindow().RefreshNowAsync();
+                UpdateTrayStatus(succeeded ? TrayStatus.Finished : TrayStatus.NeedsAttention);
+            }
+            catch { UpdateTrayStatus(TrayStatus.NeedsAttention); }
+            finally { _traySyncRunning = false; }
+        }
+
+        private void UpdateTrayStatus(TrayStatus status)
+        {
+            if (_trayIcon == null) return;
+            var descriptor = TrayStatusPolicy.Describe(status);
+            var text = _loader.GetStringOrDefault(descriptor.ResourceKey) ?? descriptor.Fallback;
+            _trayToolTipText = $"Task Flyout · {text}";
+            _trayIcon.ToolTipText = _trayToolTipText;
+            if (_trayIcon.ContextFlyout is MenuFlyout menu
+                && menu.Items.OfType<MenuFlyoutItem>().FirstOrDefault(item => item.Name == "MenuStatus") is { } statusItem)
+                statusItem.Text = _trayToolTipText;
         }
 
         public static ElementTheme GetConfiguredTheme()
@@ -523,8 +566,7 @@ namespace Task_Flyout
         {
             if (Current is not App app || app._trayIcon == null) return;
 
-            app._trayToolTipText = "Task Flyout";
-            app._trayIcon.ToolTipText = app._trayToolTipText;
+            app.UpdateTrayStatus(TrayStatus.Idle);
             try
             {
                 app._trayIcon.ClearNotifications();

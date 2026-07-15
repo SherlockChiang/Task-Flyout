@@ -877,6 +877,14 @@ namespace Task_Flyout.Views
             EmptyDetailPanel.Visibility = Visibility.Collapsed;
         }
 
+        public async Task StartComposeAsync()
+        {
+            if (!IsLoaded)
+                await WaitUntilLoadedAsync();
+            _mailService ??= (App.Current as App)?.MailService;
+            ShowComposePanel();
+        }
+
         private async void AddOutlookButton_Click(object sender, RoutedEventArgs e)
         {
             if (_mailService == null) return;

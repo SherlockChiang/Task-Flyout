@@ -402,6 +402,30 @@ namespace Task_Flyout
             ContentFrame.Navigate(typeof(Views.MailPage));
         }
 
+        public void NavigateToMailCompose()
+        {
+            if (ContentFrame.Content is Views.MailPage existingMailPage)
+            {
+                _ = existingMailPage.StartComposeAsync();
+                return;
+            }
+
+            void ComposeAfterNavigate(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs args)
+            {
+                if (args.SourcePageType != typeof(Views.MailPage)) return;
+                ContentFrame.Navigated -= ComposeAfterNavigate;
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (ContentFrame.Content is Views.MailPage mailPage)
+                        _ = mailPage.StartComposeAsync();
+                });
+            }
+
+            ContentFrame.Navigated += ComposeAfterNavigate;
+            MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Mail");
+            ContentFrame.Navigate(typeof(Views.MailPage));
+        }
+
         public void NavigateToTasks()
         {
             var tasksItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Tasks");

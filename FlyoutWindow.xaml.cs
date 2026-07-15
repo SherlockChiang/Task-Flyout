@@ -809,38 +809,36 @@ namespace Task_Flyout
             }
             else
             {
-                LoadCacheForDate(DateTime.Today);
-                _selectedDay = DateTime.Today;
-                ShowDataForDate(_selectedDay);
-
-                AdjustWindowHeight();
-                Activate();
-                _appWindow.Show();
-                App.UpdateEfficiencyMode(); // flyout on screen — run at full speed
-                _clockTimer?.Start();
-                _syncTimer?.Start();
-
-                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-                SetForegroundWindow(hWnd);
-                BringWindowToTop(hWnd);
-
-                MainCalendar.Focus(FocusState.Programmatic);
-                UpdateClock();
-
-                if (MainCalendar.SelectedDates.Count == 0 || MainCalendar.SelectedDates[0].Date != DateTime.Today)
-                {
-                    MainCalendar.SelectedDates.Clear();
-                    MainCalendar.SelectedDates.Add(DateTime.Today);
-                    MainCalendar.SetDisplayDate(DateTime.Today);
-                }
-
-                UpdateSelectedDateHeader();
-                RequestDotRefresh();
-
-                UpdateAutoHideTimer();
-
-                QueueBackgroundRefresh();
+                ShowFlyout();
             }
+        }
+
+        private void ShowFlyout()
+        {
+            LoadCacheForDate(DateTime.Today);
+            _selectedDay = DateTime.Today;
+            ShowDataForDate(_selectedDay);
+            AdjustWindowHeight();
+            Activate();
+            _appWindow.Show();
+            App.UpdateEfficiencyMode();
+            _clockTimer?.Start();
+            _syncTimer?.Start();
+            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            SetForegroundWindow(hWnd);
+            BringWindowToTop(hWnd);
+            MainCalendar.Focus(FocusState.Programmatic);
+            UpdateClock();
+            if (MainCalendar.SelectedDates.Count == 0 || MainCalendar.SelectedDates[0].Date != DateTime.Today)
+            {
+                MainCalendar.SelectedDates.Clear();
+                MainCalendar.SelectedDates.Add(DateTime.Today);
+                MainCalendar.SetDisplayDate(DateTime.Today);
+            }
+            UpdateSelectedDateHeader();
+            RequestDotRefresh();
+            UpdateAutoHideTimer();
+            QueueBackgroundRefresh();
         }
 
         private void QueueBackgroundRefresh()
@@ -1060,6 +1058,26 @@ namespace Task_Flyout
                 }
                 finally { cb.IsEnabled = true; }
             }
+        }
+
+        public void ShowNewItem()
+        {
+            if (!_appWindow.IsVisible)
+                ShowFlyout();
+            SetupFlyoutProviderComboBox();
+            TimePickerStart.Time = new TimeSpan(DateTime.Now.Hour, (DateTime.Now.Minute / 5) * 5, 0);
+            TimePickerEnd.Time = TimePickerStart.Time.Add(TimeSpan.FromHours(1));
+            AddPanel.Visibility = Visibility.Visible;
+            if (AgendaContainer != null) AgendaContainer.Visibility = Visibility.Collapsed;
+            AdjustWindowHeight();
+            TxtNewTitle.Focus(FocusState.Programmatic);
+        }
+
+        public async Task<bool> RefreshNowAsync()
+        {
+            var previousSuccess = _lastSyncSucceededAt;
+            await SyncAllDataAsync(silent: false, fullSync: true);
+            return _lastSyncSucceededAt != previousSuccess;
         }
 
         private void ShowTaskMutationState(TaskMutationState state)

@@ -14,6 +14,13 @@
                 ToolTipText="Task Flyout">
                 <tb:TaskbarIcon.ContextFlyout>
                     <MenuFlyout x:Name="TrayMenu">
+                        <MenuFlyoutItem x:Uid="TrayMenu_Status" x:Name="MenuStatus" Text="Task Flyout · Ready" IsEnabled="False"/>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem x:Uid="TrayMenu_NewItem" x:Name="MenuNewItem" Text="New item"/>
+                        <MenuFlyoutItem x:Uid="TrayMenu_SyncNow" x:Name="MenuSyncNow" Text="Sync now"/>
+                        <MenuFlyoutItem x:Uid="TrayMenu_Compose" x:Name="MenuCompose" Text="Compose mail"/>
+                        <MenuFlyoutItem x:Uid="TrayMenu_Weather" x:Name="MenuWeather" Text="Weather"/>
+                        <MenuFlyoutSeparator/>
                         <MenuFlyoutItem x:Uid="TrayMenu_ShowMain" x:Name="MenuShowMain" Text="显示主页面">
                             <MenuFlyoutItem.Icon>
                                 <SymbolIcon Symbol="Setting"/>

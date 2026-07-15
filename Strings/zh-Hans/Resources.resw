@@ -1666,4 +1666,14 @@ Microsoft：{1}
   <data name="RssPage_Search.AutomationProperties.Name" xml:space="preserve"><value>搜索缓存文章</value></data>
   <data name="TextSearchMatches" xml:space="preserve"><value>已加载 {1} 项，匹配 {0} 项</value></data>
   <data name="TextSearchMatchesSimple" xml:space="preserve"><value>匹配 {0} 个任务</value></data>
+  <data name="TrayMenu_Status.Text" xml:space="preserve"><value>Task Flyout · 就绪</value></data>
+  <data name="TrayMenu_NewItem.Text" xml:space="preserve"><value>新建项目</value></data>
+  <data name="TrayMenu_SyncNow.Text" xml:space="preserve"><value>立即同步</value></data>
+  <data name="TrayMenu_Compose.Text" xml:space="preserve"><value>撰写邮件</value></data>
+  <data name="TrayMenu_Weather.Text" xml:space="preserve"><value>天气</value></data>
+  <data name="TrayStatus_Ready" xml:space="preserve"><value>就绪</value></data>
+  <data name="TrayStatus_Syncing" xml:space="preserve"><value>正在同步...</value></data>
+  <data name="TrayStatus_Finished" xml:space="preserve"><value>同步完成</value></data>
+  <data name="TrayStatus_NeedsAttention" xml:space="preserve"><value>需要处理</value></data>
+  <data name="TrayStatus_NewMail" xml:space="preserve"><value>有新邮件</value></data>
 </root>
