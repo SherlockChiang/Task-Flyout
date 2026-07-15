@@ -224,14 +224,9 @@ namespace Task_Flyout.Views
 
         private void ShowMutationState(TaskMutationState state)
         {
-            TaskSummaryText.Text = state.Phase switch
-            {
-                TaskMutationPhase.Queued => _loader.GetStringOrDefault("TextTaskMutationQueued") ?? "Task change queued...",
-                TaskMutationPhase.Pending => _loader.GetStringOrDefault("TextTaskMutationPending") ?? "Saving task change...",
-                TaskMutationPhase.Failed => _loader.GetStringOrDefault("TextTaskMutationFailed") ?? "Task change failed. Retry is available.",
-                _ => _loader.GetStringOrDefault("TextTaskMutationSucceeded") ?? "Task change saved."
-            };
-            TaskSummaryText.Foreground = state.Phase == TaskMutationPhase.Failed
+            var status = TaskMutationStatusPolicy.Describe(state.Phase);
+            TaskSummaryText.Text = _loader.GetStringOrDefault(status.ResourceKey) ?? status.FallbackText;
+            TaskSummaryText.Foreground = status.IsError
                 ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]
                 : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
         }

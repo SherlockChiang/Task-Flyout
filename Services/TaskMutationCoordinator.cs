@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Task_Flyout.Services
 {
-    internal enum TaskMutationPhase
+    public enum TaskMutationPhase
     {
         Queued,
         Pending,

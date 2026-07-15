@@ -1303,7 +1303,7 @@ namespace Task_Flyout.Views
                         return;
                     }
 
-                    var fetched = await new RssService().FetchRemoteImageSafelyAsync(uri!, cts.Token);
+                    var fetched = await RemoteImageProxyService.Instance.FetchAsync(uri!, cts.Token);
                     if (fetched != null)
                     {
                         args.Response = coreWebView.Environment.CreateWebResourceResponse(

@@ -882,7 +882,7 @@ namespace Task_Flyout.Services
         /// (caller should block) on any failure, redirect to a non-public host, non-image
         /// content type, or oversize payload.
         /// </summary>
-        public async Task<RemoteImageStream?> FetchRemoteImageSafelyAsync(string url, CancellationToken cancellationToken = default)
+        internal static async Task<RemoteImageStream?> FetchRemoteImageSafelyAsync(string url, CancellationToken cancellationToken = default)
         {
             try
             {

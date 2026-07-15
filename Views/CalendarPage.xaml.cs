@@ -592,13 +592,8 @@ namespace Task_Flyout.Views
 
         private void ShowTaskMutationState(TaskMutationState state)
         {
-            SetCalendarStatus(state.Phase switch
-            {
-                TaskMutationPhase.Queued => _loader.GetStringOrDefault("TextTaskMutationQueued") ?? "Task change queued...",
-                TaskMutationPhase.Pending => _loader.GetStringOrDefault("TextTaskMutationPending") ?? "Saving task change...",
-                TaskMutationPhase.Failed => _loader.GetStringOrDefault("TextTaskMutationFailed") ?? "Task change failed. Retry is available.",
-                _ => _loader.GetStringOrDefault("TextTaskMutationSucceeded") ?? "Task change saved."
-            }, state.Phase == TaskMutationPhase.Failed);
+            var status = TaskMutationStatusPolicy.Describe(state.Phase);
+            SetCalendarStatus(_loader.GetStringOrDefault(status.ResourceKey) ?? status.FallbackText, status.IsError);
         }
 
         private async void RetryTaskMutationButton_Click(object sender, RoutedEventArgs e)
