@@ -446,7 +446,7 @@ namespace Task_Flyout.Services
             } while (taskPageToken != null);
             return items;
         }
-        public async Task UpdateItemAsync(string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime)
+        public async Task UpdateItemAsync(string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime, string taskListId = "")
         {
             if (isEvent)
             {
@@ -474,19 +474,21 @@ namespace Task_Flyout.Services
             {
                 await EnsureAuthorizedAsync();
                 var tasksSvc = TasksSvc!;
-                var task = await tasksSvc.Tasks.Get("@default", itemId).ExecuteAsync();
+                taskListId = string.IsNullOrWhiteSpace(taskListId) ? "@default" : taskListId;
+                var task = await tasksSvc.Tasks.Get(taskListId, itemId).ExecuteAsync();
                 task.Title = title;
                 task.Notes = description;
                 task.Due = targetDate.ToString("yyyy-MM-dd'T'00:00:00.000'Z'");
-                await tasksSvc.Tasks.Update(task, "@default", itemId).ExecuteAsync();
+                await tasksSvc.Tasks.Update(task, taskListId, itemId).ExecuteAsync();
             }
         }
 
-        public async Task UpdateTaskStatusAsync(string taskId, bool isCompleted)
+        public async Task UpdateTaskStatusAsync(string taskId, bool isCompleted, string taskListId = "")
         {
             var status = isCompleted ? "completed" : "needsAction";
             await EnsureAuthorizedAsync();
-            var updateRequest = TasksSvc!.Tasks.Patch(new Google.Apis.Tasks.v1.Data.Task { Id = taskId, Status = status }, "@default", taskId);
+            taskListId = string.IsNullOrWhiteSpace(taskListId) ? "@default" : taskListId;
+            var updateRequest = TasksSvc!.Tasks.Patch(new Google.Apis.Tasks.v1.Data.Task { Id = taskId, Status = status }, taskListId, taskId);
             await updateRequest.ExecuteAsync();
         }
 
@@ -527,8 +529,9 @@ namespace Task_Flyout.Services
             await TasksSvc!.Tasks.Insert(newTask, "@default").ExecuteAsync();
         }
 
-        public async Task DeleteItemAsync(string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode = RecurringDeleteMode.Single, DateTime? occurrenceDate = null, string recurringEventId = "")
+        public async Task DeleteItemAsync(string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode = RecurringDeleteMode.Single, DateTime? occurrenceDate = null, string recurringEventId = "", string taskListId = "")
         {
+            await EnsureAuthorizedAsync();
             if (isEvent)
             {
                 if (CalendarSvc != null)
@@ -551,10 +554,8 @@ namespace Task_Flyout.Services
             }
             else
             {
-                if (TasksSvc != null)
-                {
-                    await TasksSvc.Tasks.Delete("@default", itemId).ExecuteAsync();
-                }
+                taskListId = string.IsNullOrWhiteSpace(taskListId) ? "@default" : taskListId;
+                await TasksSvc!.Tasks.Delete(taskListId, itemId).ExecuteAsync();
             }
         }
 

@@ -211,7 +211,7 @@ namespace Task_Flyout.Views
                     var key = BuildMutationKey(item, "complete");
                     var result = await app.TaskMutations.ExecuteAsync(
                         key,
-                        () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue),
+                        () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId),
                         ShowMutationState);
                     if (result.Phase == TaskMutationPhase.Failed)
                     {
@@ -251,7 +251,7 @@ namespace Task_Flyout.Views
         }
 
         private static string BuildMutationKey(AgendaItem item, string operation)
-            => $"{item.Provider}|{item.Id}|{operation}";
+            => $"{item.Provider}|{item.CalendarId}|{item.Id}";
 
         private void ShowMutationState(TaskMutationState state)
         {
@@ -418,7 +418,7 @@ namespace Task_Flyout.Views
                     var key = BuildMutationKey(item, "delete");
                     var mutation = await app.TaskMutations.ExecuteAsync(
                         key,
-                        () => _syncManager.DeleteItemAsync(item.Provider, item.Id, isEvent: false),
+                        () => _syncManager.DeleteItemAsync(item.Provider, item.Id, isEvent: false, taskListId: item.CalendarId),
                         ShowMutationState);
                     if (mutation.Phase == TaskMutationPhase.Failed)
                     {
@@ -563,6 +563,131 @@ namespace Task_Flyout.Views
         {
             _isAccountPaneCollapsed = !_isAccountPaneCollapsed;
             ApplyResponsiveLayout();
+        }
+
+        private async void EditTaskButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_syncManager == null || sender is not Button { DataContext: AgendaItem item }) return;
+            var capabilities = TaskEditCapabilityPolicy.ForProvider(item.Provider);
+            if (!capabilities.SupportsTitle)
+            {
+                ShowMutationState(new TaskMutationState("", TaskMutationPhase.Failed));
+                return;
+            }
+            var titleBox = new TextBox { Header = _loader.GetStringOrDefault("TextTitle") ?? "Title", Text = item.Title };
+            var notesBox = new TextBox
+            {
+                Header = _loader.GetStringOrDefault("TextDescription") ?? "Notes",
+                Text = item.Description,
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                MinHeight = 96
+            };
+            var datePicker = new DatePicker
+            {
+                Header = _loader.GetStringOrDefault("TextDate") ?? "Due date",
+                Date = DateTime.TryParse(item.DateKey, out var dueDate) ? dueDate : DateTime.Today
+            };
+            var completedBox = new CheckBox
+            {
+                Content = _loader.GetStringOrDefault("TextCompleted") ?? "Completed",
+                IsChecked = item.IsCompleted
+            };
+            var identityText = new TextBlock
+            {
+                Text = string.Format(
+                    _loader.GetStringOrDefault("TextTaskAccountList") ?? "Account: {0} · List: {1}",
+                    item.Provider,
+                    string.IsNullOrWhiteSpace(item.CalendarName) ? (_loader.GetStringOrDefault("TextDefaultList") ?? "Default") : item.CalendarName),
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+            };
+            var limitations = new TextBlock
+            {
+                Text = _loader.GetStringOrDefault("TextTaskUnsupportedFields") ?? "Due time, recurrence, and moving between accounts or lists are not supported by the connected provider and will not be changed.",
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 12,
+                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorTertiaryBrush"]
+            };
+            var validation = new TextBlock
+            {
+                Visibility = Visibility.Collapsed,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]
+            };
+            var panel = new StackPanel { Spacing = 12, MaxWidth = 440 };
+            panel.Children.Add(identityText);
+            panel.Children.Add(titleBox);
+            panel.Children.Add(notesBox);
+            panel.Children.Add(datePicker);
+            panel.Children.Add(completedBox);
+            panel.Children.Add(limitations);
+            panel.Children.Add(validation);
+
+            var dialog = new ContentDialog
+            {
+                Title = _loader.GetStringOrDefault("TextEditTask") ?? "Edit Task",
+                Content = panel,
+                PrimaryButtonText = _loader.GetStringOrDefault("CalendarDialog.PrimaryButtonText") ?? "Save",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = XamlRoot
+            };
+            dialog.PrimaryButtonClick += async (_, args) =>
+            {
+                var title = titleBox.Text.Trim();
+                if (title.Length == 0)
+                {
+                    args.Cancel = true;
+                    validation.Text = _loader.GetStringOrDefault("TextTitleRequired") ?? "Title is required.";
+                    validation.Visibility = Visibility.Visible;
+                    titleBox.Focus(FocusState.Programmatic);
+                    return;
+                }
+                var deferral = args.GetDeferral();
+                try
+                {
+                    dialog.IsPrimaryButtonEnabled = false;
+                    var newDate = datePicker.Date.DateTime.Date;
+                    var newCompleted = completedBox.IsChecked == true;
+                    var key = BuildMutationKey(item, "edit");
+                    var mutation = await (App.Current as App)!.TaskMutations.ExecuteAsync(key, async () =>
+                    {
+                        await _syncManager.UpdateItemAsync(item.Provider, item.Id, false, title, "", notesBox.Text, newDate, null, null, item.CalendarId);
+                        if (newCompleted != item.IsCompleted)
+                            await _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newCompleted, item.CalendarId);
+                    }, ShowMutationState);
+                    if (mutation.Phase == TaskMutationPhase.Failed)
+                    {
+                        args.Cancel = true;
+                        validation.Text = _loader.GetStringOrDefault("TextSaveFailed") ?? "Unable to save. Please try again.";
+                        validation.Visibility = Visibility.Visible;
+                        return;
+                    }
+
+                    var oldDateKey = item.DateKey;
+                    item.Title = title;
+                    item.Description = notesBox.Text;
+                    item.DateKey = newDate.ToString("yyyy-MM-dd");
+                    item.IsCompleted = newCompleted;
+                    await _syncManager.UpsertCachedItemAsync(item, oldDateKey);
+                    LoadCache();
+                    ReloadTasks();
+                    App.MyFlyoutWindow?.ReloadFilters();
+                }
+                catch (Exception ex)
+                {
+                    args.Cancel = true;
+                    validation.Text = UserSafeErrorMessage.FromException(ex, _loader.GetStringOrDefault("TextSaveFailed") ?? "Unable to save. Please try again.");
+                    validation.Visibility = Visibility.Visible;
+                }
+                finally
+                {
+                    dialog.IsPrimaryButtonEnabled = true;
+                    deferral.Complete();
+                }
+            };
+            await dialog.ShowAsync();
         }
 
         private void LayoutRoot_SizeChanged(object sender, SizeChangedEventArgs e)

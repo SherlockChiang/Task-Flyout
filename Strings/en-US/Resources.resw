@@ -1701,4 +1701,13 @@ Weather: {3}</value></data>
   <data name="TextTaskReminder" xml:space="preserve"><value>Task Reminder</value></data>
   <data name="TextTaskDueOneMinute" xml:space="preserve"><value>Due in 1 minute</value></data>
   <data name="TextTaskDueMinutes" xml:space="preserve"><value>Due in {0} minutes</value></data>
+  <data name="TasksPage_BtnEditTask.AutomationProperties.Name" xml:space="preserve"><value>Edit task</value></data>
+  <data name="TasksPage_BtnEditTask.ToolTipService.ToolTip" xml:space="preserve"><value>Edit task</value></data>
+  <data name="TextEditTask" xml:space="preserve"><value>Edit Task</value></data>
+  <data name="TextCompleted" xml:space="preserve"><value>Completed</value></data>
+  <data name="TextTaskAccountList" xml:space="preserve"><value>Account: {0} · List: {1}</value></data>
+  <data name="TextDefaultList" xml:space="preserve"><value>Default</value></data>
+  <data name="TextTaskUnsupportedFields" xml:space="preserve"><value>Due time, recurrence, and moving between accounts or lists are not supported by the connected provider and will not be changed.</value></data>
+  <data name="TextTitleRequired" xml:space="preserve"><value>Title is required.</value></data>
+  <data name="TextSaveFailed" xml:space="preserve"><value>Unable to save. Please try again.</value></data>
 </root>

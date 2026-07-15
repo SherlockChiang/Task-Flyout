@@ -244,15 +244,16 @@
                                                        Visibility="{x:Bind HasDescription}"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         </StackPanel>
-                                        <Button x:Uid="TasksPage_BtnDeleteTask" Grid.Column="3"
-                                                Width="32"
-                                                Height="32"
-                                                Padding="0"
-                                                Background="Transparent"
-                                                BorderThickness="0"
-                                                Click="DeleteTaskButton_Click">
-                                            <FontIcon Glyph="&#xE74D;" FontSize="14"/>
-                                        </Button>
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
+                                            <Button x:Uid="TasksPage_BtnEditTask" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
+                                                    DataContext="{x:Bind}" Click="EditTaskButton_Click">
+                                                <FontIcon Glyph="&#xE70F;" FontSize="14"/>
+                                            </Button>
+                                            <Button x:Uid="TasksPage_BtnDeleteTask" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
+                                                    Click="DeleteTaskButton_Click">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="14"/>
+                                            </Button>
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -327,15 +328,16 @@
                                                        Visibility="{x:Bind HasDescription}"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         </StackPanel>
-                                        <Button x:Uid="TasksPage_BtnDeleteTask" Grid.Column="3"
-                                                Width="32"
-                                                Height="32"
-                                                Padding="0"
-                                                Background="Transparent"
-                                                BorderThickness="0"
-                                                Click="DeleteTaskButton_Click">
-                                            <FontIcon Glyph="&#xE74D;" FontSize="14"/>
-                                        </Button>
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
+                                            <Button x:Uid="TasksPage_BtnEditTask" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
+                                                    DataContext="{x:Bind}" Click="EditTaskButton_Click">
+                                                <FontIcon Glyph="&#xE70F;" FontSize="14"/>
+                                            </Button>
+                                            <Button x:Uid="TasksPage_BtnDeleteTask" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
+                                                    Click="DeleteTaskButton_Click">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="14"/>
+                                            </Button>
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
                             </DataTemplate>

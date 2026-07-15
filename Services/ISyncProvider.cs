@@ -28,12 +28,12 @@ namespace Task_Flyout.Services
         Task EnsureAuthorizedAsync(CancellationToken cancellationToken = default);
         Task<List<AgendaItem>> FetchDataAsync(DateTime min, DateTime max, CancellationToken cancellationToken);
         Task<List<SubscribedCalendarInfo>> FetchCalendarListAsync();
-        Task UpdateTaskStatusAsync(string taskId, bool isCompleted);
-        Task UpdateItemAsync(string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime);
+        Task UpdateTaskStatusAsync(string taskId, bool isCompleted, string taskListId = "");
+        Task UpdateItemAsync(string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime, string taskListId = "");
 
         Task CreateEventAsync(string title, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, bool isAllDay, EventRecurrenceKind recurrence = EventRecurrenceKind.None);
 
         Task CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay);
-        Task DeleteItemAsync(string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode = RecurringDeleteMode.Single, DateTime? occurrenceDate = null, string recurringEventId = "");
+        Task DeleteItemAsync(string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode = RecurringDeleteMode.Single, DateTime? occurrenceDate = null, string recurringEventId = "", string taskListId = "");
     }
 }

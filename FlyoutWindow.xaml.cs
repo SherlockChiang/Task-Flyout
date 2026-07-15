@@ -1030,10 +1030,10 @@ namespace Task_Flyout
                     item.IsCompleted = newValue;
                     if (App.Current is App app)
                     {
-                        var key = $"{item.Provider}|{item.Id}|complete";
+                        var key = $"{item.Provider}|{item.CalendarId}|{item.Id}";
                         var result = await app.TaskMutations.ExecuteAsync(
                             key,
-                            () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue),
+                            () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId),
                             ShowTaskMutationState);
                         if (result.Phase == TaskMutationPhase.Failed)
                         {

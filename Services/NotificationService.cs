@@ -365,10 +365,10 @@ namespace Task_Flyout.Services
                 || !string.Equals(item.Provider, "Google", StringComparison.OrdinalIgnoreCase)
                 || !_syncManager.AccountManager.IsConnected(item.Provider)) return;
             if (App.Current is not App app) return;
-            var key = $"{item.Provider}|{item.Id}|complete";
+            var key = $"{item.Provider}|{item.CalendarId}|{item.Id}";
             await app.TaskMutations.ExecuteAsync(key, async () =>
             {
-                await _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, true);
+                await _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, true, item.CalendarId);
                 await _syncManager.SetCachedTaskCompletionAsync(item, true);
             });
             App.OpenMainWindowInternal(window => window.NavigateToTasks());

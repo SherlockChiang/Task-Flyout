@@ -1701,4 +1701,13 @@ Microsoft：{1}
   <data name="TextTaskReminder" xml:space="preserve"><value>任务提醒</value></data>
   <data name="TextTaskDueOneMinute" xml:space="preserve"><value>任务将在 1 分钟后到期</value></data>
   <data name="TextTaskDueMinutes" xml:space="preserve"><value>任务将在 {0} 分钟后到期</value></data>
+  <data name="TasksPage_BtnEditTask.AutomationProperties.Name" xml:space="preserve"><value>编辑任务</value></data>
+  <data name="TasksPage_BtnEditTask.ToolTipService.ToolTip" xml:space="preserve"><value>编辑任务</value></data>
+  <data name="TextEditTask" xml:space="preserve"><value>编辑任务</value></data>
+  <data name="TextCompleted" xml:space="preserve"><value>已完成</value></data>
+  <data name="TextTaskAccountList" xml:space="preserve"><value>账号：{0} · 列表：{1}</value></data>
+  <data name="TextDefaultList" xml:space="preserve"><value>默认</value></data>
+  <data name="TextTaskUnsupportedFields" xml:space="preserve"><value>当前连接的服务不支持任务到期时间、重复规则或在账号/列表间移动，这些字段不会被更改。</value></data>
+  <data name="TextTitleRequired" xml:space="preserve"><value>标题不能为空。</value></data>
+  <data name="TextSaveFailed" xml:space="preserve"><value>无法保存，请重试。</value></data>
 </root>

@@ -534,7 +534,7 @@ namespace Task_Flyout.Services
             }
             return results;
         }
-        public async Task UpdateItemAsync(string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime)
+        public async Task UpdateItemAsync(string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime, string taskListId = "")
         {
             await EnsureAuthorizedAsync();
 
@@ -556,7 +556,7 @@ namespace Task_Flyout.Services
             }
             else
             {
-                var listId = await GetDefaultTodoListIdAsync();
+                var listId = string.IsNullOrWhiteSpace(taskListId) ? await GetDefaultTodoListIdAsync() : taskListId;
                 var updateTask = new TodoTask
                 {
                     Title = title,
@@ -567,10 +567,10 @@ namespace Task_Flyout.Services
             }
         }
 
-        public async Task UpdateTaskStatusAsync(string taskId, bool isCompleted)
+        public async Task UpdateTaskStatusAsync(string taskId, bool isCompleted, string taskListId = "")
         {
             await EnsureAuthorizedAsync();
-            var listId = await GetDefaultTodoListIdAsync();
+            var listId = string.IsNullOrWhiteSpace(taskListId) ? await GetDefaultTodoListIdAsync() : taskListId;
 
             var updateTask = new TodoTask
             {
@@ -614,7 +614,7 @@ namespace Task_Flyout.Services
             await _graphClient.Me.Todo.Lists[listId].Tasks.PostAsync(newTask);
         }
 
-        public async Task DeleteItemAsync(string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode = RecurringDeleteMode.Single, DateTime? occurrenceDate = null, string recurringEventId = "")
+        public async Task DeleteItemAsync(string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode = RecurringDeleteMode.Single, DateTime? occurrenceDate = null, string recurringEventId = "", string taskListId = "")
         {
             await EnsureAuthorizedAsync();
 
@@ -645,7 +645,7 @@ namespace Task_Flyout.Services
             }
             else
             {
-                var listId = await GetDefaultTodoListIdAsync();
+                var listId = string.IsNullOrWhiteSpace(taskListId) ? await GetDefaultTodoListIdAsync() : taskListId;
                 await _graphClient.Me.Todo.Lists[listId].Tasks[itemId].DeleteAsync();
             }
         }

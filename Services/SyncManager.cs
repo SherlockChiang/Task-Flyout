@@ -319,16 +319,20 @@ namespace Task_Flyout.Services
             return GetCachedItems(min, max);
         }
 
-        public async Task UpdateTaskStatusAsync(string providerName, string taskId, bool isCompleted)
+        public async Task UpdateTaskStatusAsync(string providerName, string taskId, bool isCompleted, string taskListId = "")
         {
             var provider = _providers.FirstOrDefault(p => p.ProviderName == providerName);
-            if (provider != null) await provider.UpdateTaskStatusAsync(taskId, isCompleted);
+            if (provider == null || !AccountManager.IsConnected(providerName))
+                throw new InvalidOperationException("The task provider is unavailable.");
+            await provider.UpdateTaskStatusAsync(taskId, isCompleted, taskListId);
         }
 
-        public async Task UpdateItemAsync(string providerName, string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime)
+        public async Task UpdateItemAsync(string providerName, string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime, string taskListId = "")
         {
             var provider = _providers.FirstOrDefault(p => p.ProviderName == providerName);
-            if (provider != null) await provider.UpdateItemAsync(itemId, isEvent, title, location, description, targetDate, startTime, endTime);
+            if (provider == null || !AccountManager.IsConnected(providerName))
+                throw new InvalidOperationException("The item provider is unavailable.");
+            await provider.UpdateItemAsync(itemId, isEvent, title, location, description, targetDate, startTime, endTime, taskListId);
         }
 
         public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, string? providerName = null)
@@ -345,16 +349,15 @@ namespace Task_Flyout.Services
                 await provider.CreateTaskAsync(title, targetDate, startTime, isAllDay);
         }
 
-        public async Task DeleteItemAsync(string providerName, string itemId, bool isEvent)
-            => await DeleteItemAsync(providerName, itemId, isEvent, RecurringDeleteMode.Single, null, "");
+        public async Task DeleteItemAsync(string providerName, string itemId, bool isEvent, string taskListId = "")
+            => await DeleteItemAsync(providerName, itemId, isEvent, RecurringDeleteMode.Single, null, "", taskListId);
 
-        public async Task DeleteItemAsync(string providerName, string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode, DateTime? occurrenceDate, string recurringEventId)
+        public async Task DeleteItemAsync(string providerName, string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode, DateTime? occurrenceDate, string recurringEventId, string taskListId = "")
         {
             var provider = _providers.FirstOrDefault(p => p.ProviderName == providerName);
-            if (provider != null)
-            {
-                await provider.DeleteItemAsync(itemId, isEvent, recurringDeleteMode, occurrenceDate, recurringEventId);
-            }
+            if (provider == null || !AccountManager.IsConnected(providerName))
+                throw new InvalidOperationException("The item provider is unavailable.");
+            await provider.DeleteItemAsync(itemId, isEvent, recurringDeleteMode, occurrenceDate, recurringEventId, taskListId);
         }
 
         public async Task RemoveAgendaAccountAsync(string providerName)

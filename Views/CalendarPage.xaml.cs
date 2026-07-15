@@ -557,10 +557,10 @@ namespace Task_Flyout.Views
                     item.IsCompleted = newValue;
                     if (_syncManager != null && App.Current is App app)
                     {
-                        var key = $"{item.Provider}|{item.Id}|complete";
+                        var key = $"{item.Provider}|{item.CalendarId}|{item.Id}";
                         var result = await app.TaskMutations.ExecuteAsync(
                             key,
-                            () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue),
+                            () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId),
                             ShowTaskMutationState);
                         if (result.Phase == TaskMutationPhase.Failed)
                         {
@@ -868,7 +868,7 @@ namespace Task_Flyout.Views
                     await _syncManager.UpdateItemAsync(
                         _itemBeingEdited.Provider, _itemBeingEdited.Id, _itemBeingEdited.IsEvent,
                         EditTxtTitle.Text, EditTxtLocation.Text, EditTxtDescription.Text,
-                        EditDatePicker.Date.DateTime, newStartTime, newEndTime);
+                         EditDatePicker.Date.DateTime, newStartTime, newEndTime, _itemBeingEdited.CalendarId);
 
                     if (_localCache.DayItems.TryGetValue(_itemBeingEdited.DateKey, out var oldList))
                     {
@@ -944,7 +944,8 @@ namespace Task_Flyout.Views
                         itemToDelete.IsEvent,
                         deleteMode.Value,
                         occurrenceDate,
-                        itemToDelete.RecurringEventId);
+                        itemToDelete.RecurringEventId,
+                        itemToDelete.CalendarId);
                 }
                 catch (Exception ex)
                 {
