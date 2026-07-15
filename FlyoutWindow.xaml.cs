@@ -1338,15 +1338,14 @@ namespace Task_Flyout
 
             TxtNewTitle.Text = string.Empty;
             TxtLocation.Text = string.Empty;
+            AddItemStatusText.Text = string.Empty;
+            AddItemStatusText.Visibility = Visibility.Collapsed;
             AdjustWindowHeight();
         }
 
         private async void BtnSaveNewItem_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(TxtNewTitle.Text)) return;
-
-            AddPanel.Visibility = Visibility.Collapsed;
-            if (AgendaContainer != null) AgendaContainer.Visibility = Visibility.Visible;
 
             string title = TxtNewTitle.Text;
             bool isEvent = RadioTypeEvent.IsChecked == true;
@@ -1359,28 +1358,26 @@ namespace Task_Flyout
 
             if (isEvent && endTime <= startTime) endTime = startTime.Add(TimeSpan.FromHours(1));
 
-            TxtNewTitle.Text = string.Empty;
-            TxtLocation.Text = string.Empty;
-
             DateTime targetDate = _selectedDay;
-            DateTime exactStartDateTime = targetDate.Add(startTime);
-            DateTime exactEndDateTime = targetDate.Add(endTime);
 
             try
             {
-                string timeDisplay = isAllDay ? (_loader.GetStringOrDefault("TextAllDay") ?? "All Day") : (isEvent ? $"{exactStartDateTime:HH\\:mm} - {exactEndDateTime:HH\\:mm}" : $"{exactStartDateTime:HH\\:mm}");
-                AgendaItems.Add(new AgendaItem
-                {
-                    Title = title,
-                    Subtitle = $"{timeDisplay} ({_loader.GetStringOrDefault("TextSyncing") ?? "Syncing..."})",
-                    Location = location,
-                    IsTask = !isEvent,
-                    IsEvent = isEvent,
-                    Provider = providerName
-                });
+                SaveNewItemButton.IsEnabled = false;
+                CancelAddButton.IsEnabled = false;
+                AddItemProgress.IsActive = true;
+                AddItemProgress.Visibility = Visibility.Visible;
+                AddItemStatusText.Text = _loader.GetStringOrDefault("TextSyncing") ?? "Syncing...";
+                AddItemStatusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+                AddItemStatusText.Visibility = Visibility.Visible;
                 AdjustWindowHeight();
 
                 await _syncManager.CreateItemAsync(title, isEvent, isAllDay, targetDate, startTime, endTime, location, providerName);
+                TxtNewTitle.Text = string.Empty;
+                TxtLocation.Text = string.Empty;
+                AddItemStatusText.Text = string.Empty;
+                AddItemStatusText.Visibility = Visibility.Collapsed;
+                AddPanel.Visibility = Visibility.Collapsed;
+                if (AgendaContainer != null) AgendaContainer.Visibility = Visibility.Visible;
                 _ = SyncAllDataAsync(true);
             }
             catch (Exception ex)
@@ -1388,13 +1385,18 @@ namespace Task_Flyout
                 System.Diagnostics.Debug.WriteLine("============== Sync Error ==============");
                 System.Diagnostics.Debug.WriteLine(ex.ToString());
 
-                AgendaItems.Insert(0, new AgendaItem
-                {
-                    Title = _loader.GetStringOrDefault("TextAddFailed") ?? "Failed to add task",
-                    Subtitle = ex.Message,
-                    IsEvent = false,
-                    IsTask = false
-                });
+                AddItemStatusText.Text = string.Format(
+                    _loader.GetStringOrDefault("TextAddFailed2") ?? "Failed to add: {0}",
+                    UserSafeErrorMessage.FromException(ex));
+                AddItemStatusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+                AddItemStatusText.Visibility = Visibility.Visible;
+            }
+            finally
+            {
+                AddItemProgress.IsActive = false;
+                AddItemProgress.Visibility = Visibility.Collapsed;
+                SaveNewItemButton.IsEnabled = true;
+                CancelAddButton.IsEnabled = true;
                 AdjustWindowHeight();
             }
         }

@@ -198,9 +198,14 @@
                         </StackPanel>
                     </StackPanel>
 
+                    <TextBlock x:Name="AddItemStatusText" FontSize="12" TextWrapping="Wrap"
+                               Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                               Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
+
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
-                        <Button x:Uid="Flyout_BtnCancel" Content="取消" Click="BtnCancelAdd_Click"/>
-                        <Button x:Uid="Flyout_BtnSave" Content="保存" Width="80" Style="{StaticResource AccentButtonStyle}" Click="BtnSaveNewItem_Click"/>
+                        <ProgressRing x:Name="AddItemProgress" Width="20" Height="20" IsActive="False" Visibility="Collapsed"/>
+                        <Button x:Uid="Flyout_BtnCancel" x:Name="CancelAddButton" Content="取消" Click="BtnCancelAdd_Click"/>
+                        <Button x:Uid="Flyout_BtnSave" x:Name="SaveNewItemButton" Content="保存" Width="80" Style="{StaticResource AccentButtonStyle}" Click="BtnSaveNewItem_Click"/>
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>

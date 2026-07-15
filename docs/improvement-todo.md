@@ -32,7 +32,7 @@ Status values:
 | P1-08 | DONE | Accessibility | Make weather bar and agenda cards keyboard-invokable. | Controls expose Invoke semantics, Enter/Space activation, localized names, and visible focus. | `accessibility: make weather and agenda keyboard invokable` |
 | P1-09 | DONE | UX | Enable scrolling in constrained flyout content and zoom in mail HTML. | All flyout controls remain reachable at high scaling; mail supports touch and keyboard zoom. | `accessibility: enable flyout scrolling and mail zoom` |
 | P1-10 | TODO | Reliability | Unify task mutation states and visible retry behavior. | Calendar, Tasks, and Flyout consistently show pending, failed, queued, and retry states instead of silent rollback. | |
-| P1-11 | TODO | UX | Preserve quick-create input when submission fails. | The form or draft remains available; errors are localized and redacted; retry is direct. | |
+| P1-11 | DONE | UX | Preserve quick-create input when submission fails. | The form remains available; errors are localized and redacted; retry is direct. | `ux: preserve failed quick-create input` |
 | P1-12 | TODO | Security | Define provider-wide mail/calendar authorization lifecycle. | Removing one feature does not silently retain or invalidate shared authorization; complete disconnect is available. | |
 
 ## P2 - Privacy, Efficiency, And Maintainability
