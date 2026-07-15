@@ -6,12 +6,16 @@
 
     <Grid x:Name="RootGrid"
           Background="Transparent">
-        <Border x:Name="MainBorder"
+        <Button x:Uid="WeatherBar_OpenButton"
+                x:Name="MainBorder"
                 Background="Transparent"
                 BorderBrush="Transparent"
                 BorderThickness="0"
                 CornerRadius="8"
-                Tapped="ContentPanel_Tapped"
+                Padding="0"
+                HorizontalContentAlignment="Stretch"
+                VerticalContentAlignment="Stretch"
+                Click="ContentPanel_Click"
                 PointerEntered="MainBorder_PointerEntered"
                 PointerExited="MainBorder_PointerExited">
 
@@ -64,6 +68,6 @@
                                VerticalAlignment="Center" Visibility="Collapsed"/>
                 </StackPanel>
             </Border>
-        </Border>
+        </Button>
     </Grid>
 </Window>

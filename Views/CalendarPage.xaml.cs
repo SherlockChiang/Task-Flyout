@@ -692,16 +692,14 @@ namespace Task_Flyout.Views
             EditRadioType_Changed(null, null);
         }
 
-        private async void AgendaCard_Tapped(object sender, TappedRoutedEventArgs e)
+        private async void SideBarAgendaList_ItemClick(object sender, ItemClickEventArgs e)
         {
-            if (e.OriginalSource is FrameworkElement src && (src is CheckBox || src.Parent is CheckBox)) return;
-            if ((sender as FrameworkElement)?.DataContext is AgendaItem item)
-            {
-                if (item.Title != null && item.Title.Contains(_loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events")) return;
-                PrepareDialogForEdit(item);
-                EditDialog.XamlRoot = this.XamlRoot;
-                await EditDialog.ShowAsync();
-            }
+            if (e.ClickedItem is not AgendaItem item) return;
+            if (item.Title != null && item.Title.Contains(_loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events")) return;
+
+            PrepareDialogForEdit(item);
+            EditDialog.XamlRoot = this.XamlRoot;
+            await EditDialog.ShowAsync();
         }
 
         public void OpenEditDialogFromExternal(AgendaItem item)

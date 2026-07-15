@@ -1609,4 +1609,6 @@ Weather: {3}</value></data>
   <data name="SettingsPage_ClearRssData.Content" xml:space="preserve"><value>Clear local RSS data</value></data>
   <data name="SettingsPage_ClearRssData.AutomationProperties.Name" xml:space="preserve"><value>Clear local RSS data</value></data>
   <data name="SettingsPage_ClearRssData.ToolTipService.ToolTip" xml:space="preserve"><value>Clear local RSS data</value></data>
+  <data name="WeatherBar_OpenButton.AutomationProperties.Name" xml:space="preserve"><value>Open Task Flyout weather</value></data>
+  <data name="WeatherBar_OpenButton.ToolTipService.ToolTip" xml:space="preserve"><value>Open weather</value></data>
 </root>

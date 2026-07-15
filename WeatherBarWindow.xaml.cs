@@ -1063,7 +1063,7 @@ namespace Task_Flyout
             EnsureGlassBrushCache();
 
             var rootGrid = root.FindName("RootGrid") as Microsoft.UI.Xaml.Controls.Grid;
-            var mainBorder = root.FindName("MainBorder") as Microsoft.UI.Xaml.Controls.Border;
+            var mainBorder = root.FindName("MainBorder") as Microsoft.UI.Xaml.Controls.Button;
             var topBorder = root.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
 
             // The outer area must stay a transparent (not null) brush: transparent
@@ -1287,14 +1287,14 @@ namespace Task_Flyout
 
         private void MainBorder_PointerEntered(object sender, PointerRoutedEventArgs e)
         {
-            var border = sender as Microsoft.UI.Xaml.Controls.Border;
-            if (border == null) return;
+            var button = sender as Microsoft.UI.Xaml.Controls.Button;
+            if (button == null) return;
 
             var topBorder = (this.Content as FrameworkElement)?.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
             EnsureGlassBrushCache();
 
-            border.Background = _glassHoverBrush;
-            border.BorderBrush = _glassTransparentBrush;
+            button.Background = _glassHoverBrush;
+            button.BorderBrush = _glassTransparentBrush;
 
             if (topBorder != null)
             {
@@ -1307,14 +1307,14 @@ namespace Task_Flyout
         {
             // Restore resting-state brushes directly instead of re-reading the registry
             // and recalculating the full theme via ApplyWindowsTheme().
-            var border = sender as Microsoft.UI.Xaml.Controls.Border;
-            if (border == null) return;
+            var button = sender as Microsoft.UI.Xaml.Controls.Button;
+            if (button == null) return;
 
             var topBorder = (this.Content as FrameworkElement)?.FindName("TopBorder") as Microsoft.UI.Xaml.Controls.Border;
             EnsureGlassBrushCache();
 
-            border.Background = _glassRestBrush;
-            border.BorderBrush = _glassTransparentBrush;
+            button.Background = _glassRestBrush;
+            button.BorderBrush = _glassTransparentBrush;
 
             if (topBorder != null)
             {
@@ -1588,7 +1588,7 @@ namespace Task_Flyout
             catch (Exception ex) { Debug.WriteLine($"RecomputeBarWidth failed: {ex.Message}"); }
         }
 
-        private void ContentPanel_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+        private void ContentPanel_Click(object sender, RoutedEventArgs e)
         {
             App.OpenMainWindowInternal(win => win.NavigateToWeather());
         }

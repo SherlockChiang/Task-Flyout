@@ -294,7 +294,9 @@
                     </StackPanel>
                 </Button>
             </Grid>
-            <ListView x:Name="SideBarAgendaList" Grid.Row="1" ItemsSource="{x:Bind SelectedDayItems}" SelectionMode="None" ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListView x:Name="SideBarAgendaList" Grid.Row="1" ItemsSource="{x:Bind SelectedDayItems}"
+                      SelectionMode="None" IsItemClickEnabled="True" ItemClick="SideBarAgendaList_ItemClick"
+                      ScrollViewer.VerticalScrollBarVisibility="Auto">
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="models:AgendaItem">
                         <Grid Margin="0,0,0,16">
@@ -303,7 +305,8 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="{x:Bind Subtitle}" FontSize="13" FontWeight="Medium" Opacity="0.6" VerticalAlignment="Top" Margin="0,6,0,0" TextWrapping="Wrap"/>
-                            <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" CornerRadius="8" Padding="12,14" Tapped="AgendaCard_Tapped">
+                            <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" CornerRadius="8" Padding="12,14"
+                                    AutomationProperties.Name="{x:Bind Title}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
