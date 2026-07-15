@@ -105,6 +105,11 @@ namespace Task_Flyout.Services
             }
         }
         public DateTimeOffset PublishedAt { get; set; }
+        public bool IsRead { get; set; }
+        public bool IsStarred { get; set; }
+        public double ReadOpacity => IsRead ? 0.68 : 1;
+        public string ReadGlyph => IsRead ? "\uE8C3" : "\uE715";
+        public string StarGlyph => IsStarred ? "\uE735" : "\uE734";
         public string PublishedText => PublishedAt == default ? "" : PublishedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 
         [System.Text.Json.Serialization.JsonIgnore]
@@ -316,7 +321,7 @@ namespace Task_Flyout.Services
                 .ToList();
         }
 
-        public IReadOnlyList<RssArticle> GetCachedArticlesPage(string? subscriptionId, string? folderId, int skip, int take)
+        public IReadOnlyList<RssArticle> GetCachedArticlesPage(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter = RssArticleFilter.All)
         {
             EnsureLoaded();
             skip = Math.Max(0, skip);
@@ -325,12 +330,15 @@ namespace Task_Flyout.Services
             try
             {
                 InitializeDatabase();
-                return QueryCachedArticlesPage(subscriptionId, folderId, skip, take);
+                return QueryCachedArticlesPage(subscriptionId, folderId, skip, take, filter);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"RSS SQL paging failed, falling back to in-memory: {ex.Message}");
                 return GetCachedArticles(subscriptionId, folderId)
+                    .Where(article => filter == RssArticleFilter.All
+                        || (filter == RssArticleFilter.Unread && !article.IsRead)
+                        || (filter == RssArticleFilter.Starred && article.IsStarred))
                     .Skip(skip)
                     .Take(take)
                     .ToList();
@@ -489,11 +497,29 @@ namespace Task_Flyout.Services
             PruneOrphanedImageCache(force: true);
         }
 
-        public Task<List<RssArticle>> LoadMoreArticlesAsync(string? subscriptionId, string? folderId, int skip, int take)
+        public void SetArticleRead(RssArticle article, bool isRead)
+        {
+            EnsureLoaded();
+            article.IsRead = isRead;
+            var cached = _cache.Articles.FirstOrDefault(item => item.Id == article.Id);
+            if (cached != null) cached.IsRead = isRead;
+            Repository.UpdateArticleState(article.Id, isRead: isRead);
+        }
+
+        public void SetArticleStarred(RssArticle article, bool isStarred)
+        {
+            EnsureLoaded();
+            article.IsStarred = isStarred;
+            var cached = _cache.Articles.FirstOrDefault(item => item.Id == article.Id);
+            if (cached != null) cached.IsStarred = isStarred;
+            Repository.UpdateArticleState(article.Id, isStarred: isStarred);
+        }
+
+        public Task<List<RssArticle>> LoadMoreArticlesAsync(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter = RssArticleFilter.All)
         {
             // SQLite paging may block on disk or antivirus scans; callers update the UI only
             // after awaiting this operation, so keep the synchronous database work off it.
-            return Task.Run(() => GetCachedArticlesPage(subscriptionId, folderId, skip, take).ToList());
+            return Task.Run(() => GetCachedArticlesPage(subscriptionId, folderId, skip, take, filter).ToList());
         }
 
         public Task InitializeAsync()
@@ -1339,9 +1365,9 @@ namespace Task_Flyout.Services
             };
         }
 
-        private List<RssArticle> QueryCachedArticlesPage(string? subscriptionId, string? folderId, int skip, int take)
+        private List<RssArticle> QueryCachedArticlesPage(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter)
         {
-            return Repository.QueryArticlesPage(subscriptionId, folderId, skip, take)
+            return Repository.QueryArticlesPage(subscriptionId, folderId, skip, take, filter)
                 .Select(record => new RssArticle
                 {
                     Id = record.Id,
@@ -1353,7 +1379,9 @@ namespace Task_Flyout.Services
                     HtmlContent = "",
                     ImageUrl = record.ImageUrl,
                     LocalImagePath = record.LocalImagePath,
-                    PublishedAt = FromTicks(record.PublishedUtcTicks)
+                    PublishedAt = FromTicks(record.PublishedUtcTicks),
+                    IsRead = record.IsRead,
+                    IsStarred = record.IsStarred
                 })
                 .ToList();
         }
@@ -1389,7 +1417,9 @@ namespace Task_Flyout.Services
                 HtmlContent = "",
                 ImageUrl = record.ImageUrl,
                 LocalImagePath = record.LocalImagePath,
-                PublishedAt = FromTicks(record.PublishedUtcTicks)
+                PublishedAt = FromTicks(record.PublishedUtcTicks),
+                IsRead = record.IsRead,
+                IsStarred = record.IsStarred
             };
 
         private void SaveFolder(RssFolder folder)

@@ -61,7 +61,7 @@ Status values:
 | P3-01 | TODO | Feature | Add a unified account health and offline center. | Users can see provider health, last success, cached state, pending mutations, and reconnect/retry actions. | |
 | P3-02 | TODO | Feature | Add local search for Tasks, Mail, and RSS. | Cached metadata is searchable with feature-appropriate filters and responsive cancellation. | |
 | P3-03 | DONE | Feature | Add RSS OPML import/export. | Import previews new, duplicate, folder, and HTTP counts, maps folders without eager network fetches, and export produces portable OPML. | `feat: add RSS OPML import and export` |
-| P3-04 | TODO | Feature | Add RSS read/unread and starred states. | State persists locally and supports All, Unread, and Starred filters. | |
+| P3-04 | DONE | Feature | Add RSS read/unread and starred states. | Opening marks articles read, list actions toggle read and starred state, state survives refresh, and SQLite paging supports All, Unread, and Starred filters. | `feat: add RSS article states and filters` |
 | P3-05 | TODO | Feature | Add complete task editing. | Users can edit supported title, date/time, notes, recurrence, provider/list, completion, and deletion fields. | |
 | P3-06 | TODO | Feature | Add toast actions for snooze, complete, and open. | Arguments are validated; actions use the shared mutation path; privacy-safe variants remain available. | |
 | P3-07 | TODO | Feature | Add protected compose draft recovery. | Unsent drafts survive navigation/process exit and can be discarded securely. | |

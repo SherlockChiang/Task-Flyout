@@ -1652,4 +1652,10 @@ Weather: {3}</value></data>
   <data name="TextOpmlFileType" xml:space="preserve"><value>OPML subscription list</value></data>
   <data name="TextOpmlExportResult" xml:space="preserve"><value>Exported {0} subscriptions to {1}.</value></data>
   <data name="TextOpmlExportFailed" xml:space="preserve"><value>OPML export failed: {0}</value></data>
+  <data name="RssPage_FilterAll.Content" xml:space="preserve"><value>All</value></data>
+  <data name="RssPage_FilterUnread.Content" xml:space="preserve"><value>Unread</value></data>
+  <data name="RssPage_FilterStarred.Content" xml:space="preserve"><value>Starred</value></data>
+  <data name="RssPage_ArticleFilter.AutomationProperties.Name" xml:space="preserve"><value>Article filter</value></data>
+  <data name="RssPage_ToggleStar.AutomationProperties.Name" xml:space="preserve"><value>Toggle starred</value></data>
+  <data name="RssPage_ToggleRead.AutomationProperties.Name" xml:space="preserve"><value>Toggle read status</value></data>
 </root>

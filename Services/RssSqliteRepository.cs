@@ -16,7 +16,16 @@ namespace Task_Flyout.Services
         string Summary,
         string ImageUrl,
         string LocalImagePath,
-        long PublishedUtcTicks);
+        long PublishedUtcTicks,
+        bool IsRead = false,
+        bool IsStarred = false);
+
+    public enum RssArticleFilter
+    {
+        All,
+        Unread,
+        Starred
+    }
 
     internal sealed record RssFolderRecord(string Id, string Name, int SortOrder);
 
@@ -50,7 +59,7 @@ namespace Task_Flyout.Services
 
     internal sealed class RssSqliteRepository
     {
-        private const int SchemaVersion = 1;
+        private const int SchemaVersion = 2;
         private const int BusyTimeoutMilliseconds = 5000;
         private const string SensitiveDataMigrationKey = "sensitive_data_dpapi_v1";
         private readonly string _connectionString;
@@ -127,11 +136,17 @@ CREATE TABLE IF NOT EXISTS rss_articles (
     html_content TEXT NOT NULL,
     image_url TEXT NOT NULL,
     local_image_path TEXT NOT NULL,
-    published_ticks INTEGER NOT NULL DEFAULT 0
+    published_ticks INTEGER NOT NULL DEFAULT 0,
+    is_read INTEGER NOT NULL DEFAULT 0,
+    is_starred INTEGER NOT NULL DEFAULT 0
 );
 """);
+                TryAddColumn(connection, "rss_articles", "is_read", "INTEGER NOT NULL DEFAULT 0");
+                TryAddColumn(connection, "rss_articles", "is_starred", "INTEGER NOT NULL DEFAULT 0");
                 ExecuteNonQuery(connection, "CREATE INDEX IF NOT EXISTS idx_rss_articles_published ON rss_articles(published_ticks DESC);");
                 ExecuteNonQuery(connection, "CREATE INDEX IF NOT EXISTS idx_rss_articles_subscription_published ON rss_articles(subscription_id, published_ticks DESC);");
+                ExecuteNonQuery(connection, "CREATE INDEX IF NOT EXISTS idx_rss_articles_read_published ON rss_articles(is_read, published_ticks DESC);");
+                ExecuteNonQuery(connection, "CREATE INDEX IF NOT EXISTS idx_rss_articles_starred_published ON rss_articles(is_starred, published_ticks DESC);");
                 ExecuteNonQuery(connection, "CREATE INDEX IF NOT EXISTS idx_rss_subscriptions_folder ON rss_subscriptions(folder_id);");
 
                 using var command = connection.CreateCommand();
@@ -143,11 +158,11 @@ CREATE TABLE IF NOT EXISTS rss_articles (
             }
         }
 
-        public List<RssArticleRecord> QueryArticlesPage(string? subscriptionId, string? folderId, int skip, int take)
+        public List<RssArticleRecord> QueryArticlesPage(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter = RssArticleFilter.All)
         {
             Initialize();
             using var connection = OpenConnection();
-            return ReadArticles(connection, subscriptionId, folderId, skip, take);
+            return ReadArticles(connection, subscriptionId, folderId, skip, take, filter);
         }
 
         public RssRepositorySnapshot LoadSnapshot(int maximumArticleCount)
@@ -187,7 +202,7 @@ CREATE TABLE IF NOT EXISTS rss_articles (
             return new RssRepositorySnapshot(
                 folders,
                 subscriptions,
-                ReadArticles(connection, null, null, 0, maximumArticleCount));
+                ReadArticles(connection, null, null, 0, maximumArticleCount, RssArticleFilter.All));
         }
 
         public List<string> LoadArticleImagePaths()
@@ -410,6 +425,26 @@ WHERE id NOT IN (
             command.ExecuteNonQuery();
         }
 
+        public void UpdateArticleState(string articleId, bool? isRead = null, bool? isStarred = null)
+        {
+            if (string.IsNullOrWhiteSpace(articleId) || (!isRead.HasValue && !isStarred.HasValue)) return;
+            Initialize();
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+UPDATE rss_articles
+SET is_read = CASE WHEN $setRead = 1 THEN $isRead ELSE is_read END,
+    is_starred = CASE WHEN $setStarred = 1 THEN $isStarred ELSE is_starred END
+WHERE id = $id;
+""";
+            command.Parameters.AddWithValue("$setRead", isRead.HasValue ? 1 : 0);
+            command.Parameters.AddWithValue("$isRead", isRead == true ? 1 : 0);
+            command.Parameters.AddWithValue("$setStarred", isStarred.HasValue ? 1 : 0);
+            command.Parameters.AddWithValue("$isStarred", isStarred == true ? 1 : 0);
+            command.Parameters.AddWithValue("$id", articleId);
+            command.ExecuteNonQuery();
+        }
+
         public void FlushCheckpoint()
         {
             if (!_initialized || _isUnavailable()) return;
@@ -533,19 +568,21 @@ ON CONFLICT(id) DO UPDATE SET
             string? subscriptionId,
             string? folderId,
             int skip,
-            int take)
+            int take,
+            RssArticleFilter filter)
         {
             bool hasSubscription = !string.IsNullOrWhiteSpace(subscriptionId);
             bool hasFolder = folderId != null;
             using var command = connection.CreateCommand();
             command.CommandText = """
-SELECT a.id, a.subscription_id, a.feed_title, a.title, a.link, a.summary, a.image_url, a.local_image_path, a.published_ticks
+SELECT a.id, a.subscription_id, a.feed_title, a.title, a.link, a.summary, a.image_url, a.local_image_path, a.published_ticks, a.is_read, a.is_starred
 FROM rss_articles a
 WHERE ($hasSubscription = 0 OR a.subscription_id = $subscriptionId)
   AND ($hasFolder = 0 OR EXISTS (
       SELECT 1 FROM rss_subscriptions s
       WHERE s.id = a.subscription_id AND s.folder_id = $folderId
   ))
+  AND ($filter = 0 OR ($filter = 1 AND a.is_read = 0) OR ($filter = 2 AND a.is_starred = 1))
 ORDER BY a.published_ticks DESC
 LIMIT $take OFFSET $skip;
 """;
@@ -553,6 +590,7 @@ LIMIT $take OFFSET $skip;
             command.Parameters.AddWithValue("$subscriptionId", subscriptionId ?? "");
             command.Parameters.AddWithValue("$hasFolder", hasFolder ? 1 : 0);
             command.Parameters.AddWithValue("$folderId", folderId ?? "");
+            command.Parameters.AddWithValue("$filter", (int)filter);
             command.Parameters.AddWithValue("$take", Math.Max(0, take));
             command.Parameters.AddWithValue("$skip", Math.Max(0, skip));
             var articles = new List<RssArticleRecord>(Math.Max(0, take));
@@ -567,7 +605,9 @@ LIMIT $take OFFSET $skip;
                     RssSensitiveDataProtector.Unprotect(reader.GetString(5)),
                     RssSensitiveDataProtector.Unprotect(reader.GetString(6)),
                     reader.GetString(7),
-                    reader.GetInt64(8)));
+                    reader.GetInt64(8),
+                    reader.GetInt64(9) != 0,
+                    reader.GetInt64(10) != 0));
             return articles;
         }
 

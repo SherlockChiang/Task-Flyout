@@ -1652,4 +1652,10 @@ Microsoft：{1}
   <data name="TextOpmlFileType" xml:space="preserve"><value>OPML 订阅列表</value></data>
   <data name="TextOpmlExportResult" xml:space="preserve"><value>已将 {0} 个订阅导出到 {1}。</value></data>
   <data name="TextOpmlExportFailed" xml:space="preserve"><value>OPML 导出失败：{0}</value></data>
+  <data name="RssPage_FilterAll.Content" xml:space="preserve"><value>全部</value></data>
+  <data name="RssPage_FilterUnread.Content" xml:space="preserve"><value>未读</value></data>
+  <data name="RssPage_FilterStarred.Content" xml:space="preserve"><value>收藏</value></data>
+  <data name="RssPage_ArticleFilter.AutomationProperties.Name" xml:space="preserve"><value>文章筛选</value></data>
+  <data name="RssPage_ToggleStar.AutomationProperties.Name" xml:space="preserve"><value>切换收藏状态</value></data>
+  <data name="RssPage_ToggleRead.AutomationProperties.Name" xml:space="preserve"><value>切换已读状态</value></data>
 </root>

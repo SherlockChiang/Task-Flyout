@@ -18,7 +18,7 @@ public class RssSqliteRepositoryTests : IDisposable
         using var connection = repository.OpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT value FROM metadata WHERE key = 'schema_version';";
-        Assert.Equal("1", command.ExecuteScalar());
+        Assert.Equal("2", command.ExecuteScalar());
         command.CommandText = "PRAGMA secure_delete;";
         Assert.Equal(1L, command.ExecuteScalar());
         command.CommandText = "PRAGMA busy_timeout;";
@@ -58,6 +58,47 @@ VALUES ($id, 'sub-a', $feedTitle, $title, $link, $summary, $html, $imageUrl, '',
         Assert.Equal("Private title", article.Title);
         Assert.Equal("Private summary", article.Summary);
         Assert.Equal("<p>Private body</p>", repository.GetArticleHtml(article.Id));
+    }
+
+    [Fact]
+    public void Article_state_persists_filters_and_survives_refresh_upsert()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertArticle(new RssArticleWriteRecord("unread", "subscription", "Feed", "Unread", "", "", "", "", "", 30));
+        repository.UpsertArticle(new RssArticleWriteRecord("read-starred", "subscription", "Feed", "Read", "", "", "", "", "", 20));
+        repository.UpdateArticleState("read-starred", isRead: true, isStarred: true);
+
+        Assert.Equal("unread", Assert.Single(repository.QueryArticlesPage(null, null, 0, 10, RssArticleFilter.Unread)).Id);
+        var starred = Assert.Single(repository.QueryArticlesPage(null, null, 0, 10, RssArticleFilter.Starred));
+        Assert.True(starred.IsRead);
+        Assert.True(starred.IsStarred);
+
+        repository.UpsertArticle(new RssArticleWriteRecord("read-starred", "subscription", "Feed", "Updated", "", "", "", "", "", 40));
+
+        starred = Assert.Single(repository.QueryArticlesPage(null, null, 0, 10, RssArticleFilter.Starred));
+        Assert.Equal("Updated", starred.Title);
+        Assert.True(starred.IsRead);
+        Assert.True(starred.IsStarred);
+    }
+
+    [Fact]
+    public void Initialize_migrates_existing_article_table_with_state_defaults()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        Directory.CreateDirectory(_root);
+        using (var connection = Open(databasePath))
+        {
+            Execute(connection, "CREATE TABLE rss_articles (id TEXT PRIMARY KEY, subscription_id TEXT NOT NULL, feed_title TEXT NOT NULL, title TEXT NOT NULL, link TEXT NOT NULL, summary TEXT NOT NULL, html_content TEXT NOT NULL, image_url TEXT NOT NULL, local_image_path TEXT NOT NULL, published_ticks INTEGER NOT NULL DEFAULT 0);");
+            Execute(connection, "INSERT INTO rss_articles VALUES ('legacy', 'subscription', '', '', '', '', '', '', '', 1);");
+        }
+
+        var repository = new RssSqliteRepository(databasePath);
+        repository.Initialize();
+
+        var article = Assert.Single(repository.QueryArticlesPage(null, null, 0, 10));
+        Assert.False(article.IsRead);
+        Assert.False(article.IsStarred);
     }
 
     [Fact]

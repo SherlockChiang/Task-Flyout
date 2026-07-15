@@ -41,6 +41,7 @@ namespace Task_Flyout.Views
         private bool _isLoading;
         private bool _isRefreshing;
         private bool _hasMore = true;
+        private RssArticleFilter _articleFilter;
         private ScrollViewer? _articleScrollViewer;
         private RssArticle? _selectedArticle;
         private bool _rssWebViewConfigured;
@@ -228,7 +229,7 @@ namespace Task_Flyout.Views
 
             try
             {
-                var items = _rssService.GetCachedArticlesPage(_selectedSubscriptionId, _selectedFolderId, 0, PageSize);
+                var items = _rssService.GetCachedArticlesPage(_selectedSubscriptionId, _selectedFolderId, 0, PageSize, _articleFilter);
                 foreach (var item in items)
                     Articles.Add(item);
 
@@ -253,7 +254,7 @@ namespace Task_Flyout.Views
             {
                 _isLoading = true;
                 SetLoading(true);
-                var items = await _rssService.LoadMoreArticlesAsync(_selectedSubscriptionId, _selectedFolderId, _loadedCount, PageSize);
+                var items = await _rssService.LoadMoreArticlesAsync(_selectedSubscriptionId, _selectedFolderId, _loadedCount, PageSize, _articleFilter);
                 if (pageGeneration.HasValue && (pageGeneration.Value != _pageGeneration || !IsLoaded))
                     return;
 
@@ -1032,6 +1033,8 @@ namespace Task_Flyout.Views
 
         private async Task OpenArticleReaderAsync(RssArticle article)
         {
+            if (!article.IsRead)
+                _rssService.SetArticleRead(article, true);
             CancelRssResourceRequests();
             _rssResourceCts = new CancellationTokenSource();
             _selectedArticle = article;
@@ -1201,6 +1204,29 @@ namespace Task_Flyout.Views
         private void BackToArticleListButton_Click(object sender, RoutedEventArgs e)
         {
             ShowArticleList();
+            ResetAndLoadCachedArticles();
+        }
+
+        private void ArticleFilterBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ArticleFilterBox?.SelectedItem is not ComboBoxItem item
+                || !Enum.TryParse(item.Tag?.ToString(), out RssArticleFilter filter)) return;
+            _articleFilter = filter;
+            if (IsLoaded) ResetAndLoadCachedArticles();
+        }
+
+        private void ToggleArticleStar_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { DataContext: RssArticle article }) return;
+            _rssService.SetArticleStarred(article, !article.IsStarred);
+            ResetAndLoadCachedArticles();
+        }
+
+        private void ToggleArticleRead_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { DataContext: RssArticle article }) return;
+            _rssService.SetArticleRead(article, !article.IsRead);
+            ResetAndLoadCachedArticles();
         }
 
         private void ShowArticleList()
