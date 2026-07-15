@@ -60,13 +60,41 @@ public class RssServiceTests
     }
 
     [Theory]
+    [InlineData("https://example.com/feed.xml", false, true)]
+    [InlineData("https://example.com/feed.xml", true, true)]
+    [InlineData("http://example.com/feed.xml", false, false)]
+    [InlineData("http://example.com/feed.xml", true, true)]
+    public void Feed_transport_requires_explicit_approval_for_http(string uriText, bool allowInsecureHttp, bool expected)
+    {
+        Assert.Equal(expected, RssFetchPolicy.CanFetchFeed(new Uri(uriText), allowInsecureHttp));
+    }
+
+    [Theory]
     [InlineData("https://example.com/feed.xml", "/next.xml", "https://example.com/next.xml")]
     [InlineData("https://example.com/folder/feed.xml", "../next.xml", "https://example.com/next.xml")]
-    [InlineData("https://example.com/feed.xml", "http://cdn.example.com/next.xml", "http://cdn.example.com/next.xml")]
     public void Redirect_policy_resolves_http_relative_and_absolute_locations(string current, string location, string expected)
     {
         Assert.True(RssFetchPolicy.TryResolveHttpRedirect(new Uri(current), new Uri(location, UriKind.RelativeOrAbsolute), out var redirect));
         Assert.Equal(expected, redirect.AbsoluteUri);
+    }
+
+    [Fact]
+    public void Redirect_policy_blocks_https_to_http_downgrade()
+    {
+        Assert.False(RssFetchPolicy.TryResolveHttpRedirect(
+            new Uri("https://example.com/feed.xml"),
+            new Uri("http://cdn.example.com/next.xml"),
+            out _));
+    }
+
+    [Fact]
+    public void Redirect_policy_allows_http_feed_to_remain_on_http_after_user_approval()
+    {
+        Assert.True(RssFetchPolicy.TryResolveHttpRedirect(
+            new Uri("http://example.com/feed.xml"),
+            new Uri("http://cdn.example.com/next.xml"),
+            out var redirect));
+        Assert.Equal("http://cdn.example.com/next.xml", redirect.AbsoluteUri);
     }
 
     [Theory]

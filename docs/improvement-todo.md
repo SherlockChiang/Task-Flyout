@@ -41,7 +41,7 @@ Status values:
 | --- | --- | --- | --- | --- | --- |
 | P2-01 | TODO | Privacy | Protect weather location/cache and add a deletion action. | Coordinates and cache are protected; users can clear weather/location data; third-party recipients are explained. | |
 | P2-02 | TODO | Privacy | Couple WebView2 browsing-data cleanup to mail/RSS deletion. | Relevant profile data is cleared after sensitive data deletion; shared-profile implications are documented or profiles are separated. | |
-| P2-03 | TODO | Security | Default RSS to HTTPS and block silent downgrade redirects. | HTTP requires per-subscription approval; HTTPS-to-HTTP downgrade is rejected or explicitly confirmed. | |
+| P2-03 | DONE | Security | Default RSS to HTTPS and block silent downgrade redirects. | HTTP requires per-subscription approval; HTTPS-to-HTTP downgrade is rejected. | `security: require approval for HTTP RSS feeds` |
 | P2-04 | TODO | Security | Make local-network RSS permission subscription-specific. | Local access is scoped, visible, and revalidated when the destination changes. | |
 | P2-05 | TODO | Security | Replace exception-string logging with structured diagnostics. | External URLs omit query/fragment; sensitive fields are allowlisted; logs rotate by age and size. | |
 | P2-06 | DONE | Supply chain | Allowlist NuGet sources and enforce locked restore for release builds. | Restore sources are explicit; every CI/release restore uses locked mode; vulnerability checks remain clean. | `security: lock release package restore` |

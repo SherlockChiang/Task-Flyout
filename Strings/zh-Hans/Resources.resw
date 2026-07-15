@@ -1611,4 +1611,9 @@ Microsoft：{1}
   <data name="SettingsPage_ClearRssData.ToolTipService.ToolTip" xml:space="preserve"><value>清除 RSS 本地数据</value></data>
   <data name="WeatherBar_OpenButton.AutomationProperties.Name" xml:space="preserve"><value>打开 Task Flyout 天气</value></data>
   <data name="WeatherBar_OpenButton.ToolTipService.ToolTip" xml:space="preserve"><value>打开天气</value></data>
+  <data name="TextAllowInsecureHttpRss" xml:space="preserve"><value>允许此订阅使用未加密的 HTTP</value></data>
+  <data name="TextInsecureHttpRssWarning" xml:space="preserve"><value>HTTP 订阅内容可能被网络中的其他设备读取或篡改，建议使用 HTTPS。</value></data>
+  <data name="TextInsecureHttpRssTitle" xml:space="preserve"><value>允许不安全的 RSS 连接？</value></data>
+  <data name="TextInsecureHttpRssConfirm" xml:space="preserve"><value>{0} 使用未加密的 HTTP，网络中的其他设备可能读取或篡改其内容。是否仅对此订阅允许？</value></data>
+  <data name="TextAllow" xml:space="preserve"><value>允许</value></data>
 </root>

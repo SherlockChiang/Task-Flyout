@@ -38,6 +38,7 @@ namespace Task_Flyout.Services
             }
         }
         public DateTimeOffset LastFetchedAt { get; set; }
+        public bool AllowInsecureHttp { get; set; }
 
         [System.Text.Json.Serialization.JsonIgnore]
         private Microsoft.UI.Xaml.Media.ImageSource? _imageCache;
@@ -397,18 +398,35 @@ namespace Task_Flyout.Services
             UpdateArticleFeedTitle(subscriptionId, subscription.Title);
         }
 
-        public async Task<RssSubscription> AddSubscriptionAsync(string url, string folderId = "")
+        public static bool RequiresInsecureHttpApproval(RssSubscription subscription)
+            => Uri.TryCreate(subscription.Url, UriKind.Absolute, out var uri) &&
+               uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
+               !subscription.AllowInsecureHttp;
+
+        public void ApproveInsecureHttp(RssSubscription subscription)
+        {
+            EnsureLoaded();
+            if (!_cache.Subscriptions.Any(item => ReferenceEquals(item, subscription))) return;
+            subscription.AllowInsecureHttp = true;
+            SaveSubscription(subscription);
+        }
+
+        public async Task<RssSubscription> AddSubscriptionAsync(string url, string folderId = "", bool allowInsecureHttp = false)
         {
             EnsureLoaded();
             url = NormalizeFeedUrl(url);
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var feedUri) ||
+                !RssFetchPolicy.CanFetchFeed(feedUri, allowInsecureHttp))
+                throw new InvalidOperationException("HTTP RSS feeds require explicit insecure transport approval.");
             var existing = _cache.Subscriptions.FirstOrDefault(item => string.Equals(item.Url, url, StringComparison.OrdinalIgnoreCase));
             if (existing != null)
             {
                 if (!string.IsNullOrWhiteSpace(folderId))
                 {
                     existing.FolderId = folderId;
-                    SaveSubscription(existing);
                 }
+                existing.AllowInsecureHttp = allowInsecureHttp;
+                SaveSubscription(existing);
                 return existing;
             }
 
@@ -416,7 +434,8 @@ namespace Task_Flyout.Services
             {
                 Url = url,
                 Title = url,
-                FolderId = _cache.Folders.Any(folder => folder.Id == folderId) ? folderId : ""
+                FolderId = _cache.Folders.Any(folder => folder.Id == folderId) ? folderId : "",
+                AllowInsecureHttp = allowInsecureHttp
             };
             _cache.Subscriptions.Add(subscription);
             SaveSubscription(subscription);
@@ -467,7 +486,7 @@ namespace Task_Flyout.Services
                 cancellationToken);
             var refreshCancellationToken = linkedCancellation.Token;
 
-            var xml = await FetchFeedAsync(subscription.Url, refreshCancellationToken);
+            var xml = await FetchFeedAsync(subscription.Url, subscription.AllowInsecureHttp, refreshCancellationToken);
             var parsed = ParseFeed(subscription, xml);
 
             refreshCancellationToken.ThrowIfCancellationRequested();
@@ -912,12 +931,12 @@ namespace Task_Flyout.Services
             }
         }
 
-        private async Task<string> FetchFeedAsync(string url, CancellationToken cancellationToken)
+        private async Task<string> FetchFeedAsync(string url, bool allowInsecureHttp, CancellationToken cancellationToken)
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
                 throw new InvalidOperationException("Invalid feed URL.");
-            if (!RssFetchPolicy.IsAllowedFetchScheme(uri))
-                throw new InvalidOperationException("Feed URL must use HTTP or HTTPS.");
+            if (!RssFetchPolicy.CanFetchFeed(uri, allowInsecureHttp))
+                throw new InvalidOperationException("HTTP RSS feeds require explicit insecure transport approval.");
 
             var priorLocalNetworkPermission = AllowCurrentLocalNetworkRequest.Value;
             AllowCurrentLocalNetworkRequest.Value = AllowRssLocalNetworkAccess && IsLocalNetworkUri(uri);
@@ -1247,7 +1266,8 @@ namespace Task_Flyout.Services
                     FolderId = subscription.FolderId,
                     ImageUrl = subscription.ImageUrl,
                     LocalImagePath = subscription.LocalImagePath,
-                    LastFetchedAt = FromTicks(subscription.LastFetchedUtcTicks)
+                    LastFetchedAt = FromTicks(subscription.LastFetchedUtcTicks),
+                    AllowInsecureHttp = subscription.AllowInsecureHttp
                 }).ToList(),
                 Articles = snapshot.Articles.Select(ToArticleListItem).ToList()
             };
@@ -1335,7 +1355,8 @@ namespace Task_Flyout.Services
                 subscription.FolderId ?? "",
                 subscription.ImageUrl ?? "",
                 subscription.LocalImagePath ?? "",
-                ToTicks(subscription.LastFetchedAt));
+                ToTicks(subscription.LastFetchedAt),
+                subscription.AllowInsecureHttp);
 
         private static RssArticleWriteRecord ToArticleWriteRecord(RssArticle article)
             => new(

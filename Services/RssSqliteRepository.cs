@@ -27,7 +27,8 @@ namespace Task_Flyout.Services
         string FolderId,
         string ImageUrl,
         string LocalImagePath,
-        long LastFetchedUtcTicks);
+        long LastFetchedUtcTicks,
+        bool AllowInsecureHttp = false);
 
     internal sealed record RssArticleWriteRecord(
         string Id,
@@ -105,11 +106,13 @@ CREATE TABLE IF NOT EXISTS rss_subscriptions (
     folder_id TEXT NOT NULL DEFAULT '',
     image_url TEXT NOT NULL DEFAULT '',
     local_image_path TEXT NOT NULL DEFAULT '',
-    last_fetched_ticks INTEGER NOT NULL DEFAULT 0
+    last_fetched_ticks INTEGER NOT NULL DEFAULT 0,
+    allow_insecure_http INTEGER NOT NULL DEFAULT 0
 );
 """);
                 TryAddColumn(connection, "rss_subscriptions", "image_url", "TEXT NOT NULL DEFAULT ''");
                 TryAddColumn(connection, "rss_subscriptions", "local_image_path", "TEXT NOT NULL DEFAULT ''");
+                TryAddColumn(connection, "rss_subscriptions", "allow_insecure_http", "INTEGER NOT NULL DEFAULT 0");
                 ExecuteNonQuery(connection, """
 CREATE TABLE IF NOT EXISTS rss_articles (
     id TEXT PRIMARY KEY,
@@ -163,7 +166,7 @@ CREATE TABLE IF NOT EXISTS rss_articles (
 
             using (var command = connection.CreateCommand())
             {
-                command.CommandText = "SELECT id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks FROM rss_subscriptions;";
+                command.CommandText = "SELECT id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks, allow_insecure_http FROM rss_subscriptions;";
                 using var reader = command.ExecuteReader();
                 while (reader.Read())
                     subscriptions.Add(new RssSubscriptionRecord(
@@ -173,7 +176,8 @@ CREATE TABLE IF NOT EXISTS rss_articles (
                         reader.GetString(3),
                         RssSensitiveDataProtector.Unprotect(reader.GetString(4)),
                         reader.GetString(5),
-                        reader.GetInt64(6)));
+                        reader.GetInt64(6),
+                        reader.GetInt64(7) != 0));
             }
 
             return new RssRepositorySnapshot(
@@ -412,8 +416,8 @@ WHERE id NOT IN (
         private static void WriteSubscription(SqliteCommand command, RssSubscriptionRecord subscription)
         {
             command.CommandText = """
-INSERT INTO rss_subscriptions(id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks)
-VALUES ($id, $title, $url, $folderId, $imageUrl, $localImagePath, $lastFetchedTicks)
+INSERT INTO rss_subscriptions(id, title, url, folder_id, image_url, local_image_path, last_fetched_ticks, allow_insecure_http)
+VALUES ($id, $title, $url, $folderId, $imageUrl, $localImagePath, $lastFetchedTicks, $allowInsecureHttp)
 ON CONFLICT(id) DO UPDATE SET
     title = excluded.title,
     url = excluded.url,
@@ -423,7 +427,8 @@ ON CONFLICT(id) DO UPDATE SET
         WHEN excluded.local_image_path = '' THEN rss_subscriptions.local_image_path
         ELSE excluded.local_image_path
     END,
-    last_fetched_ticks = excluded.last_fetched_ticks;
+    last_fetched_ticks = excluded.last_fetched_ticks,
+    allow_insecure_http = excluded.allow_insecure_http;
 """;
             command.Parameters.AddWithValue("$id", subscription.Id);
             command.Parameters.AddWithValue("$title", RssSensitiveDataProtector.Protect(subscription.Title));
@@ -432,6 +437,7 @@ ON CONFLICT(id) DO UPDATE SET
             command.Parameters.AddWithValue("$imageUrl", RssSensitiveDataProtector.Protect(subscription.ImageUrl));
             command.Parameters.AddWithValue("$localImagePath", subscription.LocalImagePath);
             command.Parameters.AddWithValue("$lastFetchedTicks", subscription.LastFetchedUtcTicks);
+            command.Parameters.AddWithValue("$allowInsecureHttp", subscription.AllowInsecureHttp ? 1 : 0);
         }
 
         private static void WriteFolder(SqliteCommand command, RssFolderRecord folder)

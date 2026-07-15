@@ -11,6 +11,10 @@ namespace Task_Flyout.Services
             => uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
                uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
 
+        public static bool CanFetchFeed(Uri uri, bool allowInsecureHttp)
+            => uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+               (allowInsecureHttp && uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase));
+
         public static bool IsRedirectStatus(HttpStatusCode code)
             => code is HttpStatusCode.Moved or HttpStatusCode.Found or HttpStatusCode.SeeOther
                 or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect
@@ -32,7 +36,9 @@ namespace Task_Flyout.Services
                 return false;
 
             redirectUri = location.IsAbsoluteUri ? location : new Uri(currentUri, location);
-            return IsAllowedFetchScheme(redirectUri);
+            if (!IsAllowedFetchScheme(redirectUri)) return false;
+            return !currentUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+                   !redirectUri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

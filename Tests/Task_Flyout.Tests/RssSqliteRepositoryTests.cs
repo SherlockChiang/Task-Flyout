@@ -291,6 +291,47 @@ END;
     }
 
     [Fact]
+    public void Subscription_insecure_http_approval_round_trips()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        var repository = new RssSqliteRepository(databasePath);
+        repository.UpsertSubscription(new RssSubscriptionRecord(
+            "subscription", "HTTP feed", "http://example.test/feed", "", "", "", 0, AllowInsecureHttp: true));
+
+        var subscription = Assert.Single(repository.LoadSnapshot(0).Subscriptions);
+
+        Assert.True(subscription.AllowInsecureHttp);
+    }
+
+    [Fact]
+    public void Existing_schema_migrates_insecure_http_approval_to_disabled()
+    {
+        var databasePath = Path.Combine(_root, "rss.db");
+        Directory.CreateDirectory(_root);
+        using (var connection = Open(databasePath))
+        {
+            Execute(connection, """
+CREATE TABLE rss_subscriptions (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    folder_id TEXT NOT NULL DEFAULT '',
+    image_url TEXT NOT NULL DEFAULT '',
+    local_image_path TEXT NOT NULL DEFAULT '',
+    last_fetched_ticks INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO rss_subscriptions(id, title, url) VALUES ('legacy', '', '');
+""");
+        }
+
+        var repository = new RssSqliteRepository(databasePath);
+        repository.Initialize();
+        var subscription = Assert.Single(repository.LoadSnapshot(0).Subscriptions);
+
+        Assert.False(subscription.AllowInsecureHttp);
+    }
+
+    [Fact]
     public void Loads_only_non_empty_article_image_paths()
     {
         var databasePath = Path.Combine(_root, "rss.db");

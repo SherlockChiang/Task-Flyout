@@ -343,9 +343,23 @@ namespace Task_Flyout.Views
                 PlaceholderText = "https://example.com/feed.xml"
             };
             var folderBox = CreateFolderComboBox(_selectedFolderId);
+            var insecureHttpCheckBox = new CheckBox
+            {
+                Content = _loader.GetStringOrDefault("TextAllowInsecureHttpRss") ?? "Allow unencrypted HTTP for this subscription",
+                IsChecked = false
+            };
+            var insecureHttpWarning = new TextBlock
+            {
+                Text = _loader.GetStringOrDefault("TextInsecureHttpRssWarning") ?? "HTTP feeds can be read or modified by other devices on the network. HTTPS is recommended.",
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 12,
+                Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+            };
             var panel = new StackPanel { Spacing = 12 };
             panel.Children.Add(urlBox);
             panel.Children.Add(folderBox);
+            panel.Children.Add(insecureHttpCheckBox);
+            panel.Children.Add(insecureHttpWarning);
 
             var dialog = new ContentDialog
             {
@@ -372,7 +386,7 @@ namespace Task_Flyout.Views
                 {
                     SetLoading(true);
                     var folderId = (folderBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "";
-                    await _rssService.AddSubscriptionAsync(url, folderId);
+                    await _rssService.AddSubscriptionAsync(url, folderId, insecureHttpCheckBox.IsChecked == true);
                     LoadSubscriptions();
                     LoadFolders();
                     BuildSubscriptionTree();
@@ -686,11 +700,15 @@ namespace Task_Flyout.Views
                     if (_selectedFolderId != null)
                         visibleSubscriptions = visibleSubscriptions.Where(subscription => subscription.FolderId == _selectedFolderId);
 
-                    foreach (var subscription in visibleSubscriptions.Take(10))
+                    foreach (var subscription in visibleSubscriptions
+                                 .Where(subscription => !RssService.RequiresInsecureHttpApproval(subscription))
+                                 .Take(10))
                         await _rssService.RefreshSubscriptionAsync(subscription, force: true, pageLifetime.Token);
                 }
                 else if (_rssService.GetSubscriptions().FirstOrDefault(item => item.Id == _selectedSubscriptionId) is { } subscription)
                 {
+                    if (RssService.RequiresInsecureHttpApproval(subscription) && !await ConfirmInsecureHttpAsync(subscription))
+                        return;
                     await _rssService.RefreshSubscriptionAsync(subscription, force: true, pageLifetime.Token);
                 }
 
@@ -719,6 +737,27 @@ namespace Task_Flyout.Views
                     SetLoading(false);
                 _isRefreshing = false;
             }
+        }
+
+        private async Task<bool> ConfirmInsecureHttpAsync(RssSubscription subscription)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = _loader.GetStringOrDefault("TextInsecureHttpRssTitle") ?? "Allow insecure RSS connection?",
+                Content = string.Format(
+                    _loader.GetStringOrDefault("TextInsecureHttpRssConfirm") ?? "{0} uses unencrypted HTTP. Other devices on the network may read or modify its content. Allow it for this subscription?",
+                    subscription.Url),
+                PrimaryButtonText = _loader.GetStringOrDefault("TextAllow") ?? "Allow",
+                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = XamlRoot
+            };
+
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+                return false;
+
+            _rssService.ApproveInsecureHttp(subscription);
+            return true;
         }
 
         private void RssService_LocalDataCleared(object? sender, EventArgs e)

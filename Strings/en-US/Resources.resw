@@ -1611,4 +1611,9 @@ Weather: {3}</value></data>
   <data name="SettingsPage_ClearRssData.ToolTipService.ToolTip" xml:space="preserve"><value>Clear local RSS data</value></data>
   <data name="WeatherBar_OpenButton.AutomationProperties.Name" xml:space="preserve"><value>Open Task Flyout weather</value></data>
   <data name="WeatherBar_OpenButton.ToolTipService.ToolTip" xml:space="preserve"><value>Open weather</value></data>
+  <data name="TextAllowInsecureHttpRss" xml:space="preserve"><value>Allow unencrypted HTTP for this subscription</value></data>
+  <data name="TextInsecureHttpRssWarning" xml:space="preserve"><value>HTTP feeds can be read or modified by other devices on the network. HTTPS is recommended.</value></data>
+  <data name="TextInsecureHttpRssTitle" xml:space="preserve"><value>Allow insecure RSS connection?</value></data>
+  <data name="TextInsecureHttpRssConfirm" xml:space="preserve"><value>{0} uses unencrypted HTTP. Other devices on the network may read or modify its content. Allow it for this subscription?</value></data>
+  <data name="TextAllow" xml:space="preserve"><value>Allow</value></data>
 </root>
