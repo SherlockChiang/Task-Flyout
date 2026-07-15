@@ -21,6 +21,7 @@ namespace Task_Flyout.Views
         private bool _isInitializing = true;
         private bool _isClearingWebViewCache;
         private bool _isClearingRssData;
+        private bool _isClearingWeatherData;
 
         public SettingsPage()
         {
@@ -570,6 +571,42 @@ namespace Task_Flyout.Views
             {
                 _isClearingRssData = false;
                 ClearRssDataButton.IsEnabled = true;
+            }
+        }
+
+        private async void ClearWeatherDataButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isClearingWeatherData || App.Current is not App app) return;
+
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = GetSafeString("TextClearWeatherDataTitle", "Clear weather and location data?"),
+                Content = GetSafeString("TextClearWeatherDataContent", "This stops location tracking and removes the saved city, precise coordinates, and cached weather from this device."),
+                PrimaryButtonText = GetSafeString("TextClear", "Clear"),
+                CloseButtonText = GetSafeString("CalendarDialog.CloseButtonText", "Cancel"),
+                DefaultButton = ContentDialogButton.Close
+            };
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+            _isClearingWeatherData = true;
+            ClearWeatherDataButton.IsEnabled = false;
+            WeatherDataStatusText.Text = GetSafeString("TextCleaning", "Cleaning...");
+            try
+            {
+                await app.WeatherService.ClearWeatherAndLocationDataAsync();
+                WeatherDataStatusText.Text = GetSafeString("TextWeatherDataCleared", "Weather and location data cleared.");
+                _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: true);
+                App.RefreshWeatherBar();
+            }
+            catch
+            {
+                WeatherDataStatusText.Text = GetSafeString("TextCleanFailed", "Clean failed");
+            }
+            finally
+            {
+                _isClearingWeatherData = false;
+                ClearWeatherDataButton.IsEnabled = true;
             }
         }
 

@@ -1616,4 +1616,10 @@ Weather: {3}</value></data>
   <data name="TextInsecureHttpRssTitle" xml:space="preserve"><value>Allow insecure RSS connection?</value></data>
   <data name="TextInsecureHttpRssConfirm" xml:space="preserve"><value>{0} uses unencrypted HTTP. Other devices on the network may read or modify its content. Allow it for this subscription?</value></data>
   <data name="TextAllow" xml:space="preserve"><value>Allow</value></data>
+  <data name="SettingsPage_ClearWeatherData.Content" xml:space="preserve"><value>Clear weather and location data</value></data>
+  <data name="SettingsPage_ClearWeatherData.AutomationProperties.Name" xml:space="preserve"><value>Clear weather and location data</value></data>
+  <data name="SettingsPage_ClearWeatherData.ToolTipService.ToolTip" xml:space="preserve"><value>Clear saved weather, city, and precise coordinates</value></data>
+  <data name="TextClearWeatherDataTitle" xml:space="preserve"><value>Clear weather and location data?</value></data>
+  <data name="TextClearWeatherDataContent" xml:space="preserve"><value>This stops location tracking and removes the saved city, precise coordinates, and cached weather from this device.</value></data>
+  <data name="TextWeatherDataCleared" xml:space="preserve"><value>Weather and location data cleared.</value></data>
 </root>

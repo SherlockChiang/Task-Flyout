@@ -62,6 +62,11 @@
                      <TextBlock x:Name="WebViewCacheStatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
                  </StackPanel>
                  <Button x:Uid="SettingsPage_ClearRssData" x:Name="ClearRssDataButton" Content="清除 RSS 本地数据" Click="ClearRssDataButton_Click"/>
+                 <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                     <Button x:Uid="SettingsPage_ClearWeatherData" x:Name="ClearWeatherDataButton" Content="清除天气和位置数据" Click="ClearWeatherDataButton_Click"/>
+                     <TextBlock x:Name="WeatherDataStatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+                 </StackPanel>
                  <InfoBar x:Uid="SettingsPage_CacheWarning"
                          x:Name="WebViewCacheWarningBar"
                          IsOpen="False"

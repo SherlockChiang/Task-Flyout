@@ -64,6 +64,7 @@
     <Compile Include="..\..\Services\RecurrencePolicy.cs" Link="Source\RecurrencePolicy.cs" />
     <Compile Include="..\..\Services\AppDataPathHelper.cs" Link="Source\AppDataPathHelper.cs" />
     <Compile Include="..\..\Services\LocalSqliteStore.cs" Link="Source\LocalSqliteStore.cs" />
+    <Compile Include="..\..\Services\WeatherLocationPolicy.cs" Link="Source\WeatherLocationPolicy.cs" />
     <Compile Include="..\..\Services\VerificationCodeStore.cs" Link="Source\VerificationCodeStore.cs" />
     <Compile Include="..\..\Services\SharedRequestCoordinator.cs" Link="Source\SharedRequestCoordinator.cs" />
     <Compile Include="..\..\Services\VersionedAsyncWriter.cs" Link="Source\VersionedAsyncWriter.cs" />

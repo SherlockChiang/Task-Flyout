@@ -162,6 +162,14 @@ namespace Task_Flyout.Services
         private int _consecutiveFailures;
         private bool _persistentWeatherLoaded;
         private static string PersistentWeatherPath => AppDataPathHelper.ResolveLocal("WeatherCache.json");
+        private const string ProtectedWeatherScope = "weather";
+        private const string ProtectedLocationKey = "location_v1";
+        private const string ProtectedCacheKey = "cache_v1";
+        private readonly object _locationLock = new();
+        private WeatherLocationSettings _location = new();
+        private bool _locationLoaded;
+        private long _weatherDataGeneration;
+        private readonly SemaphoreSlim _weatherPersistenceGate = new(1, 1);
         private static readonly TimeSpan MaxFailureBackoff = TimeSpan.FromMinutes(30);
 
         private string CurrentWeatherKey =>
@@ -186,20 +194,17 @@ namespace Task_Flyout.Services
 
         public string City
         {
-            get => ApplicationData.Current.LocalSettings.Values["WeatherCity"] as string ?? "";
-            set => ApplicationData.Current.LocalSettings.Values["WeatherCity"] = value;
+            get { EnsureLocationLoaded(); lock (_locationLock) return _location.City; }
         }
 
         public double CityLat
         {
-            get => ApplicationData.Current.LocalSettings.Values["WeatherCityLat"] as double? ?? 0;
-            set => ApplicationData.Current.LocalSettings.Values["WeatherCityLat"] = value;
+            get { EnsureLocationLoaded(); lock (_locationLock) return _location.Latitude; }
         }
 
         public double CityLon
         {
-            get => ApplicationData.Current.LocalSettings.Values["WeatherCityLon"] as double? ?? 0;
-            set => ApplicationData.Current.LocalSettings.Values["WeatherCityLon"] = value;
+            get { EnsureLocationLoaded(); lock (_locationLock) return _location.Longitude; }
         }
 
         public string IconFontFamily
@@ -507,16 +512,91 @@ namespace Task_Flyout.Services
             EnabledFlyoutFields = string.Join(",", fields);
         }
 
+        private void EnsureLocationLoaded()
+        {
+            lock (_locationLock)
+            {
+                if (_locationLoaded) return;
+
+                WeatherLocationSettings? loaded = null;
+                try
+                {
+                    string? protectedJson = LocalSqliteStore.ReadProtectedText(ProtectedWeatherScope, ProtectedLocationKey);
+                    if (!string.IsNullOrWhiteSpace(protectedJson))
+                        loaded = JsonSerializer.Deserialize(protectedJson, AppJsonContext.Default.WeatherLocationSettings);
+                }
+                catch
+                {
+                }
+
+                if (loaded == null)
+                {
+                    var values = ApplicationData.Current.LocalSettings.Values;
+                    loaded = WeatherLocationPolicy.Normalize(
+                        values["WeatherCity"] as string,
+                        values["WeatherCityLat"] as double? ?? 0,
+                        values["WeatherCityLon"] as double? ?? 0);
+
+                    if (WeatherLocationPolicy.HasPersistableData(loaded))
+                    {
+                        try
+                        {
+                            string json = JsonSerializer.Serialize(loaded, AppJsonContext.Default.WeatherLocationSettings);
+                            LocalSqliteStore.WriteProtectedText(ProtectedWeatherScope, ProtectedLocationKey, json);
+                            RemoveLegacyLocationSettings();
+                        }
+                        catch
+                        {
+                        }
+                    }
+                }
+                else
+                {
+                    RemoveLegacyLocationSettings();
+                }
+
+                _location = loaded;
+                _locationLoaded = true;
+            }
+        }
+
+        private static void RemoveLegacyLocationSettings()
+        {
+            var values = ApplicationData.Current.LocalSettings.Values;
+            values.Remove("WeatherCity");
+            values.Remove("WeatherCityLat");
+            values.Remove("WeatherCityLon");
+        }
+
         public void SelectCity(CitySuggestion suggestion)
             => SetCoordinates(suggestion.Latitude, suggestion.Longitude, suggestion.DisplayName);
 
         /// <summary>Set the weather location directly from coordinates (e.g. device GPS),
         /// with a display label. Open-Meteo uses the coordinates directly.</summary>
         public void SetCoordinates(double latitude, double longitude, string displayName)
+            => SetCoordinates(latitude, longitude, displayName, expectedGeneration: null);
+
+        private void SetCoordinates(double latitude, double longitude, string displayName, long? expectedGeneration)
         {
-            City = displayName;
-            CityLat = latitude;
-            CityLon = longitude;
+            EnsureLocationLoaded();
+            _weatherPersistenceGate.Wait();
+            try
+            {
+                if (expectedGeneration.HasValue
+                    && expectedGeneration.Value != Volatile.Read(ref _weatherDataGeneration)) return;
+
+                string json;
+                lock (_locationLock)
+                {
+                    _location = WeatherLocationPolicy.Normalize(displayName, latitude, longitude);
+                    json = JsonSerializer.Serialize(_location, AppJsonContext.Default.WeatherLocationSettings);
+                }
+                LocalSqliteStore.WriteProtectedText(ProtectedWeatherScope, ProtectedLocationKey, json);
+            }
+            finally
+            {
+                _weatherPersistenceGate.Release();
+            }
         }
 
         /// <summary>Outcome of a reverse-geocode, including which provider answered (for diagnostics).</summary>
@@ -677,6 +757,8 @@ namespace Task_Flyout.Services
 
         private async void OnTrackedPositionChanged(Geolocator sender, PositionChangedEventArgs args)
         {
+            if (!ReferenceEquals(sender, _trackingGeolocator)) return;
+            long generation = Volatile.Read(ref _weatherDataGeneration);
             try
             {
                 var p = args.Position.Coordinate.Point.Position;
@@ -685,7 +767,7 @@ namespace Task_Flyout.Services
                     ? place!
                     : (_loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location");
 
-                SetCoordinates(p.Latitude, p.Longitude, label);
+                SetCoordinates(p.Latitude, p.Longitude, label, generation);
                 // Coordinates are part of the cache key, so the next fetch is a miss and refetches.
                 LocationUpdated?.Invoke(this, EventArgs.Empty);
             }
@@ -749,7 +831,7 @@ namespace Task_Flyout.Services
                     taskToAwait = _inFlightWeatherFetch;
                 else
                 {
-                    taskToAwait = FetchAndCacheWeatherAsync(key);
+                    taskToAwait = FetchAndCacheWeatherAsync(key, Volatile.Read(ref _weatherDataGeneration));
                     _inFlightWeatherFetch = taskToAwait;
                     _inFlightWeatherKey = key;
                 }
@@ -758,7 +840,7 @@ namespace Task_Flyout.Services
             return await taskToAwait;
         }
 
-        private async Task<WeatherInfo?> FetchAndCacheWeatherAsync(string key)
+        private async Task<WeatherInfo?> FetchAndCacheWeatherAsync(string key, long generation)
         {
             try
             {
@@ -775,7 +857,7 @@ namespace Task_Flyout.Services
                     {
                         // Only publish if the location hasn't changed underneath us
                         // (guards against a slow stale fetch overwriting newer data).
-                        if (key == CurrentWeatherKey)
+                        if (generation == Volatile.Read(ref _weatherDataGeneration) && key == CurrentWeatherKey)
                         {
                             _cachedWeather = info;
                             _cachedWeatherKey = key;
@@ -790,7 +872,7 @@ namespace Task_Flyout.Services
 
                     // Write outside the lock — transient JSON string, no retained copy.
                     if (persistJson != null)
-                        await WritePersistentWeatherAsync(persistJson);
+                        await WritePersistentWeatherAsync(persistJson, generation);
                 }
             }
             catch (Exception ex)
@@ -846,6 +928,7 @@ namespace Task_Flyout.Services
         // always something to show offline; the freshness check elsewhere drives refresh.
         private async Task TryLoadPersistentWeatherAsync(string currentKey)
         {
+            long generation = Volatile.Read(ref _weatherDataGeneration);
             lock (_weatherLock)
             {
                 if (_persistentWeatherLoaded) return;
@@ -856,11 +939,35 @@ namespace Task_Flyout.Services
 
             try
             {
-                var json = await Task.Run(() =>
+                await _weatherPersistenceGate.WaitAsync();
+                string json;
+                try
                 {
-                    var path = PersistentWeatherPath;
-                    return File.Exists(path) ? File.ReadAllText(path) : "";
-                });
+                    json = await Task.Run(() =>
+                    {
+                        string? protectedJson = LocalSqliteStore.ReadProtectedText(ProtectedWeatherScope, ProtectedCacheKey);
+                        if (!string.IsNullOrWhiteSpace(protectedJson))
+                        {
+                            TryDeleteLegacyWeatherCache();
+                            return protectedJson;
+                        }
+
+                        var path = PersistentWeatherPath;
+                        if (!File.Exists(path)) return "";
+
+                        string legacyJson = File.ReadAllText(path);
+                        if (!string.IsNullOrWhiteSpace(legacyJson))
+                        {
+                            LocalSqliteStore.WriteProtectedText(ProtectedWeatherScope, ProtectedCacheKey, legacyJson);
+                            TryDeleteLegacyWeatherCache();
+                        }
+                        return legacyJson;
+                    });
+                }
+                finally
+                {
+                    _weatherPersistenceGate.Release();
+                }
                 if (string.IsNullOrWhiteSpace(json)) return;
 
                 var envelope = JsonSerializer.Deserialize(json, AppJsonContext.Default.WeatherCacheEnvelope);
@@ -874,7 +981,8 @@ namespace Task_Flyout.Services
                 // the entry is old; the fresh result replaces it once a connection is available.
                 lock (_weatherLock)
                 {
-                    if (currentKey != CurrentWeatherKey || _cachedWeather != null) return;
+                    if (generation != Volatile.Read(ref _weatherDataGeneration)
+                        || currentKey != CurrentWeatherKey || _cachedWeather != null) return;
                     _cachedWeather = envelope.Info;
                     _cachedWeatherKey = envelope.Key;
                     _lastFetchTime = fetchedAt;
@@ -900,10 +1008,68 @@ namespace Task_Flyout.Services
             }
         }
 
-        private static async Task WritePersistentWeatherAsync(string json)
+        private async Task WritePersistentWeatherAsync(string json, long generation)
         {
-            try { await Task.Run(() => File.WriteAllText(PersistentWeatherPath, json)); }
+            await _weatherPersistenceGate.WaitAsync();
+            try
+            {
+                if (generation != Volatile.Read(ref _weatherDataGeneration)) return;
+                await LocalSqliteStore.WriteProtectedTextAsync(ProtectedWeatherScope, ProtectedCacheKey, json);
+                TryDeleteLegacyWeatherCache();
+            }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Weather cache write failed: {ex.Message}"); }
+            finally { _weatherPersistenceGate.Release(); }
+        }
+
+        private static void TryDeleteLegacyWeatherCache()
+        {
+            try
+            {
+                if (File.Exists(PersistentWeatherPath))
+                    File.Delete(PersistentWeatherPath);
+            }
+            catch
+            {
+            }
+        }
+
+        public async Task ClearWeatherAndLocationDataAsync()
+        {
+            StopLocationTracking();
+            AutoFollowLocation = false;
+            IsEnabled = false;
+            Interlocked.Increment(ref _weatherDataGeneration);
+
+            lock (_locationLock)
+            {
+                _location = new WeatherLocationSettings();
+                _locationLoaded = true;
+                RemoveLegacyLocationSettings();
+            }
+
+            lock (_weatherLock)
+            {
+                _cachedWeather = null;
+                _cachedWeatherKey = null;
+                _lastFetchTime = DateTime.MinValue;
+                _lastFailureWeatherKey = null;
+                _lastFailureUtc = DateTimeOffset.MinValue;
+                _consecutiveFailures = 0;
+                _persistentWeatherLoaded = true;
+                _inFlightWeatherFetch = null;
+                _inFlightWeatherKey = null;
+            }
+
+            await _weatherPersistenceGate.WaitAsync();
+            try
+            {
+                TryDeleteLegacyWeatherCache();
+                await LocalSqliteStore.DeleteProtectedScopeAsync(ProtectedWeatherScope);
+            }
+            finally
+            {
+                _weatherPersistenceGate.Release();
+            }
         }
 
         #region Open-Meteo Provider

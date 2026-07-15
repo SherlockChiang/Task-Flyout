@@ -1616,4 +1616,10 @@ Microsoft：{1}
   <data name="TextInsecureHttpRssTitle" xml:space="preserve"><value>允许不安全的 RSS 连接？</value></data>
   <data name="TextInsecureHttpRssConfirm" xml:space="preserve"><value>{0} 使用未加密的 HTTP，网络中的其他设备可能读取或篡改其内容。是否仅对此订阅允许？</value></data>
   <data name="TextAllow" xml:space="preserve"><value>允许</value></data>
+  <data name="SettingsPage_ClearWeatherData.Content" xml:space="preserve"><value>清除天气和位置数据</value></data>
+  <data name="SettingsPage_ClearWeatherData.AutomationProperties.Name" xml:space="preserve"><value>清除天气和位置数据</value></data>
+  <data name="SettingsPage_ClearWeatherData.ToolTipService.ToolTip" xml:space="preserve"><value>清除已保存的天气、城市和精确坐标</value></data>
+  <data name="TextClearWeatherDataTitle" xml:space="preserve"><value>清除天气和位置数据？</value></data>
+  <data name="TextClearWeatherDataContent" xml:space="preserve"><value>此操作会停止位置跟踪，并从本设备删除已保存的城市、精确坐标和天气缓存。</value></data>
+  <data name="TextWeatherDataCleared" xml:space="preserve"><value>已清除天气和位置数据。</value></data>
 </root>

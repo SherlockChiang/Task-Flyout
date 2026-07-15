@@ -39,7 +39,7 @@ Status values:
 
 | ID | Status | Area | Work item | Acceptance criteria | Commit |
 | --- | --- | --- | --- | --- | --- |
-| P2-01 | TODO | Privacy | Protect weather location/cache and add a deletion action. | Coordinates and cache are protected; users can clear weather/location data; third-party recipients are explained. | |
+| P2-01 | DONE | Privacy | Protect weather location/cache and add a deletion action. | Coordinates and cache migrate to DPAPI storage; users can stop tracking and clear weather/location data; the existing location notice explains provider use. | `privacy: protect weather location data` |
 | P2-02 | TODO | Privacy | Couple WebView2 browsing-data cleanup to mail/RSS deletion. | Relevant profile data is cleared after sensitive data deletion; shared-profile implications are documented or profiles are separated. | |
 | P2-03 | DONE | Security | Default RSS to HTTPS and block silent downgrade redirects. | HTTP requires per-subscription approval; HTTPS-to-HTTP downgrade is rejected. | `security: require approval for HTTP RSS feeds` |
 | P2-04 | TODO | Security | Make local-network RSS permission subscription-specific. | Local access is scoped, visible, and revalidated when the destination changes. | |
