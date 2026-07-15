@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
 using Task_Flyout.Services;
@@ -23,6 +24,8 @@ namespace Task_Flyout.Views
         private ResponsiveLayoutMode _layoutMode = ResponsiveLayoutMode.Wide;
         private string? _failedMutationKey;
         private Func<Task>? _retrySucceeded;
+        private CancellationTokenSource? _searchCts;
+        private string _searchText = "";
         private const int TaskWindowPastDays = 365;
         private const int TaskWindowFutureDays = 365 * 3;
 
@@ -33,6 +36,7 @@ namespace Task_Flyout.Views
                 _syncManager = app.SyncManager;
 
             Loaded += TasksPage_Loaded;
+            Unloaded += (_, _) => _searchCts?.Cancel();
         }
 
         private async void TasksPage_Loaded(object sender, RoutedEventArgs e)
@@ -107,6 +111,13 @@ namespace Task_Flyout.Views
             var tasks = _localCache.DayItems.Values
                 .SelectMany(items => items)
                 .Where(item => item.IsTask && IsItemVisible(item))
+                .Where(item => LocalSearchMatcher.Matches(
+                    _searchText,
+                    item.Title,
+                    item.Description,
+                    item.Provider,
+                    item.CalendarName,
+                    item.DateKey))
                 .GroupBy(GetTaskIdentity)
                 .Select(group => group.OrderByDescending(GetTaskSortDate).First())
                 .OrderBy(GetTaskSortDate)
@@ -132,10 +143,30 @@ namespace Task_Flyout.Views
             TaskSummaryText.Text = PendingTasks.Count == 0
                 ? string.Format(_loader.GetStringOrDefault("TextAllDone") ?? "All done, {0} completed", CompletedTasks.Count)
                 : string.Format(_loader.GetStringOrDefault("TextTaskSummary") ?? "{0} pending, {1} completed", PendingTasks.Count, CompletedTasks.Count);
+            if (!string.IsNullOrWhiteSpace(_searchText))
+                TaskSummaryText.Text = string.Format(
+                    _loader.GetStringOrDefault("TextSearchMatchesSimple") ?? "{0} matching tasks",
+                    PendingTasks.Count + CompletedTasks.Count);
             if (RetryTaskMutationButton.Visibility != Visibility.Visible)
                 TaskSummaryText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
             PendingTasksList.Visibility = PendingTasks.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
             PendingEmptyText.Visibility = PendingTasks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private async void TaskSearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+        {
+            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
+            _searchCts?.Cancel();
+            _searchCts?.Dispose();
+            var cts = new CancellationTokenSource();
+            _searchCts = cts;
+            try
+            {
+                await Task.Delay(250, cts.Token);
+                _searchText = sender.Text.Trim();
+                ReloadTasks();
+            }
+            catch (OperationCanceledException) { }
         }
 
         private bool IsItemVisible(AgendaItem item)

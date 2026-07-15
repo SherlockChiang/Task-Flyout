@@ -83,6 +83,23 @@ VALUES ($id, 'sub-a', $feedTitle, $title, $link, $summary, $html, $imageUrl, '',
     }
 
     [Fact]
+    public void Article_search_matches_decrypted_metadata_and_paginates_matches()
+    {
+        var repository = new RssSqliteRepository(Path.Combine(_root, "rss.db"));
+        repository.UpsertArticle(new RssArticleWriteRecord("match-new", "subscription", "Feed", "Project Alpha", "", "", "", "", "", 40));
+        repository.UpsertArticle(new RssArticleWriteRecord("other", "subscription", "Feed", "Unrelated", "", "", "", "", "", 30));
+        repository.UpsertArticle(new RssArticleWriteRecord("match-summary", "subscription", "Feed", "Update", "", "project details", "", "", "", 20));
+        repository.UpsertArticle(new RssArticleWriteRecord("match-feed", "subscription", "Project News", "Brief", "", "", "", "", "", 10));
+        repository.UpdateArticleState("match-summary", isStarred: true);
+
+        Assert.Equal("match-new", Assert.Single(repository.QueryArticlesPage(null, null, 0, 1, searchText: "PROJECT")).Id);
+        Assert.Equal("match-summary", Assert.Single(repository.QueryArticlesPage(null, null, 1, 1, searchText: "project")).Id);
+        Assert.Equal("match-feed", Assert.Single(repository.QueryArticlesPage(null, null, 2, 1, searchText: "project")).Id);
+        Assert.Equal("match-summary", Assert.Single(repository.QueryArticlesPage(null, null, 0, 10, RssArticleFilter.Starred, "project")).Id);
+        Assert.Empty(repository.QueryArticlesPage(null, null, 0, 0, searchText: "project"));
+    }
+
+    [Fact]
     public void Initialize_migrates_existing_article_table_with_state_defaults()
     {
         var databasePath = Path.Combine(_root, "rss.db");

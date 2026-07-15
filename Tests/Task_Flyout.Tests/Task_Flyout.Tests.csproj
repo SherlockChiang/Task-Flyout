@@ -38,6 +38,7 @@
     <Compile Include="..\..\Services\RssXmlSecurity.cs" Link="Source\RssXmlSecurity.cs" />
     <Compile Include="..\..\Services\RssFeedXml.cs" Link="Source\RssFeedXml.cs" />
     <Compile Include="..\..\Services\RssOpmlService.cs" Link="Source\RssOpmlService.cs" />
+    <Compile Include="..\..\Services\LocalSearchMatcher.cs" Link="Source\LocalSearchMatcher.cs" />
     <Compile Include="..\..\Services\RssFetchPolicy.cs" Link="Source\RssFetchPolicy.cs" />
     <Compile Include="..\..\Services\RssSensitiveDataProtector.cs" Link="Source\RssSensitiveDataProtector.cs" />
     <Compile Include="..\..\Services\RssSqliteRepository.cs" Link="Source\RssSqliteRepository.cs" />

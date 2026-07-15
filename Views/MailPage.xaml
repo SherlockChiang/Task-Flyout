@@ -114,7 +114,13 @@
                         <StackPanel>
                             <TextBlock x:Uid="MailPage_InboxHeader" x:Name="MessageListTitle" Text="收件箱" FontWeight="SemiBold"/>
                              <TextBlock x:Uid="MailPage_SelectFolderPrompt" x:Name="MessageListSubtitle" Text="请选择左侧文件夹" FontSize="12"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.LiveSetting="Polite"/>
+                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.LiveSetting="Polite"/>
+                            <AutoSuggestBox x:Uid="MailPage_Search"
+                                            x:Name="MailSearchBox"
+                                            Margin="0,6,0,0"
+                                            PlaceholderText="Search loaded messages"
+                                            TextChanged="MailSearchBox_TextChanged"
+                                            AutomationProperties.Name="Search loaded messages"/>
                         </StackPanel>
                         <ProgressRing x:Name="LoadingRing" Grid.Column="1" IsActive="False" Width="24" Height="24"/>
                     </Grid>

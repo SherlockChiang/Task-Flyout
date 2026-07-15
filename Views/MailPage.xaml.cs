@@ -22,6 +22,7 @@ namespace Task_Flyout.Views
     public sealed partial class MailPage : Page
     {
         private readonly ObservableCollection<MailItem> _items = new();
+        private readonly ObservableCollection<MailItem> _displayedItems = new();
         private readonly Dictionary<string, MailAccount> _accountsById = new();
         private readonly Dictionary<TreeViewNode, MailAccount> _accountNodes = new();
         private readonly Dictionary<TreeViewNode, (MailAccount Account, MailFolder Folder)> _folderNodes = new();
@@ -62,6 +63,9 @@ namespace Task_Flyout.Views
         private CancellationTokenSource? _bodyLoadCts;
         private CancellationTokenSource? _accountAuthCts;
         private CancellationTokenSource? _imapSetupCts;
+        private CancellationTokenSource? _searchCts;
+        private string _searchText = "";
+        private bool _suppressSearchRefresh;
         private bool _isSendingMail;
         internal bool IsOpeningFromNotification { get; set; }
 
@@ -71,6 +75,7 @@ namespace Task_Flyout.Views
         {
             this.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
             InitializeComponent();
+            _items.CollectionChanged += (_, _) => ApplyMailSearch();
             Loaded += MailPage_Loaded;
             Unloaded += MailPage_Unloaded;
             ActualThemeChanged += MailPage_ActualThemeChanged;
@@ -102,6 +107,7 @@ namespace Task_Flyout.Views
             _bodyLoadCts?.Cancel();
             _accountAuthCts?.Cancel();
             _imapSetupCts?.Cancel();
+            _searchCts?.Cancel();
             _messageLoadVersion++;
             ReleaseMessageBodies();
             _selectedItem = null;
@@ -127,7 +133,7 @@ namespace Task_Flyout.Views
                 _pageRequestCts = new CancellationTokenSource();
             }
             _mailService = (App.Current as App)?.MailService;
-            MailListView.ItemsSource = _items;
+            MailListView.ItemsSource = _displayedItems;
             _isInitializing = false;
             await RefreshAccountsAsync(autoSelect: !IsOpeningFromNotification);
             if (IsOpeningFromNotification && _layoutMode == ResponsiveLayoutMode.Narrow)
@@ -313,8 +319,13 @@ namespace Task_Flyout.Views
             if (!IsLoaded)
                 await WaitUntilLoadedAsync();
 
+            _searchCts?.Cancel();
+            _searchText = "";
+            if (MailSearchBox != null) MailSearchBox.Text = "";
+            ApplyMailSearch();
+
             _mailService ??= (App.Current as App)?.MailService;
-            MailListView.ItemsSource ??= _items;
+            MailListView.ItemsSource ??= _displayedItems;
             _isInitializing = false;
             if (_mailService == null) return;
 
@@ -502,6 +513,7 @@ namespace Task_Flyout.Views
                     return;
                 var messages = window.Items;
                 var previousSelectedId = !string.IsNullOrWhiteSpace(preferredMessageId) ? preferredMessageId : _selectedItem?.Id;
+                _suppressSearchRefresh = true;
                 if (loadMore)
                 {
                     var existingIds = _items.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
@@ -517,19 +529,20 @@ namespace Task_Flyout.Views
                     foreach (var item in messages.OrderByDescending(item => item.RawReceivedTime))
                         _items.Add(item);
                 }
-
+                _suppressSearchRefresh = false;
                 _lastMessageLoadSucceededAt = DateTimeOffset.Now;
                 SetMessageListStatus($"{account.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}");
+                ApplyMailSearch();
 
                 LoadMoreButton.Visibility = window.HasMore ? Visibility.Visible : Visibility.Collapsed;
 
                 var itemToSelect = !string.IsNullOrWhiteSpace(previousSelectedId)
-                    ? _items.FirstOrDefault(item => item.Id == previousSelectedId)
+                    ? _displayedItems.FirstOrDefault(item => item.Id == previousSelectedId)
                     : null;
                 if (itemToSelect != null)
                     MailListView.SelectedItem = itemToSelect;
                 else if (selectFirstWhenNoMatch)
-                    MailListView.SelectedItem = _items.Count > 0 ? _items[0] : null;
+                    MailListView.SelectedItem = _displayedItems.Count > 0 ? _displayedItems[0] : null;
                 else
                     MailListView.SelectedItem = null;
 
@@ -558,6 +571,39 @@ namespace Task_Flyout.Views
                     _messageLoadCts = null;
                 requestCts.Dispose();
             }
+        }
+
+        private async void MailSearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+        {
+            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
+            _searchCts?.Cancel();
+            _searchCts?.Dispose();
+            var cts = new CancellationTokenSource();
+            _searchCts = cts;
+            try
+            {
+                await Task.Delay(250, cts.Token);
+                _searchText = sender.Text.Trim();
+                ApplyMailSearch();
+            }
+            catch (OperationCanceledException) { }
+        }
+
+        private void ApplyMailSearch()
+        {
+            if (_suppressSearchRefresh) return;
+            _displayedItems.Clear();
+            foreach (var item in _items.Where(item => LocalSearchMatcher.Matches(
+                         _searchText,
+                         item.Subject,
+                         item.Sender,
+                         item.SenderAddress,
+                         item.Recipient,
+                         item.Preview)))
+                _displayedItems.Add(item);
+
+            if (!string.IsNullOrWhiteSpace(_searchText) && _selectedAccount != null)
+                SetMessageListStatus($"{_selectedAccount.DisplayTitle} · {string.Format(GetResourceStringOrDefault("TextSearchMatches", "{0} matches of {1} loaded"), _displayedItems.Count, _items.Count)}");
         }
 
         private async void LoadMoreButton_Click(object sender, RoutedEventArgs e)
@@ -690,6 +736,7 @@ namespace Task_Flyout.Views
             ReleaseMailWebView();
             await WebView2RuntimeService.ClearSensitiveBrowsingDataAsync();
             _items.Clear();
+            _displayedItems.Clear();
             _selectedAccount = null;
             _selectedFolder = null;
             _selectedItem = null;

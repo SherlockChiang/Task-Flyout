@@ -42,6 +42,9 @@ namespace Task_Flyout.Views
         private bool _isRefreshing;
         private bool _hasMore = true;
         private RssArticleFilter _articleFilter;
+        private string _articleSearchText = "";
+        private CancellationTokenSource? _articleSearchCts;
+        private int _articleQueryGeneration;
         private ScrollViewer? _articleScrollViewer;
         private RssArticle? _selectedArticle;
         private bool _rssWebViewConfigured;
@@ -67,6 +70,9 @@ namespace Task_Flyout.Views
             _pageLifetimeCts?.Cancel();
             _pageLifetimeCts?.Dispose();
             _pageLifetimeCts = null;
+            _articleSearchCts?.Cancel();
+            _articleSearchCts?.Dispose();
+            _articleSearchCts = null;
             RssService.LocalDataCleared -= RssService_LocalDataCleared;
             _selectedArticle = null;
             CancelRssResourceRequests();
@@ -223,13 +229,20 @@ namespace Task_Flyout.Views
 
         private void ResetAndLoadCachedArticles()
         {
+            _articleQueryGeneration++;
             Articles.Clear();
             _loadedCount = 0;
             _hasMore = true;
 
+            if (!string.IsNullOrWhiteSpace(_articleSearchText))
+            {
+                _ = LoadFirstSearchPageAsync(_articleQueryGeneration);
+                return;
+            }
+
             try
             {
-                var items = _rssService.GetCachedArticlesPage(_selectedSubscriptionId, _selectedFolderId, 0, PageSize, _articleFilter);
+                var items = _rssService.GetCachedArticlesPage(_selectedSubscriptionId, _selectedFolderId, 0, PageSize, _articleFilter, _articleSearchText);
                 foreach (var item in items)
                     Articles.Add(item);
 
@@ -249,13 +262,16 @@ namespace Task_Flyout.Views
         private async Task LoadMoreArticlesAsync(int? pageGeneration = null)
         {
             if (_isLoading || !_hasMore) return;
+            int queryGeneration = _articleQueryGeneration;
 
             try
             {
                 _isLoading = true;
                 SetLoading(true);
-                var items = await _rssService.LoadMoreArticlesAsync(_selectedSubscriptionId, _selectedFolderId, _loadedCount, PageSize, _articleFilter);
+                var items = await _rssService.LoadMoreArticlesAsync(_selectedSubscriptionId, _selectedFolderId, _loadedCount, PageSize, _articleFilter, _articleSearchText);
                 if (pageGeneration.HasValue && (pageGeneration.Value != _pageGeneration || !IsLoaded))
+                    return;
+                if (queryGeneration != _articleQueryGeneration)
                     return;
 
                 foreach (var item in items)
@@ -536,6 +552,14 @@ namespace Task_Flyout.Views
             {
                 SetLoading(false);
             }
+        }
+
+        private async Task LoadFirstSearchPageAsync(int queryGeneration)
+        {
+            while (_isLoading && queryGeneration == _articleQueryGeneration && IsLoaded)
+                await Task.Delay(25);
+            if (queryGeneration == _articleQueryGeneration && IsLoaded)
+                await LoadMoreArticlesAsync();
         }
 
         private async void ExportOpml_Click(object sender, RoutedEventArgs e)
@@ -1213,6 +1237,22 @@ namespace Task_Flyout.Views
                 || !Enum.TryParse(item.Tag?.ToString(), out RssArticleFilter filter)) return;
             _articleFilter = filter;
             if (IsLoaded) ResetAndLoadCachedArticles();
+        }
+
+        private async void ArticleSearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+        {
+            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
+            _articleSearchCts?.Cancel();
+            _articleSearchCts?.Dispose();
+            var cts = new CancellationTokenSource();
+            _articleSearchCts = cts;
+            try
+            {
+                await Task.Delay(250, cts.Token);
+                _articleSearchText = sender.Text.Trim();
+                ResetAndLoadCachedArticles();
+            }
+            catch (OperationCanceledException) { }
         }
 
         private void ToggleArticleStar_Click(object sender, RoutedEventArgs e)

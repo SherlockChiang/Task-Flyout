@@ -26,6 +26,7 @@
               RowSpacing="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -176,7 +177,15 @@
                 </Button>
             </Grid>
 
-            <Grid Grid.Row="1" RowSpacing="14">
+            <AutoSuggestBox x:Uid="TasksPage_Search"
+                            x:Name="TaskSearchBox"
+                            Grid.Row="1"
+                            Margin="0,0,0,16"
+                            PlaceholderText="Search cached tasks"
+                            TextChanged="TaskSearchBox_TextChanged"
+                            AutomationProperties.Name="Search cached tasks"/>
+
+            <Grid Grid.Row="2" RowSpacing="14">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>

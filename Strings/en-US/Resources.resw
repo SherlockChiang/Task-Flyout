@@ -1658,4 +1658,12 @@ Weather: {3}</value></data>
   <data name="RssPage_ArticleFilter.AutomationProperties.Name" xml:space="preserve"><value>Article filter</value></data>
   <data name="RssPage_ToggleStar.AutomationProperties.Name" xml:space="preserve"><value>Toggle starred</value></data>
   <data name="RssPage_ToggleRead.AutomationProperties.Name" xml:space="preserve"><value>Toggle read status</value></data>
+  <data name="TasksPage_Search.PlaceholderText" xml:space="preserve"><value>Search cached tasks</value></data>
+  <data name="TasksPage_Search.AutomationProperties.Name" xml:space="preserve"><value>Search cached tasks</value></data>
+  <data name="MailPage_Search.PlaceholderText" xml:space="preserve"><value>Search loaded messages</value></data>
+  <data name="MailPage_Search.AutomationProperties.Name" xml:space="preserve"><value>Search loaded messages</value></data>
+  <data name="RssPage_Search.PlaceholderText" xml:space="preserve"><value>Search cached articles</value></data>
+  <data name="RssPage_Search.AutomationProperties.Name" xml:space="preserve"><value>Search cached articles</value></data>
+  <data name="TextSearchMatches" xml:space="preserve"><value>{0} matches of {1} loaded</value></data>
+  <data name="TextSearchMatchesSimple" xml:space="preserve"><value>{0} matching tasks</value></data>
 </root>

@@ -321,7 +321,7 @@ namespace Task_Flyout.Services
                 .ToList();
         }
 
-        public IReadOnlyList<RssArticle> GetCachedArticlesPage(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter = RssArticleFilter.All)
+        public IReadOnlyList<RssArticle> GetCachedArticlesPage(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter = RssArticleFilter.All, string? searchText = null)
         {
             EnsureLoaded();
             skip = Math.Max(0, skip);
@@ -330,7 +330,7 @@ namespace Task_Flyout.Services
             try
             {
                 InitializeDatabase();
-                return QueryCachedArticlesPage(subscriptionId, folderId, skip, take, filter);
+                return QueryCachedArticlesPage(subscriptionId, folderId, skip, take, filter, searchText);
             }
             catch (Exception ex)
             {
@@ -339,6 +339,7 @@ namespace Task_Flyout.Services
                     .Where(article => filter == RssArticleFilter.All
                         || (filter == RssArticleFilter.Unread && !article.IsRead)
                         || (filter == RssArticleFilter.Starred && article.IsStarred))
+                    .Where(article => LocalSearchMatcher.Matches(searchText, article.Title, article.Summary, article.FeedTitle))
                     .Skip(skip)
                     .Take(take)
                     .ToList();
@@ -515,11 +516,11 @@ namespace Task_Flyout.Services
             Repository.UpdateArticleState(article.Id, isStarred: isStarred);
         }
 
-        public Task<List<RssArticle>> LoadMoreArticlesAsync(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter = RssArticleFilter.All)
+        public Task<List<RssArticle>> LoadMoreArticlesAsync(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter = RssArticleFilter.All, string? searchText = null)
         {
             // SQLite paging may block on disk or antivirus scans; callers update the UI only
             // after awaiting this operation, so keep the synchronous database work off it.
-            return Task.Run(() => GetCachedArticlesPage(subscriptionId, folderId, skip, take, filter).ToList());
+            return Task.Run(() => GetCachedArticlesPage(subscriptionId, folderId, skip, take, filter, searchText).ToList());
         }
 
         public Task InitializeAsync()
@@ -1365,9 +1366,9 @@ namespace Task_Flyout.Services
             };
         }
 
-        private List<RssArticle> QueryCachedArticlesPage(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter)
+        private List<RssArticle> QueryCachedArticlesPage(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter, string? searchText)
         {
-            return Repository.QueryArticlesPage(subscriptionId, folderId, skip, take, filter)
+            return Repository.QueryArticlesPage(subscriptionId, folderId, skip, take, filter, searchText)
                 .Select(record => new RssArticle
                 {
                     Id = record.Id,

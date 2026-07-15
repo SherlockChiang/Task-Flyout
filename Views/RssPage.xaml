@@ -144,6 +144,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="200"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel>
@@ -161,7 +162,13 @@
                             <ComboBoxItem x:Uid="RssPage_FilterUnread" Content="Unread" Tag="Unread"/>
                             <ComboBoxItem x:Uid="RssPage_FilterStarred" Content="Starred" Tag="Starred"/>
                         </ComboBox>
-                        <Button x:Uid="RssPage_RefreshButton" x:Name="RefreshButton" Grid.Column="2" Click="RefreshButton_Click">
+                        <AutoSuggestBox x:Uid="RssPage_Search"
+                                        x:Name="ArticleSearchBox"
+                                        Grid.Column="2"
+                                        PlaceholderText="Search cached articles"
+                                        TextChanged="ArticleSearchBox_TextChanged"
+                                        AutomationProperties.Name="Search cached articles"/>
+                        <Button x:Uid="RssPage_RefreshButton" x:Name="RefreshButton" Grid.Column="3" Click="RefreshButton_Click">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE72C;" FontSize="14"/>
                                 <TextBlock x:Uid="MailPage_Refresh" Text="刷新"/>

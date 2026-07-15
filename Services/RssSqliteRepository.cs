@@ -158,11 +158,11 @@ CREATE TABLE IF NOT EXISTS rss_articles (
             }
         }
 
-        public List<RssArticleRecord> QueryArticlesPage(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter = RssArticleFilter.All)
+        public List<RssArticleRecord> QueryArticlesPage(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter = RssArticleFilter.All, string? searchText = null)
         {
             Initialize();
             using var connection = OpenConnection();
-            return ReadArticles(connection, subscriptionId, folderId, skip, take, filter);
+            return ReadArticles(connection, subscriptionId, folderId, skip, take, filter, searchText);
         }
 
         public RssRepositorySnapshot LoadSnapshot(int maximumArticleCount)
@@ -202,7 +202,7 @@ CREATE TABLE IF NOT EXISTS rss_articles (
             return new RssRepositorySnapshot(
                 folders,
                 subscriptions,
-                ReadArticles(connection, null, null, 0, maximumArticleCount, RssArticleFilter.All));
+                ReadArticles(connection, null, null, 0, maximumArticleCount, RssArticleFilter.All, null));
         }
 
         public List<string> LoadArticleImagePaths()
@@ -569,11 +569,14 @@ ON CONFLICT(id) DO UPDATE SET
             string? folderId,
             int skip,
             int take,
-            RssArticleFilter filter)
+            RssArticleFilter filter,
+            string? searchText)
         {
+            if (take <= 0) return new List<RssArticleRecord>();
             bool hasSubscription = !string.IsNullOrWhiteSpace(subscriptionId);
             bool hasFolder = folderId != null;
             using var command = connection.CreateCommand();
+            var hasSearch = !string.IsNullOrWhiteSpace(searchText);
             command.CommandText = """
 SELECT a.id, a.subscription_id, a.feed_title, a.title, a.link, a.summary, a.image_url, a.local_image_path, a.published_ticks, a.is_read, a.is_starred
 FROM rss_articles a
@@ -584,19 +587,25 @@ WHERE ($hasSubscription = 0 OR a.subscription_id = $subscriptionId)
   ))
   AND ($filter = 0 OR ($filter = 1 AND a.is_read = 0) OR ($filter = 2 AND a.is_starred = 1))
 ORDER BY a.published_ticks DESC
-LIMIT $take OFFSET $skip;
 """;
+            if (!hasSearch)
+                command.CommandText += " LIMIT $take OFFSET $skip;";
             command.Parameters.AddWithValue("$hasSubscription", hasSubscription ? 1 : 0);
             command.Parameters.AddWithValue("$subscriptionId", subscriptionId ?? "");
             command.Parameters.AddWithValue("$hasFolder", hasFolder ? 1 : 0);
             command.Parameters.AddWithValue("$folderId", folderId ?? "");
             command.Parameters.AddWithValue("$filter", (int)filter);
-            command.Parameters.AddWithValue("$take", Math.Max(0, take));
-            command.Parameters.AddWithValue("$skip", Math.Max(0, skip));
+            if (!hasSearch)
+            {
+                command.Parameters.AddWithValue("$take", Math.Max(0, take));
+                command.Parameters.AddWithValue("$skip", Math.Max(0, skip));
+            }
             var articles = new List<RssArticleRecord>(Math.Max(0, take));
+            int matchesToSkip = Math.Max(0, skip);
             using var reader = command.ExecuteReader();
             while (reader.Read())
-                articles.Add(new RssArticleRecord(
+            {
+                var article = new RssArticleRecord(
                     reader.GetString(0),
                     reader.GetString(1),
                     RssSensitiveDataProtector.Unprotect(reader.GetString(2)),
@@ -607,7 +616,15 @@ LIMIT $take OFFSET $skip;
                     reader.GetString(7),
                     reader.GetInt64(8),
                     reader.GetInt64(9) != 0,
-                    reader.GetInt64(10) != 0));
+                    reader.GetInt64(10) != 0);
+                if (hasSearch && !LocalSearchMatcher.Matches(searchText, article.Title, article.Summary, article.FeedTitle))
+                    continue;
+                if (hasSearch && matchesToSkip-- > 0)
+                    continue;
+                articles.Add(article);
+                if (hasSearch && articles.Count >= Math.Max(0, take))
+                    break;
+            }
             return articles;
         }
 

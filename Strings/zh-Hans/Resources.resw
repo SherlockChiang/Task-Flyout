@@ -1658,4 +1658,12 @@ Microsoft：{1}
   <data name="RssPage_ArticleFilter.AutomationProperties.Name" xml:space="preserve"><value>文章筛选</value></data>
   <data name="RssPage_ToggleStar.AutomationProperties.Name" xml:space="preserve"><value>切换收藏状态</value></data>
   <data name="RssPage_ToggleRead.AutomationProperties.Name" xml:space="preserve"><value>切换已读状态</value></data>
+  <data name="TasksPage_Search.PlaceholderText" xml:space="preserve"><value>搜索缓存任务</value></data>
+  <data name="TasksPage_Search.AutomationProperties.Name" xml:space="preserve"><value>搜索缓存任务</value></data>
+  <data name="MailPage_Search.PlaceholderText" xml:space="preserve"><value>搜索已加载邮件</value></data>
+  <data name="MailPage_Search.AutomationProperties.Name" xml:space="preserve"><value>搜索已加载邮件</value></data>
+  <data name="RssPage_Search.PlaceholderText" xml:space="preserve"><value>搜索缓存文章</value></data>
+  <data name="RssPage_Search.AutomationProperties.Name" xml:space="preserve"><value>搜索缓存文章</value></data>
+  <data name="TextSearchMatches" xml:space="preserve"><value>已加载 {1} 项，匹配 {0} 项</value></data>
+  <data name="TextSearchMatchesSimple" xml:space="preserve"><value>匹配 {0} 个任务</value></data>
 </root>
