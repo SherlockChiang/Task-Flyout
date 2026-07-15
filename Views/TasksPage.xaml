@@ -12,10 +12,10 @@
         <views:TaskCompletedOpacityConverter x:Key="TaskCompletedOpacityConverter"/>
     </Page.Resources>
 
-    <Grid Background="#01000000">
+    <Grid x:Name="LayoutRoot" Background="#01000000" SizeChanged="LayoutRoot_SizeChanged">
         <Grid.ColumnDefinitions>
             <ColumnDefinition x:Name="AccountColumn" Width="2*" MinWidth="200" MaxWidth="280"/>
-            <ColumnDefinition Width="5*" MinWidth="360"/>
+            <ColumnDefinition x:Name="TaskContentColumn" Width="5*" MinWidth="360"/>
         </Grid.ColumnDefinitions>
 
         <Grid x:Name="AccountPane" Grid.Column="0"
@@ -132,7 +132,7 @@
             <Button Grid.Row="3" x:Uid="MainWindow_BtnForceSync" Content="强制立即同步" HorizontalAlignment="Stretch" Click="BtnForceSync_Click"/>
         </Grid>
 
-        <Grid Grid.Column="1" Padding="32">
+        <Grid x:Name="TaskContent" Grid.Column="1" Padding="32">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -171,7 +171,7 @@
                         Click="AddTaskButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon Glyph="&#xE710;" FontSize="14"/>
-                        <TextBlock x:Uid="TasksPage_AddTask" Text="添加任务"/>
+                        <TextBlock x:Uid="TasksPage_AddTask" x:Name="AddTaskButtonText" Text="添加任务"/>
                     </StackPanel>
                 </Button>
             </Grid>

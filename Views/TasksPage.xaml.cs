@@ -20,6 +20,7 @@ namespace Task_Flyout.Views
         private AppCache _localCache = new();
         private ResourceLoader _loader = new();
         private bool _isAccountPaneCollapsed;
+        private ResponsiveLayoutMode _layoutMode = ResponsiveLayoutMode.Wide;
         private string? _failedMutationKey;
         private Func<Task>? _retrySucceeded;
         private const int TaskWindowPastDays = 365;
@@ -535,10 +536,34 @@ namespace Task_Flyout.Views
         private void ToggleAccountPane_Click(object sender, RoutedEventArgs e)
         {
             _isAccountPaneCollapsed = !_isAccountPaneCollapsed;
-            AccountColumn.MinWidth = _isAccountPaneCollapsed ? 0 : 200;
-            AccountColumn.Width = _isAccountPaneCollapsed ? new GridLength(0) : new GridLength(2, GridUnitType.Star);
-            AccountPane.Visibility = _isAccountPaneCollapsed ? Visibility.Collapsed : Visibility.Visible;
-            ToggleAccountPaneIcon.Glyph = _isAccountPaneCollapsed ? "\uE76C" : "\uE76B";
+            ApplyResponsiveLayout();
+        }
+
+        private void LayoutRoot_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            var mode = ResponsiveLayoutPolicy.GetMode(e.NewSize.Width);
+            if (_layoutMode == mode) return;
+            _layoutMode = mode;
+            if (mode != ResponsiveLayoutMode.Wide)
+                _isAccountPaneCollapsed = true;
+            ApplyResponsiveLayout();
+        }
+
+        private void ApplyResponsiveLayout()
+        {
+            bool showAccounts = !_isAccountPaneCollapsed;
+            bool showContent = _layoutMode != ResponsiveLayoutMode.Narrow || !showAccounts;
+            AccountColumn.MinWidth = showAccounts && _layoutMode == ResponsiveLayoutMode.Wide ? 200 : 0;
+            AccountColumn.Width = showAccounts
+                ? (_layoutMode == ResponsiveLayoutMode.Narrow ? new GridLength(1, GridUnitType.Star) : new GridLength(2, GridUnitType.Star))
+                : new GridLength(0);
+            TaskContentColumn.MinWidth = 0;
+            TaskContentColumn.Width = showContent ? new GridLength(5, GridUnitType.Star) : new GridLength(0);
+            AccountPane.Visibility = showAccounts ? Visibility.Visible : Visibility.Collapsed;
+            TaskContent.Visibility = showContent ? Visibility.Visible : Visibility.Collapsed;
+            TaskContent.Padding = _layoutMode == ResponsiveLayoutMode.Narrow ? new Thickness(16) : new Thickness(32);
+            AddTaskButtonText.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow ? Visibility.Collapsed : Visibility.Visible;
+            ToggleAccountPaneIcon.Glyph = showAccounts ? "\uE76B" : "\uE76C";
         }
     }
 

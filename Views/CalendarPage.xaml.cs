@@ -91,6 +91,7 @@ namespace Task_Flyout.Views
         private ResourceLoader _loader;
         private bool _isAccountPaneCollapsed;
         private bool _isTimelinePaneCollapsed;
+        private ResponsiveLayoutMode _layoutMode = ResponsiveLayoutMode.Wide;
         private DateTimeOffset? _lastCalendarSyncSucceededAt;
 
         private void TaskCheckBox_Tapped(object sender, TappedRoutedEventArgs e)
@@ -286,8 +287,8 @@ namespace Task_Flyout.Views
         {
             if (CalendarGrid.ItemsPanelRoot is ItemsWrapGrid wrapGrid)
             {
-                wrapGrid.ItemWidth = Math.Max(80, e.NewSize.Width / 7.0);
-                wrapGrid.ItemHeight = Math.Max(80, e.NewSize.Height / 6.0);
+                wrapGrid.ItemWidth = Math.Max(44, e.NewSize.Width / 7.0);
+                wrapGrid.ItemHeight = Math.Max(56, e.NewSize.Height / 6.0);
             }
         }
 
@@ -321,19 +322,60 @@ namespace Task_Flyout.Views
         private void ToggleAccountPane_Click(object sender, RoutedEventArgs e)
         {
             _isAccountPaneCollapsed = !_isAccountPaneCollapsed;
-            AccountColumn.MinWidth = _isAccountPaneCollapsed ? 0 : 200;
-            AccountColumn.Width = _isAccountPaneCollapsed ? new GridLength(0) : new GridLength(2, GridUnitType.Star);
-            AccountPane.Visibility = _isAccountPaneCollapsed ? Visibility.Collapsed : Visibility.Visible;
-            ToggleAccountPaneIcon.Glyph = _isAccountPaneCollapsed ? "\uE76C" : "\uE76B";
+            if (_layoutMode != ResponsiveLayoutMode.Wide && !_isAccountPaneCollapsed)
+                _isTimelinePaneCollapsed = true;
+            ApplyResponsiveLayout();
+        }
+
+        private void LayoutRoot_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            var mode = ResponsiveLayoutPolicy.GetMode(e.NewSize.Width);
+            if (_layoutMode == mode) return;
+            _layoutMode = mode;
+            if (mode == ResponsiveLayoutMode.Wide)
+            {
+                _isAccountPaneCollapsed = false;
+                _isTimelinePaneCollapsed = false;
+            }
+            else
+                _isAccountPaneCollapsed = true;
+            if (mode == ResponsiveLayoutMode.Narrow)
+                _isTimelinePaneCollapsed = true;
+            ApplyResponsiveLayout();
+        }
+
+        private void ApplyResponsiveLayout()
+        {
+            bool showAccounts = !_isAccountPaneCollapsed;
+            bool showCalendar = _layoutMode != ResponsiveLayoutMode.Narrow || !showAccounts;
+            bool showTimeline = !_isTimelinePaneCollapsed && _layoutMode != ResponsiveLayoutMode.Narrow;
+
+            AccountColumn.MinWidth = showAccounts && _layoutMode == ResponsiveLayoutMode.Wide ? 200 : 0;
+            AccountColumn.Width = showAccounts
+                ? (_layoutMode == ResponsiveLayoutMode.Narrow ? new GridLength(1, GridUnitType.Star) : new GridLength(2, GridUnitType.Star))
+                : new GridLength(0);
+            CalendarColumn.MinWidth = 0;
+            CalendarColumn.Width = showCalendar ? new GridLength(5, GridUnitType.Star) : new GridLength(0);
+            TimelineColumn.MinWidth = showTimeline ? 280 : 0;
+            TimelineColumn.Width = showTimeline ? new GridLength(3, GridUnitType.Star) : new GridLength(0);
+            AccountPane.Visibility = showAccounts ? Visibility.Visible : Visibility.Collapsed;
+            CalendarContent.Visibility = showCalendar ? Visibility.Visible : Visibility.Collapsed;
+            TimelinePane.Visibility = showTimeline ? Visibility.Visible : Visibility.Collapsed;
+            CalendarContent.Padding = _layoutMode == ResponsiveLayoutMode.Narrow
+                ? new Thickness(16)
+                : new Thickness(32, 32, 24, 32);
+            ToggleAccountPaneIcon.Glyph = showAccounts ? "\uE76B" : "\uE76C";
+            ToggleTimelinePaneIcon.Glyph = showTimeline ? "\uE76C" : "\uE76B";
+            ToggleTimelinePaneButton.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow
+                ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private void ToggleTimelinePane_Click(object sender, RoutedEventArgs e)
         {
             _isTimelinePaneCollapsed = !_isTimelinePaneCollapsed;
-            TimelineColumn.MinWidth = _isTimelinePaneCollapsed ? 0 : 280;
-            TimelineColumn.Width = _isTimelinePaneCollapsed ? new GridLength(0) : new GridLength(3, GridUnitType.Star);
-            TimelinePane.Visibility = _isTimelinePaneCollapsed ? Visibility.Collapsed : Visibility.Visible;
-            ToggleTimelinePaneIcon.Glyph = _isTimelinePaneCollapsed ? "\uE76B" : "\uE76C";
+            if (_layoutMode == ResponsiveLayoutMode.Medium && !_isTimelinePaneCollapsed)
+                _isAccountPaneCollapsed = true;
+            ApplyResponsiveLayout();
         }
 
         public void RefreshAccountList()

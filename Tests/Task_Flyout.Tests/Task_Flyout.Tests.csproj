@@ -48,6 +48,7 @@
     <Compile Include="..\..\Services\DeferredStartupWork.cs" Link="Source\DeferredStartupWork.cs" />
     <Compile Include="..\..\Services\IncrementalBucketSnapshot.cs" Link="Source\IncrementalBucketSnapshot.cs" />
     <Compile Include="..\..\Services\TaskMutationCoordinator.cs" Link="Source\TaskMutationCoordinator.cs" />
+    <Compile Include="..\..\Services\ResponsiveLayoutPolicy.cs" Link="Source\ResponsiveLayoutPolicy.cs" />
     <Compile Include="..\..\Services\LocalizationHelper.cs" Link="Source\LocalizationHelper.cs" />
     <Compile Include="..\..\Services\UserSafeErrorMessage.cs" Link="Source\UserSafeErrorMessage.cs" />
     <Compile Include="..\..\Services\JsonFallbackPolicy.cs" Link="Source\JsonFallbackPolicy.cs" />

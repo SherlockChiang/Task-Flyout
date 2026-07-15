@@ -15,12 +15,12 @@
         <views:ProviderToTextBrushConverter x:Key="ProviderToTextBrushConverter"/>
     </Page.Resources>
 
-    <Grid Background="#01000000">
+    <Grid x:Name="LayoutRoot" Background="#01000000" SizeChanged="LayoutRoot_SizeChanged">
         <Grid.ColumnDefinitions>
             <!-- Proportional layout: side panes scale with the window and cap on wide
                  screens; the calendar keeps a readable floor (MinWidth) on small laptops. -->
             <ColumnDefinition x:Name="AccountColumn" Width="2*" MinWidth="200" MaxWidth="280"/>
-            <ColumnDefinition Width="5*" MinWidth="380"/>
+            <ColumnDefinition x:Name="CalendarColumn" Width="5*" MinWidth="380"/>
             <ColumnDefinition x:Name="TimelineColumn" Width="3*" MinWidth="280" MaxWidth="360"/>
         </Grid.ColumnDefinitions>
 
@@ -141,14 +141,16 @@
             <Button Grid.Row="3" x:Uid="MainWindow_BtnForceSync" Content="强制立即同步" HorizontalAlignment="Stretch" Click="BtnForceSync_Click"/>
         </Grid>
 
-        <Grid Grid.Column="1" Padding="32,32,24,32">
+        <Grid x:Name="CalendarContent" Grid.Column="1" Padding="32,32,24,32">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Margin="0,0,0,24">
+            <ScrollViewer Grid.Row="0" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,24">
+            <StackPanel Orientation="Horizontal" Spacing="12">
                 <Button x:Uid="CalendarPage_BtnToggleAccounts" x:Name="ToggleAccountPaneButton" Width="40" Height="36" Padding="0" Background="Transparent" BorderThickness="0"
                         Click="ToggleAccountPane_Click">
                     <FontIcon x:Name="ToggleAccountPaneIcon" Glyph="&#xE76B;" FontSize="12"/>
@@ -206,6 +208,7 @@
                 <Button x:Uid="TaskMutation_Retry" x:Name="RetryTaskMutationButton" Content="Retry" Visibility="Collapsed"
                         Click="RetryTaskMutationButton_Click" Padding="10,4"/>
             </StackPanel>
+            </ScrollViewer>
 
             <Grid Grid.Row="1" Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>

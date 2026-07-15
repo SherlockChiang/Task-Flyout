@@ -1635,4 +1635,8 @@ Microsoft：{1}
   <data name="TextRemoveMailOnly" xml:space="preserve"><value>仅移除邮件</value></data>
   <data name="TextDisconnectProvider" xml:space="preserve"><value>完全断开</value></data>
   <data name="TextDisconnectProviderFailed" xml:space="preserve"><value>账户更改未完成，部分本地数据可能仍然保留，请重试。</value></data>
+  <data name="MailPage_AccountsButton.AutomationProperties.Name" xml:space="preserve"><value>显示邮件账户和文件夹</value></data>
+  <data name="MailPage_AccountsButton.ToolTipService.ToolTip" xml:space="preserve"><value>邮件账户和文件夹</value></data>
+  <data name="MailPage_BackButton.AutomationProperties.Name" xml:space="preserve"><value>返回上一个邮件面板</value></data>
+  <data name="MailPage_BackButton.ToolTipService.ToolTip" xml:space="preserve"><value>返回</value></data>
 </root>

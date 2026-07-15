@@ -51,6 +51,9 @@ namespace Task_Flyout.Views
         private bool _isLoadingMessages;
         private bool _suppressSelectionClear;
         private bool _suppressUnreadToggle;
+        private ResponsiveLayoutMode _layoutMode = ResponsiveLayoutMode.Wide;
+        private MailPane _narrowMailPane = MailPane.Accounts;
+        private bool _showMediumAccounts;
         private int _messageLoadVersion;
         private DateTimeOffset? _lastMessageLoadSucceededAt;
         private Task? _refreshAccountsTask;
@@ -61,6 +64,8 @@ namespace Task_Flyout.Views
         private CancellationTokenSource? _imapSetupCts;
         private bool _isSendingMail;
         internal bool IsOpeningFromNotification { get; set; }
+
+        private enum MailPane { Accounts, Messages, Detail }
 
         public MailPage()
         {
@@ -125,6 +130,11 @@ namespace Task_Flyout.Views
             MailListView.ItemsSource = _items;
             _isInitializing = false;
             await RefreshAccountsAsync(autoSelect: !IsOpeningFromNotification);
+            if (IsOpeningFromNotification && _layoutMode == ResponsiveLayoutMode.Narrow)
+            {
+                _narrowMailPane = MailPane.Detail;
+                ApplyResponsiveLayout();
+            }
         }
 
         private async void MailPage_ActualThemeChanged(FrameworkElement sender, object args)
@@ -382,6 +392,7 @@ namespace Task_Flyout.Views
                 _selectedAccountForRemoval = account;
                 RemoveMailButton.IsEnabled = true;
                 await SelectFirstFolderForAccountNodeAsync(node);
+                ShowMailPane(MailPane.Messages);
                 return;
             }
 
@@ -392,6 +403,7 @@ namespace Task_Flyout.Views
             _selectedAccountForRemoval = selection.Account;
             RemoveMailButton.IsEnabled = true;
             await LoadMessagesAsync();
+            ShowMailPane(MailPane.Messages);
         }
 
         private void AccountTree_SelectionChanged(TreeView sender, TreeViewSelectionChangedEventArgs args)
@@ -701,6 +713,7 @@ namespace Task_Flyout.Views
 
         private void ShowAddAccountPanel()
         {
+            ShowMailPane(MailPane.Detail);
             AddAccountPanel.Visibility = Visibility.Visible;
             ComposePanel.Visibility = Visibility.Collapsed;
             DetailPanel.Visibility = Visibility.Collapsed;
@@ -711,7 +724,73 @@ namespace Task_Flyout.Views
 
         private void ComposeButton_Click(object sender, RoutedEventArgs e)
         {
+            ShowMailPane(MailPane.Detail);
             ShowComposePanel();
+        }
+
+        private void ShowMailPane(MailPane pane)
+        {
+            if (_layoutMode == ResponsiveLayoutMode.Wide) return;
+            if (_layoutMode == ResponsiveLayoutMode.Narrow)
+                _narrowMailPane = pane;
+            else
+                _showMediumAccounts = false;
+            ApplyResponsiveLayout();
+        }
+
+        private void LayoutRoot_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            var mode = ResponsiveLayoutPolicy.GetMode(e.NewSize.Width);
+            if (_layoutMode == mode) return;
+            _layoutMode = mode;
+            _showMediumAccounts = false;
+            if (mode == ResponsiveLayoutMode.Narrow)
+                _narrowMailPane = _selectedItem != null ? MailPane.Detail
+                    : _selectedFolder != null ? MailPane.Messages : MailPane.Accounts;
+            ApplyResponsiveLayout();
+        }
+
+        private void MailBackButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_layoutMode != ResponsiveLayoutMode.Narrow) return;
+            _narrowMailPane = _narrowMailPane == MailPane.Detail ? MailPane.Messages : MailPane.Accounts;
+            ApplyResponsiveLayout();
+        }
+
+        private void MailAccountsButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_layoutMode != ResponsiveLayoutMode.Medium) return;
+            _showMediumAccounts = !_showMediumAccounts;
+            ApplyResponsiveLayout();
+        }
+
+        private void ApplyResponsiveLayout()
+        {
+            bool wide = _layoutMode == ResponsiveLayoutMode.Wide;
+            bool medium = _layoutMode == ResponsiveLayoutMode.Medium;
+            bool showAccounts = wide || medium && _showMediumAccounts
+                || _layoutMode == ResponsiveLayoutMode.Narrow && _narrowMailPane == MailPane.Accounts;
+            bool showMessages = wide || medium && !_showMediumAccounts
+                || _layoutMode == ResponsiveLayoutMode.Narrow && _narrowMailPane == MailPane.Messages;
+            bool showDetail = wide || medium && !_showMediumAccounts
+                || _layoutMode == ResponsiveLayoutMode.Narrow && _narrowMailPane == MailPane.Detail;
+
+            AccountColumn.MinWidth = wide ? 190 : 0;
+            AccountColumn.Width = showAccounts ? (wide ? new GridLength(2, GridUnitType.Star) : new GridLength(1, GridUnitType.Star)) : new GridLength(0);
+            MessageColumn.MinWidth = wide ? 280 : 0;
+            MessageColumn.Width = showMessages ? new GridLength(medium ? 2 : 3, GridUnitType.Star) : new GridLength(0);
+            DetailColumn.MinWidth = 0;
+            DetailColumn.Width = showDetail ? new GridLength(medium ? 3 : 5, GridUnitType.Star) : new GridLength(0);
+            MailAccountPane.Visibility = showAccounts ? Visibility.Visible : Visibility.Collapsed;
+            MailMessagePane.Visibility = showMessages ? Visibility.Visible : Visibility.Collapsed;
+            MailDetailPane.Visibility = showDetail ? Visibility.Visible : Visibility.Collapsed;
+            MailBackButton.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow && _narrowMailPane != MailPane.Accounts
+                ? Visibility.Visible : Visibility.Collapsed;
+            MailAccountsButton.Visibility = medium ? Visibility.Visible : Visibility.Collapsed;
+            UnreadOnlyToggle.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow ? Visibility.Collapsed : Visibility.Visible;
+            ComposeButtonText.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow ? Visibility.Collapsed : Visibility.Visible;
+            RefreshButtonText.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow ? Visibility.Collapsed : Visibility.Visible;
+            LayoutRoot.Padding = _layoutMode == ResponsiveLayoutMode.Narrow ? new Thickness(12) : new Thickness(28);
         }
 
         private void ShowComposePanel(MailItem? replyTo = null)
@@ -943,6 +1022,7 @@ namespace Task_Flyout.Views
             }
 
             _selectedItem = item;
+            ShowMailPane(MailPane.Detail);
             _bodyLoadCts?.Cancel();
             var bodyCts = CancellationTokenSource.CreateLinkedTokenSource(_pageRequestCts.Token);
             _bodyLoadCts = bodyCts;

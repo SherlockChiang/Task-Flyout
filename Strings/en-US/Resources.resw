@@ -1635,4 +1635,8 @@ Weather: {3}</value></data>
   <data name="TextRemoveMailOnly" xml:space="preserve"><value>Remove Mail only</value></data>
   <data name="TextDisconnectProvider" xml:space="preserve"><value>Disconnect completely</value></data>
   <data name="TextDisconnectProviderFailed" xml:space="preserve"><value>The account change did not finish. Existing local data may remain; try again.</value></data>
+  <data name="MailPage_AccountsButton.AutomationProperties.Name" xml:space="preserve"><value>Show mail accounts and folders</value></data>
+  <data name="MailPage_AccountsButton.ToolTipService.ToolTip" xml:space="preserve"><value>Mail accounts and folders</value></data>
+  <data name="MailPage_BackButton.AutomationProperties.Name" xml:space="preserve"><value>Back to previous mail pane</value></data>
+  <data name="MailPage_BackButton.ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
 </root>
