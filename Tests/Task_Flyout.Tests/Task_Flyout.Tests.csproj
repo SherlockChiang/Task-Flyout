@@ -44,6 +44,7 @@
     <Compile Include="..\..\Services\RssDataLifecycle.cs" Link="Source\RssDataLifecycle.cs" />
     <Compile Include="..\..\Services\DiagnosticsRedactor.cs" Link="Source\DiagnosticsRedactor.cs" />
     <Compile Include="..\..\Services\DiagnosticLogRetention.cs" Link="Source\DiagnosticLogRetention.cs" />
+    <Compile Include="..\..\Services\DiagnosticEventFormatter.cs" Link="Source\DiagnosticEventFormatter.cs" />
     <Compile Include="..\..\Services\LocalizationHelper.cs" Link="Source\LocalizationHelper.cs" />
     <Compile Include="..\..\Services\UserSafeErrorMessage.cs" Link="Source\UserSafeErrorMessage.cs" />
     <Compile Include="..\..\Services\JsonFallbackPolicy.cs" Link="Source\JsonFallbackPolicy.cs" />
