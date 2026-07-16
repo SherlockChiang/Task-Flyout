@@ -136,6 +136,7 @@
         <Grid x:Name="TaskContent" Grid.Column="1" Padding="32">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
@@ -185,7 +186,7 @@
                             TextChanged="TaskSearchBox_TextChanged"
                             AutomationProperties.Name="Search cached tasks"/>
 
-            <Grid Grid.Row="2" RowSpacing="14">
+            <Grid Grid.Row="2" RowSpacing="14" MinHeight="0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>

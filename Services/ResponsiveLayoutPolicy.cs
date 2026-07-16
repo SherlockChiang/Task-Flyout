@@ -18,5 +18,8 @@ namespace Task_Flyout.Services
                 : width >= MediumMinimumWidth
                     ? ResponsiveLayoutMode.Medium
                     : ResponsiveLayoutMode.Narrow;
+
+        public static double GetFlyoutCalendarHeight(double availableHeight)
+            => availableHeight < 520 ? 190 : availableHeight < 650 ? 250 : 354;
     }
 }

@@ -1485,6 +1485,12 @@
   <data name="RssPage_AllSubscriptions.Text" xml:space="preserve">
     <value>全部订阅文章</value>
   </data>
+  <data name="RssPage_ShowSubscriptions.Content" xml:space="preserve">
+    <value>订阅源</value>
+  </data>
+  <data name="RssPage_ShowSubscriptions.AutomationProperties.Name" xml:space="preserve">
+    <value>显示订阅源</value>
+  </data>
   <data name="RssPage_AllArticles.Text" xml:space="preserve">
     <value>全部文章</value>
   </data>

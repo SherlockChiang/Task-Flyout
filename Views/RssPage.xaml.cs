@@ -45,6 +45,8 @@ namespace Task_Flyout.Views
         private string _articleSearchText = "";
         private CancellationTokenSource? _articleSearchCts;
         private int _articleQueryGeneration;
+        private bool _isNarrowLayout;
+        private bool _showSubscriptionsInNarrow;
         private ScrollViewer? _articleScrollViewer;
         private RssArticle? _selectedArticle;
         private bool _rssWebViewConfigured;
@@ -351,6 +353,11 @@ namespace Task_Flyout.Views
             }
 
             ResetAndLoadCachedArticles();
+            if (_isNarrowLayout)
+            {
+                _showSubscriptionsInNarrow = false;
+                ApplyRssResponsiveLayout();
+            }
         }
 
         private async void AddSubscriptionButton_Click(object sender, RoutedEventArgs e)
@@ -1229,6 +1236,72 @@ namespace Task_Flyout.Views
         {
             ShowArticleList();
             ResetAndLoadCachedArticles();
+            if (_isNarrowLayout)
+            {
+                _showSubscriptionsInNarrow = false;
+                ApplyRssResponsiveLayout();
+            }
+        }
+
+        private void RssContentGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            bool narrow = e.NewSize.Width < ResponsiveLayoutPolicy.MediumMinimumWidth;
+            if (_isNarrowLayout == narrow) return;
+            _isNarrowLayout = narrow;
+            _showSubscriptionsInNarrow = narrow && _selectedSubscriptionId == null && _selectedFolderId == null && Articles.Count == 0;
+            ApplyRssResponsiveLayout();
+        }
+
+        private void ShowSubscriptionsButton_Click(object sender, RoutedEventArgs e)
+        {
+            _showSubscriptionsInNarrow = true;
+            ApplyRssResponsiveLayout();
+        }
+
+        private void ApplyRssResponsiveLayout()
+        {
+            LayoutRoot.Padding = _isNarrowLayout ? new Thickness(12) : new Thickness(28);
+            if (!_isNarrowLayout)
+            {
+                SubscriptionPane.Visibility = Visibility.Visible;
+                ArticlePane.Visibility = Visibility.Visible;
+                Grid.SetColumn(SubscriptionPane, 0);
+                Grid.SetColumnSpan(SubscriptionPane, 1);
+                Grid.SetColumn(ArticlePane, 1);
+                Grid.SetColumnSpan(ArticlePane, 1);
+                ShowSubscriptionsButton.Visibility = Visibility.Collapsed;
+                Grid.SetRow(ShowSubscriptionsButton, 0);
+                Grid.SetColumn(ShowSubscriptionsButton, 1);
+                Grid.SetRow(ArticleFilterBox, 0);
+                Grid.SetColumn(ArticleFilterBox, 2);
+                Grid.SetRow(ArticleSearchBox, 0);
+                Grid.SetColumn(ArticleSearchBox, 3);
+                Grid.SetColumnSpan(ArticleSearchBox, 1);
+                Grid.SetRow(RefreshButton, 0);
+                Grid.SetColumn(RefreshButton, 4);
+                Grid.SetColumnSpan(ArticleHeaderTitle, 1);
+                ArticleSearchColumn.Width = new GridLength(200);
+                return;
+            }
+
+            SubscriptionPane.Visibility = _showSubscriptionsInNarrow ? Visibility.Visible : Visibility.Collapsed;
+            ArticlePane.Visibility = _showSubscriptionsInNarrow ? Visibility.Collapsed : Visibility.Visible;
+            Grid.SetColumn(SubscriptionPane, 0);
+            Grid.SetColumnSpan(SubscriptionPane, 2);
+            Grid.SetColumn(ArticlePane, 0);
+            Grid.SetColumnSpan(ArticlePane, 2);
+            ShowSubscriptionsButton.Visibility = Visibility.Visible;
+            Grid.SetRow(ShowSubscriptionsButton, 0);
+            Grid.SetColumn(ShowSubscriptionsButton, 4);
+            Grid.SetColumnSpan(ArticleHeaderTitle, 4);
+            Grid.SetRow(ArticleFilterBox, 1);
+            Grid.SetColumn(ArticleFilterBox, 0);
+            Grid.SetRow(ArticleSearchBox, 1);
+            Grid.SetColumn(ArticleSearchBox, 1);
+            Grid.SetColumnSpan(ArticleSearchBox, 3);
+            Grid.SetRow(RefreshButton, 1);
+            Grid.SetColumn(RefreshButton, 4);
+            ArticleSearchColumn.Width = new GridLength(1, GridUnitType.Star);
         }
 
         private void ArticleFilterBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

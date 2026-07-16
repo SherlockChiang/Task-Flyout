@@ -10,11 +10,15 @@ using Task_Flyout.Services;
 using Task_Flyout.Views;
 using Windows.Storage;
 using Microsoft.Windows.ApplicationModel.Resources;
+using Windows.Graphics;
 
 namespace Task_Flyout
 {
     public sealed partial class MainWindow : Window
     {
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern uint GetDpiForWindow(IntPtr hWnd);
+
         private ResourceLoader _loader;
         private bool _pendingMailMessageNavigation;
         private Type _lastContentPageType = typeof(Views.CalendarPage);
@@ -33,6 +37,7 @@ namespace Task_Flyout
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(null);
             this.AppWindow.Closing += AppWindow_Closing;
+            SizeToCurrentWorkArea();
 
             ContentFrame.Navigated += ContentFrame_Navigated;
 
@@ -41,6 +46,21 @@ namespace Task_Flyout
             var calendarItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault();
             if (calendarItem != null) MainNav.SelectedItem = calendarItem;
             ContentFrame.Navigate(ShouldShowOnboardingOnLaunch() ? typeof(Views.AddAccountPage) : typeof(Views.CalendarPage));
+        }
+
+        private void SizeToCurrentWorkArea()
+        {
+            var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
+            var display = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(windowId, Microsoft.UI.Windowing.DisplayAreaFallback.Primary);
+            var workArea = display.WorkArea;
+            var scale = Math.Max(1, GetDpiForWindow(hWnd) / 96d);
+            var size = WindowSizingPolicy.Calculate(1200, 800, scale, workArea.Width, workArea.Height, 24);
+            int width = size.Width;
+            int height = size.Height;
+            int x = workArea.X + Math.Max(0, (workArea.Width - width) / 2);
+            int y = workArea.Y + Math.Max(0, (workArea.Height - height) / 2);
+            AppWindow.MoveAndResize(new RectInt32(x, y, width, height));
         }
 
         private bool ShouldShowOnboardingOnLaunch()

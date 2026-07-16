@@ -15,4 +15,11 @@ public class ResponsiveLayoutPolicyTests
     {
         Assert.Equal(expected, ResponsiveLayoutPolicy.GetMode(width));
     }
+
+    [Theory]
+    [InlineData(700, 354)]
+    [InlineData(600, 250)]
+    [InlineData(500, 190)]
+    public void Selects_compact_flyout_calendar_height(double availableHeight, double expected)
+        => Assert.Equal(expected, ResponsiveLayoutPolicy.GetFlyoutCalendarHeight(availableHeight));
 }

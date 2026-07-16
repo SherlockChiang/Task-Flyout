@@ -353,8 +353,8 @@
         </Grid>
 
         <ContentDialog x:Uid="CalendarDialog" x:Name="EditDialog" Title="编辑日程 / 任务" PrimaryButtonText="保存" SecondaryButtonText="删除" CloseButtonText="取消" PrimaryButtonClick="EditDialog_PrimaryButtonClick" SecondaryButtonClick="EditDialog_SecondaryButtonClick">
-            <ScrollViewer MaxHeight="560" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
-                <StackPanel Spacing="16" Width="420" MaxWidth="420" Margin="0,12,0,0">
+            <ScrollViewer MaxHeight="560" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto" HorizontalScrollMode="Disabled">
+                <StackPanel Spacing="16" MaxWidth="420" MinWidth="0" HorizontalAlignment="Stretch" Margin="0,12,0,0">
                     <ComboBox x:Uid="CalendarDialog_Provider" x:Name="EditCmbProvider" Header="所属账户" HorizontalAlignment="Stretch" />
                     <StackPanel Orientation="Horizontal" Spacing="24">
                         <RadioButton x:Uid="CalendarDialog_RadioEvent" x:Name="EditRadioEvent" Content="日程" IsChecked="True" Checked="EditRadioType_Changed"/>

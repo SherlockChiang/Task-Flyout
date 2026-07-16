@@ -74,7 +74,7 @@
                         HorizontalAlignment="Left">
             </StackPanel>
 
-            <Grid Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,12" Width="320" Height="354">
+            <Grid x:Name="CalendarHost" Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,12" Width="320" Height="354">
                 <CalendarView x:Name="MainCalendar" 
                               HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                               CalendarViewDayItemChanging="MainCalendar_CalendarViewDayItemChanging" 

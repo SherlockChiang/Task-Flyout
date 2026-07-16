@@ -232,7 +232,7 @@
 
                 <!-- Weather Source -->
                 <StackPanel Spacing="8">
-                    <ComboBox x:Name="SourceComboBox" x:Uid="WeatherPage_SourceHeader" Width="460" HorizontalAlignment="Left" SelectionChanged="SourceComboBox_SelectionChanged">
+                    <ComboBox x:Name="SourceComboBox" x:Uid="WeatherPage_SourceHeader" MaxWidth="460" HorizontalAlignment="Stretch" SelectionChanged="SourceComboBox_SelectionChanged">
                         <ComboBoxItem Content="Open-Meteo" Tag="OpenMeteo"/>
                         <ComboBoxItem Content="wttr.in" Tag="WttrIn"/>
                     </ComboBox>
@@ -243,10 +243,10 @@
 
                 <!-- Weather Icon (emoji / custom font / imported icon pack) -->
                 <StackPanel Spacing="8">
-                    <ComboBox x:Uid="WeatherPage_IconFontHeader" x:Name="IconFontComboBox" Width="460" HorizontalAlignment="Left" SelectionChanged="IconFontComboBox_SelectionChanged"/>
+                    <ComboBox x:Uid="WeatherPage_IconFontHeader" x:Name="IconFontComboBox" MaxWidth="460" HorizontalAlignment="Stretch" SelectionChanged="IconFontComboBox_SelectionChanged"/>
 
                     <AutoSuggestBox x:Uid="WeatherPage_CustomFontBox" x:Name="CustomFontBox"
-                                    Width="460" HorizontalAlignment="Left" Visibility="Collapsed"
+                                    MaxWidth="460" HorizontalAlignment="Stretch" Visibility="Collapsed"
                                     TextChanged="CustomFontBox_TextChanged"
                                     QuerySubmitted="CustomFontBox_QuerySubmitted"
                                     SuggestionChosen="CustomFontBox_SuggestionChosen"/>

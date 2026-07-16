@@ -238,7 +238,7 @@
                                 </Button>
                             </Grid>
                         </Border>
-                        <Grid Grid.Row="5" MinHeight="320">
+                        <Grid Grid.Row="5" MinHeight="0">
                             <Grid x:Name="DetailHtmlViewHost" Visibility="Collapsed"/>
                             <ScrollViewer x:Name="DetailTextScrollViewer" VerticalScrollBarVisibility="Auto">
                                 <TextBlock x:Name="DetailPreview" FontSize="14" TextWrapping="WrapWholeWords"

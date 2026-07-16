@@ -871,6 +871,15 @@ namespace Task_Flyout
 
             int logicalWidth = 360;
             double targetLogicalHeight = 0;
+            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            double scaleFactor = Math.Max(1, GetDpiForWindow(hWnd) / 96.0);
+            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
+            var display = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(windowId, Microsoft.UI.Windowing.DisplayAreaFallback.Nearest);
+            var workArea = display.WorkArea;
+            double availableLogicalHeight = workArea.Height / scaleFactor;
+            double calendarHeight = ResponsiveLayoutPolicy.GetFlyoutCalendarHeight(availableLogicalHeight);
+            if (CalendarHost != null) CalendarHost.Height = calendarHeight;
+            if (AgendaContainer != null) AgendaContainer.MinHeight = availableLogicalHeight < 650 ? 0 : 80;
 
             if (AddPanel != null && AddPanel.Visibility == Visibility.Visible)
             {
@@ -887,7 +896,7 @@ namespace Task_Flyout
                 double headerHeight = 16; // top padding
                 headerHeight += 50;       // clock area
                 headerHeight += 12;       // clock bottom margin
-                headerHeight += 354;      // calendar fixed height
+                headerHeight += calendarHeight;
                 headerHeight += 12;       // calendar bottom margin
 
                 // Account for weather detail strip when visible
@@ -912,17 +921,10 @@ namespace Task_Flyout
                 targetLogicalHeight = headerHeight + listHeight + bottomAndAgendaChrome;
             }
 
-            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            double scaleFactor = GetDpiForWindow(hWnd) / 96.0;
+            int physicalWidth = (int)Math.Ceiling(logicalWidth * scaleFactor);
+            int physicalHeight = (int)Math.Ceiling(targetLogicalHeight * scaleFactor);
 
-            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
-            var display = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(windowId, Microsoft.UI.Windowing.DisplayAreaFallback.Nearest);
-            var workArea = display.WorkArea;
-
-            int physicalWidth = (int)(logicalWidth * scaleFactor);
-            int physicalHeight = (int)(targetLogicalHeight * scaleFactor);
-
-            int maxPhysicalHeight = workArea.Height - 80;
+            int maxPhysicalHeight = Math.Max(1, workArea.Height - (int)Math.Ceiling(24 * scaleFactor));
 
             if (physicalHeight > maxPhysicalHeight)
             {
@@ -946,7 +948,7 @@ namespace Task_Flyout
 
             _appWindow.Resize(new SizeInt32(physicalWidth, physicalHeight));
 
-            int physicalMargin = (int)(12 * scaleFactor);
+            int physicalMargin = (int)Math.Ceiling(12 * scaleFactor);
             int targetX = workArea.X + workArea.Width - physicalWidth - physicalMargin;
             int targetY = workArea.Y + workArea.Height - physicalHeight - physicalMargin;
 
