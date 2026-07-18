@@ -15,13 +15,17 @@
             <Border x:Name="CurrentWeatherCard" Visibility="Collapsed"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8"
                     BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="24">
-                <Grid>
+                <Grid x:Name="CurrentWeatherGrid" RowSpacing="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4" Margin="0,0,28,0" MinWidth="90">
+                    <StackPanel x:Name="CurrentWeatherSummary" Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4" Margin="0,0,28,0" MinWidth="90">
                         <Grid Width="72" Height="72" HorizontalAlignment="Center">
                             <TextBlock x:Name="CurrentIcon" FontSize="48" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             <Image x:Name="CurrentIconImage0" Visibility="Collapsed" Stretch="Uniform"/>
@@ -32,9 +36,9 @@
                         <TextBlock x:Name="CurrentTemp" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
-                        <TextBlock x:Name="CurrentDesc" FontSize="16" FontWeight="SemiBold"/>
-                        <TextBlock x:Name="CurrentCity" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    <StackPanel x:Name="CurrentWeatherDetails" Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+                        <TextBlock x:Name="CurrentDesc" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="CurrentCity" FontSize="13" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                         <StackPanel x:Name="CurrentDetailsPanel" Orientation="Horizontal" Spacing="16" Margin="0,4,0,0"/>
                     </StackPanel>
                 </Grid>
@@ -92,13 +96,17 @@
                 <Border x:Name="HourDetailPanel" Visibility="Collapsed"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8"
                         BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="24">
-                    <Grid>
+                    <Grid x:Name="HourDetailGrid" RowSpacing="12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Center" Spacing="4" Margin="0,0,24,0" MinWidth="80">
+                        <StackPanel x:Name="HourDetailSummary" Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Center" Spacing="4" Margin="0,0,24,0" MinWidth="80">
                             <Grid Width="64" Height="64" HorizontalAlignment="Center">
                                 <TextBlock x:Name="DetailIcon" FontSize="44" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 <Image x:Name="DetailIconImage0" Visibility="Collapsed" Stretch="Uniform"/>

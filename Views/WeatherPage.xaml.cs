@@ -572,6 +572,17 @@ namespace Task_Flyout.Views
             IconPackButtonPanel.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
             AlertHoursPanel.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
             AlertHoursPanel.HorizontalAlignment = narrow ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
+            Grid.SetRow(CurrentWeatherSummary, 0);
+            Grid.SetColumn(CurrentWeatherSummary, 0);
+            Grid.SetRow(CurrentWeatherDetails, narrow ? 1 : 0);
+            Grid.SetColumn(CurrentWeatherDetails, narrow ? 0 : 1);
+            CurrentWeatherSummary.Margin = narrow ? new Thickness(0) : new Thickness(0, 0, 28, 0);
+            CurrentDetailsPanel.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
+            Grid.SetRow(HourDetailSummary, 0);
+            Grid.SetColumn(HourDetailSummary, 0);
+            Grid.SetRow(DetailFieldsRepeater, narrow ? 1 : 0);
+            Grid.SetColumn(DetailFieldsRepeater, narrow ? 0 : 1);
+            HourDetailSummary.Margin = narrow ? new Thickness(0) : new Thickness(0, 0, 24, 0);
         }
 
         private void SetIconPackOperation(bool isRunning)

@@ -69,10 +69,14 @@
             </Grid>
 
             <!-- Weather detail strip (configurable fields) -->
-            <StackPanel x:Name="WeatherDetailStrip" Grid.Row="1" Orientation="Horizontal" Spacing="12"
-                        Margin="16,0,16,8" Visibility="Collapsed"
-                        HorizontalAlignment="Left">
-            </StackPanel>
+            <ItemsControl x:Name="WeatherDetailStrip" Grid.Row="1" Margin="16,0,16,8" Visibility="Collapsed"
+                          HorizontalAlignment="Stretch">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <ItemsWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="3"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
 
             <Grid x:Name="CalendarHost" Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,12" Width="320" Height="354">
                 <CalendarView x:Name="MainCalendar" 

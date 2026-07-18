@@ -1267,7 +1267,7 @@ namespace Task_Flyout
 
         private void BuildWeatherDetailStrip(WeatherInfo info, WeatherService weatherService)
         {
-            WeatherDetailStrip.Children.Clear();
+            WeatherDetailStrip.Items.Clear();
             var fields = weatherService.GetEnabledFields();
 
             // Remove temperature and description since they're already shown in the weather button
@@ -1285,7 +1285,7 @@ namespace Task_Flyout
             void AddChip(string glyph, string text)
             {
                 if (string.IsNullOrEmpty(text)) return;
-                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new Thickness(0, 0, 12, 0) };
                 panel.Children.Add(new FontIcon
                 {
                     Glyph = glyph,
@@ -1301,7 +1301,7 @@ namespace Task_Flyout
                     Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
                     VerticalAlignment = VerticalAlignment.Center
                 });
-                WeatherDetailStrip.Children.Add(panel);
+                WeatherDetailStrip.Items.Add(panel);
             }
 
             if (fields.Contains("feelslike") && !string.IsNullOrEmpty(info.FeelsLike))
@@ -1331,7 +1331,7 @@ namespace Task_Flyout
                     AddChip("\uE790", hw.PrecipProbability);
             }
 
-            WeatherDetailStrip.Visibility = WeatherDetailStrip.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            WeatherDetailStrip.Visibility = WeatherDetailStrip.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private static string GetWeatherLang()

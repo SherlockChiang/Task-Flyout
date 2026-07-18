@@ -11,19 +11,23 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Grid ColumnSpacing="16">
+        <Grid x:Name="MailHeaderGrid" ColumnSpacing="16" RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <StackPanel Spacing="2">
+            <StackPanel x:Name="MailHeaderTitle" Spacing="2" MinWidth="0">
                 <TextBlock x:Name="TitleText" x:Uid="MailPage_Title" Text="邮件" Style="{StaticResource TitleTextBlockStyle}"/>
                 <TextBlock x:Name="SubtitleText" x:Uid="MailPage_Subtitle" Text="账户、文件夹与收件箱" FontSize="13"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <StackPanel x:Name="MailHeaderCommands" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <Button x:Uid="MailPage_AccountsButton" x:Name="MailAccountsButton" Visibility="Collapsed" Click="MailAccountsButton_Click" Padding="10,6">
                     <FontIcon Glyph="&#xE716;" FontSize="14"/>
                 </Button>

@@ -21,6 +21,7 @@ namespace Task_Flyout
 
         private ResourceLoader _loader;
         private bool _pendingMailMessageNavigation;
+        private bool _isClampingToWorkArea;
         private Type _lastContentPageType = typeof(Views.CalendarPage);
 
         public MainWindow()
@@ -29,6 +30,11 @@ namespace Task_Flyout
             if (this.Content is FrameworkElement fe)
             {
                 fe.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
+                fe.Loaded += (_, _) =>
+                {
+                    if (fe.XamlRoot != null)
+                        fe.XamlRoot.Changed += (_, _) => EnsureWithinCurrentWorkArea();
+                };
             }
             this.AppWindow.SetIcon(System.IO.Path.Combine(System.AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
             _loader = new ResourceLoader();
@@ -46,6 +52,32 @@ namespace Task_Flyout
             var calendarItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault();
             if (calendarItem != null) MainNav.SelectedItem = calendarItem;
             ContentFrame.Navigate(ShouldShowOnboardingOnLaunch() ? typeof(Views.AddAccountPage) : typeof(Views.CalendarPage));
+        }
+
+        private void EnsureWithinCurrentWorkArea()
+        {
+            if (_isClampingToWorkArea) return;
+            var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
+            var display = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(windowId, Microsoft.UI.Windowing.DisplayAreaFallback.Nearest);
+            var workArea = display.WorkArea;
+            int margin = (int)Math.Ceiling(12 * Math.Max(1, GetDpiForWindow(hWnd) / 96d));
+            int width = Math.Min(AppWindow.Size.Width, Math.Max(1, workArea.Width - margin * 2));
+            int height = Math.Min(AppWindow.Size.Height, Math.Max(1, workArea.Height - margin * 2));
+            int x = Math.Clamp(AppWindow.Position.X, workArea.X + margin, workArea.X + workArea.Width - width - margin);
+            int y = Math.Clamp(AppWindow.Position.Y, workArea.Y + margin, workArea.Y + workArea.Height - height - margin);
+            if (width == AppWindow.Size.Width && height == AppWindow.Size.Height
+                && x == AppWindow.Position.X && y == AppWindow.Position.Y) return;
+
+            _isClampingToWorkArea = true;
+            try
+            {
+                AppWindow.MoveAndResize(new RectInt32(x, y, width, height));
+            }
+            finally
+            {
+                _isClampingToWorkArea = false;
+            }
         }
 
         private void SizeToCurrentWorkArea()

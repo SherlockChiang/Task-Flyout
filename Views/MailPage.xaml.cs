@@ -860,6 +860,11 @@ namespace Task_Flyout.Views
             ComposeButtonText.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow ? Visibility.Collapsed : Visibility.Visible;
             RefreshButtonText.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow ? Visibility.Collapsed : Visibility.Visible;
             LayoutRoot.Padding = _layoutMode == ResponsiveLayoutMode.Narrow ? new Thickness(12) : new Thickness(28);
+            Grid.SetRow(MailHeaderCommands, _layoutMode == ResponsiveLayoutMode.Narrow ? 1 : 0);
+            Grid.SetColumn(MailHeaderCommands, _layoutMode == ResponsiveLayoutMode.Narrow ? 0 : 1);
+            Grid.SetColumnSpan(MailHeaderCommands, _layoutMode == ResponsiveLayoutMode.Narrow ? 2 : 1);
+            MailHeaderCommands.HorizontalAlignment = _layoutMode == ResponsiveLayoutMode.Narrow
+                ? HorizontalAlignment.Left : HorizontalAlignment.Right;
         }
 
         private void ShowComposePanel(MailItem? replyTo = null)
