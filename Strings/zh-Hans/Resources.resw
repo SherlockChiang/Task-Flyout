@@ -306,6 +306,12 @@
   <data name="Flyout_TextAdd.Text" xml:space="preserve">
     <value>添加</value>
   </data>
+  <data name="Flyout_BtnAdd.AutomationProperties.Name" xml:space="preserve">
+    <value>添加项目</value>
+  </data>
+  <data name="Flyout_BtnAdd.ToolTipService.ToolTip" xml:space="preserve">
+    <value>添加项目</value>
+  </data>
   <data name="Flyout_TextNew.Text" xml:space="preserve">
     <value>新建</value>
   </data>

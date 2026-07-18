@@ -173,11 +173,8 @@
             </Button>
             <ProgressRing x:Name="SyncProgress" Grid.Column="3" Width="20" Height="20" Margin="12,0,0,0"
                           IsActive="False" Visibility="Collapsed" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-            <Button Grid.Column="4" Style="{StaticResource AccentButtonStyle}" Padding="12,4" Click="BtnToggleAddPanel_Click">
-                <StackPanel Orientation="Horizontal">
-                    <SymbolIcon Symbol="Add" Margin="0,0,8,0"/>
-                    <TextBlock x:Uid="Flyout_TextAdd" Text="添加"/>
-                </StackPanel>
+            <Button x:Uid="Flyout_BtnAdd" Grid.Column="4" Style="{StaticResource AccentButtonStyle}" Width="36" Height="32" Padding="0" Click="BtnToggleAddPanel_Click">
+                <SymbolIcon Symbol="Add"/>
             </Button>
         </Grid>
 

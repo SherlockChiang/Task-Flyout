@@ -59,13 +59,16 @@
                                MaxWidth="120" TextTrimming="CharacterEllipsis"/>
                     <TextBlock x:Name="TxtFeels" Text="" FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                               VerticalAlignment="Center" Visibility="Collapsed"/>
+                               VerticalAlignment="Center" Visibility="Collapsed"
+                               MaxWidth="90" TextTrimming="CharacterEllipsis"/>
                     <TextBlock x:Name="TxtHumidity" Text="" FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                               VerticalAlignment="Center" Visibility="Collapsed"/>
+                               VerticalAlignment="Center" Visibility="Collapsed"
+                               MaxWidth="90" TextTrimming="CharacterEllipsis"/>
                     <TextBlock x:Name="TxtWind" Text="" FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                               VerticalAlignment="Center" Visibility="Collapsed"/>
+                               VerticalAlignment="Center" Visibility="Collapsed"
+                               MaxWidth="90" TextTrimming="CharacterEllipsis"/>
                 </StackPanel>
             </Border>
         </Button>

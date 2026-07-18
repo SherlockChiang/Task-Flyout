@@ -306,6 +306,12 @@
   <data name="Flyout_TextAdd.Text" xml:space="preserve">
     <value>Add</value>
   </data>
+  <data name="Flyout_BtnAdd.AutomationProperties.Name" xml:space="preserve">
+    <value>Add item</value>
+  </data>
+  <data name="Flyout_BtnAdd.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Add item</value>
+  </data>
   <data name="Flyout_TextNew.Text" xml:space="preserve">
     <value>New</value>
   </data>

@@ -762,6 +762,7 @@ namespace Task_Flyout.Views
             EditEndTimePicker.SelectedTime = null;
 
             EditDialog.XamlRoot = this.XamlRoot;
+            PrepareEditDialogSize();
             _ = EditDialog.ShowAsync();
         }
 
@@ -813,6 +814,7 @@ namespace Task_Flyout.Views
 
             PrepareDialogForEdit(item);
             EditDialog.XamlRoot = this.XamlRoot;
+            PrepareEditDialogSize();
             await EditDialog.ShowAsync();
         }
 
@@ -822,9 +824,16 @@ namespace Task_Flyout.Views
             {
                 PrepareDialogForEdit(item);
                 EditDialog.XamlRoot = this.XamlRoot;
+                PrepareEditDialogSize();
                 try { await EditDialog.ShowAsync(); } catch { }
             };
             if (this.XamlRoot == null) this.Loaded += (s, e) => showDialog(); else showDialog();
+        }
+
+        private void PrepareEditDialogSize()
+        {
+            if (XamlRoot == null) return;
+            EditDialogScrollViewer.MaxHeight = Math.Clamp(XamlRoot.Size.Height - 180, 120, 560);
         }
 
         private async void EditDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)

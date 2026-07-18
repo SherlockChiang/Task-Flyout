@@ -809,6 +809,7 @@ namespace Task_Flyout.Views
 
         private void LayoutRoot_SizeChanged(object sender, SizeChangedEventArgs e)
         {
+            ComposeBodyBox.MinHeight = e.NewSize.Height < 600 ? 120 : 220;
             var mode = ResponsiveLayoutPolicy.GetMode(e.NewSize.Width);
             if (_layoutMode == mode) return;
             _layoutMode = mode;

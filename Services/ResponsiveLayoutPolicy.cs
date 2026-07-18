@@ -1,3 +1,5 @@
+using System;
+
 namespace Task_Flyout.Services
 {
     public enum ResponsiveLayoutMode
@@ -11,6 +13,7 @@ namespace Task_Flyout.Services
     {
         public const double MediumMinimumWidth = 720;
         public const double WideMinimumWidth = 1100;
+        public const double ComfortableTaskbarMinimumWidth = 1400;
 
         public static ResponsiveLayoutMode GetMode(double width)
             => width >= WideMinimumWidth
@@ -24,5 +27,11 @@ namespace Task_Flyout.Services
 
         public static double GetCalendarCellMinimumHeight(double availableHeight)
             => availableHeight < 420 ? 40 : 56;
+
+        public static double GetWeatherBarMaximumWidth(double taskbarLogicalWidth)
+            => Math.Clamp(taskbarLogicalWidth * 0.32, 80, 420);
+
+        public static bool UseCompactWeatherBar(double taskbarLogicalWidth)
+            => taskbarLogicalWidth < ComfortableTaskbarMinimumWidth;
     }
 }

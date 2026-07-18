@@ -468,7 +468,8 @@ namespace Task_Flyout
                 pillHeight = (int)(28 * scaleFactor);
             int pillWidth = (int)(_preferredLogicalWidth * scaleFactor);
             int minPillWidth = (int)(MinLogicalWidth * scaleFactor);
-            int maxPillWidth = (int)(MaxLogicalWidth * scaleFactor);
+            double taskbarLogicalWidth = (tbClient.Right - tbClient.Left) / scaleFactor;
+            int maxPillWidth = (int)(ResponsiveLayoutPolicy.GetWeatherBarMaximumWidth(taskbarLogicalWidth) * scaleFactor);
             pillWidth = Math.Clamp(pillWidth, minPillWidth, maxPillWidth);
 
             IntPtr previousFluentFlyout = _fluentFlyoutHwnd;
@@ -1458,24 +1459,25 @@ namespace Task_Flyout
 
                 // Hide secondary fields when an alert is active to avoid text crowding
                 bool hasAlert = alert != null;
+                bool compactBar = IsCompactTaskbar();
 
                 // Location
-                bool showLocation = !hasAlert && enabledFields.Contains("location") && !string.IsNullOrWhiteSpace(info.City);
+                bool showLocation = !hasAlert && !compactBar && enabledFields.Contains("location") && !string.IsNullOrWhiteSpace(info.City);
                 TxtLocation.Visibility = showLocation ? Visibility.Visible : Visibility.Collapsed;
                 if (showLocation) TxtLocation.Text = FormatBarLocation(info.City);
 
                 // Feels like
-                bool showFeels = !hasAlert && enabledFields.Contains("feelslike") && !string.IsNullOrEmpty(info.FeelsLike);
+                bool showFeels = !hasAlert && !compactBar && enabledFields.Contains("feelslike") && !string.IsNullOrEmpty(info.FeelsLike);
                 TxtFeels.Visibility = showFeels ? Visibility.Visible : Visibility.Collapsed;
                 if (showFeels) TxtFeels.Text = info.FeelsLike;
 
                 // Humidity
-                bool showHum = !hasAlert && enabledFields.Contains("humidity") && !string.IsNullOrEmpty(info.Humidity);
+                bool showHum = !hasAlert && !compactBar && enabledFields.Contains("humidity") && !string.IsNullOrEmpty(info.Humidity);
                 TxtHumidity.Visibility = showHum ? Visibility.Visible : Visibility.Collapsed;
                 if (showHum) TxtHumidity.Text = info.Humidity;
 
                 // Wind
-                bool showWind = !hasAlert && enabledFields.Contains("wind") && !string.IsNullOrEmpty(info.WindSpeed);
+                bool showWind = !hasAlert && !compactBar && enabledFields.Contains("wind") && !string.IsNullOrEmpty(info.WindSpeed);
                 TxtWind.Visibility = showWind ? Visibility.Visible : Visibility.Collapsed;
                 if (showWind) TxtWind.Text = info.WindSpeed;
 
@@ -1591,6 +1593,13 @@ namespace Task_Flyout
         private void ContentPanel_Click(object sender, RoutedEventArgs e)
         {
             App.OpenMainWindowInternal(win => win.NavigateToWeather());
+        }
+
+        private bool IsCompactTaskbar()
+        {
+            if (_taskbarHwnd == IntPtr.Zero || !GetClientRect(_taskbarHwnd, out RECT client)) return false;
+            double scale = Math.Max(1, GetDpiForWindow(_taskbarHwnd) / 96d);
+            return ResponsiveLayoutPolicy.UseCompactWeatherBar((client.Right - client.Left) / scale);
         }
 
         /// <summary>True while the underlying native window still exists. Returns false once
