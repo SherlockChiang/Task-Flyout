@@ -34,6 +34,20 @@ To create the certificate secret locally in PowerShell:
 
 The package version is read from `Package.appxmanifest` at build time. Every push creates a new prerelease tag using the manifest version, GitHub run number, and run attempt, so repeated beta builds for the same app version do not overwrite each other.
 
+## Local Sideload Packages
+
+Local packaging is unsigned by default because Store packages are signed after certification and CI signs beta artifacts in its protected release job. Before installing a locally generated MSIX, sign it with the local sideload helper:
+
+```powershell
+.\scripts\sign-sideload-package.ps1 `
+  -PackagePath ".\AppPackages\Task_Flyout_1.3.0.0_x64_Test\Task_Flyout_1.3.0.0_x64.msix" `
+  -TrustMachine
+```
+
+The first `-TrustMachine` run creates a non-exportable current-user test signing key and requests UAC approval to trust only its public certificate in `LocalMachine\TrustedPeople`. Later packages can be signed with the same command; machine trust is reused. This certificate is only for local testing and must not be used for public releases.
+
+The certificate subject is read from `Package.appxmanifest`, and the script fails if signing or verification is unsuccessful. Re-run the helper whenever packaging overwrites the MSIX.
+
 ## Notes
 
 - The workflow only packages `win-x64` for beta releases.
