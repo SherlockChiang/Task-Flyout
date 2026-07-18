@@ -21,5 +21,8 @@ namespace Task_Flyout.Services
 
         public static double GetFlyoutCalendarHeight(double availableHeight)
             => availableHeight < 520 ? 190 : availableHeight < 650 ? 250 : 354;
+
+        public static double GetCalendarCellMinimumHeight(double availableHeight)
+            => availableHeight < 420 ? 40 : 56;
     }
 }

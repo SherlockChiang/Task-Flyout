@@ -4,7 +4,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Background="Transparent">
 
-    <Grid Padding="40" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="500">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
+    <Grid Padding="24" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="500">
         <StackPanel Spacing="24">
             <TextBlock x:Uid="AddAccount_Title" Text="添加账户" FontSize="28" FontWeight="SemiBold"/>
             <TextBlock x:Uid="AddAccount_Subtitle" Text="选择要连接的账户类型" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="14"/>
@@ -13,7 +14,7 @@
                 <StackPanel Spacing="8">
                     <TextBlock x:Uid="AddAccount_ChecklistTitle" Text="Setup checklist" FontSize="14" FontWeight="SemiBold"/>
                     <TextBlock x:Name="ChecklistText" Text="" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                    <StackPanel Spacing="8">
                         <Button x:Name="OpenMailSetupButton" Click="OpenMailSetupButton_Click" Padding="10,4">
                             <TextBlock x:Uid="AddAccount_OpenMailSetup" Text="Open Mail setup" FontSize="12"/>
                         </Button>
@@ -53,10 +54,11 @@
             <ProgressRing x:Name="AuthProgress" IsActive="False" Width="32" Height="32"/>
             <TextBlock x:Name="StatusText" Text="" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"
                        HorizontalAlignment="Center"/>
-            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <StackPanel Spacing="8" HorizontalAlignment="Stretch">
                 <Button x:Uid="AddAccount_Skip" Content="Skip for now" Click="SkipButton_Click"/>
                 <Button x:Uid="AddAccount_Finish" Content="Finish setup" Style="{StaticResource AccentButtonStyle}" Click="FinishButton_Click"/>
             </StackPanel>
         </StackPanel>
     </Grid>
+    </ScrollViewer>
 </Page>

@@ -288,7 +288,9 @@ namespace Task_Flyout.Views
             if (CalendarGrid.ItemsPanelRoot is ItemsWrapGrid wrapGrid)
             {
                 wrapGrid.ItemWidth = Math.Max(44, e.NewSize.Width / 7.0);
-                wrapGrid.ItemHeight = Math.Max(56, e.NewSize.Height / 6.0);
+                wrapGrid.ItemHeight = Math.Max(
+                    ResponsiveLayoutPolicy.GetCalendarCellMinimumHeight(e.NewSize.Height),
+                    e.NewSize.Height / 6.0);
             }
         }
 
@@ -362,7 +364,7 @@ namespace Task_Flyout.Views
             CalendarContent.Visibility = showCalendar ? Visibility.Visible : Visibility.Collapsed;
             TimelinePane.Visibility = showTimeline ? Visibility.Visible : Visibility.Collapsed;
             CalendarContent.Padding = _layoutMode == ResponsiveLayoutMode.Narrow
-                ? new Thickness(16)
+                ? new Thickness(12)
                 : new Thickness(32, 32, 24, 32);
             ToggleAccountPaneIcon.Glyph = showAccounts ? "\uE76B" : "\uE76C";
             ToggleTimelinePaneIcon.Glyph = showTimeline ? "\uE76C" : "\uE76B";

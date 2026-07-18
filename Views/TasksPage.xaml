@@ -140,8 +140,13 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Grid Margin="0,0,0,24">
-                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+            <Grid Margin="0,0,0,24" ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                     <Button x:Uid="TasksPage_BtnExpandAccounts" x:Name="ToggleAccountPaneButton"
                             Width="40"
                             Height="36"
@@ -151,7 +156,7 @@
                             Click="ToggleAccountPane_Click">
                         <FontIcon x:Name="ToggleAccountPaneIcon" Glyph="&#xE76C;" FontSize="14"/>
                     </Button>
-                    <StackPanel Spacing="2">
+                    <StackPanel Spacing="2" MinWidth="0">
                         <TextBlock x:Uid="TasksPage_Title" Text="任务" FontSize="28" FontWeight="SemiBold"/>
                          <TextBlock x:Uid="TasksPage_Loading" x:Name="TaskSummaryText"
                                    Text="正在加载任务"
@@ -162,14 +167,13 @@
                     </StackPanel>
                 </StackPanel>
                 <ProgressRing x:Name="SyncProgress"
+                              Grid.Column="1"
                               Width="24"
                               Height="24"
-                              HorizontalAlignment="Right"
                               VerticalAlignment="Center"
                               IsActive="False"
                               Visibility="Collapsed"/>
-                <Button HorizontalAlignment="Right"
-                        Margin="0,0,36,0"
+                <Button Grid.Column="2"
                         Click="AddTaskButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon Glyph="&#xE710;" FontSize="14"/>

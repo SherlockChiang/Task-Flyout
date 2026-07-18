@@ -6,7 +6,7 @@
     xmlns:models="using:Task_Flyout.Services"
     Background="Transparent">
 
-    <ScrollViewer Padding="40">
+    <ScrollViewer x:Name="WeatherScrollViewer" Padding="24" SizeChanged="WeatherScrollViewer_SizeChanged">
         <StackPanel Spacing="28" MaxWidth="1040" HorizontalAlignment="Stretch">
             <TextBlock x:Uid="WeatherPage_Title" Style="{StaticResource TitleTextBlockStyle}"/>
             <TextBlock x:Name="WeatherStatusText" FontSize="13" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
@@ -196,7 +196,11 @@
 
                 <StackPanel Spacing="8">
                     <TextBlock x:Uid="WeatherPage_CityHeader" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                    <Grid ColumnSpacing="12" HorizontalAlignment="Stretch" MaxWidth="640">
+                    <Grid x:Name="LocationInputGrid" ColumnSpacing="12" RowSpacing="8" HorizontalAlignment="Stretch" MaxWidth="640">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -251,7 +255,7 @@
                                     QuerySubmitted="CustomFontBox_QuerySubmitted"
                                     SuggestionChosen="CustomFontBox_SuggestionChosen"/>
 
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                    <StackPanel x:Name="IconPackButtonPanel" Orientation="Horizontal" Spacing="8">
                         <Button x:Uid="WeatherPage_BtnImportIconPack" x:Name="BtnImportIconPack" Click="BtnImportIconPack_Click"/>
                         <Button x:Uid="WeatherPage_BtnDeleteIconPack" x:Name="BtnDeleteIconPack" Click="BtnDeleteIconPack_Click"/>
                     </StackPanel>
@@ -289,7 +293,7 @@
                 <TextBlock x:Name="AlertsHeader" FontWeight="SemiBold" FontSize="16"/>
                 <TextBlock x:Name="AlertsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                 <ToggleSwitch x:Name="AlertsToggle" Toggled="AlertsToggle_Toggled"/>
-                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <StackPanel x:Name="AlertHoursPanel" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                     <TextBlock x:Name="AlertHoursLabel" VerticalAlignment="Center" FontSize="13"/>
                     <NumberBox x:Name="AlertHoursBox" Minimum="1" Maximum="24" SpinButtonPlacementMode="Inline" Width="120" ValueChanged="AlertHoursBox_ValueChanged"/>
                 </StackPanel>

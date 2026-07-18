@@ -919,6 +919,10 @@ namespace Task_Flyout
                 double bottomAndAgendaChrome = 56 + 30 + 16 + 16;
 
                 targetLogicalHeight = headerHeight + listHeight + bottomAndAgendaChrome;
+                ContentRow.Height = GridLength.Auto;
+                RootGrid.Measure(new Windows.Foundation.Size(logicalWidth, double.PositiveInfinity));
+                targetLogicalHeight = Math.Max(targetLogicalHeight, RootGrid.DesiredSize.Height);
+                ContentRow.Height = new GridLength(1, GridUnitType.Star);
             }
 
             int physicalWidth = (int)Math.Ceiling(logicalWidth * scaleFactor);

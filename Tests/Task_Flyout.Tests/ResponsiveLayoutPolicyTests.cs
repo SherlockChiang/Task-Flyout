@@ -22,4 +22,10 @@ public class ResponsiveLayoutPolicyTests
     [InlineData(500, 190)]
     public void Selects_compact_flyout_calendar_height(double availableHeight, double expected)
         => Assert.Equal(expected, ResponsiveLayoutPolicy.GetFlyoutCalendarHeight(availableHeight));
+
+    [Theory]
+    [InlineData(419, 40)]
+    [InlineData(420, 56)]
+    public void Selects_calendar_cell_minimum_for_short_viewports(double availableHeight, double expected)
+        => Assert.Equal(expected, ResponsiveLayoutPolicy.GetCalendarCellMinimumHeight(availableHeight));
 }

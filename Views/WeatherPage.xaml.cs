@@ -558,6 +558,22 @@ namespace Task_Flyout.Views
             if (IconPackStatusText != null) IconPackStatusText.Text = "";
         }
 
+        private void WeatherScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            bool narrow = e.NewSize.Width < 600;
+            WeatherScrollViewer.Padding = narrow ? new Thickness(12) : new Thickness(24);
+            Grid.SetRow(CitySearchBox, 0);
+            Grid.SetColumn(CitySearchBox, 0);
+            Grid.SetColumnSpan(CitySearchBox, narrow ? 3 : 1);
+            Grid.SetRow(UseCurrentLocationButton, narrow ? 1 : 0);
+            Grid.SetColumn(UseCurrentLocationButton, narrow ? 0 : 1);
+            Grid.SetRow(BtnRefresh, narrow ? 1 : 0);
+            Grid.SetColumn(BtnRefresh, narrow ? 1 : 2);
+            IconPackButtonPanel.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
+            AlertHoursPanel.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
+            AlertHoursPanel.HorizontalAlignment = narrow ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
+        }
+
         private void SetIconPackOperation(bool isRunning)
         {
             _isIconPackOperation = isRunning;
