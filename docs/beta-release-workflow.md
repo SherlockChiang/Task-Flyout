@@ -48,6 +48,12 @@ The first `-TrustMachine` run creates a non-exportable current-user test signing
 
 The certificate subject is read from `Package.appxmanifest`, and the script fails if signing or verification is unsuccessful. Re-run the helper whenever packaging overwrites the MSIX.
 
+For the normal local test loop, use the combined helper instead. It selects the newest x64 Task Flyout package, signs it after every rebuild, closes a running tray instance, installs the matching Windows App Runtime dependency, and verifies the deployed package:
+
+```powershell
+.\scripts\install-latest-sideload-package.ps1
+```
+
 ## Notes
 
 - The workflow only packages `win-x64` for beta releases.
