@@ -1,7 +1,8 @@
 using Azure.Core;
-using Azure.Identity;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
+using Microsoft.Identity.Client;
+using Microsoft.Identity.Client.Extensions.Msal;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -18,31 +19,23 @@ namespace Task_Flyout.Services
         public string ProviderName => "Microsoft";
         private ResourceLoader _loader = new ResourceLoader();
         private GraphServiceClient _graphClient = null!;
+        private IPublicClientApplication? _msalClient;
+        private MsalCacheHelper? _cacheHelper;
+        private readonly SemaphoreSlim _authorizationLock = new(1, 1);
 
         private string _defaultTodoListId = "";
 
-        private static readonly string[] AgendaScopes = new[]
-        {
-            "Calendars.ReadWrite",
-            "Tasks.ReadWrite",
-            "User.Read"
-        };
-
-        private static readonly string[] MailScopes = new[]
-        {
-            "Mail.Read"
-        };
-
-        private static readonly string[] MailWriteScopes = new[] { "Mail.ReadWrite" };
-        private static readonly string[] MailSendScopes = new[] { "Mail.Send" };
-        private string[] _graphClientScopes = Array.Empty<string>();
+        private static readonly string[] AllFeatureScopes = ProviderAuthorizationScopePolicy.MicrosoftAllFeatures;
 
         public GraphServiceClient? GraphClient => _graphClient;
 
         public async Task ClearLocalAuthorizationAsync()
         {
+            if (_cacheHelper != null && _msalClient != null)
+                _cacheHelper.UnregisterCache(_msalClient.UserTokenCache);
             _graphClient = null!;
-            _graphClientScopes = Array.Empty<string>();
+            _msalClient = null;
+            _cacheHelper = null;
             _defaultTodoListId = "";
 
             var failures = new List<Exception>();
@@ -94,108 +87,121 @@ namespace Task_Flyout.Services
                 throw new AggregateException("Microsoft authorization data could not be completely removed.", failures);
         }
 
+        public async Task ConnectInteractivelyAsync(CancellationToken cancellationToken = default)
+        {
+            await _authorizationLock.WaitAsync(cancellationToken);
+            try
+            {
+                var client = await GetMsalClientAsync();
+                var account = await GetStoredAccountAsync(client);
+                var builder = client.AcquireTokenInteractive(AllFeatureScopes).WithUseEmbeddedWebView(false);
+                if (account != null) builder = builder.WithAccount(account);
+                var result = await builder.ExecuteAsync(cancellationToken);
+                await ProtectedLocalStore.WriteTextAsync(GetAuthRecordPath(), result.Account.HomeAccountId.Identifier);
+                _graphClient = CreateSilentGraphClient(client, result.Account.HomeAccountId.Identifier);
+            }
+            finally
+            {
+                _authorizationLock.Release();
+            }
+        }
+
         public async Task EnsureAuthorizedAsync(CancellationToken cancellationToken = default)
         {
-            if (_graphClient != null && HasScopes(_graphClientScopes, AgendaScopes)) return;
-
-            var scopes = MergeScopes(AgendaScopes, _graphClientScopes);
-            _graphClient = await CreateAuthorizedGraphClientAsync(scopes, cancellationToken);
-            _graphClientScopes = scopes;
+            if (_graphClient != null) return;
+            await _authorizationLock.WaitAsync(cancellationToken);
+            try
+            {
+                if (_graphClient != null) return;
+                var client = await GetMsalClientAsync();
+                var account = await GetStoredAccountAsync(client);
+                if (account == null)
+                    throw new AuthorizationInteractionRequiredException(ProviderName, "Microsoft reconnect is required. Open account settings to reconnect explicitly.");
+                try
+                {
+                    await client.AcquireTokenSilent(AllFeatureScopes, account).ExecuteAsync(cancellationToken);
+                }
+                catch (MsalUiRequiredException ex)
+                {
+                    throw new AuthorizationInteractionRequiredException(ProviderName, "Microsoft reconnect is required. Open account settings to reconnect explicitly.", ex);
+                }
+                _graphClient = CreateSilentGraphClient(client, account.HomeAccountId.Identifier);
+            }
+            finally
+            {
+                _authorizationLock.Release();
+            }
         }
 
         public async Task<GraphServiceClient> EnsureMailAuthorizedAsync(bool requireWrite = false, bool requireSend = false, CancellationToken cancellationToken = default)
         {
-            var scopes = MergeScopes(BuildMailScopes(requireWrite, requireSend), _graphClientScopes);
-            if (_graphClient == null || !HasScopes(_graphClientScopes, scopes))
-            {
-                _graphClient = await CreateAuthorizedGraphClientAsync(scopes, cancellationToken);
-                _graphClientScopes = scopes;
-            }
-
+            await EnsureAuthorizedAsync(cancellationToken);
             return _graphClient;
         }
 
-        private static string[] BuildMailScopes(bool requireWrite, bool requireSend)
+        private async Task<IPublicClientApplication> GetMsalClientAsync()
         {
-            var scopes = new List<string> { "User.Read" };
-            scopes.AddRange(requireWrite ? MailWriteScopes : MailScopes);
-            if (requireSend) scopes.AddRange(MailSendScopes);
-            return scopes.ToArray();
+            if (_msalClient != null) return _msalClient;
+            var storage = new StorageCreationPropertiesBuilder(
+                "TaskFlyout_MSAL_Cache.nocae",
+                ProviderAuthCleanup.MicrosoftTokenCacheDirectory).Build();
+            _cacheHelper = await MsalCacheHelper.CreateAsync(storage);
+            _msalClient = PublicClientApplicationBuilder
+                .Create(Secrets.MicrosoftClientId)
+                .WithAuthority(AzureCloudInstance.AzurePublic, "common")
+                .WithRedirectUri("http://localhost")
+                .Build();
+            _cacheHelper.RegisterCache(_msalClient.UserTokenCache);
+            return _msalClient;
         }
 
-        private static bool HasScopes(IEnumerable<string> grantedScopes, IEnumerable<string> requiredScopes)
+        private static async Task<IAccount?> GetStoredAccountAsync(IPublicClientApplication client)
         {
-            var granted = grantedScopes.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            return requiredScopes.All(scope =>
-                granted.Contains(scope) ||
-                (string.Equals(scope, "Mail.Read", StringComparison.OrdinalIgnoreCase) && granted.Contains("Mail.ReadWrite")));
+            string? homeAccountId = ProtectedLocalStore.ReadText(GetAuthRecordPath());
+            if (!string.IsNullOrWhiteSpace(homeAccountId))
+            {
+                var stored = await client.GetAccountAsync(homeAccountId);
+                if (stored != null) return stored;
+            }
+
+            var cachedAccounts = (await client.GetAccountsAsync()).ToList();
+            if (cachedAccounts.Count != 1) return null;
+            await ProtectedLocalStore.WriteTextAsync(GetAuthRecordPath(), cachedAccounts[0].HomeAccountId.Identifier);
+            return cachedAccounts[0];
         }
 
-        private static string[] MergeScopes(params IEnumerable<string>[] scopeGroups)
+        private static GraphServiceClient CreateSilentGraphClient(IPublicClientApplication client, string homeAccountId)
+            => new(new SilentMsalTokenCredential(client, homeAccountId), AllFeatureScopes);
+
+        private sealed class SilentMsalTokenCredential : TokenCredential
         {
-            return scopeGroups
-                .SelectMany(scope => scope)
-                .Where(scope => !string.IsNullOrWhiteSpace(scope))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-        }
+            private readonly IPublicClientApplication _client;
+            private readonly string _homeAccountId;
 
-        private async Task<GraphServiceClient> CreateAuthorizedGraphClientAsync(string[] scopes, CancellationToken cancellationToken = default)
-        {
-
-            string authRecordPath = GetAuthRecordPath();
-
-            AuthenticationRecord? authRecord = null;
-
-            try
+            public SilentMsalTokenCredential(IPublicClientApplication client, string homeAccountId)
             {
-                var encrypted = ProtectedLocalStore.ReadText(authRecordPath);
-                if (!string.IsNullOrEmpty(encrypted))
-                {
-                    var bytes = Convert.FromBase64String(encrypted);
-                    using var stream = new MemoryStream(bytes);
-                    authRecord = await AuthenticationRecord.DeserializeAsync(stream);
-                }
-            }
-            catch {}
-
-            var options = new InteractiveBrowserCredentialOptions
-            {
-                TenantId = "common",
-                ClientId = Secrets.MicrosoftClientId,
-                AuthorityHost = AzureAuthorityHosts.AzurePublicCloud,
-                RedirectUri = new Uri("http://localhost"),
-                TokenCachePersistenceOptions = new TokenCachePersistenceOptions { Name = "TaskFlyout_MSAL_Cache" },
-                AuthenticationRecord = authRecord
-            };
-
-            var credential = new InteractiveBrowserCredential(options);
-
-            try
-            {
-                var tokenContext = new TokenRequestContext(scopes);
-
-                if (authRecord == null)
-                {
-                    authRecord = await credential.AuthenticateAsync(tokenContext, cancellationToken);
-                    await SaveAuthRecordAsync(authRecordPath, authRecord);
-                }
-                else
-                {
-                    await credential.GetTokenAsync(tokenContext, cancellationToken);
-                }
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-            catch (Exception)
-            {
-                if (File.Exists(authRecordPath)) File.Delete(authRecordPath);
-                options.AuthenticationRecord = null;
-
-                authRecord = await credential.AuthenticateAsync(new TokenRequestContext(scopes), cancellationToken);
-                await SaveAuthRecordAsync(authRecordPath, authRecord);
+                _client = client;
+                _homeAccountId = homeAccountId;
             }
 
-            return new GraphServiceClient(credential, scopes);
+            public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
+                => GetTokenAsync(requestContext, cancellationToken).AsTask().GetAwaiter().GetResult();
+
+            public override async ValueTask<AccessToken> GetTokenAsync(TokenRequestContext requestContext, CancellationToken cancellationToken)
+            {
+                var account = await _client.GetAccountAsync(_homeAccountId);
+                if (account == null)
+                    throw new AuthorizationInteractionRequiredException("Microsoft", "Microsoft account is no longer present in the token cache.");
+                try
+                {
+                    var result = await _client.AcquireTokenSilent(AllFeatureScopes, account).ExecuteAsync(cancellationToken);
+                    return new AccessToken(result.AccessToken, result.ExpiresOn);
+                }
+                catch (MsalUiRequiredException ex)
+                {
+                    throw new AuthorizationInteractionRequiredException("Microsoft", "Microsoft reconnect is required.", ex);
+                }
+            }
         }
 
         private static string GetAuthRecordPath()
@@ -718,12 +724,5 @@ namespace Task_Flyout.Services
             return RecurrencePolicy.ToDisplayKindFromMicrosoftPattern(recurrence?.Pattern?.Type?.ToString());
         }
 
-        private static async Task SaveAuthRecordAsync(string path, AuthenticationRecord record)
-        {
-            using var stream = new MemoryStream();
-            await record.SerializeAsync(stream);
-            var base64 = Convert.ToBase64String(stream.ToArray());
-            ProtectedLocalStore.WriteText(path, base64);
-        }
     }
 }

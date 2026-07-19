@@ -1119,6 +1119,8 @@ namespace Task_Flyout.Views
 
             try
             {
+                if (App.Current is App app && app.SyncManager.GetProvider("Microsoft") is ISyncProvider provider)
+                    await provider.ConnectInteractivelyAsync(authCts.Token);
                 var account = await _mailService.AddOutlookAccountAsync(authCts.Token);
                 AddStatusText.Text = string.Format(_loader.GetStringOrDefault("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
                 await RefreshAccountsAsync();
@@ -1159,6 +1161,8 @@ namespace Task_Flyout.Views
 
             try
             {
+                if (App.Current is App app && app.SyncManager.GetProvider("Google") is ISyncProvider provider)
+                    await provider.ConnectInteractivelyAsync(authCts.Token);
                 var account = await _mailService.AddGoogleAccountAsync(authCts.Token);
                 AddStatusText.Text = string.Format(_loader.GetStringOrDefault("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
                 await RefreshAccountsAsync();

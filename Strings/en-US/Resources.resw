@@ -435,6 +435,9 @@
   <data name="AddAccount_AlreadyConnected" xml:space="preserve">
     <value>Already connected</value>
   </data>
+  <data name="AddAccount_Reconnect" xml:space="preserve">
+    <value>Reconnect all features</value>
+  </data>
   <data name="AddAccount_ChecklistTitle.Text" xml:space="preserve">
     <value>Optional setup</value>
   </data>

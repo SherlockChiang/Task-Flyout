@@ -5,6 +5,7 @@ using Google.Apis.Services;
 using Google.Apis.Tasks.v1;
 using Google.Apis.Util.Store;
 using Google.Apis.Auth.OAuth2.Responses;
+using Google.Apis.Auth.OAuth2.Flows;
 using System.Linq;
 using System;
 using System.Collections.Generic;
@@ -27,29 +28,16 @@ namespace Task_Flyout.Services
         private ResourceLoader _loader = new ResourceLoader();
         private static readonly TimeSpan CalendarListCacheDuration = TimeSpan.FromMinutes(30);
         private readonly SemaphoreSlim _calendarListLock = new(1, 1);
+        private readonly SemaphoreSlim _authorizationLock = new(1, 1);
         private List<SubscribedCalendarInfo>? _cachedCalendarList;
         private DateTimeOffset _calendarListCacheExpiresAt = DateTimeOffset.MinValue;
-        private static readonly string[] CalendarTaskScopes =
-        {
-            CalendarService.Scope.Calendar,
-            TasksService.Scope.Tasks
-        };
-
-        private static readonly string[] GmailScopes =
-        {
-            GmailService.Scope.GmailReadonly,
-            GmailService.Scope.GmailSend,
-            GmailService.Scope.GmailModify
-        };
-
-        private string[] _gmailGrantedScopes = Array.Empty<string>();
+        private static readonly string[] AllFeatureScopes = ProviderAuthorizationScopePolicy.GoogleAllFeatures;
 
         public async Task ClearLocalAuthorizationAsync()
         {
             CalendarSvc = null;
             TasksSvc = null;
             GmailSvc = null;
-            _gmailGrantedScopes = Array.Empty<string>();
             _cachedCalendarList = null;
             _calendarListCacheExpiresAt = DateTimeOffset.MinValue;
 
@@ -59,90 +47,81 @@ namespace Task_Flyout.Services
             ProviderAuthCleanup.DeleteGoogleLegacyTokenStore(legacyTokenPath);
         }
 
+        public async Task ConnectInteractivelyAsync(CancellationToken cancellationToken = default)
+        {
+            await _authorizationLock.WaitAsync(cancellationToken);
+            try
+            {
+                string tokenPath = ProviderAuthCleanup.GoogleLegacyTokenPath;
+                var dataStore = new ProtectedGoogleDataStore();
+                await TryMigrateLegacyTokenStoreAsync(tokenPath, dataStore);
+                UserCredential credential = await AuthorizeAsync(dataStore, AllFeatureScopes, cancellationToken);
+                if (!HasScopes(GetGrantedScopes(credential.Token), AllFeatureScopes))
+                {
+                    await dataStore.ClearAsync();
+                    credential = await AuthorizeAsync(dataStore, AllFeatureScopes, cancellationToken);
+                }
+                if (!HasScopes(GetGrantedScopes(credential.Token), AllFeatureScopes))
+                    throw new AuthorizationInteractionRequiredException(ProviderName, "Google did not grant all requested Task Flyout permissions.");
+                InitializeServices(credential);
+            }
+            finally
+            {
+                _authorizationLock.Release();
+            }
+        }
+
         public async Task EnsureAuthorizedAsync(CancellationToken cancellationToken = default)
         {
-            if (CalendarSvc != null && TasksSvc != null) return;
-
-            string tokenPath = ProviderAuthCleanup.GoogleLegacyTokenPath;
-            var dataStore = new ProtectedGoogleDataStore();
-            await TryMigrateLegacyTokenStoreAsync(tokenPath, dataStore);
-            var requiredScopes = MergeScopes(CalendarTaskScopes, _gmailGrantedScopes.Where(scope => GmailScopes.Contains(scope, StringComparer.OrdinalIgnoreCase)));
-            UserCredential credential = await AuthorizeAsync(dataStore, requiredScopes, cancellationToken);
-
-            var grantedScopes = credential.Token?.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
-            if (!HasScopes(grantedScopes, CalendarTaskScopes))
+            if (CalendarSvc != null && TasksSvc != null && GmailSvc != null) return;
+            await _authorizationLock.WaitAsync(cancellationToken);
+            try
             {
-                CalendarSvc = null;
-                TasksSvc = null;
-                GmailSvc = null;
-                _gmailGrantedScopes = Array.Empty<string>();
-                if (Directory.Exists(tokenPath)) Directory.Delete(tokenPath, true);
-                await dataStore.ClearAsync();
-                credential = await AuthorizeAsync(dataStore, requiredScopes, cancellationToken);
-                grantedScopes = credential.Token?.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
-            }
+                if (CalendarSvc != null && TasksSvc != null && GmailSvc != null) return;
+                var dataStore = new ProtectedGoogleDataStore();
+                await TryMigrateLegacyTokenStoreAsync(ProviderAuthCleanup.GoogleLegacyTokenPath, dataStore);
+                var token = await dataStore.GetAsync<TokenResponse>("user");
+                if (token == null || string.IsNullOrWhiteSpace(token.RefreshToken)
+                    || !HasScopes(GetGrantedScopes(token), AllFeatureScopes))
+                    throw new AuthorizationInteractionRequiredException(ProviderName, "Google reconnect is required. Open account settings to reconnect explicitly.");
 
-            CalendarSvc = new CalendarService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
-            TasksSvc = new TasksService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
-            _gmailGrantedScopes = grantedScopes;
-            GmailSvc = HasScopes(grantedScopes, new[] { GmailService.Scope.GmailReadonly })
-                ? new GmailService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" })
-                : null;
+                var credential = new UserCredential(CreateAuthorizationFlow(dataStore), "user", token);
+                InitializeServices(credential);
+            }
+            finally
+            {
+                _authorizationLock.Release();
+            }
         }
 
         public async Task<GmailService> EnsureGmailAuthorizedAsync(bool requireModify = false, bool requireSend = false, CancellationToken cancellationToken = default)
         {
-            var requiredScopes = BuildGmailScopes(requireModify, requireSend);
-            if (CalendarSvc != null && TasksSvc != null)
-                requiredScopes = MergeScopes(requiredScopes, CalendarTaskScopes);
-            requiredScopes = MergeScopes(requiredScopes, _gmailGrantedScopes.Where(scope => GmailScopes.Contains(scope, StringComparer.OrdinalIgnoreCase)));
-            if (GmailSvc != null && HasScopes(_gmailGrantedScopes, requiredScopes)) return GmailSvc;
-
-            string tokenPath = ProviderAuthCleanup.GoogleLegacyTokenPath;
-            var dataStore = new ProtectedGoogleDataStore();
-            await TryMigrateLegacyTokenStoreAsync(tokenPath, dataStore);
-            UserCredential credential = await AuthorizeAsync(dataStore, requiredScopes, cancellationToken);
-
-            var grantedScopes = credential.Token?.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
-            if (!HasScopes(grantedScopes, requiredScopes))
-            {
-                CalendarSvc = null;
-                TasksSvc = null;
-                GmailSvc = null;
-                _gmailGrantedScopes = Array.Empty<string>();
-                if (Directory.Exists(tokenPath)) Directory.Delete(tokenPath, true);
-                await dataStore.ClearAsync();
-                credential = await AuthorizeAsync(dataStore, requiredScopes, cancellationToken);
-                grantedScopes = credential.Token?.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
-            }
-
-            _gmailGrantedScopes = grantedScopes;
-            if (HasScopes(grantedScopes, CalendarTaskScopes))
-            {
-                CalendarSvc = new CalendarService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
-                TasksSvc = new TasksService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
-            }
-
-            GmailSvc = new GmailService(new BaseClientService.Initializer() { HttpClientInitializer = credential, ApplicationName = "Task Flyout" });
-            return GmailSvc;
+            await EnsureAuthorizedAsync(cancellationToken);
+            return GmailSvc!;
         }
 
-        private static string[] BuildGmailScopes(bool requireModify, bool requireSend)
+        private void InitializeServices(UserCredential credential)
         {
-            var scopes = new List<string> { GmailService.Scope.GmailReadonly };
-            if (requireModify) scopes.Add(GmailService.Scope.GmailModify);
-            if (requireSend) scopes.Add(GmailService.Scope.GmailSend);
-            return scopes.ToArray();
+            var initializer = new BaseClientService.Initializer { HttpClientInitializer = credential, ApplicationName = "Task Flyout" };
+            CalendarSvc = new CalendarService(initializer);
+            TasksSvc = new TasksService(initializer);
+            GmailSvc = new GmailService(initializer);
         }
 
-        private static string[] MergeScopes(params IEnumerable<string>[] scopeGroups)
+        private GoogleAuthorizationCodeFlow CreateAuthorizationFlow(IDataStore dataStore)
         {
-            return scopeGroups
-                .SelectMany(scope => scope)
-                .Where(scope => !string.IsNullOrWhiteSpace(scope))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+            using var stream = OpenCredentialsStream();
+            var secrets = GoogleClientSecrets.FromStream(stream).Secrets;
+            return new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
+            {
+                ClientSecrets = secrets,
+                Scopes = AllFeatureScopes,
+                DataStore = dataStore
+            });
         }
+
+        private static string[] GetGrantedScopes(TokenResponse? token)
+            => token?.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
 
         private async Task<UserCredential> AuthorizeAsync(IDataStore dataStore, string[] scopes, CancellationToken cancellationToken = default)
         {

@@ -418,7 +418,10 @@ namespace Task_Flyout.Services
                 a.Kind == MailAccountKind.Outlook &&
                 string.Equals(a.Address, address, StringComparison.OrdinalIgnoreCase));
             if (existing != null)
+            {
+                await EnsureProviderAgendaAccountAsync("Microsoft");
                 return existing;
+            }
 
             var account = new MailAccount
             {
@@ -431,7 +434,7 @@ namespace Task_Flyout.Services
             _accounts.Add(account);
             SaveAccounts();
             UpdateMailPollingSettings();
-            await EnsureMicrosoftAgendaAccountAsync();
+            await EnsureProviderAgendaAccountAsync("Microsoft");
             return account;
         }
 
@@ -528,7 +531,10 @@ namespace Task_Flyout.Services
                 a.Kind == MailAccountKind.Google &&
                 string.Equals(a.Address, address, StringComparison.OrdinalIgnoreCase));
             if (existing != null)
+            {
+                await EnsureProviderAgendaAccountAsync("Google");
                 return existing;
+            }
 
             var account = new MailAccount
             {
@@ -541,6 +547,7 @@ namespace Task_Flyout.Services
             _accounts.Add(account);
             SaveAccounts();
             UpdateMailPollingSettings();
+            await EnsureProviderAgendaAccountAsync("Google");
             return account;
         }
 
@@ -2031,16 +2038,16 @@ namespace Task_Flyout.Services
                 throw new InvalidOperationException("Microsoft provider is not available.");
         }
 
-        private async Task EnsureMicrosoftAgendaAccountAsync()
+        private async Task EnsureProviderAgendaAccountAsync(string providerName)
         {
             if (App.Current is not App app) return;
 
             var accountManager = app.SyncManager.AccountManager;
-            if (accountManager.IsConnected("Microsoft")) return;
+            if (accountManager.IsConnected(providerName)) return;
 
-            if (app.SyncManager.GetProvider("Microsoft") is not MicrosoftSyncProvider provider) return;
+            if (app.SyncManager.GetProvider(providerName) is not ISyncProvider provider) return;
 
-            var connected = new ConnectedAccountInfo { ProviderName = "Microsoft" };
+            var connected = new ConnectedAccountInfo { ProviderName = providerName };
             try
             {
                 var calendars = await provider.FetchCalendarListAsync();

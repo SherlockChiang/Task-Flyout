@@ -24,15 +24,15 @@ namespace Task_Flyout.Views
             var mgr = GetAccountManager();
             if (mgr == null) return;
 
-            BtnGoogle.IsEnabled = !mgr.IsConnected("Google");
-            BtnMicrosoft.IsEnabled = !mgr.IsConnected("Microsoft");
+            BtnGoogle.IsEnabled = true;
+            BtnMicrosoft.IsEnabled = true;
 
-            if (!BtnGoogle.IsEnabled)
+            if (mgr.IsConnected("Google"))
                 BtnGoogle.Content = CreateDisabledContent("Google", "#EA4335",
-                    _loader.GetStringOrDefault("AddAccount_AlreadyConnected") ?? "Already connected");
-            if (!BtnMicrosoft.IsEnabled)
+                    _loader.GetStringOrDefault("AddAccount_Reconnect") ?? "Reconnect all Google features");
+            if (mgr.IsConnected("Microsoft"))
                 BtnMicrosoft.Content = CreateDisabledContent("Microsoft", "#0078D4",
-                    _loader.GetStringOrDefault("AddAccount_AlreadyConnected") ?? "Already connected");
+                    _loader.GetStringOrDefault("AddAccount_Reconnect") ?? "Reconnect all Microsoft features");
 
             UpdateChecklist();
         }
@@ -132,24 +132,37 @@ namespace Task_Flyout.Views
                 var provider = syncManager.Providers.FirstOrDefault(p => p.ProviderName == providerName);
                 if (provider == null) throw new Exception($"Provider {providerName} not registered");
 
-                await provider.EnsureAuthorizedAsync();
+                await provider.ConnectInteractivelyAsync();
+
+                if (App.Current is App app)
+                {
+                    if (providerName == "Google")
+                        await app.MailService.AddGoogleAccountAsync();
+                    else if (providerName == "Microsoft")
+                        await app.MailService.AddOutlookAccountAsync();
+                }
 
                 // Create account entry
-                var account = new ConnectedAccountInfo { ProviderName = providerName };
+                var account = mgr.GetAccount(providerName) ?? new ConnectedAccountInfo { ProviderName = providerName };
 
                 // Fetch subscribed calendars
                 try
                 {
                     var calendars = await provider.FetchCalendarListAsync();
+                    var visibility = account.Calendars.ToDictionary(calendar => calendar.Id, calendar => calendar.IsVisible);
+                    account.Calendars.Clear();
                     foreach (var cal in calendars)
+                    {
+                        if (visibility.TryGetValue(cal.Id, out bool isVisible)) cal.IsVisible = isVisible;
                         account.Calendars.Add(cal);
+                    }
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"Failed to fetch calendar list for {providerName}: {ex.Message}");
                 }
 
-                mgr.AddAccount(account);
+                if (!mgr.IsConnected(providerName)) mgr.AddAccount(account); else mgr.Save();
                 Windows.Storage.ApplicationData.Current.LocalSettings.Values[OnboardingPolicy.CompletedVersionKey] = OnboardingPolicy.CurrentVersion;
 
                 // Refresh the MainWindow pane
