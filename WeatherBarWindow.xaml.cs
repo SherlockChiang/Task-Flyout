@@ -243,6 +243,14 @@ namespace Task_Flyout
             RecomputeBarWidth();
         }
 
+        private void RootGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            double radius = Math.Max(0, e.NewSize.Height * 0.18);
+            var cornerRadius = new CornerRadius(radius);
+            MainBorder.CornerRadius = cornerRadius;
+            TopBorder.CornerRadius = cornerRadius;
+        }
+
         private void QueueBarWidthRecompute()
         {
             if (Interlocked.Exchange(ref _barWidthRecomputeQueued, 1) != 0) return;
@@ -1312,7 +1320,7 @@ namespace Task_Flyout
                 // there is no top-lit-to-dark ramp — that ramp (plus the top sheen) is what made
                 // the pill read as a convex, raised chip. Equal alpha + only a faint diagonal
                 // hue drift keeps it a flush, even film over the taskbar.
-                byte alpha = isHovering ? (byte)52 : (byte)24;
+                byte alpha = isHovering ? (byte)76 : (byte)56;
                 brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(alpha, 18, 22, 28), Offset = 0 });
                 brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(alpha, 16, 26, 34), Offset = 0.5 });
                 brush.GradientStops.Add(new GradientStop { Color = Color.FromArgb(alpha, 26, 22, 36), Offset = 1 });
@@ -1328,7 +1336,7 @@ namespace Task_Flyout
             // a whisper return on hover. Light mode keeps its gentle sheen (it blends well).
             byte topAlpha = _isLightTheme
                 ? (isHovering ? (byte)42 : (byte)28)
-                : (isHovering ? (byte)6 : (byte)0);
+                : (isHovering ? (byte)16 : (byte)8);
             byte bottomAlpha = _isLightTheme
                 ? (isHovering ? (byte)6 : (byte)3)
                 : (byte)0;

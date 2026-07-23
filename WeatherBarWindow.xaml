@@ -5,7 +5,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Grid x:Name="RootGrid"
-          Background="Transparent">
+          Background="Transparent"
+          SizeChanged="RootGrid_SizeChanged">
         <Button x:Uid="WeatherBar_OpenButton"
                 x:Name="MainBorder"
                 Background="Transparent"
@@ -13,6 +14,8 @@
                 BorderThickness="0"
                 CornerRadius="8"
                 Padding="0"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
                 HorizontalContentAlignment="Stretch"
                 VerticalContentAlignment="Stretch"
                 Click="ContentPanel_Click"
@@ -23,7 +26,8 @@
                     BorderThickness="0"
                     BorderBrush="Transparent"
                     Background="Transparent"
-                    CornerRadius="7"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
                     Margin="0">
 
                 <StackPanel x:Name="ContentPanel"
