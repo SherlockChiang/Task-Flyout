@@ -105,7 +105,6 @@ namespace Task_Flyout.Services
         private readonly Dictionary<string, CacheEntry<List<MailFolder>>> _folderCache = new();
         private readonly Dictionary<string, CacheEntry<List<MailItem>>> _messageCache = new();
         private readonly ConcurrentDictionary<string, byte> _knownUnreadIds = new(StringComparer.Ordinal);
-        private DispatcherTimer? _pollTimer;
         private DispatcherTimer? _pendingMutationTimer;
         private bool _pendingMutationRetryStopped;
         private int _isPollingMail;
@@ -282,30 +281,18 @@ namespace Task_Flyout.Services
                 return;
             }
 
-            var interval = TimeSpan.FromMinutes(Math.Max(1, MailPollingIntervalMinutes));
-            if (_pollTimer != null)
-            {
-                if (_pollTimer.Interval != interval)
-                    _pollTimer.Interval = interval;
+            QueueInitialMailCheckIfDue(TimeSpan.FromMinutes(Math.Max(1, MailPollingIntervalMinutes)));
+        }
 
-                if (!_pollTimer.IsEnabled)
-                    _pollTimer.Start();
-
-                QueueInitialMailCheckIfDue(interval);
-                return;
-            }
-
-            _pollTimer = new DispatcherTimer
-            {
-                Interval = interval
-            };
-            _pollTimer.Tick += async (_, _) =>
-            {
-                try { await CheckNewMailAsync(); }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Mail poll tick failed: {ex.Message}"); }
-            };
-            _pollTimer.Start();
-            QueueInitialMailCheckIfDue(interval);
+        public async Task RunScheduledPollIfDueAsync(DateTimeOffset now)
+        {
+            if (!BackgroundRefreshSchedulePolicy.IsMailPollDue(
+                now,
+                _lastMailPollStartedUtc,
+                MailPollingIntervalMinutes,
+                MailPollingEnabled,
+                HasSetupCompleteAccounts())) return;
+            await CheckNewMailAsync();
         }
 
         private void QueueInitialMailCheckIfDue(TimeSpan interval)
@@ -323,11 +310,6 @@ namespace Task_Flyout.Services
 
         public void StopMailPolling()
         {
-            if (_pollTimer != null)
-            {
-                _pollTimer.Stop();
-                _pollTimer = null;
-            }
             DisconnectAllPollImapClients();
         }
 

@@ -7,7 +7,6 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
-using Microsoft.UI.Xaml;
 using Windows.Storage;
 
 namespace Task_Flyout.Services
@@ -15,13 +14,12 @@ namespace Task_Flyout.Services
     public class NotificationService
     {
         private readonly SyncManager _syncManager;
-        // UI-thread only: all mutation paths (ctor LoadNotifiedIds, the DispatcherTimer
-        // tick that drives CheckUpcomingEvents, and OpenFromActivationArguments which
+        // UI-thread only: all mutation paths (ctor LoadNotifiedIds, the app heartbeat
+        // that drives CheckUpcomingEvents, and OpenFromActivationArguments which
         // marshals through MainDispatcherQueue) execute on the main UI thread. Do not
         // add background-thread callers without wrapping access in a lock first.
         private readonly Dictionary<string, DateTimeOffset> _notifiedIds = new(StringComparer.Ordinal);
         private readonly ResourceLoader _loader = new();
-        private DispatcherTimer? _timer;
         private int _reminderMinutes;
         private Dictionary<string, List<AgendaItem>>? _cachedItems;
         private DateTime _cacheReadTime = DateTime.MinValue;
@@ -65,23 +63,13 @@ namespace Task_Flyout.Services
 
         public void StartPeriodicCheck()
         {
-            if (_timer != null)
-            {
-                _timer.Stop();
-            }
-            _timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
-            _timer.Tick += (s, e) => CheckUpcomingEvents();
-            _timer.Start();
+            CheckUpcomingEvents();
         }
 
-        public void StopTimer()
-        {
-            _timer?.Stop();
-        }
+        public void StopTimer() { }
 
         public void Stop()
         {
-            _timer?.Stop();
             try
             {
                 AppNotificationManager.Default.NotificationInvoked -= OnNotificationInvoked;

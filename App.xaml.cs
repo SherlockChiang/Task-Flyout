@@ -73,6 +73,7 @@ namespace Task_Flyout
             MyFlyoutWindow?.ReloadFilters();
         }
         public MemoryDiagnosticsService MemoryDiagnostics { get; } = new MemoryDiagnosticsService();
+        private BackgroundRefreshCoordinator? _backgroundRefresh;
 
         public App()
         {
@@ -112,6 +113,7 @@ namespace Task_Flyout
 
             NotificationService = new NotificationService(SyncManager);
             NotificationService.Initialize();
+            _backgroundRefresh = new BackgroundRefreshCoordinator(MainDispatcherQueue, NotificationService, MailService);
             MailService.NewMailArrived += MailService_NewMailArrived;
             MemoryDiagnostics.StartIfEnabled();
             startup.Mark("services");
@@ -123,7 +125,7 @@ namespace Task_Flyout
             UpdateTrayStatus(TrayStatus.Idle);
             _trayIcon.ForceCreate(enablesEfficiencyMode: EfficiencyModeEnabledSetting);
             _ = EnsureAccountsHydratedAsync();
-            QueueMailPollingStart();
+            QueueBackgroundRefreshStart();
             startup.Mark("tray-mail");
 
             _trayIcon.LeftClickCommand = new RelayCommand(async () =>
@@ -177,7 +179,6 @@ namespace Task_Flyout
 
             HandleLaunchActivation(args);
             QueueFlyoutPrewarmIfEnabled();
-            QueueInitialNotificationCheck();
             startup.Mark("activation");
 
             // Launched into the tray with no window on screen — start throttled.
@@ -234,39 +235,20 @@ namespace Task_Flyout
             });
         }
 
-        private void QueueInitialNotificationCheck()
+        private void QueueBackgroundRefreshStart()
         {
-            if (NotificationService?.IsEnabled != true) return;
-
             MainDispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, async () =>
             {
                 try
                 {
                     await Task.Delay(TimeSpan.FromSeconds(2));
                     await EnsureAccountsHydratedAsync();
-                    NotificationService.StartPeriodicCheck();
-                    NotificationService.CheckUpcomingEvents();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Initial notification check failed: {ex.Message}");
-                }
-            });
-        }
-
-        private void QueueMailPollingStart()
-        {
-            MainDispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, async () =>
-            {
-                try
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(3));
-                    await EnsureAccountsHydratedAsync();
                     MailService.StartMailPolling();
+                    _backgroundRefresh?.Start();
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Deferred mail polling start failed: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Background refresh start failed: {ex.Message}");
                 }
             });
         }
@@ -530,6 +512,7 @@ namespace Task_Flyout
         private void StopWeatherBarWatchdog()
         {
             _weatherBarWatchdog?.Stop();
+            _backgroundRefresh?.Stop();
             _weatherBarWatchdog = null;
         }
 
