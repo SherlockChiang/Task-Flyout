@@ -421,10 +421,10 @@
     <value>添加账户</value>
   </data>
   <data name="AddAccount_Title.Text" xml:space="preserve">
-    <value>添加账户</value>
+    <value>账户与健康状态</value>
   </data>
   <data name="AddAccount_Subtitle.Text" xml:space="preserve">
-    <value>选择要连接的账户类型</value>
+    <value>查看连接状态、缓存数据、待处理更改与账户设置</value>
   </data>
   <data name="AddAccount_GoogleDesc.Text" xml:space="preserve">
     <value>Google 日历与任务</value>
@@ -439,7 +439,10 @@
     <value>重新连接全部功能</value>
   </data>
   <data name="AddAccount_ChecklistTitle.Text" xml:space="preserve">
-    <value>可选设置</value>
+    <value>账户健康与离线状态</value>
+  </data>
+  <data name="AddAccount_RetrySync.Content" xml:space="preserve">
+    <value>重试同步</value>
   </data>
   <data name="AddAccount_OpenMailSetup.Text" xml:space="preserve">
     <value>打开邮件设置</value>
@@ -455,6 +458,36 @@
   </data>
   <data name="AddAccount_Ready" xml:space="preserve">
     <value>已就绪</value>
+  </data>
+  <data name="AddAccount_HealthReady" xml:space="preserve">
+    <value>已连接</value>
+  </data>
+  <data name="AddAccount_HealthSyncing" xml:space="preserve">
+    <value>正在同步</value>
+  </data>
+  <data name="AddAccount_HealthCached" xml:space="preserve">
+    <value>当前离线或服务不可用；已有缓存数据</value>
+  </data>
+  <data name="AddAccount_HealthReconnect" xml:space="preserve">
+    <value>需要重新连接</value>
+  </data>
+  <data name="AddAccount_HealthFailed" xml:space="preserve">
+    <value>同步失败</value>
+  </data>
+  <data name="AddAccount_LastSuccess" xml:space="preserve">
+    <value>上次成功：{0}</value>
+  </data>
+  <data name="AddAccount_CacheAvailable" xml:space="preserve">
+    <value>已有缓存数据</value>
+  </data>
+  <data name="AddAccount_PendingChanges" xml:space="preserve">
+    <value>待处理更改：任务 {0}，失败任务 {1}，邮件 {2}</value>
+  </data>
+  <data name="AddAccount_MailSetupIncomplete" xml:space="preserve">
+    <value>设置未完成</value>
+  </data>
+  <data name="AddAccount_MailHealth" xml:space="preserve">
+    <value>邮件 {0}：{1}；待处理更改 {2}</value>
   </data>
   <data name="AddAccount_ConnectGoogle" xml:space="preserve">
     <value>连接 Google 以使用日历、任务和 Gmail。</value>

@@ -20,6 +20,25 @@ namespace Task_Flyout.Services
         private readonly object _lock = new();
         private readonly Dictionary<string, Func<Task>> _retryOperations = new(StringComparer.Ordinal);
         private readonly Dictionary<string, QueueEntry> _queues = new(StringComparer.Ordinal);
+        public event EventHandler? StateChanged;
+
+        public int PendingCount
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    int count = 0;
+                    foreach (var entry in _queues.Values) count += entry.Users;
+                    return count;
+                }
+            }
+        }
+
+        public int FailedCount
+        {
+            get { lock (_lock) return _retryOperations.Count; }
+        }
 
         private sealed class QueueEntry
         {
@@ -66,23 +85,23 @@ namespace Task_Flyout.Services
             }
 
             if (forceQueued || wasQueued)
-                stateChanged?.Invoke(new TaskMutationState(key, TaskMutationPhase.Queued));
+                ReportState(new TaskMutationState(key, TaskMutationPhase.Queued), stateChanged);
             await entry.Gate.WaitAsync();
             var pending = new TaskMutationState(key, TaskMutationPhase.Pending);
-            stateChanged?.Invoke(pending);
+            ReportState(pending, stateChanged);
             try
             {
                 await operation();
                 lock (_lock) _retryOperations.Remove(key);
                 var succeeded = new TaskMutationState(key, TaskMutationPhase.Succeeded);
-                stateChanged?.Invoke(succeeded);
+                ReportState(succeeded, stateChanged);
                 return succeeded;
             }
             catch
             {
                 lock (_lock) _retryOperations[key] = operation;
                 var failed = new TaskMutationState(key, TaskMutationPhase.Failed);
-                stateChanged?.Invoke(failed);
+                ReportState(failed, stateChanged);
                 return failed;
             }
             finally
@@ -98,6 +117,12 @@ namespace Task_Flyout.Services
                     }
                 }
             }
+        }
+
+        private void ReportState(TaskMutationState state, Action<TaskMutationState>? callback)
+        {
+            callback?.Invoke(state);
+            StateChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }

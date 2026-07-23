@@ -66,4 +66,28 @@ public class TaskMutationCoordinatorTests
 
         Assert.Null(await coordinator.RetryAsync("task"));
     }
+
+    [Fact]
+    public async Task Counts_reflect_pending_and_retryable_operations()
+    {
+        var coordinator = new TaskMutationCoordinator();
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pending = coordinator.ExecuteAsync("pending", async () =>
+        {
+            entered.SetResult();
+            await release.Task;
+        });
+
+        await entered.Task;
+        Assert.Equal(1, coordinator.PendingCount);
+        Assert.Equal(0, coordinator.FailedCount);
+
+        await coordinator.ExecuteAsync("failed", () => Task.FromException(new InvalidOperationException()));
+        Assert.Equal(1, coordinator.FailedCount);
+
+        release.SetResult();
+        await pending;
+        Assert.Equal(0, coordinator.PendingCount);
+    }
 }

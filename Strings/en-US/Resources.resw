@@ -421,10 +421,10 @@
     <value>Add Account</value>
   </data>
   <data name="AddAccount_Title.Text" xml:space="preserve">
-    <value>Add Account</value>
+    <value>Accounts and health</value>
   </data>
   <data name="AddAccount_Subtitle.Text" xml:space="preserve">
-    <value>Choose an account type to connect</value>
+    <value>Review connection status, cached data, pending changes, and account setup</value>
   </data>
   <data name="AddAccount_GoogleDesc.Text" xml:space="preserve">
     <value>Google Calendar &amp; Tasks</value>
@@ -439,7 +439,10 @@
     <value>Reconnect all features</value>
   </data>
   <data name="AddAccount_ChecklistTitle.Text" xml:space="preserve">
-    <value>Optional setup</value>
+    <value>Account health and offline status</value>
+  </data>
+  <data name="AddAccount_RetrySync.Content" xml:space="preserve">
+    <value>Retry sync</value>
   </data>
   <data name="AddAccount_OpenMailSetup.Text" xml:space="preserve">
     <value>Open Mail setup</value>
@@ -455,6 +458,36 @@
   </data>
   <data name="AddAccount_Ready" xml:space="preserve">
     <value>Ready</value>
+  </data>
+  <data name="AddAccount_HealthReady" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="AddAccount_HealthSyncing" xml:space="preserve">
+    <value>Syncing</value>
+  </data>
+  <data name="AddAccount_HealthCached" xml:space="preserve">
+    <value>Offline or unavailable; cached data is available</value>
+  </data>
+  <data name="AddAccount_HealthReconnect" xml:space="preserve">
+    <value>Reconnect required</value>
+  </data>
+  <data name="AddAccount_HealthFailed" xml:space="preserve">
+    <value>Sync failed</value>
+  </data>
+  <data name="AddAccount_LastSuccess" xml:space="preserve">
+    <value>Last success: {0}</value>
+  </data>
+  <data name="AddAccount_CacheAvailable" xml:space="preserve">
+    <value>Cached data available</value>
+  </data>
+  <data name="AddAccount_PendingChanges" xml:space="preserve">
+    <value>Pending changes: tasks {0}, failed tasks {1}, mail {2}</value>
+  </data>
+  <data name="AddAccount_MailSetupIncomplete" xml:space="preserve">
+    <value>Setup incomplete</value>
+  </data>
+  <data name="AddAccount_MailHealth" xml:space="preserve">
+    <value>Mail {0}: {1}; pending changes {2}</value>
   </data>
   <data name="AddAccount_ConnectGoogle" xml:space="preserve">
     <value>Connect Google for Calendar, Tasks, and Gmail.</value>

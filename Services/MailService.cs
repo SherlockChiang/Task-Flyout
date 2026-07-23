@@ -195,6 +195,13 @@ namespace Task_Flyout.Services
             return _accounts.Any(account => account.IsSetupComplete);
         }
 
+        public int GetPendingMutationCount(string? accountId = null)
+        {
+            EnsurePersistentCacheLoaded();
+            lock (_mailCacheLock)
+                return _persistentCache?.PendingMutations.Count(mutation => accountId == null || mutation.AccountId == accountId) ?? 0;
+        }
+
         public void SaveMailAccountOrder(IEnumerable<string> accountIds)
         {
             EnsureAccountsLoaded();

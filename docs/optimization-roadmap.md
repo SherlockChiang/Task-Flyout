@@ -57,7 +57,7 @@
 | P1 | HTML 清洗 | 邮件 sanitizer 基于正则，已有超时保护和测试，覆盖 entity 编码危险 URL、空白/控制字符协议混淆、CSS escape dangerous style、namespaced dangerous tags、oversized input fallback、malformed dangerous tags、`srcset` 远程候选和 trusted `meta refresh`。正则 sanitizer 天然较脆弱。 | 若维护成本升高，考虑基于 HTML parser 的 sanitizer。 |
 | P1 | RSS 解析 | RSS fetcher 有最大字节数、重定向限制、DNS pin 到公网 IP 和 XML 解析；feed scheme、redirect scheme、redirect hop 上限、malformed XML fallback、resolved-address private host policy 和 XML 安全设置已有测试。 | 后续可在独立网络测试环境补真实 DNS-rebinding integration。 |
 | P1 | 外部 URI 打开 | 邮件/RSS WebView 导航和打开浏览器动作走 `SafeUriLauncher`；Safe URI tests 覆盖 scheme、本机/私网 host、超长 URL 和 userinfo 欺骗链接；通知 activation parser 也有校验。 | 继续在手工验证中覆盖邮件/RSS/Toast 的实际点击路径。 |
-| P1 | OAuth scope | Google/Microsoft 已拆分日历/任务与邮件 scope，邮件读取、标记已读、发送也按能力延迟授权；设置和写邮件界面已补充额外 consent 说明。 | 手工验证既有 broad-scope token 与新 least-privilege 授权路径。 |
+| P1 | OAuth scope | Google/Microsoft 首次连接会一次申请该 provider 的日历、任务和邮件完整功能 scope；后台同步和功能调用只允许 silent token acquisition。 | 手工验证既有 token 迁移、首次完整 consent、后台授权失效只提示 reconnect 且不会自行打开浏览器。 |
 | P1 | Token 和密码存储 | 本地 token/password 使用 DPAPI 和 PasswordVault，Google legacy token 有迁移。 | 增加按 provider 登出/移除本地 token 的设置项。确认删除账号时清除 token、消息正文和相关本地缓存。 |
 | P1 | 日志 | 崩溃日志会将异常消息和 stack trace 写入本地 roaming logs；写入前已通过 `DiagnosticsRedactor` 脱敏 bearer/basic auth、cookie、URL userinfo、敏感 query 和常见 key/value secret。 | 继续避免主动记录邮件正文、OAuth 响应正文或完整外部 URL；新增诊断应复用日志脱敏 helper。 |
 | P2 | 依赖审计 | `Task_Flyout.csproj` 对 SQLite advisory GHSA-2m69-gcr7-jv3q 做了有理由的 suppress。 | 每次依赖更新时复查；一旦 SQLitePCLRaw/Microsoft.Data.Sqlite 链路提供修复版本，移除 suppress 并升级。 |

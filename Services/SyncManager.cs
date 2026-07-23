@@ -6,10 +6,27 @@ using System.Globalization;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Concurrent;
 using Task_Flyout.Models;
 
 namespace Task_Flyout.Services
 {
+    public enum ProviderHealthKind
+    {
+        Ready,
+        Syncing,
+        Cached,
+        ReconnectRequired,
+        Failed
+    }
+
+    public sealed record ProviderHealthSnapshot(
+        string ProviderName,
+        ProviderHealthKind Kind,
+        DateTimeOffset? LastAttemptUtc,
+        DateTimeOffset? LastSuccessUtc,
+        bool HasCachedData);
+
     public class SyncManager
     {
         private readonly List<ISyncProvider> _providers = new();
@@ -19,6 +36,7 @@ namespace Task_Flyout.Services
         private long _cacheVersion;
         private readonly ReaderWriterLockSlim _cacheLock = new(LockRecursionPolicy.NoRecursion);
         private readonly SharedRequestCoordinator<List<AgendaItem>> _dataRequests = new();
+        private readonly ConcurrentDictionary<string, ProviderHealthSnapshot> _providerHealth = new(StringComparer.OrdinalIgnoreCase);
         private readonly VersionedAsyncWriter<string> _cacheWriter = new(
             json => LocalSqliteStore.WriteProtectedTextAsync(StoreScope, CacheKey, json));
         private const string StoreScope = "calendar";
@@ -28,8 +46,23 @@ namespace Task_Flyout.Services
 
         public IReadOnlyList<ISyncProvider> Providers => _providers;
         public AccountManager AccountManager { get; } = new AccountManager();
+        public event EventHandler? ProviderHealthChanged;
 
         public void RegisterProvider(ISyncProvider provider) => _providers.Add(provider);
+
+        public ProviderHealthSnapshot GetProviderHealth(string providerName)
+        {
+            if (_providerHealth.TryGetValue(providerName, out var health)) return health;
+            return new ProviderHealthSnapshot(
+                providerName,
+                HasCachedData(providerName) ? ProviderHealthKind.Cached : ProviderHealthKind.Ready,
+                null,
+                null,
+                HasCachedData(providerName));
+        }
+
+        public IReadOnlyList<ProviderHealthSnapshot> GetProviderHealthSnapshot()
+            => _providers.Select(provider => GetProviderHealth(provider.ProviderName)).ToList();
 
         public async Task SyncAllCalendarsAsync()
         {
@@ -291,14 +324,25 @@ namespace Task_Flyout.Services
 
             var fetchTasks = activeProviders.Select(async provider =>
             {
+                SetProviderHealth(provider.ProviderName, ProviderHealthKind.Syncing, DateTimeOffset.UtcNow, null);
                 try
                 {
                     await provider.EnsureAuthorizedAsync(cancellationToken);
                     var items = await provider.FetchDataAsync(min, max, cancellationToken);
+                    SetProviderHealth(provider.ProviderName, ProviderHealthKind.Ready, null, DateTimeOffset.UtcNow);
                     return (Provider: provider.ProviderName, Items: items ?? new List<AgendaItem>(), Success: true);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-                catch { return (Provider: provider.ProviderName, Items: new List<AgendaItem>(), Success: false); }
+                catch (AuthorizationInteractionRequiredException)
+                {
+                    SetProviderHealth(provider.ProviderName, ProviderHealthKind.ReconnectRequired, null, null);
+                    return (Provider: provider.ProviderName, Items: new List<AgendaItem>(), Success: false);
+                }
+                catch
+                {
+                    SetProviderHealth(provider.ProviderName, HasCachedData(provider.ProviderName) ? ProviderHealthKind.Cached : ProviderHealthKind.Failed, null, null);
+                    return (Provider: provider.ProviderName, Items: new List<AgendaItem>(), Success: false);
+                }
             });
 
             var results = await Task.WhenAll(fetchTasks);
@@ -317,6 +361,29 @@ namespace Task_Flyout.Services
                 await SaveCacheAsync();
 
             return GetCachedItems(min, max);
+        }
+
+        private bool HasCachedData(string providerName)
+        {
+            EnsureCacheLoaded();
+            var cache = Volatile.Read(ref _publishedCache).Cache;
+            return cache.CachedRanges.Any(range => string.Equals(range.ProviderName, providerName, StringComparison.OrdinalIgnoreCase))
+                || cache.DayItems.Values.Any(items => items.Any(item => string.Equals(item.Provider, providerName, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        private void SetProviderHealth(string providerName, ProviderHealthKind kind, DateTimeOffset? attempt, DateTimeOffset? success)
+        {
+            _providerHealth.AddOrUpdate(
+                providerName,
+                _ => new ProviderHealthSnapshot(providerName, kind, attempt, success, HasCachedData(providerName)),
+                (_, current) => current with
+                {
+                    Kind = kind,
+                    LastAttemptUtc = attempt ?? current.LastAttemptUtc,
+                    LastSuccessUtc = success ?? current.LastSuccessUtc,
+                    HasCachedData = HasCachedData(providerName)
+                });
+            ProviderHealthChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public async Task UpdateTaskStatusAsync(string providerName, string taskId, bool isCompleted, string taskListId = "")

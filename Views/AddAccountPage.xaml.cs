@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System;
 using System.Linq;
+using System.Collections.Generic;
 using Task_Flyout.Models;
 using Task_Flyout.Services;
 
@@ -15,9 +16,38 @@ namespace Task_Flyout.Views
         public AddAccountPage()
         {
             this.InitializeComponent();
+            Loaded += AddAccountPage_Loaded;
+            Unloaded += AddAccountPage_Unloaded;
+            OnboardingActions.Visibility = Windows.Storage.ApplicationData.Current.LocalSettings.Values[OnboardingPolicy.CompletedVersionKey] is int completed
+                && completed >= OnboardingPolicy.CurrentVersion
+                ? Visibility.Collapsed
+                : Visibility.Visible;
             UpdateButtonStates();
             UpdateChecklist();
         }
+
+        private void AddAccountPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (GetSyncManager() is { } syncManager)
+                syncManager.ProviderHealthChanged += SyncManager_ProviderHealthChanged;
+            if (App.Current is App app)
+                app.TaskMutations.StateChanged += TaskMutations_StateChanged;
+            UpdateChecklist();
+        }
+
+        private void AddAccountPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (GetSyncManager() is { } syncManager)
+                syncManager.ProviderHealthChanged -= SyncManager_ProviderHealthChanged;
+            if (App.Current is App app)
+                app.TaskMutations.StateChanged -= TaskMutations_StateChanged;
+        }
+
+        private void SyncManager_ProviderHealthChanged(object? sender, EventArgs e)
+            => DispatcherQueue.TryEnqueue(UpdateChecklist);
+
+        private void TaskMutations_StateChanged(object? sender, EventArgs e)
+            => DispatcherQueue.TryEnqueue(UpdateChecklist);
 
         private void UpdateButtonStates()
         {
@@ -60,6 +90,72 @@ namespace Task_Flyout.Views
                 weather);
             OpenMailSetupButton.Visibility = App.Current is App mailApp && mailApp.MailService.HasSetupCompleteAccounts() ? Visibility.Collapsed : Visibility.Visible;
             OpenWeatherSetupButton.Visibility = App.Current is App weatherApp && weatherApp.WeatherService.IsEnabled ? Visibility.Collapsed : Visibility.Visible;
+            UpdateHealthText(mgr);
+        }
+
+        private void UpdateHealthText(AccountManager mgr)
+        {
+            if (HealthText == null || App.Current is not App app) return;
+
+            var lines = new List<string>();
+            foreach (var providerName in new[] { "Google", "Microsoft" })
+            {
+                if (!mgr.IsConnected(providerName)) continue;
+                var health = app.SyncManager.GetProviderHealth(providerName);
+                var state = health.Kind switch
+                {
+                    ProviderHealthKind.Syncing => _loader.GetStringOrDefault("AddAccount_HealthSyncing") ?? "Syncing",
+                    ProviderHealthKind.Cached => _loader.GetStringOrDefault("AddAccount_HealthCached") ?? "Offline or unavailable; cached data is available",
+                    ProviderHealthKind.ReconnectRequired => _loader.GetStringOrDefault("AddAccount_HealthReconnect") ?? "Reconnect required",
+                    ProviderHealthKind.Failed => _loader.GetStringOrDefault("AddAccount_HealthFailed") ?? "Sync failed",
+                    _ => _loader.GetStringOrDefault("AddAccount_HealthReady") ?? "Connected"
+                };
+                if (health.LastSuccessUtc.HasValue)
+                    state += " · " + string.Format(_loader.GetStringOrDefault("AddAccount_LastSuccess") ?? "Last success: {0}", health.LastSuccessUtc.Value.LocalDateTime.ToString("g"));
+                else if (health.HasCachedData)
+                    state += " · " + (_loader.GetStringOrDefault("AddAccount_CacheAvailable") ?? "Cached data available");
+                lines.Add($"{providerName}: {state}");
+            }
+
+            int taskPending = app.TaskMutations.PendingCount;
+            int taskFailed = app.TaskMutations.FailedCount;
+            int mailPending = app.MailService.GetPendingMutationCount();
+            foreach (var account in app.MailService.GetAccounts())
+            {
+                var mailState = account.IsSetupComplete
+                    ? _loader.GetStringOrDefault("AddAccount_HealthReady") ?? "Connected"
+                    : _loader.GetStringOrDefault("AddAccount_MailSetupIncomplete") ?? "Setup incomplete";
+                int accountPending = app.MailService.GetPendingMutationCount(account.Id);
+                lines.Add(string.Format(
+                    _loader.GetStringOrDefault("AddAccount_MailHealth") ?? "Mail {0}: {1}; pending changes {2}",
+                    account.DisplayName,
+                    mailState,
+                    accountPending));
+            }
+            lines.Add(string.Format(
+                _loader.GetStringOrDefault("AddAccount_PendingChanges") ?? "Pending changes: tasks {0}, failed tasks {1}, mail {2}",
+                taskPending,
+                taskFailed,
+                mailPending));
+            HealthText.Text = string.Join(Environment.NewLine, lines);
+            RetrySyncButton.Visibility = mgr.Accounts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private async void RetrySyncButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (GetSyncManager() is not { } syncManager) return;
+            RetrySyncButton.IsEnabled = false;
+            AuthProgress.IsActive = true;
+            try
+            {
+                await syncManager.GetAllDataAsync(DateTime.Today.AddMonths(-1), DateTime.Today.AddMonths(2), forceRefresh: true);
+                UpdateChecklist();
+            }
+            finally
+            {
+                AuthProgress.IsActive = false;
+                RetrySyncButton.IsEnabled = true;
+            }
         }
 
         private void OpenMailSetupButton_Click(object sender, RoutedEventArgs e)
