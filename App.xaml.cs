@@ -633,6 +633,7 @@ namespace Task_Flyout
             NotificationService?.Stop();
             MailService.StopMailPolling();
             MailService.StopPendingMutationRetryScheduler();
+            MemoryDiagnostics.Stop();
             MailService.NewMailArrived -= MailService_NewMailArrived;
             await FlushPendingSavesBeforeExitAsync();
             if (_uiSettings != null) _uiSettings.ColorValuesChanged -= UiSettings_ColorValuesChanged;

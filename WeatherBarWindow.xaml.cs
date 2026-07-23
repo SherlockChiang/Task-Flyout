@@ -1729,6 +1729,8 @@ namespace Task_Flyout
                 }
 
                 ApplyWindowsTheme();
+                if (!_refreshTimer.IsEnabled)
+                    _refreshTimer.Start();
                 UseFastReparentPolling();
 
                 if (!_isParented)
@@ -1754,6 +1756,7 @@ namespace Task_Flyout
                 if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
 
                 ShowWindow(hWnd, 0); // SW_HIDE
+                _refreshTimer.Stop();
                 _reparentTimer.Stop();
                 ResetCachedWindowPlacement();
                 SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0,

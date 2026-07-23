@@ -849,7 +849,7 @@ namespace Task_Flyout
             _ = Task.Run(async () =>
             {
                 await Task.Delay(1200);
-                DispatcherQueue.TryEnqueue(async () =>
+                bool enqueued = DispatcherQueue.TryEnqueue(async () =>
                 {
                     try
                     {
@@ -862,6 +862,8 @@ namespace Task_Flyout
                         _backgroundRefreshQueued = false;
                     }
                 });
+                if (!enqueued)
+                    _backgroundRefreshQueued = false;
             });
         }
 
