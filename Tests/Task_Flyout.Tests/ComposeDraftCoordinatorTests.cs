@@ -12,7 +12,7 @@ public class ComposeDraftCoordinatorTests
         coordinator.Schedule(Draft("first"));
         coordinator.Schedule(Draft("second"));
 
-        await Task.Delay(40);
+        await repository.WaitForSaveAsync();
 
         Assert.Equal("second", repository.Current?.Subject);
         Assert.Equal(1, repository.SaveCount);
@@ -87,8 +87,10 @@ public class ComposeDraftCoordinatorTests
     {
         public ComposeDraft? Current { get; set; }
         public int SaveCount { get; private set; }
+        private readonly TaskCompletionSource _saved = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public ComposeDraft? Load() => Current;
-        public Task SaveAsync(ComposeDraft draft) { Current = draft; SaveCount++; return Task.CompletedTask; }
+        public Task SaveAsync(ComposeDraft draft) { Current = draft; SaveCount++; _saved.TrySetResult(); return Task.CompletedTask; }
         public Task DeleteAsync() { Current = null; return Task.CompletedTask; }
+        public Task WaitForSaveAsync() => _saved.Task.WaitAsync(TimeSpan.FromSeconds(5));
     }
 }
