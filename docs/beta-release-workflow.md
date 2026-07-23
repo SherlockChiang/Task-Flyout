@@ -18,6 +18,7 @@ The `.github/workflows/beta-release.yml` workflow builds and publishes a prerele
 Set this repository secret for the package job:
 
 - `TASK_FLYOUT_GOOGLE_CREDENTIALS_JSON`: the full contents of the local `credentials.json` file used by Google OAuth.
+- `TASK_FLYOUT_MICROSOFT_CLIENT_ID`: the Microsoft public-client application ID used to generate the ignored `Secrets.cs` build input.
 
 Create a GitHub Environment named `beta-release` and set these environment secrets. Do not require reviewers if every `master` push must publish automatically:
 

@@ -72,14 +72,21 @@ jobs:
         shell: pwsh
         env:
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.TASK_FLYOUT_GOOGLE_CREDENTIALS_JSON }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.TASK_FLYOUT_MICROSOFT_CLIENT_ID }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:GOOGLE_CREDENTIALS_JSON)) {
             throw "Missing secret: TASK_FLYOUT_GOOGLE_CREDENTIALS_JSON"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:MICROSOFT_CLIENT_ID)) {
+            throw "Missing secret: TASK_FLYOUT_MICROSOFT_CLIENT_ID"
           }
 
           [System.IO.File]::WriteAllText(
             (Join-Path $env:GITHUB_WORKSPACE "credentials.json"),
             $env:GOOGLE_CREDENTIALS_JSON)
+          [System.IO.File]::WriteAllText(
+            (Join-Path $env:GITHUB_WORKSPACE "Secrets.cs"),
+            "namespace Task_Flyout.Services; internal static class Secrets { internal const string MicrosoftClientId = `"$env:MICROSOFT_CLIENT_ID`"; }")
 
       - name: Compute beta version
         id: version
@@ -132,7 +139,9 @@ jobs:
       - name: Remove OAuth build input
         if: always()
         shell: pwsh
-        run: Remove-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE "credentials.json") -Force -ErrorAction SilentlyContinue
+        run: |
+          Remove-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE "credentials.json") -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE "Secrets.cs") -Force -ErrorAction SilentlyContinue
 
       - name: Upload unsigned package
         # v4.6.2
