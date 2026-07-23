@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: beta-release-${{ github.ref }}
+  group: task-flyout-master-release
   cancel-in-progress: false
 
 env:
@@ -22,6 +22,7 @@ env:
 jobs:
   verify:
     name: Restore and test
+    if: github.ref == 'refs/heads/master'
     runs-on: windows-latest
 
     steps:
@@ -37,13 +38,11 @@ jobs:
 
       - name: Restore dependencies
         shell: pwsh
-        run: |
-          dotnet restore $env:PROJECT_FILE --locked-mode
-          dotnet restore $env:TEST_PROJECT_FILE --locked-mode
+        run: dotnet restore $env:TEST_PROJECT_FILE --locked-mode
 
       - name: Run tests
         shell: pwsh
-        run: dotnet test $env:TEST_PROJECT_FILE -c Debug --no-restore
+        run: dotnet test $env:TEST_PROJECT_FILE -c Release --no-restore
 
   package:
     name: Build unsigned package
@@ -87,7 +86,15 @@ jobs:
         shell: pwsh
         run: |
           [xml]$manifest = Get-Content -LiteralPath "Package.appxmanifest"
-          $version = $manifest.Package.Identity.Version
+          [version]$baseVersion = $manifest.Package.Identity.Version
+          $revision = [int]$env:GITHUB_RUN_NUMBER
+          if ($revision -gt 65535) {
+            throw "GITHUB_RUN_NUMBER exceeds the MSIX version component limit."
+          }
+
+          $version = "$($baseVersion.Major).$($baseVersion.Minor).$($baseVersion.Build).$revision"
+          $manifest.Package.Identity.Version = $version
+          $manifest.Save((Join-Path $env:GITHUB_WORKSPACE "Package.appxmanifest"))
           $shortSha = $env:GITHUB_SHA.Substring(0, 7)
           $tag = "beta-v$version-$env:GITHUB_RUN_NUMBER.$env:GITHUB_RUN_ATTEMPT"
 
@@ -145,6 +152,14 @@ jobs:
       contents: write
 
     steps:
+      - name: Check out release history
+        # v4.2.2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
       - name: Download unsigned package
         # v4.3.0
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -171,6 +186,25 @@ jobs:
             [Convert]::FromBase64String($env:CERTIFICATE_BASE64))
 
           try {
+            $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
+              $certificatePath,
+              $env:CERTIFICATE_PASSWORD,
+              [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+            [xml]$manifest = Get-Content -LiteralPath "Package.appxmanifest"
+            $publisher = $manifest.Package.Identity.Publisher
+            if ($certificate.Subject -ne $publisher) {
+              throw "Signing certificate subject '$($certificate.Subject)' does not match manifest publisher '$publisher'."
+            }
+            if ($certificate.NotBefore -gt (Get-Date) -or $certificate.NotAfter -le (Get-Date)) {
+              throw "The signing certificate is not currently valid."
+            }
+            $certificatePathPublic = Join-Path $env:GITHUB_WORKSPACE "unsigned-package\TaskFlyout.cer"
+            [System.IO.File]::WriteAllBytes(
+              $certificatePathPublic,
+              $certificate.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+            Import-Certificate -FilePath $certificatePathPublic -CertStoreLocation Cert:\CurrentUser\TrustedPeople | Out-Null
+            Import-Certificate -FilePath $certificatePathPublic -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
+
             $signTool = Get-ChildItem -LiteralPath "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -File -Filter "signtool.exe" |
               Where-Object { $_.FullName -match "\\x64\\signtool\.exe$" } |
               Sort-Object FullName -Descending |
@@ -179,7 +213,7 @@ jobs:
               throw "Windows SDK signtool.exe was not found."
             }
 
-            $packages = @(Get-ChildItem -LiteralPath "unsigned-package" -Recurse -File -Filter "*.msix")
+            $packages = @(Get-ChildItem -LiteralPath "unsigned-package" -Recurse -File -Filter "Task_Flyout*.msix")
             if ($packages.Count -eq 0) {
               throw "No unsigned MSIX package was downloaded."
             }
@@ -197,6 +231,10 @@ jobs:
             }
           }
           finally {
+            if ($null -ne $certificate) {
+              Remove-Item -LiteralPath "Cert:\CurrentUser\TrustedPeople\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
+              Remove-Item -LiteralPath "Cert:\CurrentUser\Root\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
+            }
             Remove-Item -LiteralPath $certificatePath -Force -ErrorAction SilentlyContinue
           }
 
@@ -209,29 +247,85 @@ jobs:
           $stagingDir = Join-Path $artifactDir "TaskFlyout-beta-$env:PACKAGE_VERSION-$env:GITHUB_RUN_NUMBER"
           New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
 
-          Get-ChildItem -LiteralPath "unsigned-package" -Recurse -File -Filter "*.msix" |
+          Get-ChildItem -LiteralPath "unsigned-package" -Recurse -File -Filter "Task_Flyout*.msix" |
             Copy-Item -Destination $stagingDir -Force
+          Copy-Item -LiteralPath "unsigned-package\TaskFlyout.cer" -Destination $stagingDir -Force
+          $x64Dependencies = @(Get-ChildItem -LiteralPath "unsigned-package" -Recurse -File -Filter "Microsoft.WindowsAppRuntime*.msix" |
+            Where-Object FullName -match "[\\/]Dependencies[\\/]x64[\\/]")
+          if ($x64Dependencies.Count -gt 0) {
+            $dependencyDir = Join-Path $stagingDir "Dependencies\x64"
+            New-Item -ItemType Directory -Force -Path $dependencyDir | Out-Null
+            $x64Dependencies | Copy-Item -Destination $dependencyDir -Force
+          }
 
-          $zipPath = Join-Path $artifactDir "TaskFlyout-beta-$env:PACKAGE_VERSION-$env:GITHUB_RUN_NUMBER-win-x64.zip"
+          @'
+          $ErrorActionPreference = "Stop"
+          $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+          $certificate = Join-Path $root "TaskFlyout.cer"
+          $package = Get-ChildItem -LiteralPath $root -File -Filter "*.msix" | Select-Object -First 1
+          if ($null -eq $package) { throw "Task Flyout MSIX was not found." }
+          $dependencies = @(Get-ChildItem -LiteralPath (Join-Path $root "Dependencies\x64") -File -Filter "*.msix" -ErrorAction SilentlyContinue)
+          $process = Start-Process certutil.exe -ArgumentList @("-f", "-addstore", "TrustedPeople", "`"$certificate`"") -Verb RunAs -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "The Task Flyout signing certificate was not trusted." }
+          Get-Process -Name "Task_Flyout" -ErrorAction SilentlyContinue | Stop-Process -Force
+          if ($dependencies.Count -gt 0) {
+            Add-AppxPackage -Path $package.FullName -DependencyPath $dependencies.FullName -ForceUpdateFromAnyVersion
+          }
+          else {
+            Add-AppxPackage -Path $package.FullName -ForceUpdateFromAnyVersion
+          }
+          Write-Host "Task Flyout installed successfully." -ForegroundColor Green
+          '@ | Set-Content -LiteralPath (Join-Path $stagingDir "Install.ps1") -Encoding UTF8
+
+          $zipPath = Join-Path $artifactDir "TaskFlyout-beta-$env:PACKAGE_VERSION-$env:GITHUB_RUN_NUMBER.$env:GITHUB_RUN_ATTEMPT-win-x64.zip"
           Compress-Archive -Path (Join-Path $stagingDir "*") -DestinationPath $zipPath -Force
 
-          $notes = @(
-            "Automated beta build for Task Flyout.",
-            "",
-            "Version: $env:PACKAGE_VERSION",
-            "Commit: $env:GITHUB_SHA",
-            "Build: $env:GITHUB_RUN_NUMBER.$env:GITHUB_RUN_ATTEMPT",
-            "Platform: win-x64"
-          ) -join "`n"
-          Set-Content -LiteralPath (Join-Path $artifactDir "release-notes.md") -Value $notes -Encoding UTF8
+      - name: Generate commit release notes
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_VERSION: ${{ needs.package.outputs.package_version }}
+        run: |
+          $artifactDir = Join-Path $env:GITHUB_WORKSPACE "release-artifacts"
+          $notesPath = Join-Path $artifactDir "release-notes.md"
+          $previousTag = gh release list --repo $env:GITHUB_REPOSITORY --limit 1 --json tagName --jq ".[0].tagName"
 
-      - name: Upload signed workflow artifact
-        # v4.6.2
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: TaskFlyout-beta-${{ github.run_number }}-win-x64
-          path: release-artifacts/*.zip
-          if-no-files-found: error
+          if (-not [string]::IsNullOrWhiteSpace($previousTag)) {
+            git merge-base --is-ancestor $previousTag $env:GITHUB_SHA
+            if ($LASTEXITCODE -ne 0) {
+              throw "Previous release tag '$previousTag' is not an ancestor of $env:GITHUB_SHA."
+            }
+            $range = "$previousTag..$env:GITHUB_SHA"
+            $rangeText = "Changes since [$previousTag](https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$previousTag)"
+            $compareUrl = "https://github.com/$env:GITHUB_REPOSITORY/compare/$previousTag...$env:GITHUB_SHA"
+          }
+          else {
+            $range = $env:GITHUB_SHA
+            $rangeText = "Initial automated release history"
+            $compareUrl = "https://github.com/$env:GITHUB_REPOSITORY/commits/$env:GITHUB_SHA"
+          }
+
+          $commits = @(git log $range --reverse --pretty=format:"- %s ([%h](https://github.com/$env:GITHUB_REPOSITORY/commit/%H))")
+          if ($commits.Count -eq 0) {
+            throw "No commits were found for release range '$range'."
+          }
+
+          @(
+            "Automated Task Flyout beta release.",
+            "",
+            "- Package version: ``$env:PACKAGE_VERSION``",
+            "- Commit: ``$env:GITHUB_SHA``",
+            "- Build: ``$env:GITHUB_RUN_NUMBER.$env:GITHUB_RUN_ATTEMPT``",
+            "- Platform: ``win-x64``",
+            "",
+            "## Updates",
+            "",
+            $rangeText,
+            "",
+            $commits,
+            "",
+            "**[Full comparison]($compareUrl)**"
+          ) | Set-Content -LiteralPath $notesPath -Encoding UTF8
 
       - name: Create GitHub beta release
         shell: pwsh
@@ -242,7 +336,7 @@ jobs:
           SHORT_SHA: ${{ needs.package.outputs.short_sha }}
         run: |
           gh release create $env:BETA_TAG `
-            "release-artifacts\TaskFlyout-beta-$env:PACKAGE_VERSION-$env:GITHUB_RUN_NUMBER-win-x64.zip" `
+            "release-artifacts\TaskFlyout-beta-$env:PACKAGE_VERSION-$env:GITHUB_RUN_NUMBER.$env:GITHUB_RUN_ATTEMPT-win-x64.zip" `
             --title "Task Flyout Beta $env:PACKAGE_VERSION ($env:SHORT_SHA)" `
             --notes-file "release-artifacts\release-notes.md" `
             --target "$env:GITHUB_SHA" `
