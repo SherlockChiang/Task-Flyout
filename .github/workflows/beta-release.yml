@@ -215,6 +215,10 @@ jobs:
               $certificate.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
             Write-Host "Trusting the signing certificate for verification."
             Import-Certificate -FilePath $certificatePathPublic -CertStoreLocation Cert:\CurrentUser\TrustedPeople | Out-Null
+            & certutil.exe -user -f -addstore Root $certificatePathPublic
+            if ($LASTEXITCODE -ne 0) {
+              throw "The signing certificate could not be added to the current-user root store."
+            }
 
             Write-Host "Locating the Windows SDK signing tool."
             $signTool = Get-ChildItem -LiteralPath "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Directory |
@@ -247,6 +251,7 @@ jobs:
           finally {
             if ($null -ne $certificate) {
               Remove-Item -LiteralPath "Cert:\CurrentUser\TrustedPeople\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
+              & certutil.exe -user -delstore Root $certificate.Thumbprint | Out-Null
             }
             Remove-Item -LiteralPath $certificatePath -Force -ErrorAction SilentlyContinue
           }
