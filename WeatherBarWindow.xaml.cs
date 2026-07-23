@@ -1643,8 +1643,8 @@ namespace Task_Flyout
                 double contentLogical = desiredLogical > 0 ? desiredLogical : panel.ActualWidth;
                 if (contentLogical <= 0) return;
 
-                // ContentPanel Margin="10,0,10,0" = 20 DIPs. Add small slack for rounding.
-                double logical = contentLogical + 24;
+                // DesiredSize already includes ContentPanel's horizontal margin.
+                double logical = Math.Ceiling(contentLogical);
 
                 logical = Math.Clamp(logical, MinLogicalWidth, MaxLogicalWidth);
 
