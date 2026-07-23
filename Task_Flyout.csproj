@@ -139,4 +139,5 @@
         <AppxBundlePlatforms>x86|x64|ARM64</AppxBundlePlatforms>
         <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
     </PropertyGroup>
+    <Import Project="Directory.Build.local.props" Condition="Exists('Directory.Build.local.props')" />
 </Project>

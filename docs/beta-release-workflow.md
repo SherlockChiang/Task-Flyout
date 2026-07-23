@@ -56,6 +56,14 @@ For the normal local test loop, use the combined helper instead. It selects the 
 .\scripts\install-latest-sideload-package.ps1
 ```
 
+To make Visual Studio or `dotnet msbuild` `SideloadOnly` packaging sign automatically, configure the current machine once:
+
+```powershell
+.\scripts\configure-local-sideload-signing.ps1 -TrustMachine
+```
+
+This writes the Git-ignored `Directory.Build.local.props` with the matching current-user certificate thumbprint. Store and CI builds remain unsigned until their separate protected signing stage.
+
 ## Notes
 
 - The workflow only packages `win-x64` for beta releases.
