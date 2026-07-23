@@ -156,6 +156,7 @@ jobs:
     name: Sign and publish beta
     needs: package
     runs-on: windows-latest
+    timeout-minutes: 15
     environment: beta-release
     permissions:
       contents: write
@@ -177,6 +178,7 @@ jobs:
           path: unsigned-package
 
       - name: Sign MSIX package
+        timeout-minutes: 5
         shell: pwsh
         env:
           CERTIFICATE_BASE64: ${{ secrets.TASK_FLYOUT_CERTIFICATE_BASE64 }}
@@ -211,12 +213,13 @@ jobs:
             [System.IO.File]::WriteAllBytes(
               $certificatePathPublic,
               $certificate.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+            Write-Host "Trusting the signing certificate for verification."
             Import-Certificate -FilePath $certificatePathPublic -CertStoreLocation Cert:\CurrentUser\TrustedPeople | Out-Null
-            Import-Certificate -FilePath $certificatePathPublic -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
 
-            $signTool = Get-ChildItem -LiteralPath "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -File -Filter "signtool.exe" |
-              Where-Object { $_.FullName -match "\\x64\\signtool\.exe$" } |
-              Sort-Object FullName -Descending |
+            Write-Host "Locating the Windows SDK signing tool."
+            $signTool = Get-ChildItem -LiteralPath "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Directory |
+              Sort-Object Name -Descending |
+              ForEach-Object { Get-Item -LiteralPath (Join-Path $_.FullName "x64\signtool.exe") -ErrorAction SilentlyContinue } |
               Select-Object -First 1
             if ($null -eq $signTool) {
               throw "Windows SDK signtool.exe was not found."
@@ -228,11 +231,13 @@ jobs:
             }
 
             foreach ($package in $packages) {
+              Write-Host "Signing $($package.Name)."
               & $signTool.FullName sign /fd SHA256 /f $certificatePath /p $env:CERTIFICATE_PASSWORD $package.FullName
               if ($LASTEXITCODE -ne 0) {
                 throw "Signing failed for $($package.Name)."
               }
 
+              Write-Host "Verifying $($package.Name)."
               & $signTool.FullName verify /pa /v $package.FullName
               if ($LASTEXITCODE -ne 0) {
                 throw "Signature verification failed for $($package.Name)."
@@ -242,7 +247,6 @@ jobs:
           finally {
             if ($null -ne $certificate) {
               Remove-Item -LiteralPath "Cert:\CurrentUser\TrustedPeople\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
-              Remove-Item -LiteralPath "Cert:\CurrentUser\Root\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
             }
             Remove-Item -LiteralPath $certificatePath -Force -ErrorAction SilentlyContinue
           }
