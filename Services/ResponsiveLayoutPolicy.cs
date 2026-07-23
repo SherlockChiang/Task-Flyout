@@ -34,9 +34,16 @@ namespace Task_Flyout.Services
         public static bool UseCompactWeatherBar(double taskbarLogicalWidth)
             => taskbarLogicalWidth < ComfortableTaskbarMinimumWidth;
 
-        public static int GetWeatherBarPhysicalWidth(int detectedWidgetWidth, int fallbackWidth, int minimumWidth, int maximumWidth)
-            => detectedWidgetWidth > 0
-                ? detectedWidgetWidth
-                : Math.Clamp(fallbackWidth, minimumWidth, maximumWidth);
+        public static int GetWeatherBarPhysicalHeight(
+            int detectedWidgetHeight,
+            int taskbarHeight,
+            int verticalInset,
+            int minimumHeight)
+        {
+            taskbarHeight = Math.Max(1, taskbarHeight);
+            if (detectedWidgetHeight > 0)
+                return Math.Clamp(detectedWidgetHeight, 1, taskbarHeight);
+            return Math.Min(taskbarHeight, Math.Max(minimumHeight, taskbarHeight - verticalInset * 2));
+        }
     }
 }

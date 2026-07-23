@@ -43,11 +43,12 @@ public class ResponsiveLayoutPolicyTests
         => Assert.Equal(expected, ResponsiveLayoutPolicy.UseCompactWeatherBar(taskbarWidth));
 
     [Theory]
-    [InlineData(152, 240, 80, 420, 152)]
-    [InlineData(0, 240, 80, 420, 240)]
-    [InlineData(0, 500, 80, 420, 420)]
-    public void Uses_exact_widgets_width_with_bounded_fallback(
-        int detectedWidth, int fallbackWidth, int minimumWidth, int maximumWidth, int expected)
-        => Assert.Equal(expected, ResponsiveLayoutPolicy.GetWeatherBarPhysicalWidth(
-            detectedWidth, fallbackWidth, minimumWidth, maximumWidth));
+    [InlineData(40, 48, 4, 28, 40)]
+    [InlineData(0, 48, 4, 28, 40)]
+    [InlineData(60, 48, 4, 28, 48)]
+    [InlineData(0, 24, 4, 28, 24)]
+    public void Uses_exact_widgets_height_with_bounded_fallback(
+        int detectedHeight, int taskbarHeight, int inset, int minimumHeight, int expected)
+        => Assert.Equal(expected, ResponsiveLayoutPolicy.GetWeatherBarPhysicalHeight(
+            detectedHeight, taskbarHeight, inset, minimumHeight));
 }

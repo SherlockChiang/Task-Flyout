@@ -41,7 +41,6 @@ namespace Task_Flyout
         private int _lastBarY = int.MinValue;
         private int _lastBarWidth = int.MinValue;
         private int _lastBarHeight = int.MinValue;
-        private double _nativeWidgetLogicalWidth;
         private IntPtr _lastInsertAfter = IntPtr.Zero;
         private DateTime _fastReparentPollingUntilUtc = DateTime.MinValue;
         private static readonly TimeSpan NormalReparentInterval = TimeSpan.FromSeconds(8);
@@ -464,17 +463,13 @@ namespace Task_Flyout
             int taskbarHeight = tbClient.Bottom - tbClient.Top;
 
             int verticalInset = (int)(4 * scaleFactor);
-            int pillHeight = taskbarHeight - verticalInset * 2;
-            if (pillHeight < (int)(28 * scaleFactor))
-                pillHeight = (int)(28 * scaleFactor);
             IntPtr previousFluentFlyout = _fluentFlyoutHwnd;
             TaskbarWidgetGeometry widgets = GetTaskbarWidgetGeometry(hWnd, tbRect, scaleFactor);
-            double nativeWidgetLogicalWidth = widgets.NativeWidgetWidth / scaleFactor;
-            if (Math.Abs(nativeWidgetLogicalWidth - _nativeWidgetLogicalWidth) > 1)
-            {
-                _nativeWidgetLogicalWidth = nativeWidgetLogicalWidth;
-                _ = RefreshWeatherAsync();
-            }
+            int pillHeight = ResponsiveLayoutPolicy.GetWeatherBarPhysicalHeight(
+                widgets.NativeWidgetHeight,
+                taskbarHeight,
+                verticalInset,
+                (int)(28 * scaleFactor));
             if (previousFluentFlyout != _fluentFlyoutHwnd)
                 UseFastReparentPolling();
 
@@ -482,8 +477,7 @@ namespace Task_Flyout
             int minPillWidth = (int)(MinLogicalWidth * scaleFactor);
             double taskbarLogicalWidth = (tbClient.Right - tbClient.Left) / scaleFactor;
             int maxPillWidth = (int)(ResponsiveLayoutPolicy.GetWeatherBarMaximumWidth(taskbarLogicalWidth) * scaleFactor);
-            int pillWidth = ResponsiveLayoutPolicy.GetWeatherBarPhysicalWidth(
-                widgets.NativeWidgetWidth, fallbackPillWidth, minPillWidth, maxPillWidth);
+            int pillWidth = Math.Clamp(fallbackPillWidth, minPillWidth, maxPillWidth);
 
             int gap = (int)(6 * scaleFactor);
             int x = widgets.OccupiedOffset + (widgets.OccupiedOffset > 0 ? gap : 0);
@@ -631,7 +625,7 @@ namespace Task_Flyout
             }
         }
 
-        private readonly record struct TaskbarWidgetGeometry(int OccupiedOffset, int NativeWidgetWidth);
+        private readonly record struct TaskbarWidgetGeometry(int OccupiedOffset, int NativeWidgetHeight);
 
         private TaskbarWidgetGeometry GetTaskbarWidgetGeometry(IntPtr ownHwnd, RECT taskbarScreenRect, double scaleFactor)
         {
@@ -645,7 +639,7 @@ namespace Task_Flyout
                 GetWindowThreadProcessId(ownHwnd, out uint ownPid);
 
                 int maxRightScreen = taskbarLeft;
-                int nativeWidgetWidth = 0;
+                int nativeWidgetHeight = 0;
                 _fluentFlyoutHwnd = IntPtr.Zero;
 
                 // Enumerate direct children of Shell_TrayWnd (FluentFlyout TaskbarWindow is
@@ -707,17 +701,17 @@ namespace Task_Flyout
                         int leftTolerance = (int)Math.Ceiling(32 * scaleFactor);
                         if (isBridge && visibleRc.Left <= taskbarLeft + leftTolerance)
                         {
-                            int clippedLeft = Math.Max(visibleRc.Left, taskbarLeft);
-                            int clippedRight = Math.Min(visibleRc.Right, taskbarMidX);
-                            int candidateWidth = clippedRight - clippedLeft;
-                            if (candidateWidth > 0 && (nativeWidgetWidth == 0 || candidateWidth < nativeWidgetWidth))
-                                nativeWidgetWidth = candidateWidth;
+                            int clippedTop = Math.Max(visibleRc.Top, taskbarTop);
+                            int clippedBottom = Math.Min(visibleRc.Bottom, taskbarBottom);
+                            int candidateHeight = clippedBottom - clippedTop;
+                            if (candidateHeight > 0 && (nativeWidgetHeight == 0 || candidateHeight < nativeWidgetHeight))
+                                nativeWidgetHeight = candidateHeight;
                         }
                     }
                 }
 
                 int occupiedOffset = maxRightScreen > taskbarLeft ? maxRightScreen - taskbarLeft : 0;
-                return new TaskbarWidgetGeometry(occupiedOffset, nativeWidgetWidth);
+                return new TaskbarWidgetGeometry(occupiedOffset, nativeWidgetHeight);
             }
             catch
             {
@@ -1511,10 +1505,7 @@ namespace Task_Flyout
 
         private void ApplyDescriptionLayout(bool isAlert)
         {
-            double configuredMaximum = isAlert ? AlertDescriptionMaxWidth : NormalDescriptionMaxWidth;
-            TxtDesc.MaxWidth = _nativeWidgetLogicalWidth > 0
-                ? Math.Clamp(_nativeWidgetLogicalWidth - 100, 48, configuredMaximum)
-                : configuredMaximum;
+            TxtDesc.MaxWidth = isAlert ? AlertDescriptionMaxWidth : NormalDescriptionMaxWidth;
             TxtDesc.MaxLines = 1;
             TxtDesc.TextWrapping = TextWrapping.NoWrap;
             TxtDesc.TextTrimming = TextTrimming.CharacterEllipsis;
@@ -1622,8 +1613,6 @@ namespace Task_Flyout
 
         private bool IsCompactTaskbar()
         {
-            if (_nativeWidgetLogicalWidth > 0)
-                return _nativeWidgetLogicalWidth < 300;
             if (_taskbarHwnd == IntPtr.Zero || !GetClientRect(_taskbarHwnd, out RECT client)) return false;
             double scale = Math.Max(1, GetDpiForWindow(_taskbarHwnd) / 96d);
             return ResponsiveLayoutPolicy.UseCompactWeatherBar((client.Right - client.Left) / scale);
