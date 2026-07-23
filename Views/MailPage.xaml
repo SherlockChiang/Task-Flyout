@@ -5,7 +5,7 @@
     xmlns:models="using:Task_Flyout.Services"
     Background="Transparent">
 
-    <Grid x:Name="LayoutRoot" Padding="28" RowSpacing="14" SizeChanged="LayoutRoot_SizeChanged">
+    <Grid x:Name="LayoutRoot" AutomationProperties.AutomationId="MailLayoutRoot" Padding="28" RowSpacing="14" SizeChanged="LayoutRoot_SizeChanged">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -28,14 +28,14 @@
             </StackPanel>
 
             <StackPanel x:Name="MailHeaderCommands" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <Button x:Uid="MailPage_AccountsButton" x:Name="MailAccountsButton" Visibility="Collapsed" Click="MailAccountsButton_Click" Padding="10,6">
+                <Button x:Uid="MailPage_AccountsButton" x:Name="MailAccountsButton" AutomationProperties.AutomationId="MailAccountsButton" Visibility="Collapsed" Click="MailAccountsButton_Click" Padding="10,6">
                     <FontIcon Glyph="&#xE716;" FontSize="14"/>
                 </Button>
                 <Button x:Uid="MailPage_BackButton" x:Name="MailBackButton" Visibility="Collapsed" Click="MailBackButton_Click" Padding="10,6">
                     <FontIcon Glyph="&#xE72B;" FontSize="14"/>
                 </Button>
                 <ToggleSwitch x:Uid="MailPage_UnreadOnlyToggle" x:Name="UnreadOnlyToggle" Header="仅未读" Toggled="UnreadOnlyToggle_Toggled"/>
-                <Button x:Uid="MailPage_ComposeButton" x:Name="ComposeButton" Click="ComposeButton_Click">
+                <Button x:Uid="MailPage_ComposeButton" x:Name="ComposeButton" AutomationProperties.AutomationId="MailComposeButton" Click="ComposeButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <FontIcon Glyph="&#xE724;" FontSize="14"/>
                         <TextBlock x:Uid="MailPage_Compose" x:Name="ComposeButtonText" Text="写邮件"/>
@@ -59,7 +59,7 @@
                 <ColumnDefinition x:Name="DetailColumn" Width="5*" MinWidth="340"/>
             </Grid.ColumnDefinitions>
 
-            <Grid x:Name="MailAccountPane" Grid.Column="0" RowSpacing="10">
+            <Grid x:Name="MailAccountPane" AutomationProperties.AutomationId="MailAccountPane" Grid.Column="0" RowSpacing="10">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
@@ -97,7 +97,7 @@
                 </Button>
             </Grid>
 
-            <Border x:Name="MailMessagePane" Grid.Column="1"
+            <Border x:Name="MailMessagePane" AutomationProperties.AutomationId="MailMessagePane" Grid.Column="1"
                     Background="{ThemeResource LayerFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"
@@ -179,7 +179,7 @@
                 </Grid>
             </Border>
 
-            <Border x:Name="MailDetailPane" Grid.Column="2"
+            <Border x:Name="MailDetailPane" AutomationProperties.AutomationId="MailDetailPane" Grid.Column="2"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"

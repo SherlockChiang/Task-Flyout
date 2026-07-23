@@ -34,3 +34,23 @@ Use this checklist before and after performance-sensitive changes. Record result
 - Do not include account names, email subjects, message bodies, OAuth URLs, tokens, or exact home/work locations in notes.
 - If logs are attached, run them through the diagnostic redaction path or manually inspect them first.
 - Compare packaged release numbers separately from `Debug`; WinUI/WebView2 startup behavior can differ significantly.
+
+## Automated Packaged Checks
+
+Run the installed-package smoke test after installing a current x64 package:
+
+```powershell
+.\scripts\test-packaged-smoke.ps1
+```
+
+The smoke test uses invariant UI Automation IDs to verify package activation, localized accessible navigation names, keyboard invocation of Calendar, Tasks, and Mail, the 640 x 700 narrow Calendar layout, and close-to-tray reactivation.
+
+Run the default 10-minute soak with:
+
+```powershell
+.\scripts\test-packaged-soak.ps1
+```
+
+The soak samples process handles, working set, private memory, and threads every 10 seconds. It writes `TestResults\packaged-soak.csv` and fails when median handle growth exceeds 25 or median private-memory growth exceeds 64 MB. Override duration and limits with `TASKFLYOUT_SOAK_MINUTES`, `TASKFLYOUT_SOAK_MAX_HANDLE_GROWTH`, and `TASKFLYOUT_SOAK_MAX_PRIVATE_MB_GROWTH`.
+
+The `Quality` workflow runs unit/resource checks for pull requests, packaged smoke after a successful beta release, and packaged soak on its weekly schedule or manual dispatch.

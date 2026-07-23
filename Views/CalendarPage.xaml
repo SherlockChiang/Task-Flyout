@@ -15,7 +15,7 @@
         <views:ProviderToTextBrushConverter x:Key="ProviderToTextBrushConverter"/>
     </Page.Resources>
 
-    <Grid x:Name="LayoutRoot" Background="#01000000" SizeChanged="LayoutRoot_SizeChanged">
+    <Grid x:Name="LayoutRoot" AutomationProperties.AutomationId="CalendarLayoutRoot" Background="#01000000" SizeChanged="LayoutRoot_SizeChanged">
         <Grid.ColumnDefinitions>
             <!-- Proportional layout: side panes scale with the window and cap on wide
                  screens; the calendar keeps a readable floor (MinWidth) on small laptops. -->
@@ -24,7 +24,7 @@
             <ColumnDefinition x:Name="TimelineColumn" Width="3*" MinWidth="280" MaxWidth="360"/>
         </Grid.ColumnDefinitions>
 
-        <Grid x:Name="AccountPane" Grid.Column="0" Background="{ThemeResource LayerFillColorAltBrush}" BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Padding="16,32,16,24" RowSpacing="12">
+        <Grid x:Name="AccountPane" AutomationProperties.AutomationId="CalendarAccountPane" Grid.Column="0" Background="{ThemeResource LayerFillColorAltBrush}" BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Padding="16,32,16,24" RowSpacing="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -34,7 +34,7 @@
 
             <Grid Margin="4,0,0,8">
                 <TextBlock x:Uid="CalendarPage_AccountHeader" Text="日程账户" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                <Button x:Uid="CalendarPage_BtnCollapseAccounts" HorizontalAlignment="Right" Width="40" Height="40" Padding="0" Background="Transparent" BorderThickness="0"
+                <Button x:Uid="CalendarPage_BtnCollapseAccounts" AutomationProperties.AutomationId="CalendarCollapseAccounts" HorizontalAlignment="Right" Width="40" Height="40" Padding="0" Background="Transparent" BorderThickness="0"
                         Click="ToggleAccountPane_Click">
                     <FontIcon Glyph="&#xE76B;" FontSize="12"/>
                 </Button>
@@ -141,7 +141,7 @@
             <Button Grid.Row="3" x:Uid="MainWindow_BtnForceSync" Content="强制立即同步" HorizontalAlignment="Stretch" Click="BtnForceSync_Click"/>
         </Grid>
 
-        <Grid x:Name="CalendarContent" Grid.Column="1" Padding="32,32,24,32">
+        <Grid x:Name="CalendarContent" AutomationProperties.AutomationId="CalendarContentPane" Grid.Column="1" Padding="32,32,24,32">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -151,7 +151,7 @@
             <ScrollViewer Grid.Row="0" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Auto"
                           VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,24">
             <StackPanel Orientation="Horizontal" Spacing="12">
-                <Button x:Uid="CalendarPage_BtnToggleAccounts" x:Name="ToggleAccountPaneButton" Width="40" Height="36" Padding="0" Background="Transparent" BorderThickness="0"
+                <Button x:Uid="CalendarPage_BtnToggleAccounts" x:Name="ToggleAccountPaneButton" AutomationProperties.AutomationId="CalendarToggleAccounts" Width="40" Height="36" Padding="0" Background="Transparent" BorderThickness="0"
                         Click="ToggleAccountPane_Click">
                     <FontIcon x:Name="ToggleAccountPaneIcon" Glyph="&#xE76B;" FontSize="12"/>
                 </Button>
@@ -281,7 +281,7 @@
             </StackPanel>
         </Grid>
 
-        <Grid x:Name="TimelinePane" Grid.Column="2" Background="{ThemeResource LayerFillColorAltBrush}" BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}" BorderThickness="1,0,0,0" Padding="24,32,24,0">
+        <Grid x:Name="TimelinePane" AutomationProperties.AutomationId="CalendarTimelinePane" Grid.Column="2" Background="{ThemeResource LayerFillColorAltBrush}" BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}" BorderThickness="1,0,0,0" Padding="24,32,24,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>

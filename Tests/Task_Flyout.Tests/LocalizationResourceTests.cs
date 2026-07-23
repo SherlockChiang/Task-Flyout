@@ -33,11 +33,33 @@ public class LocalizationResourceTests
         Assert.Empty(violations);
     }
 
+    [Fact]
+    public void Packaged_smoke_surfaces_have_stable_automation_ids()
+    {
+        string root = FindRepositoryRoot();
+        var requiredIds = new[]
+        {
+            "MainNavigation", "NavCalendar", "NavTasks", "NavMail",
+            "CalendarToggleAccounts", "CalendarCollapseAccounts",
+            "TasksToggleAccounts", "MailComposeButton"
+        };
+        string xaml = string.Join('\n', Directory.EnumerateFiles(root, "*.xaml", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+            .Select(File.ReadAllText));
+
+        foreach (string automationId in requiredIds)
+            Assert.Contains($"AutomationProperties.AutomationId=\"{automationId}\"", xaml, StringComparison.Ordinal);
+    }
+
     private static HashSet<string> LoadResourceKeys(string path)
     {
-        var keys = XDocument.Load(path)
+        var elements = XDocument.Load(path)
             .Root!
             .Elements("data")
+            .ToList();
+        Assert.DoesNotContain(elements, element => string.IsNullOrWhiteSpace(element.Element("value")?.Value));
+        var keys = elements
             .Select(element => (string?)element.Attribute("name"))
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .Cast<string>()

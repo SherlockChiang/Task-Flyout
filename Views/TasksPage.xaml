@@ -12,13 +12,13 @@
         <views:TaskCompletedOpacityConverter x:Key="TaskCompletedOpacityConverter"/>
     </Page.Resources>
 
-    <Grid x:Name="LayoutRoot" Background="#01000000" SizeChanged="LayoutRoot_SizeChanged">
+    <Grid x:Name="LayoutRoot" AutomationProperties.AutomationId="TasksLayoutRoot" Background="#01000000" SizeChanged="LayoutRoot_SizeChanged">
         <Grid.ColumnDefinitions>
             <ColumnDefinition x:Name="AccountColumn" Width="2*" MinWidth="200" MaxWidth="280"/>
             <ColumnDefinition x:Name="TaskContentColumn" Width="5*" MinWidth="360"/>
         </Grid.ColumnDefinitions>
 
-        <Grid x:Name="AccountPane" Grid.Column="0"
+        <Grid x:Name="AccountPane" AutomationProperties.AutomationId="TasksAccountPane" Grid.Column="0"
               Background="{ThemeResource LayerFillColorAltBrush}"
               BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
               BorderThickness="0,0,1,0"
@@ -133,7 +133,7 @@
             <Button Grid.Row="3" x:Uid="MainWindow_BtnForceSync" Content="强制立即同步" HorizontalAlignment="Stretch" Click="BtnForceSync_Click"/>
         </Grid>
 
-        <Grid x:Name="TaskContent" Grid.Column="1" Padding="32">
+        <Grid x:Name="TaskContent" AutomationProperties.AutomationId="TasksContentPane" Grid.Column="1" Padding="32">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -147,7 +147,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                    <Button x:Uid="TasksPage_BtnExpandAccounts" x:Name="ToggleAccountPaneButton"
+                    <Button x:Uid="TasksPage_BtnExpandAccounts" x:Name="ToggleAccountPaneButton" AutomationProperties.AutomationId="TasksToggleAccounts"
                             Width="40"
                             Height="36"
                             Padding="0"
