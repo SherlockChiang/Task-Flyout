@@ -247,10 +247,12 @@ jobs:
                   $signature.SignerCertificate.Thumbprint -ne $certificate.Thumbprint) {
                 throw "Signature integrity or signer verification failed for $($package.Name): $($signature.Status)."
               }
-              & $makeAppx validate /p $package.FullName
+              $validationDir = Join-Path $env:RUNNER_TEMP "validated-$($package.BaseName)"
+              & $makeAppx unpack /p $package.FullName /d $validationDir /o
               if ($LASTEXITCODE -ne 0) {
                 throw "Package validation failed for $($package.Name)."
               }
+              Remove-Item -LiteralPath $validationDir -Recurse -Force
             }
           }
           finally {
