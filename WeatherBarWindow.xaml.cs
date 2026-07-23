@@ -83,6 +83,14 @@ namespace Task_Flyout
         [DllImport("user32.dll", SetLastError = true)]
         private static extern IntPtr FindWindowEx(IntPtr hWndParent, IntPtr hWndChildAfter, string? lpszClass, string? lpszWindow);
 
+        private delegate bool EnumWindowProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool EnumWindows(EnumWindowProc callback, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowProc callback, IntPtr lParam);
+
         [DllImport("user32.dll")]
         private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
@@ -462,14 +470,11 @@ namespace Task_Flyout
             double scaleFactor = Math.Max(1, GetDpiForWindow(_taskbarHwnd) / 96.0);
             int taskbarHeight = tbClient.Bottom - tbClient.Top;
 
-            int verticalInset = (int)(4 * scaleFactor);
             IntPtr previousFluentFlyout = _fluentFlyoutHwnd;
             TaskbarWidgetGeometry widgets = GetTaskbarWidgetGeometry(hWnd, tbRect, scaleFactor);
             int pillHeight = ResponsiveLayoutPolicy.GetWeatherBarPhysicalHeight(
                 widgets.NativeWidgetHeight,
-                taskbarHeight,
-                verticalInset,
-                (int)(28 * scaleFactor));
+                taskbarHeight);
             if (previousFluentFlyout != _fluentFlyoutHwnd)
                 UseFastReparentPolling();
 
@@ -639,7 +644,8 @@ namespace Task_Flyout
                 GetWindowThreadProcessId(ownHwnd, out uint ownPid);
 
                 int maxRightScreen = taskbarLeft;
-                int nativeWidgetHeight = 0;
+                int nativeWidgetHeight = GetNativeWidgetContainerHeight(
+                    ownHwnd, taskbarScreenRect, scaleFactor);
                 _fluentFlyoutHwnd = IntPtr.Zero;
 
                 // Enumerate direct children of Shell_TrayWnd (FluentFlyout TaskbarWindow is
@@ -704,7 +710,7 @@ namespace Task_Flyout
                             int clippedTop = Math.Max(visibleRc.Top, taskbarTop);
                             int clippedBottom = Math.Min(visibleRc.Bottom, taskbarBottom);
                             int candidateHeight = clippedBottom - clippedTop;
-                            if (candidateHeight > 0 && (nativeWidgetHeight == 0 || candidateHeight < nativeWidgetHeight))
+                            if (candidateHeight > nativeWidgetHeight)
                                 nativeWidgetHeight = candidateHeight;
                         }
                     }
@@ -717,6 +723,43 @@ namespace Task_Flyout
             {
                 return default;
             }
+        }
+
+        private int GetNativeWidgetContainerHeight(IntPtr ownHwnd, RECT taskbarRect, double scaleFactor)
+        {
+            GetWindowThreadProcessId(ownHwnd, out uint ownPid);
+            int taskbarMidX = (taskbarRect.Left + taskbarRect.Right) / 2;
+            int leftTolerance = (int)Math.Ceiling(32 * scaleFactor);
+            int detectedHeight = 0;
+
+            bool Inspect(IntPtr window)
+            {
+                if (window == ownHwnd || !IsWindowVisible(window)) return true;
+                GetWindowThreadProcessId(window, out uint pid);
+                if (pid == ownPid) return true;
+
+                _classNameBuffer.Clear();
+                GetClassName(window, _classNameBuffer, _classNameBuffer.Capacity);
+                if (_classNameBuffer.ToString() != "Windows.UI.Composition.DesktopWindowContentBridge")
+                    return true;
+                if (!GetWindowRect(window, out RECT rect)) return true;
+                if (rect.Left > taskbarRect.Left + leftTolerance || rect.Left >= taskbarMidX) return true;
+
+                int top = Math.Max(rect.Top, taskbarRect.Top);
+                int bottom = Math.Min(rect.Bottom, taskbarRect.Bottom);
+                detectedHeight = Math.Max(detectedHeight, bottom - top);
+                return true;
+            }
+
+            EnumWindowProc inspect = (window, _) => Inspect(window);
+            EnumWindowProc inspectTree = (window, _) =>
+            {
+                Inspect(window);
+                EnumChildWindows(window, inspect, IntPtr.Zero);
+                return true;
+            };
+            EnumWindows(inspectTree, IntPtr.Zero);
+            return detectedHeight;
         }
 
         /// <summary>
