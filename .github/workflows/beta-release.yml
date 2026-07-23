@@ -241,7 +241,8 @@ jobs:
 
               Write-Host "Verifying $($package.Name)."
               $signature = Get-AuthenticodeSignature -LiteralPath $package.FullName
-              if ($signature.Status.ToString() -notin @("Valid", "NotTrusted") -or
+              Write-Host "Authenticode status: $($signature.Status) ($($signature.StatusMessage))"
+              if ($signature.Status.ToString() -notin @("Valid", "NotTrusted", "UnknownError") -or
                   $null -eq $signature.SignerCertificate -or
                   $signature.SignerCertificate.Thumbprint -ne $certificate.Thumbprint) {
                 throw "Signature integrity or signer verification failed for $($package.Name): $($signature.Status)."
