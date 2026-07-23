@@ -213,21 +213,19 @@ jobs:
             [System.IO.File]::WriteAllBytes(
               $certificatePathPublic,
               $certificate.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
-            Write-Host "Trusting the signing certificate for verification."
-            Import-Certificate -FilePath $certificatePathPublic -CertStoreLocation Cert:\CurrentUser\TrustedPeople | Out-Null
-            & certutil.exe -user -f -addstore Root $certificatePathPublic
-            if ($LASTEXITCODE -ne 0) {
-              throw "The signing certificate could not be added to the current-user root store."
-            }
-
-            Write-Host "Locating the Windows SDK signing tool."
-            $signTool = Get-ChildItem -LiteralPath "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Directory |
+            Write-Host "Locating Windows SDK package tools."
+            $sdkBin = Get-ChildItem -LiteralPath "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Directory |
               Sort-Object Name -Descending |
-              ForEach-Object { Get-Item -LiteralPath (Join-Path $_.FullName "x64\signtool.exe") -ErrorAction SilentlyContinue } |
+              Where-Object {
+                (Test-Path -LiteralPath (Join-Path $_.FullName "x64\signtool.exe")) -and
+                (Test-Path -LiteralPath (Join-Path $_.FullName "x64\makeappx.exe"))
+              } |
               Select-Object -First 1
-            if ($null -eq $signTool) {
-              throw "Windows SDK signtool.exe was not found."
+            if ($null -eq $sdkBin) {
+              throw "Windows SDK package tools were not found."
             }
+            $signTool = Join-Path $sdkBin.FullName "x64\signtool.exe"
+            $makeAppx = Join-Path $sdkBin.FullName "x64\makeappx.exe"
 
             $packages = @(Get-ChildItem -LiteralPath "unsigned-package" -Recurse -File -Filter "Task_Flyout*.msix")
             if ($packages.Count -eq 0) {
@@ -236,23 +234,25 @@ jobs:
 
             foreach ($package in $packages) {
               Write-Host "Signing $($package.Name)."
-              & $signTool.FullName sign /fd SHA256 /f $certificatePath /p $env:CERTIFICATE_PASSWORD $package.FullName
+              & $signTool sign /fd SHA256 /f $certificatePath /p $env:CERTIFICATE_PASSWORD $package.FullName
               if ($LASTEXITCODE -ne 0) {
                 throw "Signing failed for $($package.Name)."
               }
 
               Write-Host "Verifying $($package.Name)."
-              & $signTool.FullName verify /pa /v $package.FullName
+              $signature = Get-AuthenticodeSignature -LiteralPath $package.FullName
+              if ($signature.Status.ToString() -notin @("Valid", "NotTrusted") -or
+                  $null -eq $signature.SignerCertificate -or
+                  $signature.SignerCertificate.Thumbprint -ne $certificate.Thumbprint) {
+                throw "Signature integrity or signer verification failed for $($package.Name): $($signature.Status)."
+              }
+              & $makeAppx validate /p $package.FullName
               if ($LASTEXITCODE -ne 0) {
-                throw "Signature verification failed for $($package.Name)."
+                throw "Package validation failed for $($package.Name)."
               }
             }
           }
           finally {
-            if ($null -ne $certificate) {
-              Remove-Item -LiteralPath "Cert:\CurrentUser\TrustedPeople\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
-              & certutil.exe -user -delstore Root $certificate.Thumbprint | Out-Null
-            }
             Remove-Item -LiteralPath $certificatePath -Force -ErrorAction SilentlyContinue
           }
 
