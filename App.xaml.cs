@@ -439,7 +439,7 @@ namespace Task_Flyout
         {
             MainDispatcherQueue?.TryEnqueue(() =>
             {
-                RefreshWeatherBar();
+                RefreshWeatherBar(forceRefresh: true);
                 _ = MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: true);
             });
         }
@@ -556,12 +556,12 @@ namespace Task_Flyout
             _weatherBarWatchdog = null;
         }
 
-        public static void RefreshWeatherBar()
+        public static void RefreshWeatherBar(bool forceRefresh = false)
         {
             MainDispatcherQueue.TryEnqueue(async () =>
             {
                 if (MyWeatherBar != null)
-                    await MyWeatherBar.RefreshWeatherAsync();
+                    await MyWeatherBar.RefreshWeatherAsync(forceRefresh);
             });
         }
 

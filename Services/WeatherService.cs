@@ -137,6 +137,9 @@ namespace Task_Flyout.Services
         public string Key { get; set; } = "";
         public long FetchedTicks { get; set; }
         public WeatherInfo? Info { get; set; }
+        public string? FailureKey { get; set; }
+        public long FailureUtcTicks { get; set; }
+        public int FailureCount { get; set; }
     }
 
     public sealed record CitySuggestion(string DisplayName, double Latitude, double Longitude)
@@ -152,12 +155,11 @@ namespace Task_Flyout.Services
         private string? _cachedWeatherKey;
         private DateTime _lastFetchTime = DateTime.MinValue;
         private readonly TimeSpan _cacheExpiry = TimeSpan.FromMinutes(30);
-        // Coalesce concurrent weather fetches: the bar timer, flyout, nav icon and
-        // settings page can all ask at once (especially on a city change). Without this
-        // each hits the provider independently (OpenMeteo = 2 requests apiece).
+        // The coordinator isolates caller cancellation while sharing equivalent requests.
         private readonly object _weatherLock = new();
-        private Task<WeatherInfo?>? _inFlightWeatherFetch;
-        private string? _inFlightWeatherKey;
+        private readonly object _contextLock = new();
+        private readonly SharedRequestCoordinator<WeatherInfo?> _weatherRequests = new();
+        private CancellationTokenSource _weatherContextCancellation = new();
         private string? _lastFailureWeatherKey;
         private DateTimeOffset _lastFailureUtc = DateTimeOffset.MinValue;
         private int _consecutiveFailures;
@@ -171,10 +173,19 @@ namespace Task_Flyout.Services
         private bool _locationLoaded;
         private long _weatherDataGeneration;
         private readonly SemaphoreSlim _weatherPersistenceGate = new(1, 1);
-        private static readonly TimeSpan MaxFailureBackoff = TimeSpan.FromMinutes(30);
-
-        private string CurrentWeatherKey =>
-            $"{WeatherSource}|{City}|{CityLat.ToString(CultureInfo.InvariantCulture)}|{CityLon.ToString(CultureInfo.InvariantCulture)}";
+        private sealed record WeatherRequestContext(
+            long Generation,
+            bool IsEnabled,
+            string Source,
+            string City,
+            double Latitude,
+            double Longitude,
+            string IconFont,
+            CancellationToken ServiceCancellationToken)
+        {
+            public string Key => $"{Source}|{City}|{Latitude.ToString(CultureInfo.InvariantCulture)}|{Longitude.ToString(CultureInfo.InvariantCulture)}";
+            public string CoordinatorKey => $"{Generation}|{Key}";
+        }
 
         private static async Task<string> GetStringWithAgentAsync(string url, string userAgent, CancellationToken ct = default)
         {
@@ -190,7 +201,15 @@ namespace Task_Flyout.Services
         public bool IsEnabled
         {
             get => ApplicationData.Current.LocalSettings.Values["WeatherEnabled"] as bool? ?? false;
-            set => ApplicationData.Current.LocalSettings.Values["WeatherEnabled"] = value;
+            set
+            {
+                lock (_contextLock)
+                {
+                    if (IsEnabled == value) return;
+                    ApplicationData.Current.LocalSettings.Values["WeatherEnabled"] = value;
+                    InvalidateWeatherContext();
+                }
+            }
         }
 
         public string City
@@ -211,13 +230,29 @@ namespace Task_Flyout.Services
         public string IconFontFamily
         {
             get => ApplicationData.Current.LocalSettings.Values["WeatherIconFont"] as string ?? "Segoe UI Emoji";
-            set => ApplicationData.Current.LocalSettings.Values["WeatherIconFont"] = value;
+            set
+            {
+                lock (_contextLock)
+                {
+                    if (string.Equals(IconFontFamily, value, StringComparison.Ordinal)) return;
+                    ApplicationData.Current.LocalSettings.Values["WeatherIconFont"] = value;
+                    InvalidateWeatherContext();
+                }
+            }
         }
 
         public string WeatherSource
         {
             get => ApplicationData.Current.LocalSettings.Values["WeatherSource"] as string ?? "OpenMeteo";
-            set => ApplicationData.Current.LocalSettings.Values["WeatherSource"] = value;
+            set
+            {
+                lock (_contextLock)
+                {
+                    if (string.Equals(WeatherSource, value, StringComparison.Ordinal)) return;
+                    ApplicationData.Current.LocalSettings.Values["WeatherSource"] = value;
+                    InvalidateWeatherContext();
+                }
+            }
         }
 
         public string EnabledFlyoutFields
@@ -594,18 +629,31 @@ namespace Task_Flyout.Services
         private void SetCoordinates(double latitude, double longitude, string displayName, long? expectedGeneration)
         {
             EnsureLocationLoaded();
-            _weatherPersistenceGate.Wait();
-            try
+            var normalized = WeatherLocationPolicy.Normalize(displayName, latitude, longitude);
+            string json;
+            long generation;
+            lock (_contextLock)
             {
                 if (expectedGeneration.HasValue
                     && expectedGeneration.Value != Volatile.Read(ref _weatherDataGeneration)) return;
 
-                string json;
                 lock (_locationLock)
                 {
-                    _location = WeatherLocationPolicy.Normalize(displayName, latitude, longitude);
+                    if (_location.City == normalized.City &&
+                        _location.Latitude == normalized.Latitude &&
+                        _location.Longitude == normalized.Longitude)
+                        return;
+                    _location = normalized;
                     json = JsonSerializer.Serialize(_location, AppJsonContext.Default.WeatherLocationSettings);
                 }
+                InvalidateWeatherContext();
+                generation = Volatile.Read(ref _weatherDataGeneration);
+            }
+
+            _weatherPersistenceGate.Wait();
+            try
+            {
+                if (generation != Volatile.Read(ref _weatherDataGeneration)) return;
                 LocalSqliteStore.WriteProtectedText(ProtectedWeatherScope, ProtectedLocationKey, json);
             }
             finally
@@ -624,18 +672,24 @@ namespace Task_Flyout.Services
 
         /// <summary>Resolve coordinates to a localized street-level label,
         /// falling back to the keyless city-level geocoder. Returns null on failure.</summary>
-        public async Task<string?> ReverseGeocodeAsync(double latitude, double longitude)
-            => (await ReverseGeocodeDetailedAsync(latitude, longitude)).Name;
+        public async Task<string?> ReverseGeocodeAsync(
+            double latitude,
+            double longitude,
+            CancellationToken cancellationToken = default)
+            => (await ReverseGeocodeDetailedAsync(latitude, longitude, cancellationToken)).Name;
 
         /// <summary>Like <see cref="ReverseGeocodeAsync"/> but also reports which provider answered,
         /// so callers can tell a Nominatim-unreachable city fallback from a coarse fix.</summary>
-        public async Task<ReverseGeocodeResult> ReverseGeocodeDetailedAsync(double latitude, double longitude)
+        public async Task<ReverseGeocodeResult> ReverseGeocodeDetailedAsync(
+            double latitude,
+            double longitude,
+            CancellationToken cancellationToken = default)
         {
-            var area = await ReverseGeocodeStreetAsync(latitude, longitude);
+            var area = await ReverseGeocodeStreetAsync(latitude, longitude, cancellationToken);
             if (!string.IsNullOrWhiteSpace(area.Name)) return area;
 
             // Nominatim gave nothing usable (often unreachable from mainland China) — try city level.
-            var city = await ReverseGeocodeCityAsync(latitude, longitude);
+            var city = await ReverseGeocodeCityAsync(latitude, longitude, cancellationToken);
             if (!string.IsNullOrWhiteSpace(city))
                 return new ReverseGeocodeResult { Name = city, Source = "bigdatacloud" };
 
@@ -643,7 +697,10 @@ namespace Task_Flyout.Services
         }
 
         /// <summary>Street-level reverse geocode via OpenStreetMap Nominatim.</summary>
-        private async Task<ReverseGeocodeResult> ReverseGeocodeStreetAsync(double latitude, double longitude)
+        private async Task<ReverseGeocodeResult> ReverseGeocodeStreetAsync(
+            double latitude,
+            double longitude,
+            CancellationToken cancellationToken)
         {
             try
             {
@@ -655,7 +712,7 @@ namespace Task_Flyout.Services
                              $"&accept-language={lang}";
 
                 // Nominatim's usage policy requires an identifying User-Agent.
-                var json = await GetStringWithAgentAsync(url, "TaskFlyout/1.0 (weather location)");
+                var json = await GetStringWithAgentAsync(url, "TaskFlyout/1.0 (weather location)", cancellationToken);
                 using var doc = JsonDocument.Parse(json);
                 if (!doc.RootElement.TryGetProperty("address", out var addr) ||
                     addr.ValueKind != JsonValueKind.Object)
@@ -678,6 +735,7 @@ namespace Task_Flyout.Services
                     ? new ReverseGeocodeResult { Source = "osm-empty" }
                     : new ReverseGeocodeResult { Name = label, Source = string.IsNullOrWhiteSpace(street) ? "osm-area" : "osm-road" };
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Nominatim reverse geocode failed: {ex.Message}");
@@ -686,7 +744,10 @@ namespace Task_Flyout.Services
         }
 
         /// <summary>City-level reverse geocode via the keyless BigDataCloud client (fallback).</summary>
-        private async Task<string?> ReverseGeocodeCityAsync(double latitude, double longitude)
+        private async Task<string?> ReverseGeocodeCityAsync(
+            double latitude,
+            double longitude,
+            CancellationToken cancellationToken)
         {
             try
             {
@@ -696,7 +757,7 @@ namespace Task_Flyout.Services
                              $"&longitude={longitude.ToString(CultureInfo.InvariantCulture)}" +
                              $"&localityLanguage={lang}";
 
-                var json = await GetStringWithAgentAsync(url, "TaskFlyout/1.0");
+                var json = await GetStringWithAgentAsync(url, "TaskFlyout/1.0", cancellationToken);
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
@@ -710,6 +771,7 @@ namespace Task_Flyout.Services
                 string label = WeatherLocationLabelPolicy.FormatProvinceCity(province, city);
                 return string.IsNullOrWhiteSpace(label) ? null : label;
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch
             {
                 return null;
@@ -719,7 +781,15 @@ namespace Task_Flyout.Services
         public bool AutoFollowLocation
         {
             get => ApplicationData.Current.LocalSettings.Values["WeatherAutoFollowLocation"] as bool? ?? false;
-            set => ApplicationData.Current.LocalSettings.Values["WeatherAutoFollowLocation"] = value;
+            set
+            {
+                lock (_contextLock)
+                {
+                    if (AutoFollowLocation == value) return;
+                    ApplicationData.Current.LocalSettings.Values["WeatherAutoFollowLocation"] = value;
+                    InvalidateWeatherContext();
+                }
+            }
         }
 
         private Geolocator? _trackingGeolocator;
@@ -768,19 +838,29 @@ namespace Task_Flyout.Services
 
         private async void OnTrackedPositionChanged(Geolocator sender, PositionChangedEventArgs args)
         {
-            if (!ReferenceEquals(sender, _trackingGeolocator)) return;
+            if (!ReferenceEquals(sender, _trackingGeolocator) || !AutoFollowLocation) return;
             long generation = Volatile.Read(ref _weatherDataGeneration);
             try
             {
                 var p = args.Position.Coordinate.Point.Position;
-                string? place = await ReverseGeocodeAsync(p.Latitude, p.Longitude);
+                CancellationToken serviceToken;
+                lock (_contextLock) serviceToken = _weatherContextCancellation.Token;
+                string? place = await ReverseGeocodeAsync(p.Latitude, p.Longitude, serviceToken);
+                if (generation != Volatile.Read(ref _weatherDataGeneration) ||
+                    !ReferenceEquals(sender, _trackingGeolocator) || !AutoFollowLocation)
+                    return;
                 string label = !string.IsNullOrWhiteSpace(place)
                     ? place!
                     : (_loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location");
 
                 SetCoordinates(p.Latitude, p.Longitude, label, generation);
+                if (generation + 1 != Volatile.Read(ref _weatherDataGeneration) || !AutoFollowLocation)
+                    return;
                 // Coordinates are part of the cache key, so the next fetch is a miss and refetches.
                 LocationUpdated?.Invoke(this, EventArgs.Empty);
+            }
+            catch (OperationCanceledException)
+            {
             }
             catch (Exception ex)
             {
@@ -819,138 +899,144 @@ namespace Task_Flyout.Services
             return new List<CitySuggestion>();
         }
 
-        public async Task<WeatherInfo?> GetWeatherAsync(bool forceRefresh = false)
+        public async Task<WeatherInfo?> GetWeatherAsync(
+            bool forceRefresh = false,
+            CancellationToken cancellationToken = default)
         {
-            if (!IsEnabled || string.IsNullOrWhiteSpace(City))
+            var context = CaptureWeatherRequestContext();
+            if (!context.IsEnabled || string.IsNullOrWhiteSpace(context.City))
                 return null;
 
-            var key = CurrentWeatherKey;
-            await TryLoadPersistentWeatherAsync(key);
-            Task<WeatherInfo?> taskToAwait;
+            await TryLoadPersistentWeatherAsync(context, cancellationToken);
             lock (_weatherLock)
             {
-                if (!forceRefresh && _cachedWeather != null && _cachedWeatherKey == key
+                if (!forceRefresh && _cachedWeather != null && _cachedWeatherKey == context.Key
                     && (DateTime.Now - _lastFetchTime) < _cacheExpiry)
                     return _cachedWeather;
 
-                if (!forceRefresh && _cachedWeather != null && _cachedWeatherKey == key && IsWeatherFetchBackedOff(key))
-                    return _cachedWeather;
-
-                // Join an in-flight fetch only if it targets the same location/source;
-                // a city change starts its own fetch so callers never get stale data.
-                if (_inFlightWeatherFetch != null && _inFlightWeatherKey == key)
-                    taskToAwait = _inFlightWeatherFetch;
-                else
-                {
-                    taskToAwait = FetchAndCacheWeatherAsync(key, Volatile.Read(ref _weatherDataGeneration));
-                    _inFlightWeatherFetch = taskToAwait;
-                    _inFlightWeatherKey = key;
-                }
+                if (!forceRefresh && WeatherRetryPolicy.IsBackedOff(
+                    context.Key, _lastFailureWeatherKey, _lastFailureUtc.UtcTicks,
+                    _consecutiveFailures, DateTimeOffset.UtcNow))
+                    return _cachedWeatherKey == context.Key ? _cachedWeather : null;
             }
 
-            return await taskToAwait;
+            return await _weatherRequests.RunAsync(
+                context.CoordinatorKey,
+                requestCancellation => FetchAndCacheWeatherAsync(context, requestCancellation),
+                cancellationToken);
         }
 
-        private async Task<WeatherInfo?> FetchAndCacheWeatherAsync(string key, long generation)
+        private WeatherRequestContext CaptureWeatherRequestContext()
         {
+            EnsureLocationLoaded();
+            lock (_contextLock)
+            lock (_locationLock)
+            {
+                return new WeatherRequestContext(
+                    Volatile.Read(ref _weatherDataGeneration),
+                    IsEnabled,
+                    WeatherSource,
+                    _location.City,
+                    _location.Latitude,
+                    _location.Longitude,
+                    IconFontFamily,
+                    _weatherContextCancellation.Token);
+            }
+        }
+
+        private void InvalidateWeatherContext()
+        {
+            var oldCancellation = _weatherContextCancellation;
+            _weatherContextCancellation = new CancellationTokenSource();
+            Interlocked.Increment(ref _weatherDataGeneration);
+            lock (_weatherLock) _persistentWeatherLoaded = false;
+            oldCancellation.Cancel();
+        }
+
+        private async Task<WeatherInfo?> FetchAndCacheWeatherAsync(
+            WeatherRequestContext context,
+            CancellationToken requestCancellationToken)
+        {
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                requestCancellationToken, context.ServiceCancellationToken);
+            var cancellationToken = linkedCancellation.Token;
             try
             {
                 WeatherInfo info;
-                if (WeatherSource == "OpenMeteo" && CityLat != 0 && CityLon != 0)
-                    info = await GetWeatherFromOpenMeteoAsync();
+                if (context.Source == "OpenMeteo" && context.Latitude != 0 && context.Longitude != 0)
+                    info = await GetWeatherFromOpenMeteoAsync(context, cancellationToken);
                 else
-                    info = await GetWeatherFromWttrInAsync();
+                    info = await GetWeatherFromWttrInAsync(context, cancellationToken);
 
-                if (info != null)
+                cancellationToken.ThrowIfCancellationRequested();
+                string? persistJson = null;
+                lock (_weatherLock)
                 {
-                    string? persistJson = null;
-                    lock (_weatherLock)
+                    if (context.Generation == Volatile.Read(ref _weatherDataGeneration))
                     {
-                        // Only publish if the location hasn't changed underneath us
-                        // (guards against a slow stale fetch overwriting newer data).
-                        if (generation == Volatile.Read(ref _weatherDataGeneration) && key == CurrentWeatherKey)
-                        {
-                            _cachedWeather = info;
-                            _cachedWeatherKey = key;
-                            _lastFetchTime = DateTime.Now;
-                            _lastFailureWeatherKey = null;
-                            _lastFailureUtc = DateTimeOffset.MinValue;
-                            _consecutiveFailures = 0;
-                            _persistentWeatherLoaded = true;
-                            persistJson = SerializePersistentWeather(key, _lastFetchTime, info);
-                        }
+                        _cachedWeather = info;
+                        _cachedWeatherKey = context.Key;
+                        _lastFetchTime = DateTime.Now;
+                        _lastFailureWeatherKey = null;
+                        _lastFailureUtc = DateTimeOffset.MinValue;
+                        _consecutiveFailures = 0;
+                        _persistentWeatherLoaded = true;
+                        persistJson = SerializePersistentWeatherLocked();
                     }
-
-                    // Write outside the lock — transient JSON string, no retained copy.
-                    if (persistJson != null)
-                        await WritePersistentWeatherAsync(persistJson, generation);
                 }
+                if (persistJson != null)
+                    await WritePersistentWeatherAsync(persistJson, context.Generation, CancellationToken.None);
+
+                return context.Generation == Volatile.Read(ref _weatherDataGeneration) ? info : null;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
-                RecordWeatherFetchFailure(key);
-                System.Diagnostics.Debug.WriteLine($"Weather fetch failed: {ex.Message}");
-            }
-            finally
-            {
+                string? persistJson = null;
                 lock (_weatherLock)
                 {
-                    if (_inFlightWeatherKey == key)
+                    if (context.Generation == Volatile.Read(ref _weatherDataGeneration))
                     {
-                        _inFlightWeatherFetch = null;
-                        _inFlightWeatherKey = null;
+                        if (_lastFailureWeatherKey == context.Key)
+                            _consecutiveFailures = Math.Min(_consecutiveFailures + 1, 4);
+                        else
+                        {
+                            _lastFailureWeatherKey = context.Key;
+                            _consecutiveFailures = 1;
+                        }
+                        _lastFailureUtc = DateTimeOffset.UtcNow;
+                        persistJson = SerializePersistentWeatherLocked();
                     }
                 }
+                if (persistJson != null)
+                    await WritePersistentWeatherAsync(persistJson, context.Generation, CancellationToken.None);
+                System.Diagnostics.Debug.WriteLine($"Weather fetch failed: {ex.Message}");
             }
 
             lock (_weatherLock)
             {
-                return _cachedWeather;
-            }
-        }
-
-        private bool IsWeatherFetchBackedOff(string key)
-        {
-            if (_lastFailureWeatherKey != key || _consecutiveFailures <= 0) return false;
-
-            var multiplier = Math.Min(1 << Math.Min(_consecutiveFailures - 1, 4), 16);
-            var delay = TimeSpan.FromMinutes(Math.Min(MaxFailureBackoff.TotalMinutes, 5 * multiplier));
-            return DateTimeOffset.UtcNow - _lastFailureUtc < delay;
-        }
-
-        private void RecordWeatherFetchFailure(string key)
-        {
-            lock (_weatherLock)
-            {
-                if (_lastFailureWeatherKey == key)
-                    _consecutiveFailures = Math.Min(_consecutiveFailures + 1, 5);
-                else
-                {
-                    _lastFailureWeatherKey = key;
-                    _consecutiveFailures = 1;
-                }
-
-                _lastFailureUtc = DateTimeOffset.UtcNow;
+                return _cachedWeatherKey == context.Key ? _cachedWeather : null;
             }
         }
 
         // Lazily hydrate the in-memory cache from disk on first use. Adopts the persisted
         // entry whenever it matches the current location (regardless of age) so there is
         // always something to show offline; the freshness check elsewhere drives refresh.
-        private async Task TryLoadPersistentWeatherAsync(string currentKey)
+        private async Task TryLoadPersistentWeatherAsync(
+            WeatherRequestContext context,
+            CancellationToken cancellationToken)
         {
-            long generation = Volatile.Read(ref _weatherDataGeneration);
             lock (_weatherLock)
             {
                 if (_persistentWeatherLoaded) return;
-                _persistentWeatherLoaded = true;
-
-                if (_cachedWeather != null) return;
             }
 
             try
             {
-                await _weatherPersistenceGate.WaitAsync();
+                await _weatherPersistenceGate.WaitAsync(cancellationToken);
                 string json;
                 try
                 {
@@ -973,18 +1059,24 @@ namespace Task_Flyout.Services
                             TryDeleteLegacyWeatherCache();
                         }
                         return legacyJson;
-                    });
+                    }, cancellationToken);
                 }
                 finally
                 {
                     _weatherPersistenceGate.Release();
                 }
-                if (string.IsNullOrWhiteSpace(json)) return;
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    lock (_weatherLock)
+                    {
+                        if (context.Generation == Volatile.Read(ref _weatherDataGeneration))
+                            _persistentWeatherLoaded = true;
+                    }
+                    return;
+                }
 
                 var envelope = JsonSerializer.Deserialize(json, AppJsonContext.Default.WeatherCacheEnvelope);
-                if (envelope?.Info == null || envelope.Key != currentKey) return;
-
-                var fetchedAt = new DateTime(envelope.FetchedTicks, DateTimeKind.Local);
+                if (envelope == null) return;
 
                 // Always adopt the saved entry as a baseline so the bar shows the last-known
                 // weather even when offline. Staleness is handled downstream: GetWeatherAsync's
@@ -992,25 +1084,51 @@ namespace Task_Flyout.Services
                 // the entry is old; the fresh result replaces it once a connection is available.
                 lock (_weatherLock)
                 {
-                    if (generation != Volatile.Read(ref _weatherDataGeneration)
-                        || currentKey != CurrentWeatherKey || _cachedWeather != null) return;
-                    _cachedWeather = envelope.Info;
-                    _cachedWeatherKey = envelope.Key;
-                    _lastFetchTime = fetchedAt;
+                    if (context.Generation != Volatile.Read(ref _weatherDataGeneration)) return;
+                    _persistentWeatherLoaded = true;
+                    _lastFailureWeatherKey = envelope.FailureKey;
+                    _lastFailureUtc = envelope.FailureUtcTicks > 0
+                        ? new DateTimeOffset(envelope.FailureUtcTicks, TimeSpan.Zero)
+                        : DateTimeOffset.MinValue;
+                    _consecutiveFailures = Math.Max(0, envelope.FailureCount);
+                    if (envelope.Info != null && envelope.Key == context.Key && _cachedWeatherKey != context.Key)
+                    {
+                        _cachedWeather = envelope.Info;
+                        _cachedWeatherKey = envelope.Key;
+                        _lastFetchTime = new DateTime(envelope.FetchedTicks, DateTimeKind.Local);
+                    }
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                lock (_weatherLock) _persistentWeatherLoaded = false;
+                throw;
             }
             catch (Exception ex)
             {
+                lock (_weatherLock)
+                {
+                    if (context.Generation == Volatile.Read(ref _weatherDataGeneration))
+                        _persistentWeatherLoaded = true;
+                }
                 System.Diagnostics.Debug.WriteLine($"Weather cache load failed: {ex.Message}");
             }
         }
 
-        private static string? SerializePersistentWeather(string key, DateTime fetchedAt, WeatherInfo info)
+        private string? SerializePersistentWeatherLocked()
         {
             try
             {
                 return JsonSerializer.Serialize(
-                    new WeatherCacheEnvelope { Key = key, FetchedTicks = fetchedAt.Ticks, Info = info },
+                    new WeatherCacheEnvelope
+                    {
+                        Key = _cachedWeatherKey ?? "",
+                        FetchedTicks = _lastFetchTime.Ticks,
+                        Info = _cachedWeather,
+                        FailureKey = _lastFailureWeatherKey,
+                        FailureUtcTicks = _lastFailureUtc == DateTimeOffset.MinValue ? 0 : _lastFailureUtc.UtcTicks,
+                        FailureCount = _consecutiveFailures
+                    },
                     AppJsonContext.Default.WeatherCacheEnvelope);
             }
             catch
@@ -1019,9 +1137,12 @@ namespace Task_Flyout.Services
             }
         }
 
-        private async Task WritePersistentWeatherAsync(string json, long generation)
+        private async Task WritePersistentWeatherAsync(
+            string json,
+            long generation,
+            CancellationToken cancellationToken)
         {
-            await _weatherPersistenceGate.WaitAsync();
+            await _weatherPersistenceGate.WaitAsync(cancellationToken);
             try
             {
                 if (generation != Volatile.Read(ref _weatherDataGeneration)) return;
@@ -1047,9 +1168,12 @@ namespace Task_Flyout.Services
         public async Task ClearWeatherAndLocationDataAsync()
         {
             StopLocationTracking();
-            AutoFollowLocation = false;
-            IsEnabled = false;
-            Interlocked.Increment(ref _weatherDataGeneration);
+            lock (_contextLock)
+            {
+                ApplicationData.Current.LocalSettings.Values["WeatherAutoFollowLocation"] = false;
+                ApplicationData.Current.LocalSettings.Values["WeatherEnabled"] = false;
+                InvalidateWeatherContext();
+            }
 
             lock (_locationLock)
             {
@@ -1067,8 +1191,6 @@ namespace Task_Flyout.Services
                 _lastFailureUtc = DateTimeOffset.MinValue;
                 _consecutiveFailures = 0;
                 _persistentWeatherLoaded = true;
-                _inFlightWeatherFetch = null;
-                _inFlightWeatherKey = null;
             }
 
             await _weatherPersistenceGate.WaitAsync();
@@ -1085,10 +1207,12 @@ namespace Task_Flyout.Services
 
         #region Open-Meteo Provider
 
-        private async Task<WeatherInfo> GetWeatherFromOpenMeteoAsync()
+        private async Task<WeatherInfo> GetWeatherFromOpenMeteoAsync(
+            WeatherRequestContext context,
+            CancellationToken cancellationToken)
         {
             string forecastUrl = $"https://api.open-meteo.com/v1/forecast?" +
-                $"latitude={CityLat}&longitude={CityLon}" +
+                $"latitude={context.Latitude.ToString(CultureInfo.InvariantCulture)}&longitude={context.Longitude.ToString(CultureInfo.InvariantCulture)}" +
                 $"&hourly=temperature_2m,relative_humidity_2m,apparent_temperature," +
                 $"precipitation_probability,precipitation,weather_code," +
                 $"surface_pressure,visibility,wind_speed_10m,wind_direction_10m,uv_index" +
@@ -1097,18 +1221,20 @@ namespace Task_Flyout.Services
                 $"&timezone=auto&forecast_days=7";
 
             string aqUrl = $"https://air-quality-api.open-meteo.com/v1/air-quality?" +
-                $"latitude={CityLat}&longitude={CityLon}" +
+                $"latitude={context.Latitude.ToString(CultureInfo.InvariantCulture)}&longitude={context.Longitude.ToString(CultureInfo.InvariantCulture)}" +
                 $"&hourly=us_aqi,pm2_5,pm10,grass_pollen,birch_pollen,ragweed_pollen" +
                 $"&forecast_days=2";
 
-            var forecastTask = GetStringWithAgentAsync(forecastUrl, "TaskFlyout/1.0");
+            var forecastTask = GetStringWithAgentAsync(forecastUrl, "TaskFlyout/1.0", cancellationToken);
             Task<string> aqTask;
-            try { aqTask = GetStringWithAgentAsync(aqUrl, "TaskFlyout/1.0"); }
+            try { aqTask = GetStringWithAgentAsync(aqUrl, "TaskFlyout/1.0", cancellationToken); }
             catch { aqTask = Task.FromResult(""); }
 
             string forecastJson = await forecastTask;
             string? aqJson = null;
-            try { aqJson = await aqTask; } catch { }
+            try { aqJson = await aqTask; }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch { }
 
             using var forecastDoc = JsonDocument.Parse(forecastJson);
             var root = forecastDoc.RootElement;
@@ -1163,8 +1289,8 @@ namespace Task_Flyout.Services
             string lang = GetCurrentLanguage();
             var info = new WeatherInfo
             {
-                City = City,
-                IconFont = IconFontFamily,
+                City = context.City,
+                IconFont = context.IconFont,
                 Sunrise = sunriseTime,
                 Sunset = sunsetTime,
                 MoonPhase = GetMoonPhaseEmoji(DateTime.Today),
@@ -1172,7 +1298,7 @@ namespace Task_Flyout.Services
                 DailyForecast = new()
             };
 
-            BuildOpenMeteoDailyForecast(info, daily, lang);
+            BuildOpenMeteoDailyForecast(info, daily, lang, context.IconFont);
 
             int totalHours = times.GetArrayLength();
             int nowHour = DateTime.Now.Hour;
@@ -1228,8 +1354,8 @@ namespace Task_Flyout.Services
                     PrecipValue = pVal,
                     Time = dt.ToString("HH:mm"),
                     Temperature = $"{tempVal:F0}°C",
-                    Icon = OpenMeteoCodeToIcon(code, IconFontFamily),
-                    IconFont = IconFontFamily,
+                    Icon = OpenMeteoCodeToIcon(code, context.IconFont),
+                    IconFont = context.IconFont,
                     IconLayerUris = IconPackService.Instance.TryResolveBitmapLayers(code, omHourIsDay, isOpenMeteo: true),
                     Description = OpenMeteoCodeToDescription(code, lang),
                     FeelsLike = $"{flVal:F0}°C",
@@ -1282,7 +1408,7 @@ namespace Task_Flyout.Services
             return info;
         }
 
-        private void BuildOpenMeteoDailyForecast(WeatherInfo info, JsonElement daily, string lang)
+        private void BuildOpenMeteoDailyForecast(WeatherInfo info, JsonElement daily, string lang, string iconFont)
         {
             try
             {
@@ -1318,8 +1444,8 @@ namespace Task_Flyout.Services
                         HighTemperature = $"{high:F0}°",
                         LowTemperature = $"{low:F0}°",
                         TemperatureRange = $"{low:F0}° / {high:F0}°C",
-                        Icon = OpenMeteoCodeToIcon(code, IconFontFamily),
-                        IconFont = IconFontFamily,
+                        Icon = OpenMeteoCodeToIcon(code, iconFont),
+                        IconFont = iconFont,
                         IconLayerUris = IconPackService.Instance.TryResolveBitmapLayers(code, true, isOpenMeteo: true),
                         Description = OpenMeteoCodeToDescription(code, lang),
                         PrecipProbability = $"{chance:F0}%",
@@ -1479,14 +1605,16 @@ namespace Task_Flyout.Services
 
         #region wttr.in Provider (Legacy)
 
-        private async Task<WeatherInfo> GetWeatherFromWttrInAsync()
+        private async Task<WeatherInfo> GetWeatherFromWttrInAsync(
+            WeatherRequestContext context,
+            CancellationToken cancellationToken)
         {
             string lang = GetCurrentLanguage();
             string wttrLang = lang == "en" ? "en" : "zh";
-            string searchCity = City.Split(',')[0].Trim();
+            string searchCity = context.City.Split(',')[0].Trim();
             string url = $"https://wttr.in/{Uri.EscapeDataString(searchCity)}?format=j1&lang={wttrLang}";
 
-            var response = await GetStringWithAgentAsync(url, "curl/7.68.0");
+            var response = await GetStringWithAgentAsync(url, "curl/7.68.0", cancellationToken);
             using var doc = JsonDocument.Parse(response);
             var root = doc.RootElement;
 
@@ -1513,13 +1641,13 @@ namespace Task_Flyout.Services
             {
                 Temperature = $"{tempC}\u00B0C",
                 Description = desc,
-                Icon = WttrCodeToIcon(weatherCode, IconFontFamily),
-                IconFont = IconFontFamily,
+                Icon = WttrCodeToIcon(weatherCode, context.IconFont),
+                IconFont = context.IconFont,
                 IconLayerUris = wttrLayers,
                 IconBitmapUri = wttrLayers.Length > 0 ? wttrLayers[0] : null,
                 RawWeatherCode = wttrRawCode,
                 IsDayTime = wttrIsDay,
-                City = City,
+                City = context.City,
                 FeelsLike = string.IsNullOrEmpty(flVal) ? "" : $"{flVal}\u00B0C",
                 Humidity = string.IsNullOrEmpty(humidityVal) ? "" : $"{humidityVal}%",
                 WindSpeed = string.IsNullOrEmpty(windVal) ? "" : $"{windVal} km/h",
@@ -1588,8 +1716,8 @@ namespace Task_Flyout.Services
                         HighTemperature = string.IsNullOrEmpty(maxC) ? "" : $"{maxC}°",
                         LowTemperature = string.IsNullOrEmpty(minC) ? "" : $"{minC}°",
                         TemperatureRange = string.IsNullOrEmpty(minC) || string.IsNullOrEmpty(maxC) ? "" : $"{minC}° / {maxC}°C",
-                        Icon = WttrCodeToIcon(dayCode, IconFontFamily),
-                        IconFont = IconFontFamily,
+                        Icon = WttrCodeToIcon(dayCode, context.IconFont),
+                        IconFont = context.IconFont,
                         IconLayerUris = IconPackService.Instance.TryResolveBitmapLayers(rawDailyCode, true, isOpenMeteo: false),
                         Description = dayDesc,
                         PrecipProbability = $"{maxRainChance}%",
@@ -1661,8 +1789,8 @@ namespace Task_Flyout.Services
                         PrecipProbValue = rawPp,
                         Time = $"{displayHour:D2}:00",
                         Temperature = $"{source.tempC}\u00B0C",
-                        Icon = WttrCodeToIcon(source.code, IconFontFamily),
-                        IconFont = IconFontFamily,
+                        Icon = WttrCodeToIcon(source.code, context.IconFont),
+                        IconFont = context.IconFont,
                         IconLayerUris = IconPackService.Instance.TryResolveBitmapLayers(rawCode, hIsDay, isOpenMeteo: false),
                         Description = source.hDesc,
                         FeelsLike = string.IsNullOrEmpty(source.flC) ? "" : $"{source.flC}\u00B0C",

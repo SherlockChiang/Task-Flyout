@@ -20,7 +20,8 @@ namespace Task_Flyout.Views
         private WeatherInfo? _currentWeatherInfo;
         private DateTimeOffset? _lastWeatherLoadSucceededAt;
         private bool _isIconPackOperation;
-        private bool _isLoadingWeather;
+        private CancellationTokenSource? _weatherLoadCts;
+        private long _weatherLoadGeneration;
         private CancellationTokenSource? _citySearchCts;
         private int _citySearchGeneration;
 
@@ -670,6 +671,7 @@ namespace Task_Flyout.Views
                 await LoadWeatherDataAsync();
             else
             {
+                CancelWeatherLoad();
                 ForecastPanel.Visibility = Visibility.Collapsed;
                 CurrentWeatherCard.Visibility = Visibility.Collapsed;
             }
@@ -747,13 +749,30 @@ namespace Task_Flyout.Views
             string city = args.QueryText;
             if (!string.IsNullOrWhiteSpace(city))
             {
-                var suggestions = await _weatherService.SearchCityAsync(city);
-                var match = suggestions.FirstOrDefault();
-                if (match == null) return;
+                _citySearchCts?.Cancel();
+                var cts = new CancellationTokenSource();
+                _citySearchCts = cts;
+                int generation = ++_citySearchGeneration;
+                try
+                {
+                    var suggestions = await _weatherService.SearchCityAsync(city, cts.Token);
+                    if (generation != _citySearchGeneration) return;
+                    var match = suggestions.FirstOrDefault();
+                    if (match == null) return;
 
-                sender.Text = match.DisplayName;
-                _weatherService.SelectCity(match);
-                await LoadWeatherDataAsync(forceRefresh: true);
+                    sender.Text = match.DisplayName;
+                    _weatherService.SelectCity(match);
+                    await LoadWeatherDataAsync(forceRefresh: true);
+                }
+                catch (OperationCanceledException) when (cts.IsCancellationRequested)
+                {
+                }
+                finally
+                {
+                    if (ReferenceEquals(_citySearchCts, cts))
+                        _citySearchCts = null;
+                    cts.Dispose();
+                }
             }
         }
 
@@ -764,6 +783,8 @@ namespace Task_Flyout.Views
 
         private async void UseCurrentLocationButton_Click(object sender, RoutedEventArgs e)
         {
+            var operationCts = ReplaceWeatherLoadCancellation();
+            long generation = _weatherLoadGeneration;
             UseCurrentLocationButton.IsEnabled = false;
             LocationStatusText.Visibility = Visibility.Collapsed;
             try
@@ -779,7 +800,9 @@ namespace Task_Flyout.Views
                 var geolocator = new Geolocator { DesiredAccuracy = PositionAccuracy.High };
                 var position = await geolocator.GetGeopositionAsync();
                 var point = position.Coordinate.Point.Position;
-                var geo = await _weatherService.ReverseGeocodeDetailedAsync(point.Latitude, point.Longitude);
+                var geo = await _weatherService.ReverseGeocodeDetailedAsync(
+                    point.Latitude, point.Longitude, operationCts.Token);
+                if (generation != _weatherLoadGeneration) return;
                 string label = !string.IsNullOrWhiteSpace(geo.Name)
                     ? geo.Name!
                     : (_loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location");
@@ -790,7 +813,11 @@ namespace Task_Flyout.Views
                     _loader.GetStringOrDefault("WeatherLocationUpdated") ?? "Location updated: {0}",
                     label));
 
+                UseCurrentLocationButton.IsEnabled = true;
                 await LoadWeatherDataAsync(forceRefresh: true);
+            }
+            catch (OperationCanceledException) when (operationCts.IsCancellationRequested)
+            {
             }
             catch (Exception ex)
             {
@@ -800,7 +827,8 @@ namespace Task_Flyout.Views
             }
             finally
             {
-                UseCurrentLocationButton.IsEnabled = true;
+                if (generation == _weatherLoadGeneration)
+                    UseCurrentLocationButton.IsEnabled = true;
             }
         }
 
@@ -847,6 +875,7 @@ namespace Task_Flyout.Views
             _citySearchGeneration++;
             _citySearchCts?.Cancel();
             _citySearchCts = null;
+            CancelWeatherLoad();
             if (_weatherService != null)
                 _weatherService.LocationUpdated -= OnWeatherLocationUpdated;
         }
@@ -940,20 +969,21 @@ namespace Task_Flyout.Views
         private async Task LoadWeatherDataAsync(bool forceRefresh = false)
         {
             if (_weatherService == null || string.IsNullOrWhiteSpace(_weatherService.City)) return;
-            if (_isLoadingWeather) return;
+            var cts = ReplaceWeatherLoadCancellation();
+            long generation = _weatherLoadGeneration;
 
             try
             {
-                _isLoadingWeather = true;
                 LoadingRing.IsActive = true;
                 BtnRefresh.IsEnabled = false;
                 ForecastPanel.Visibility = Visibility.Collapsed;
                 DailyForecastPanel.Visibility = Visibility.Collapsed;
                 SetWeatherStatus(GetSafeString("TextLoading", "Loading"));
 
-                var info = await _weatherService.GetWeatherAsync(forceRefresh);
+                var info = await _weatherService.GetWeatherAsync(forceRefresh, cts.Token);
+                if (generation != _weatherLoadGeneration) return;
                 _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh);
-                App.RefreshWeatherBar();
+                App.RefreshWeatherBar(forceRefresh);
 
                 // Update current weather card
                 if (info == null)
@@ -991,6 +1021,9 @@ namespace Task_Flyout.Views
                     });
                 }
             }
+            catch (OperationCanceledException) when (cts.IsCancellationRequested)
+            {
+            }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Weather refresh failed: {ex.Message}");
@@ -998,10 +1031,32 @@ namespace Task_Flyout.Views
             }
             finally
             {
-                LoadingRing.IsActive = false;
-                BtnRefresh.IsEnabled = true;
-                _isLoadingWeather = false;
+                if (generation == _weatherLoadGeneration)
+                {
+                    LoadingRing.IsActive = false;
+                    BtnRefresh.IsEnabled = true;
+                }
+                if (ReferenceEquals(_weatherLoadCts, cts))
+                    _weatherLoadCts = null;
+                cts.Dispose();
             }
+        }
+
+        private CancellationTokenSource ReplaceWeatherLoadCancellation()
+        {
+            _weatherLoadCts?.Cancel();
+            _weatherLoadCts?.Dispose();
+            _weatherLoadCts = new CancellationTokenSource();
+            _weatherLoadGeneration++;
+            return _weatherLoadCts;
+        }
+
+        private void CancelWeatherLoad()
+        {
+            _weatherLoadGeneration++;
+            _weatherLoadCts?.Cancel();
+            _weatherLoadCts?.Dispose();
+            _weatherLoadCts = null;
         }
 
         private void SetWeatherStatus(string message, bool isError = false)

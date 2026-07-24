@@ -113,6 +113,8 @@ namespace Task_Flyout
         private static readonly SemaphoreSlim _syncLock = new(1, 1);
         private bool _backgroundRefreshQueued;
         private DateTimeOffset? _lastSyncSucceededAt;
+        private CancellationTokenSource? _weatherRefreshCts;
+        private long _weatherRefreshGeneration;
 
         private readonly record struct DotSpec(double Left, double Top, SolidColorBrush Fill);
 
@@ -1001,6 +1003,7 @@ namespace Task_Flyout
             _focusTimer?.Stop();
             _clockTimer?.Stop();
             _syncTimer?.Stop();
+            CancelWeatherRefresh();
             _appWindow.Hide();
             _lastHideTime = DateTime.Now;
             App.UpdateEfficiencyMode(); // flyout dismissed — re-evaluate throttle
@@ -1183,21 +1186,43 @@ namespace Task_Flyout
 
         public async Task RefreshWeatherAsync(bool forceRefresh = false)
         {
+            var cts = ReplaceWeatherRefreshCancellation();
+            long generation = _weatherRefreshGeneration;
             var weatherService = (App.Current as App)?.WeatherService;
             if (weatherService == null || !weatherService.IsEnabled)
             {
                 DispatcherQueue.TryEnqueue(() =>
                 {
+                    if (generation != _weatherRefreshGeneration) return;
                     WeatherPanel.Visibility = Visibility.Collapsed;
                     WeatherDetailStrip.Visibility = Visibility.Collapsed;
                 });
+                if (ReferenceEquals(_weatherRefreshCts, cts))
+                    _weatherRefreshCts = null;
+                cts.Dispose();
                 return;
             }
 
-            var info = await weatherService.GetWeatherAsync(forceRefresh);
+            WeatherInfo? info;
+            try
+            {
+                info = await weatherService.GetWeatherAsync(forceRefresh, cts.Token);
+            }
+            catch (OperationCanceledException) when (cts.IsCancellationRequested)
+            {
+                return;
+            }
+            finally
+            {
+                if (ReferenceEquals(_weatherRefreshCts, cts))
+                    _weatherRefreshCts = null;
+                cts.Dispose();
+            }
+            if (generation != _weatherRefreshGeneration) return;
 
             DispatcherQueue.TryEnqueue(() =>
             {
+                if (generation != _weatherRefreshGeneration || !_appWindow.IsVisible) return;
                 if (info != null)
                 {
                     WeatherIcon.Text = info.Icon;
@@ -1218,6 +1243,23 @@ namespace Task_Flyout
                     AdjustWindowHeight();
                 }
             });
+        }
+
+        private CancellationTokenSource ReplaceWeatherRefreshCancellation()
+        {
+            _weatherRefreshCts?.Cancel();
+            _weatherRefreshCts?.Dispose();
+            _weatherRefreshCts = new CancellationTokenSource();
+            _weatherRefreshGeneration++;
+            return _weatherRefreshCts;
+        }
+
+        private void CancelWeatherRefresh()
+        {
+            _weatherRefreshGeneration++;
+            _weatherRefreshCts?.Cancel();
+            _weatherRefreshCts?.Dispose();
+            _weatherRefreshCts = null;
         }
 
         private const int FlyoutWeatherIconDecodePixelWidth = 48;

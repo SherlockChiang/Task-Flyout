@@ -33,7 +33,8 @@ namespace Task_Flyout
         private bool _userHidden;
         private double _preferredLogicalWidth = 180;
         private IntPtr _fluentFlyoutHwnd = IntPtr.Zero;
-        private int _refreshing;
+        private CancellationTokenSource? _weatherRefreshCts;
+        private long _weatherRefreshGeneration;
         private int _mediaSessionInitializing;
         private GlobalSystemMediaTransportControlsSessionManager? _mediaSessionManager;
         private GlobalSystemMediaTransportControlsSession? _mediaSession;
@@ -1515,26 +1516,34 @@ namespace Task_Flyout
         private static string FormatBarLocation(string city)
             => WeatherLocationLabelPolicy.FormatForWeatherBar(city);
 
-        public async Task RefreshWeatherAsync()
+        public async Task RefreshWeatherAsync(bool forceRefresh = false)
         {
-            if (Interlocked.CompareExchange(ref _refreshing, 1, 0) != 0) return;
+            var cts = ReplaceWeatherRefreshCancellation();
+            long generation = _weatherRefreshGeneration;
             try
             {
-                await RefreshWeatherCoreAsync();
+                await RefreshWeatherCoreAsync(forceRefresh, cts.Token, generation);
             }
+            catch (OperationCanceledException) when (cts.IsCancellationRequested) { }
             finally
             {
-                Interlocked.Exchange(ref _refreshing, 0);
+                if (ReferenceEquals(_weatherRefreshCts, cts))
+                    _weatherRefreshCts = null;
+                cts.Dispose();
             }
         }
 
-        private async Task RefreshWeatherCoreAsync()
+        private async Task RefreshWeatherCoreAsync(
+            bool forceRefresh,
+            CancellationToken cancellationToken,
+            long generation)
         {
             var weatherService = (App.Current as App)?.WeatherService;
             if (weatherService == null || !weatherService.IsEnabled)
             {
                 DispatcherQueue.TryEnqueue(() =>
                 {
+                    if (generation != _weatherRefreshGeneration || _userHidden) return;
                     _barAlertActive = false;
                     if (this.Content is FrameworkElement root)
                         ApplyWeatherBarTextBrush(root, includeDescription: true);
@@ -1548,13 +1557,15 @@ namespace Task_Flyout
                 return;
             }
 
-            var info = await weatherService.GetWeatherAsync(false);
+            var info = await weatherService.GetWeatherAsync(forceRefresh, cancellationToken);
+            if (generation != _weatherRefreshGeneration) return;
             var alert = (info != null && weatherService.BarAlertsEnabled)
                 ? weatherService.DetectUpcomingAlert(info)
                 : null;
 
             DispatcherQueue.TryEnqueue(() =>
             {
+                if (generation != _weatherRefreshGeneration || _userHidden) return;
                 if (info == null)
                 {
                     _barAlertActive = false;
@@ -1666,6 +1677,23 @@ namespace Task_Flyout
                 NextRenderHelper.RunOnce(() =>
                     PerformanceDiagnostics.MarkOnce("weatherbar.display", "weather_bar", "first_weather_display", source: "ui"));
             });
+        }
+
+        private CancellationTokenSource ReplaceWeatherRefreshCancellation()
+        {
+            _weatherRefreshCts?.Cancel();
+            _weatherRefreshCts?.Dispose();
+            _weatherRefreshCts = new CancellationTokenSource();
+            _weatherRefreshGeneration++;
+            return _weatherRefreshCts;
+        }
+
+        private void CancelWeatherRefresh()
+        {
+            _weatherRefreshGeneration++;
+            _weatherRefreshCts?.Cancel();
+            _weatherRefreshCts?.Dispose();
+            _weatherRefreshCts = null;
         }
 
         private void ApplyDescriptionLayout(bool isAlert)
@@ -1804,6 +1832,7 @@ namespace Task_Flyout
         /// </summary>
         public void DetachForRecovery()
         {
+            CancelWeatherRefresh();
             InvalidateTaskbarAttachment("Explorer restarted or the taskbar disappeared");
             try { _refreshTimer?.Stop(); } catch { }
             try { _reparentTimer?.Stop(); } catch { }
@@ -1866,6 +1895,7 @@ namespace Task_Flyout
             try
             {
                 _userHidden = true;
+                CancelWeatherRefresh();
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
 
