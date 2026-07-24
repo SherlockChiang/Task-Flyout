@@ -106,6 +106,7 @@
                 <Grid RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
@@ -129,10 +130,17 @@
                         <ProgressRing x:Name="LoadingRing" Grid.Column="1" IsActive="False" Width="24" Height="24"/>
                     </Grid>
 
-                    <ListView Grid.Row="1"
-                              x:Name="MailListView"
-                              SelectionMode="Single"
-                              SelectionChanged="MailListView_SelectionChanged">
+                    <CommandBar Grid.Row="1" x:Name="MailMutationCommandBar" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True">
+                        <AppBarButton x:Uid="MailPage_MarkRead" Label="Mark read" Icon="MailRead" Click="MarkReadButton_Click"/>
+                        <AppBarButton x:Uid="MailPage_MarkUnread" Label="Mark unread" Icon="Mail" Click="MarkUnreadButton_Click"/>
+                        <AppBarButton x:Uid="MailPage_Flag" Label="Flag" Icon="Flag" Click="FlagButton_Click"/>
+                        <AppBarButton x:Uid="MailPage_Unflag" Label="Unflag" Icon="UnFavorite" Click="UnflagButton_Click"/>
+                    </CommandBar>
+
+                    <ListView Grid.Row="2"
+                               x:Name="MailListView"
+                               SelectionMode="Multiple"
+                               SelectionChanged="MailListView_SelectionChanged">
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem">
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -143,10 +151,11 @@
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:MailItem">
                                 <Grid MinHeight="82" ColumnSpacing="10" Padding="8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
+                                     <Grid.ColumnDefinitions>
+                                         <ColumnDefinition Width="Auto"/>
+                                         <ColumnDefinition Width="*"/>
+                                         <ColumnDefinition Width="Auto"/>
+                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="{x:Bind ReadMarker, Mode=OneWay}" FontSize="12"
                                                Foreground="{ThemeResource SystemAccentColor}"
@@ -159,7 +168,9 @@
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                    TextTrimming="CharacterEllipsis"/>
                                     </StackPanel>
-                                    <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Right">
+                                     <TextBlock Grid.Column="2" Text="{x:Bind FlagMarker, Mode=OneWay}" FontSize="14"
+                                                Foreground="{ThemeResource SystemAccentColor}" VerticalAlignment="Top"/>
+                                     <StackPanel Grid.Column="3" Spacing="4" HorizontalAlignment="Right">
                                         <TextBlock Text="{x:Bind ReceivedTime}" FontSize="12"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         <TextBlock Text="{x:Bind AttachmentMarker}" FontSize="12" HorizontalAlignment="Right"/>
@@ -169,7 +180,7 @@
                         </ListView.ItemTemplate>
                     </ListView>
 
-                    <Button x:Uid="MailPage_LoadMoreButton" Grid.Row="2" x:Name="LoadMoreButton" Visibility="Collapsed"
+                    <Button x:Uid="MailPage_LoadMoreButton" Grid.Row="3" x:Name="LoadMoreButton" Visibility="Collapsed"
                             HorizontalAlignment="Stretch" Click="LoadMoreButton_Click" Margin="4,0">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <FontIcon Glyph="&#xE74B;" FontSize="12"/>
@@ -425,5 +436,11 @@
                 </Grid>
             </Border>
         </Grid>
+        <InfoBar x:Name="MailUndoBar" Grid.Row="1" IsOpen="False" IsClosable="True" Severity="Success"
+                 HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="16" MaxWidth="560">
+            <InfoBar.ActionButton>
+                <Button x:Uid="MailPage_Undo" Content="Undo" Click="UndoMailMutationButton_Click"/>
+            </InfoBar.ActionButton>
+        </InfoBar>
     </Grid>
 </Page>

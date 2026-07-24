@@ -11,6 +11,7 @@ namespace Task_Flyout.Services
             maximumMessages = Math.Max(0, maximumMessages);
             bool dirty = false;
             dirty |= EnsureCollections(cache);
+            dirty |= MailPendingMutationPolicy.MigrateLegacyAndDeduplicate(cache.PendingMutations);
             dirty |= MailPendingMutationPolicy.RemoveExpired(cache.PendingMutations, now) > 0;
 
             foreach (var key in cache.Messages.Keys.ToList())
@@ -47,7 +48,7 @@ namespace Task_Flyout.Services
         {
             AccountId = item.AccountId, FolderId = item.FolderId, Id = item.Id, ImapUidValidity = item.ImapUidValidity,
             Subject = item.Subject, Sender = item.Sender, SenderAddress = item.SenderAddress, Recipient = item.Recipient,
-            Preview = item.Preview, ReceivedTime = item.ReceivedTime, RawReceivedTime = item.RawReceivedTime, IsRead = item.IsRead,
+            Preview = item.Preview, ReceivedTime = item.ReceivedTime, RawReceivedTime = item.RawReceivedTime, IsRead = item.IsRead, IsFlagged = item.IsFlagged,
             HasAttachments = item.HasAttachments, Importance = item.Importance, WebLink = item.WebLink
         };
     }

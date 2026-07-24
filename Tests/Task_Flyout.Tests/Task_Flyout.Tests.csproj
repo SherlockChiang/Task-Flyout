@@ -96,6 +96,9 @@
     <Compile Include="..\..\Services\MailPaginationPolicy.cs" Link="Source\MailPaginationPolicy.cs" />
     <Compile Include="..\..\Services\MailMutationRetryPolicy.cs" Link="Source\MailMutationRetryPolicy.cs" />
     <Compile Include="..\..\Services\MailPendingMutationPolicy.cs" Link="Source\MailPendingMutationPolicy.cs" />
+    <Compile Include="..\..\Services\MailMutationCapabilityPolicy.cs" Link="Source\MailMutationCapabilityPolicy.cs" />
+    <Compile Include="..\..\Services\MailMutationCachePolicy.cs" Link="Source\MailMutationCachePolicy.cs" />
+    <Compile Include="..\..\Services\MailBulkMutationPolicy.cs" Link="Source\MailBulkMutationPolicy.cs" />
     <Compile Include="..\..\Services\MailCacheRepository.cs" Link="Source\MailCacheRepository.cs" />
     <Compile Include="..\..\Services\MailCacheModels.cs" Link="Source\MailCacheModels.cs" />
     <Compile Include="..\..\Services\MailPersistentCachePolicy.cs" Link="Source\MailPersistentCachePolicy.cs" />

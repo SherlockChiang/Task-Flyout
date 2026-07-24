@@ -40,7 +40,9 @@ public class MailPersistentCachePolicyTests
     public void Normalize_strips_bodies_limits_window_and_reports_dirty_snapshot()
     {
         var cache = new MailPersistentCache();
-        cache.Messages["window"] = new() { Item("old", 1, "secret body"), Item("new", 2, "new secret") };
+        var flagged = Item("new", 2, "new secret");
+        flagged.IsFlagged = true;
+        cache.Messages["window"] = new() { Item("old", 1, "secret body"), flagged };
 
         Assert.True(MailPersistentCachePolicy.Normalize(cache, DateTimeOffset.UtcNow, maximumMessages: 1));
 
@@ -48,6 +50,7 @@ public class MailPersistentCachePolicyTests
         Assert.Equal("new", retained.Id);
         Assert.Equal("", retained.BodyText);
         Assert.Equal("", retained.HtmlBody);
+        Assert.True(retained.IsFlagged);
     }
 
     [Fact]

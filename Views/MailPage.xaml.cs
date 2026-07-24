@@ -36,6 +36,10 @@ namespace Task_Flyout.Views
         private MailAccount? _selectedAccountForRemoval;
         private readonly MailTrustStore _mailTrustStore = new();
         private readonly ResourceLoader _loader = new();
+        private readonly Dictionary<string, long> _mailIntentVersions = new(StringComparer.Ordinal);
+        private List<MailUndoState> _undoStates = new();
+        private MailMutationKind _undoKind;
+        private long _nextMailIntentVersion;
 
         // Pre-compiled regex patterns for mail HTML sanitization
         private static readonly Regex RxHtmlContentTags = new(@"<\s*(html|head|body|style|table|div|p|span|br|img|a|meta)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -76,6 +80,7 @@ namespace Task_Flyout.Views
         private ComposeDraftCoordinator? Drafts => (App.Current as App)?.ComposeDrafts;
 
         private enum MailPane { Accounts, Messages, Detail }
+        private sealed record MailUndoState(MailItem Item, bool PreviousValue, int PreviousIndex);
 
         public MailPage()
         {
@@ -1325,6 +1330,14 @@ namespace Task_Flyout.Views
 
         private async void MailListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (MailListView.SelectedItems.Count != 1)
+            {
+                if (MailListView.SelectedItems.Count > 1)
+                    ClearDetail();
+                else if (!_isLoadingMessages && !_suppressSelectionClear)
+                    ClearDetail();
+                return;
+            }
             if (MailListView.SelectedItem is not MailItem item)
             {
                 if (!_isLoadingMessages && !_suppressSelectionClear)
@@ -1402,8 +1415,10 @@ namespace Task_Flyout.Views
             if (_mailService == null || _selectedAccount == null || item.IsRead || !_mailService.AutoMarkMailAsRead)
                 return null;
 
-            _mailService.MarkCachedRead(item);
-            var remoteSyncTask = _mailService.MarkAsReadAsync(_selectedAccount, item, forceRemoteSync: true);
+            long version = ++_nextMailIntentVersion;
+            _mailIntentVersions[GetIntentKey(item, MailMutationKind.SetReadState)] = version;
+            _mailService.ApplyCachedMutation(item, MailMutationKind.SetReadState, true);
+            var remoteSyncTask = CompleteAutomaticReadMutationAsync(_selectedAccount, item, version);
 
             if (UnreadOnlyToggle.IsOn)
             {
@@ -1423,13 +1438,31 @@ namespace Task_Flyout.Views
             return remoteSyncTask;
         }
 
+        private async Task CompleteAutomaticReadMutationAsync(MailAccount account, MailItem item, long version)
+        {
+            try
+            {
+                await _mailService!.SetReadStateAsync(account, item, true);
+            }
+            catch (MailMutationSyncQueuedException) { throw; }
+            catch
+            {
+                if (MailBulkMutationPolicy.ShouldRollback(version, GetCurrentIntent(item, MailMutationKind.SetReadState)))
+                {
+                    _mailService!.ApplyCachedMutation(item, MailMutationKind.SetReadState, false);
+                    RestoreUnreadItemIfNeeded(new MailUndoState(item, false, 0), MailMutationKind.SetReadState, false);
+                }
+                throw;
+            }
+        }
+
         private async Task CompleteMarkAsReadAsync(Task remoteSyncTask)
         {
             try
             {
                 await remoteSyncTask;
             }
-            catch (MailReadSyncQueuedException ex)
+            catch (MailMutationSyncQueuedException ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Mark as read queued: {ex.Message}");
                 SetMessageListStatus(_loader.GetStringOrDefault("TextReadSyncQueued") ?? "Read status will sync automatically when the account is available.");
@@ -1489,6 +1522,121 @@ namespace Task_Flyout.Views
             }
 
             _mailService?.ClearVolatileMessageBodies();
+        }
+
+        private async void MarkReadButton_Click(object sender, RoutedEventArgs e)
+            => await MutateSelectedMailAsync(MailMutationKind.SetReadState, true);
+
+        private async void MarkUnreadButton_Click(object sender, RoutedEventArgs e)
+            => await MutateSelectedMailAsync(MailMutationKind.SetReadState, false);
+
+        private async void FlagButton_Click(object sender, RoutedEventArgs e)
+            => await MutateSelectedMailAsync(MailMutationKind.SetFlagged, true);
+
+        private async void UnflagButton_Click(object sender, RoutedEventArgs e)
+            => await MutateSelectedMailAsync(MailMutationKind.SetFlagged, false);
+
+        private async Task MutateSelectedMailAsync(MailMutationKind kind, bool value, IReadOnlyList<MailUndoState>? restoreTargets = null)
+        {
+            var service = _mailService;
+            var account = _selectedAccount;
+            if (service == null || account == null || !MailMutationCapabilityPolicy.Supports(account.Kind, kind)) return;
+
+            var selected = restoreTargets?.Select(state => state.Item).ToList()
+                ?? MailBulkMutationPolicy.SelectBounded(MailListView.SelectedItems.Cast<MailItem>()).ToList();
+            if (selected.Count == 0) return;
+
+            var previous = selected.Select(item => new MailUndoState(
+                item,
+                kind == MailMutationKind.SetReadState ? item.IsRead : item.IsFlagged,
+                _items.IndexOf(item))).ToList();
+            var versions = new Dictionary<MailItem, long>();
+            foreach (var item in selected)
+            {
+                long version = ++_nextMailIntentVersion;
+                versions[item] = version;
+                _mailIntentVersions[GetIntentKey(item, kind)] = version;
+                service.ApplyCachedMutation(item, kind, value);
+                var restoreState = restoreTargets?.FirstOrDefault(state => ReferenceEquals(state.Item, item));
+                if (restoreState != null)
+                    RestoreUnreadItemIfNeeded(restoreState, kind, value);
+            }
+            RefreshSelectedFolderCount();
+
+            if (kind == MailMutationKind.SetReadState && value && UnreadOnlyToggle.IsOn)
+            {
+                _suppressSelectionClear = true;
+                try { foreach (var item in selected) _items.Remove(item); }
+                finally { _suppressSelectionClear = false; }
+            }
+            ApplyMailSearch();
+
+            if (restoreTargets == null)
+            {
+                _undoStates = previous;
+                _undoKind = kind;
+                MailUndoBar.Message = string.Format(GetResourceStringOrDefault("TextMailMutationComplete", "Updated {0} messages."), selected.Count);
+                MailUndoBar.IsOpen = true;
+            }
+
+            using var gate = new SemaphoreSlim(MailBulkMutationPolicy.MaximumConcurrency);
+            var tasks = selected.Select(async item =>
+            {
+                await gate.WaitAsync();
+                try
+                {
+                    if (kind == MailMutationKind.SetReadState)
+                        await service.SetReadStateAsync(account, item, value);
+                    else
+                        await service.SetFlaggedAsync(account, item, value);
+                    return (Item: item, Error: (Exception?)null);
+                }
+                catch (MailMutationSyncQueuedException) { return (Item: item, Error: (Exception?)null); }
+                catch (Exception ex) { return (Item: item, Error: ex); }
+                finally { gate.Release(); }
+            });
+            var results = await Task.WhenAll(tasks);
+
+            foreach (var result in results.Where(result => result.Error != null))
+            {
+                var prior = previous.First(state => ReferenceEquals(state.Item, result.Item));
+                if (!MailBulkMutationPolicy.ShouldRollback(versions[result.Item], GetCurrentIntent(result.Item, kind))) continue;
+                service.ApplyCachedMutation(result.Item, kind, prior.PreviousValue);
+                RestoreUnreadItemIfNeeded(prior, kind, prior.PreviousValue);
+            }
+            RefreshSelectedFolderCount();
+
+            if (results.Any(result => result.Error != null))
+                SetMessageListStatus(GetResourceStringOrDefault("TextMailMutationFailed", "Some messages could not be updated."), isError: true);
+        }
+
+        private async void UndoMailMutationButton_Click(object sender, RoutedEventArgs e)
+        {
+            var states = _undoStates;
+            MailUndoBar.IsOpen = false;
+            _undoStates = new();
+            foreach (var group in states.GroupBy(state => state.PreviousValue))
+                await MutateSelectedMailAsync(_undoKind, group.Key, group.ToList());
+        }
+
+        private void RestoreUnreadItemIfNeeded(MailUndoState state, MailMutationKind kind, bool value)
+        {
+            if (kind != MailMutationKind.SetReadState || value || !UnreadOnlyToggle.IsOn || _items.Contains(state.Item)) return;
+            _items.Insert(Math.Clamp(state.PreviousIndex, 0, _items.Count), state.Item);
+            ApplyMailSearch();
+        }
+
+        private static string GetIntentKey(MailItem item, MailMutationKind kind)
+            => $"{item.AccountId}\u001f{item.FolderId}\u001f{item.Id}\u001f{(int)kind}";
+
+        private long GetCurrentIntent(MailItem item, MailMutationKind kind)
+            => _mailIntentVersions.TryGetValue(GetIntentKey(item, kind), out var version) ? version : 0;
+
+        private void RefreshSelectedFolderCount()
+        {
+            if (_selectedFolder == null) return;
+            foreach (var pair in _folderNodes.Where(pair => ReferenceEquals(pair.Value.Folder, _selectedFolder)))
+                pair.Key.Content = FormatFolderContent(_selectedFolder);
         }
 
         public async Task OpenCachedMessageAsync(string accountId, string folderId, string messageId)

@@ -1580,7 +1580,7 @@
     <value>Automatically mark messages as read when opened</value>
   </data>
   <data name="SettingsPage_AutoMarkMailAsReadDesc.Text" xml:space="preserve">
-    <value>Gmail/Outlook needs extra write permission to sync read state. Turn this off to keep message reading read-only.</value>
+    <value>This setting only controls automatic marking when one message is opened. Manual read, unread, and flag commands still update your mailbox.</value>
   </data>
   <data name="SettingsPage_BackgroundDesc.Text" xml:space="preserve">
     <value>When enabled, closing the main window keeps tray, sync, reminders, and mail polling running. When disabled, closing exits the app.</value>
@@ -1818,4 +1818,11 @@ Weather: {3}</value></data>
   <data name="GlobalSearch_Close.AutomationProperties.Name" xml:space="preserve"><value>Close global search</value></data>
   <data name="GlobalSearch_CommandOpenWeather" xml:space="preserve"><value>Open weather</value></data>
   <data name="GlobalSearch_CommandToggleWeatherBar" xml:space="preserve"><value>Toggle Weather Bar</value></data>
+  <data name="MailPage_MarkRead.Label" xml:space="preserve"><value>Mark read</value></data>
+  <data name="MailPage_MarkUnread.Label" xml:space="preserve"><value>Mark unread</value></data>
+  <data name="MailPage_Flag.Label" xml:space="preserve"><value>Flag</value></data>
+  <data name="MailPage_Unflag.Label" xml:space="preserve"><value>Unflag</value></data>
+  <data name="MailPage_Undo.Content" xml:space="preserve"><value>Undo</value></data>
+  <data name="TextMailMutationComplete" xml:space="preserve"><value>Updated {0} messages.</value></data>
+  <data name="TextMailMutationFailed" xml:space="preserve"><value>Some messages could not be updated.</value></data>
 </root>

@@ -22,6 +22,53 @@ public class MailPendingMutationPolicyTests
     }
 
     [Fact]
+    public void Upsert_is_last_write_wins_per_message_and_kind()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var queue = new List<PendingMailMutation>();
+        var read = Create("account", "folder", "message", 0);
+        read.Kind = MailMutationKind.SetReadState;
+        read.Value = true;
+        MailPendingMutationPolicy.Upsert(queue, read, now, 500);
+        read.Value = false;
+        MailPendingMutationPolicy.Upsert(queue, read, now.AddSeconds(1), 500);
+        var flag = Create("account", "folder", "message", 0);
+        flag.Kind = MailMutationKind.SetFlagged;
+        flag.Value = true;
+        MailPendingMutationPolicy.Upsert(queue, flag, now.AddSeconds(2), 500);
+
+        Assert.Equal(2, queue.Count);
+        Assert.False(queue.Single(item => item.Kind == MailMutationKind.SetReadState).Value);
+        Assert.True(queue.Single(item => item.Kind == MailMutationKind.SetFlagged).Value);
+    }
+
+    [Fact]
+    public void Legacy_entry_migrates_to_mark_read_true()
+    {
+        var queue = new List<PendingMailMutation> { Create("account", "folder", "message", DateTimeOffset.UtcNow.UtcTicks) };
+
+        Assert.True(MailPendingMutationPolicy.MigrateLegacyAndDeduplicate(queue));
+        var mutation = Assert.Single(queue);
+        Assert.Equal(MailMutationKind.SetReadState, mutation.Kind);
+        Assert.True(mutation.Value);
+    }
+
+    [Fact]
+    public void New_intent_can_replace_queued_opposite_value()
+    {
+        var queued = Create("account", "folder", "message", DateTimeOffset.UtcNow.UtcTicks);
+        queued.Kind = MailMutationKind.SetReadState;
+        queued.Value = true;
+        var queue = new List<PendingMailMutation> { queued };
+
+        Assert.True(MailPendingMutationPolicy.RemoveKind(queue, new PendingMailMutation
+        {
+            AccountId = "account", FolderId = "folder", MessageId = "message", Kind = MailMutationKind.SetReadState, Value = false
+        }));
+        Assert.Empty(queue);
+    }
+
+    [Fact]
     public void Queue_limit_retains_newest_mutations()
     {
         var now = DateTimeOffset.UtcNow;

@@ -11,6 +11,13 @@ namespace Task_Flyout.Services
         Imap
     }
 
+    public enum MailMutationKind
+    {
+        Unknown = 0,
+        SetReadState = 1,
+        SetFlagged = 2
+    }
+
     public sealed class PendingMailMutation
     {
         public string AccountId { get; set; } = "";
@@ -18,6 +25,8 @@ namespace Task_Flyout.Services
         public string MessageId { get; set; } = "";
         public MailAccountKind ProviderKind { get; set; }
         public uint? ImapUidValidity { get; set; }
+        public MailMutationKind Kind { get; set; }
+        public bool Value { get; set; }
         public int FailureCount { get; set; }
         public long CreatedUtcTicks { get; set; }
         public long NextAttemptUtcTicks { get; set; }
@@ -31,6 +40,7 @@ namespace Task_Flyout.Services
             DateTimeOffset now,
             int maximumCount)
         {
+            NormalizeLegacy(mutation);
             var pending = queue.FirstOrDefault(candidate => IsSame(candidate, mutation));
             if (pending == null)
             {
@@ -40,8 +50,15 @@ namespace Task_Flyout.Services
             }
             else
             {
+                bool replacesIntent = pending.Value != mutation.Value;
                 pending.ProviderKind = mutation.ProviderKind;
                 pending.ImapUidValidity = mutation.ImapUidValidity;
+                pending.Value = mutation.Value;
+                if (replacesIntent)
+                {
+                    pending.CreatedUtcTicks = now.UtcTicks;
+                    pending.FailureCount = 0;
+                }
             }
 
             pending.FailureCount = Math.Max(1, pending.FailureCount + 1);
@@ -80,13 +97,59 @@ namespace Task_Flyout.Services
             => queue.RemoveAll(mutation => mutation.AccountId == accountId);
 
         public static bool Remove(List<PendingMailMutation> queue, PendingMailMutation mutation)
+            => queue.RemoveAll(candidate => IsSame(candidate, mutation) && candidate.Value == mutation.Value) > 0;
+
+        public static bool RemoveIfCurrent(List<PendingMailMutation> queue, PendingMailMutation mutation)
+            => queue.RemoveAll(candidate => IsCurrentIntent(candidate, mutation)) > 0;
+
+        public static bool RemoveKind(List<PendingMailMutation> queue, PendingMailMutation mutation)
             => queue.RemoveAll(candidate => IsSame(candidate, mutation)) > 0;
 
         public static PendingMailMutation? Find(List<PendingMailMutation> queue, PendingMailMutation mutation)
             => queue.FirstOrDefault(candidate => IsSame(candidate, mutation));
 
         public static bool IsSame(PendingMailMutation left, PendingMailMutation right)
-            => left.AccountId == right.AccountId && left.FolderId == right.FolderId && left.MessageId == right.MessageId;
+            => left.AccountId == right.AccountId && left.FolderId == right.FolderId && left.MessageId == right.MessageId &&
+               EffectiveKind(left) == EffectiveKind(right);
+
+        public static bool IsCurrentIntent(PendingMailMutation current, PendingMailMutation attempted)
+            => IsSame(current, attempted) && current.Value == attempted.Value && current.CreatedUtcTicks == attempted.CreatedUtcTicks;
+
+        public static bool MigrateLegacyAndDeduplicate(List<PendingMailMutation> queue)
+        {
+            bool changed = false;
+            foreach (var mutation in queue)
+            {
+                if (mutation.Kind != MailMutationKind.Unknown) continue;
+                NormalizeLegacy(mutation);
+                changed = true;
+            }
+
+            var retained = queue
+                .GroupBy(MutationKey, StringComparer.Ordinal)
+                .Select(group => group.OrderByDescending(mutation => mutation.CreatedUtcTicks).First())
+                .ToList();
+            if (retained.Count != queue.Count)
+            {
+                queue.Clear();
+                queue.AddRange(retained);
+                changed = true;
+            }
+            return changed;
+        }
+
+        private static MailMutationKind EffectiveKind(PendingMailMutation mutation)
+            => mutation.Kind == MailMutationKind.Unknown ? MailMutationKind.SetReadState : mutation.Kind;
+
+        private static void NormalizeLegacy(PendingMailMutation mutation)
+        {
+            if (mutation.Kind != MailMutationKind.Unknown) return;
+            mutation.Kind = MailMutationKind.SetReadState;
+            mutation.Value = true;
+        }
+
+        private static string MutationKey(PendingMailMutation mutation)
+            => $"{mutation.AccountId}\u001f{mutation.FolderId}\u001f{mutation.MessageId}\u001f{(int)EffectiveKind(mutation)}";
 
         public static PendingMailMutation Clone(PendingMailMutation mutation)
             => new()
@@ -96,6 +159,8 @@ namespace Task_Flyout.Services
                 MessageId = mutation.MessageId,
                 ProviderKind = mutation.ProviderKind,
                 ImapUidValidity = mutation.ImapUidValidity,
+                Kind = EffectiveKind(mutation),
+                Value = mutation.Kind == MailMutationKind.Unknown || mutation.Value,
                 FailureCount = mutation.FailureCount,
                 CreatedUtcTicks = mutation.CreatedUtcTicks,
                 NextAttemptUtcTicks = mutation.NextAttemptUtcTicks

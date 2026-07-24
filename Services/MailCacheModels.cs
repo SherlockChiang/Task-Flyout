@@ -18,6 +18,7 @@ namespace Task_Flyout.Services
     public class MailItem : INotifyPropertyChanged
     {
         private bool _isRead;
+        private bool _isFlagged;
         public string AccountId { get; set; } = "";
         public string FolderId { get; set; } = "";
         public string Id { get; set; } = "";
@@ -32,10 +33,12 @@ namespace Task_Flyout.Services
         public string ReceivedTime { get; set; } = "";
         public DateTimeOffset? RawReceivedTime { get; set; }
         public bool IsRead { get => _isRead; set { if (_isRead == value) return; _isRead = value; OnPropertyChanged(); OnPropertyChanged(nameof(ReadMarker)); } }
+        public bool IsFlagged { get => _isFlagged; set { if (_isFlagged == value) return; _isFlagged = value; OnPropertyChanged(); OnPropertyChanged(nameof(FlagMarker)); } }
         public bool HasAttachments { get; set; }
         public string Importance { get; set; } = "";
         public string WebLink { get; set; } = "";
         public string ReadMarker => IsRead ? "" : "●";
+        public string FlagMarker => IsFlagged ? "★" : "";
         public string AttachmentMarker => HasAttachments ? "📎" : "";
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

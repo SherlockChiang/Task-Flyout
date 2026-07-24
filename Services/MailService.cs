@@ -87,10 +87,10 @@ namespace Task_Flyout.Services
         }
     }
 
-    public sealed class MailReadSyncQueuedException : Exception
+    public sealed class MailMutationSyncQueuedException : Exception
     {
-        public MailReadSyncQueuedException(Exception innerException)
-            : base("The read-state update was queued for a later retry.", innerException)
+        public MailMutationSyncQueuedException(Exception innerException)
+            : base("The mail update was queued for a later retry.", innerException)
         {
         }
     }
@@ -141,6 +141,7 @@ namespace Task_Flyout.Services
         private readonly SemaphoreSlim _persistentCacheWriteGate = new(1, 1);
         private readonly MailCacheRepository _cacheRepository = new();
         private readonly SemaphoreSlim _pendingMutationRetryGate = new(1, 1);
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> _mutationGates = new(StringComparer.Ordinal);
         private CancellationTokenSource? _persistentCacheSaveCts;
         private long _persistentCacheVersion;
         private long _lastPersistedCacheVersion;
@@ -388,7 +389,7 @@ namespace Task_Flyout.Services
             {
                 EnsureAccountsLoaded();
                 foreach (var account in _accounts.Where(account => account.IsSetupComplete).ToList())
-                    await RetryPendingReadMutationsAsync(account);
+                    await RetryPendingMutationsAsync(account);
             }
             catch (Exception ex)
             {
@@ -711,65 +712,90 @@ namespace Task_Flyout.Services
             throw new InvalidOperationException("Unsupported mail account.");
         }
 
-        public void MarkCachedRead(MailItem item)
+        public void ApplyCachedMutation(MailItem item, MailMutationKind kind, bool value)
         {
-            item.IsRead = true;
-            UpdateCachedReadState(item);
+            bool previousRead = item.IsRead;
+            MailMutationCachePolicy.Apply(new[] { item }, item.AccountId, item.FolderId, item.Id, kind, value);
+            UpdateCachedMutation(item, kind, value, previousRead);
         }
 
-        public async Task MarkAsReadAsync(MailAccount account, MailItem item, bool forceRemoteSync = false, CancellationToken cancellationToken = default)
-        {
-            if (item.IsRead && !forceRemoteSync) return;
+        public Task SetReadStateAsync(MailAccount account, MailItem item, bool value, CancellationToken cancellationToken = default)
+            => SetMailStateAsync(account, item, MailMutationKind.SetReadState, value, cancellationToken);
 
-            for (int attempt = 0; ; attempt++)
+        public Task SetFlaggedAsync(MailAccount account, MailItem item, bool value, CancellationToken cancellationToken = default)
+            => SetMailStateAsync(account, item, MailMutationKind.SetFlagged, value, cancellationToken);
+
+        private async Task SetMailStateAsync(MailAccount account, MailItem item, MailMutationKind kind, bool value, CancellationToken cancellationToken)
+        {
+            if (!MailMutationCapabilityPolicy.Supports(account.Kind, kind))
+                throw new NotSupportedException("This mail provider does not support the requested mutation.");
+
+            string mutationKey = GetMutationKey(account.Id, item.FolderId, item.Id, kind);
+            var mutationGate = _mutationGates.GetOrAdd(mutationKey, _ => new SemaphoreSlim(1, 1));
+            await mutationGate.WaitAsync(cancellationToken);
+            try
             {
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-                using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-                try
+                if (RemovePendingMutationKind(new PendingMailMutation
+                    {
+                        AccountId = account.Id,
+                        FolderId = item.FolderId,
+                        MessageId = item.Id,
+                        Kind = kind
+                    }))
+                    SavePersistentCache();
+
+                for (int attempt = 0; ; attempt++)
                 {
-                    await MarkAsReadRemoteOnceAsync(account, item, operationCts.Token);
-                    break;
-                }
-                catch (Exception ex) when (attempt == 0 &&
-                                           !cancellationToken.IsCancellationRequested &&
-                                           IsTransientReadStateFailure(ex, timeoutCts.IsCancellationRequested))
-                {
-                    await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
-                }
-                catch (Exception ex) when (!cancellationToken.IsCancellationRequested &&
-                                           IsTransientReadStateFailure(ex, timeoutCts.IsCancellationRequested))
-                {
-                    if (EnqueuePendingReadMutation(account, item))
-                        throw new MailReadSyncQueuedException(ex);
-                    throw;
+                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                    using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+                    try
+                    {
+                        await SetMailStateRemoteOnceAsync(account, item, kind, value, operationCts.Token);
+                        break;
+                    }
+                    catch (Exception ex) when (attempt == 0 &&
+                                               !cancellationToken.IsCancellationRequested &&
+                                               IsTransientMutationFailure(ex, timeoutCts.IsCancellationRequested))
+                    {
+                        await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+                    }
+                    catch (Exception ex) when (!cancellationToken.IsCancellationRequested &&
+                                                IsTransientMutationFailure(ex, timeoutCts.IsCancellationRequested))
+                    {
+                        if (EnqueuePendingMutation(account, item, kind, value))
+                            throw new MailMutationSyncQueuedException(ex);
+                        throw;
+                    }
                 }
             }
-
-            if (RemovePendingMutation(new PendingMailMutation
-                {
-                    AccountId = account.Id,
-                    FolderId = item.FolderId,
-                    MessageId = item.Id
-                }))
-                SavePersistentCache();
-            item.IsRead = true;
-            UpdateCachedReadState(item);
+            finally
+            {
+                mutationGate.Release();
+            }
         }
 
-        private async Task MarkAsReadRemoteOnceAsync(MailAccount account, MailItem item, CancellationToken operationToken)
+        private async Task SetMailStateRemoteOnceAsync(MailAccount account, MailItem item, MailMutationKind kind, bool value, CancellationToken operationToken)
         {
             if (account.Kind == MailAccountKind.Outlook)
             {
                 await EnsureOutlookMailWriteAuthorizedAsync(operationToken);
                 if (_outlookClient != null)
-                    await _outlookClient.Me.Messages[item.Id].PatchAsync(new GraphMessage { IsRead = true }, cancellationToken: operationToken);
+                {
+                    var patch = kind == MailMutationKind.SetReadState
+                        ? new GraphMessage { IsRead = value }
+                        : new GraphMessage { Flag = new FollowupFlag { FlagStatus = value ? FollowupFlagStatus.Flagged : FollowupFlagStatus.NotFlagged } };
+                    await _outlookClient.Me.Messages[item.Id].PatchAsync(patch, cancellationToken: operationToken);
+                }
             }
             else if (account.Kind == MailAccountKind.Google)
             {
                 var gmail = await EnsureGoogleMailModifyAuthorizedAsync(operationToken);
+                string label = kind == MailMutationKind.SetReadState ? "UNREAD" : "STARRED";
+                bool addLabel = kind == MailMutationKind.SetReadState ? !value : value;
                 await gmail.Users.Messages.Modify(new ModifyMessageRequest
                 {
-                    RemoveLabelIds = new List<string> { "UNREAD" }
+                    AddLabelIds = addLabel ? new List<string> { label } : null,
+                    RemoveLabelIds = addLabel ? null : new List<string> { label }
                 }, "me", item.Id).ExecuteAsync(operationToken);
             }
             else if (account.Kind == MailAccountKind.Imap)
@@ -781,12 +807,16 @@ namespace Task_Flyout.Services
                 if (!uint.TryParse(item.Id, out var uidValue) ||
                     !MailPaginationPolicy.IsValidImapMutation(item.ImapUidValidity, folder.UidValidity, uidValue))
                     throw new InvalidOperationException("IMAP message identity is no longer valid for this folder.");
-                await folder.AddFlagsAsync(new UniqueId(uidValue), MessageFlags.Seen, true, operationToken);
+                var flag = kind == MailMutationKind.SetReadState ? MessageFlags.Seen : MessageFlags.Flagged;
+                if (value)
+                    await folder.AddFlagsAsync(new UniqueId(uidValue), flag, true, operationToken);
+                else
+                    await folder.RemoveFlagsAsync(new UniqueId(uidValue), flag, true, operationToken);
                 await client.DisconnectAsync(true, operationToken);
             }
         }
 
-        private static bool IsTransientReadStateFailure(Exception exception, bool operationTimedOut)
+        private static bool IsTransientMutationFailure(Exception exception, bool operationTimedOut)
         {
             if (exception is OperationCanceledException)
                 return operationTimedOut;
@@ -802,7 +832,7 @@ namespace Task_Flyout.Services
             return false;
         }
 
-        private bool EnqueuePendingReadMutation(MailAccount account, MailItem item)
+        private bool EnqueuePendingMutation(MailAccount account, MailItem item, MailMutationKind kind, bool value)
         {
             if (account.Kind == MailAccountKind.Imap && !item.ImapUidValidity.HasValue) return false;
 
@@ -816,7 +846,9 @@ namespace Task_Flyout.Services
                     FolderId = item.FolderId,
                     MessageId = item.Id,
                     ProviderKind = account.Kind,
-                    ImapUidValidity = item.ImapUidValidity
+                    ImapUidValidity = item.ImapUidValidity,
+                    Kind = kind,
+                    Value = value
                 }, DateTimeOffset.UtcNow, maximumCount: 500);
             }
             SavePersistentCache();
@@ -1335,7 +1367,7 @@ namespace Task_Flyout.Services
             return false;
         }
 
-        private async Task RetryPendingReadMutationsAsync(MailAccount account)
+        private async Task RetryPendingMutationsAsync(MailAccount account)
         {
             await _pendingMutationRetryGate.WaitAsync();
             try
@@ -1352,25 +1384,38 @@ namespace Task_Flyout.Services
                 bool changed = false;
                 foreach (var mutation in due)
                 {
+                    string mutationKey = GetMutationKey(mutation.AccountId, mutation.FolderId, mutation.MessageId, mutation.Kind);
+                    var mutationGate = _mutationGates.GetOrAdd(mutationKey, _ => new SemaphoreSlim(1, 1));
+                    await mutationGate.WaitAsync();
                     using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
                     try
                     {
-                        await MarkAsReadRemoteOnceAsync(account, new MailItem
+                        lock (_mailCacheLock)
+                        {
+                            if (_persistentCache == null ||
+                                _persistentCache.PendingMutations.FirstOrDefault(candidate => MailPendingMutationPolicy.IsSame(candidate, mutation)) is not { } current ||
+                                !MailPendingMutationPolicy.IsCurrentIntent(current, mutation))
+                                continue;
+                        }
+                        await SetMailStateRemoteOnceAsync(account, new MailItem
                         {
                             AccountId = mutation.AccountId,
                             FolderId = mutation.FolderId,
                             Id = mutation.MessageId,
                             ImapUidValidity = mutation.ImapUidValidity,
-                            IsRead = true
-                        }, timeoutCts.Token);
-                        changed |= RemovePendingMutation(mutation);
+                        }, mutation.Kind, mutation.Value, timeoutCts.Token);
+                        changed |= RemovePendingMutationIfCurrent(mutation);
                     }
                     catch (Exception ex)
                     {
-                        if (IsTransientReadStateFailure(ex, timeoutCts.IsCancellationRequested))
+                        if (IsTransientMutationFailure(ex, timeoutCts.IsCancellationRequested))
                             changed |= ReschedulePendingMutation(mutation);
                         else
-                            changed |= RemovePendingMutation(mutation);
+                            changed |= RemovePendingMutationIfCurrent(mutation);
+                    }
+                    finally
+                    {
+                        mutationGate.Release();
                     }
                 }
 
@@ -1392,19 +1437,40 @@ namespace Task_Flyout.Services
             }
         }
 
+        private bool RemovePendingMutationIfCurrent(PendingMailMutation mutation)
+        {
+            lock (_mailCacheLock)
+            {
+                if (_persistentCache == null) return false;
+                return MailPendingMutationPolicy.RemoveIfCurrent(_persistentCache.PendingMutations, mutation);
+            }
+        }
+
+        private bool RemovePendingMutationKind(PendingMailMutation mutation)
+        {
+            lock (_mailCacheLock)
+            {
+                if (_persistentCache == null) return false;
+                return MailPendingMutationPolicy.RemoveKind(_persistentCache.PendingMutations, mutation);
+            }
+        }
+
         private bool ReschedulePendingMutation(PendingMailMutation mutation)
         {
             lock (_mailCacheLock)
             {
                 if (_persistentCache == null) return false;
                 var current = MailPendingMutationPolicy.Find(_persistentCache.PendingMutations, mutation);
-                if (current == null) return false;
+                if (current == null || !MailPendingMutationPolicy.IsCurrentIntent(current, mutation)) return false;
 
                 current.FailureCount = Math.Min(current.FailureCount + 1, 30);
                 current.NextAttemptUtcTicks = (DateTimeOffset.UtcNow + MailMutationRetryPolicy.GetRetryDelay(current.FailureCount)).UtcTicks;
                 return true;
             }
         }
+
+        private static string GetMutationKey(string accountId, string folderId, string messageId, MailMutationKind kind)
+            => $"{accountId}\u001f{folderId}\u001f{messageId}\u001f{(int)kind}";
 
         private async Task CheckNewMailAsync()
         {
@@ -1427,7 +1493,7 @@ namespace Task_Flyout.Services
 
                     try
                     {
-                        await RetryPendingReadMutationsAsync(account);
+                        await RetryPendingMutationsAsync(account);
                         var folders = await FetchFoldersAsync(account, forceRefresh: false);
                         var inbox = folders.FirstOrDefault(folder => IsInboxName(folder.Id) || IsInboxName(folder.DisplayName))
                                     ?? folders.FirstOrDefault(folder => !folder.IsPlaceholder);
@@ -1620,7 +1686,7 @@ namespace Task_Flyout.Services
                     request.QueryParameters.Top = Math.Clamp(pageSize, MinPageSize, MaxPageSize);
                     request.QueryParameters.Select = new[]
                     {
-                        "id", "subject", "from", "toRecipients", "receivedDateTime", "isRead",
+                        "id", "subject", "from", "toRecipients", "receivedDateTime", "isRead", "flag",
                         "bodyPreview", "webLink", "hasAttachments", "importance"
                     };
                     request.QueryParameters.Orderby = new[] { "receivedDateTime desc" };
@@ -1776,7 +1842,9 @@ namespace Task_Flyout.Services
                     || (unreadOnly ? false : await GetImapReadStateAsync(mailFolder, id, new Dictionary<uint, MessageFlags?>(), cancellationToken));
                 try
                 {
-                    items.Add(await BuildImapMailItemAsync(mailFolder, account, folder, id, summary, isRead, cancellationToken));
+                    var item = await BuildImapMailItemAsync(mailFolder, account, folder, id, summary, isRead, cancellationToken);
+                    item.IsFlagged = summary?.Flags?.HasFlag(MessageFlags.Flagged) == true;
+                    items.Add(item);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
                 catch
@@ -2254,6 +2322,7 @@ namespace Task_Flyout.Services
                 RawReceivedTime = received,
                 ReceivedTime = FormatReceivedTime(received),
                 IsRead = message.IsRead == true,
+                IsFlagged = message.Flag?.FlagStatus == FollowupFlagStatus.Flagged,
                 HasAttachments = message.HasAttachments == true,
                 Importance = message.Importance?.ToString() ?? "",
                 WebLink = message.WebLink ?? ""
@@ -2330,6 +2399,7 @@ namespace Task_Flyout.Services
                 RawReceivedTime = received,
                 ReceivedTime = FormatReceivedTime(received),
                 IsRead = message.LabelIds?.Contains("UNREAD") != true,
+                IsFlagged = message.LabelIds?.Contains("STARRED") == true,
                 HasAttachments = HasGoogleAttachments(message.Payload),
                 WebLink = string.IsNullOrWhiteSpace(message.Id) ? "" : $"https://mail.google.com/mail/u/0/#all/{message.Id}"
             };
@@ -2522,7 +2592,7 @@ namespace Task_Flyout.Services
             SavePersistentCache();
         }
 
-        private void UpdateCachedReadState(MailItem item)
+        private void UpdateCachedMutation(MailItem item, MailMutationKind kind, bool value, bool previousRead)
         {
             EnsurePersistentCacheLoaded();
             lock (_mailCacheLock)
@@ -2535,10 +2605,7 @@ namespace Task_Flyout.Services
                         message.Id == item.Id);
 
                     if (cached != null)
-                        cached.IsRead = true;
-
-                    if (string.Equals(pair.Key, GetMessageCacheKey(item.AccountId, item.FolderId, true), StringComparison.Ordinal))
-                        pair.Value.Value.RemoveAll(message => message.Id == item.Id);
+                        MailMutationCachePolicy.Apply(new[] { cached }, item.AccountId, item.FolderId, item.Id, kind, value);
                 }
 
                 if (_persistentCache == null) return;
@@ -2551,16 +2618,23 @@ namespace Task_Flyout.Services
                         message.Id == item.Id);
 
                     if (cached != null)
-                        cached.IsRead = true;
-
-                    if (string.Equals(pair.Key, GetMessageCacheKey(item.AccountId, item.FolderId, true), StringComparison.Ordinal))
-                        pair.Value.RemoveAll(message => message.Id == item.Id);
+                        MailMutationCachePolicy.Apply(new[] { cached }, item.AccountId, item.FolderId, item.Id, kind, value);
                 }
 
-                var unreadKey = GetMessageCacheKey(item.AccountId, item.FolderId, true);
-                _messageCache.Remove(unreadKey);
-                _persistentCache.MessageCursors.Remove(unreadKey);
-                _persistentCache.MessageHasMore.Remove(unreadKey);
+                if (kind == MailMutationKind.SetReadState)
+                {
+                    var unreadKey = GetMessageCacheKey(item.AccountId, item.FolderId, true);
+                    _messageCache.Remove(unreadKey);
+                    _persistentCache.Messages.Remove(unreadKey);
+                    _persistentCache.MessageCursors.Remove(unreadKey);
+                    _persistentCache.MessageHasMore.Remove(unreadKey);
+
+                    var folder = _persistentCache.Folders.TryGetValue(item.AccountId, out var folders)
+                        ? folders.FirstOrDefault(candidate => candidate.Id == item.FolderId)
+                        : null;
+                    if (folder != null)
+                        folder.UnreadCount = MailMutationCachePolicy.AdjustUnreadCount(folder.UnreadCount, previousRead, value);
+                }
             }
             SavePersistentCache();
         }
@@ -2885,6 +2959,7 @@ namespace Task_Flyout.Services
                 ReceivedTime = item.ReceivedTime,
                 RawReceivedTime = item.RawReceivedTime,
                 IsRead = item.IsRead,
+                IsFlagged = item.IsFlagged,
                 HasAttachments = item.HasAttachments,
                 Importance = item.Importance,
                 WebLink = item.WebLink
