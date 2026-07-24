@@ -49,7 +49,7 @@ namespace Task_Flyout
         private const double MinLogicalWidth = 80;
         private const double MaxLogicalWidth = 420;
         private const double NormalDescriptionMaxWidth = 170;
-        private const double AlertDescriptionMaxWidth = 260;
+        private const double AlertDescriptionMaxWidth = 170;
         private bool _subclassInstalled;
         private string _lastWeatherLayerKey = "";
         private readonly StringBuilder _classNameBuffer = new(256);
@@ -1392,16 +1392,7 @@ namespace Task_Flyout
         }
 
         private static string FormatBarLocation(string city)
-        {
-            if (string.IsNullOrWhiteSpace(city)) return "";
-
-            string text = city.Trim();
-            int comma = text.IndexOf(',');
-            if (comma > 0)
-                text = text[..comma].Trim();
-
-            return text.Length > 18 ? text[..18] + "..." : text;
-        }
+            => WeatherLocationLabelPolicy.FormatForWeatherBar(city);
 
         public async Task RefreshWeatherAsync()
         {
@@ -1513,7 +1504,7 @@ namespace Task_Flyout
                 ApplyDescriptionLayout(alert != null);
                 if (showDesc)
                 {
-                    TxtDesc.Text = alert != null ? alert.Message : (info.Description ?? "");
+                    TxtDesc.Text = alert != null ? weatherService.FormatBarAlert(alert) : (info.Description ?? "");
                     if (alert != null)
                     {
                         TxtDesc.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 170, 80));

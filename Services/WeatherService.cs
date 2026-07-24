@@ -98,6 +98,7 @@ namespace Task_Flyout.Services
     {
         public WeatherAlertType Type { get; set; }
         public int HoursAhead { get; set; }
+        public int? MinutesUntilEnd { get; set; }
         public string Icon { get; set; } = "";
         public string Message { get; set; } = "";
     }
@@ -312,6 +313,7 @@ namespace Task_Flyout.Services
                 {
                     Type = currentRainType,
                     HoursAhead = 0,
+                    MinutesUntilEnd = GetRainDurationMinutes(stopHour, now, forecast.LastOrDefault()?.RawTime),
                     Icon = GetAlertIcon(currentRainType),
                     Message = BuildRainEndingMessage(stopHour, now, forecast.LastOrDefault()?.RawTime, lang)
                 };
@@ -399,6 +401,12 @@ namespace Task_Flyout.Services
                 ? Math.Max(1, (int)Math.Ceiling((lastForecastTime.Value - now).TotalHours))
                 : 24;
             return string.Format(_loader.GetStringOrDefault("TextRainContinues") ?? "Rain continues for the next {0}h", hours);
+        }
+
+        private static int? GetRainDurationMinutes(HourlyWeather? stopHour, DateTime now, DateTime? lastForecastTime)
+        {
+            DateTime? end = stopHour?.RawTime ?? lastForecastTime;
+            return end.HasValue ? Math.Max(1, (int)Math.Round((end.Value - now).TotalMinutes)) : null;
         }
 
         private static string FormatRainTimeSpan(int minutes, bool zh)
@@ -500,6 +508,13 @@ namespace Task_Flyout.Services
             (WeatherAlertType.ExtremeHeat,  "WeatherAlert_ExtremeHeat",  "Extreme heat"),
             (WeatherAlertType.ExtremeCold,  "WeatherAlert_ExtremeCold",  "Extreme cold"),
         };
+
+        public string FormatBarAlert(WeatherAlert alert)
+        {
+            var descriptor = AllAlertTypes.First(entry => entry.Type == alert.Type);
+            string label = _loader.GetStringOrDefault(descriptor.ResourceKey) ?? descriptor.EnLabel;
+            return WeatherAlertTextPolicy.FormatCompact(label, alert.HoursAhead, alert.MinutesUntilEnd);
+        }
 
         public HashSet<string> GetEnabledFields()
         {
@@ -607,8 +622,8 @@ namespace Task_Flyout.Services
             public string Source { get; init; } = "none";
         }
 
-        /// <summary>Resolve coordinates to a localized place name. Street-level via Nominatim,
-        /// falling back to the city-level BigDataCloud geocoder. Returns null on failure.</summary>
+        /// <summary>Resolve coordinates to a localized street-level label,
+        /// falling back to the keyless city-level geocoder. Returns null on failure.</summary>
         public async Task<string?> ReverseGeocodeAsync(double latitude, double longitude)
             => (await ReverseGeocodeDetailedAsync(latitude, longitude)).Name;
 
@@ -616,18 +631,18 @@ namespace Task_Flyout.Services
         /// so callers can tell a Nominatim-unreachable city fallback from a coarse fix.</summary>
         public async Task<ReverseGeocodeResult> ReverseGeocodeDetailedAsync(double latitude, double longitude)
         {
-            var street = await ReverseGeocodeStreetAsync(latitude, longitude);
-            if (!string.IsNullOrWhiteSpace(street.Name)) return street;
+            var area = await ReverseGeocodeStreetAsync(latitude, longitude);
+            if (!string.IsNullOrWhiteSpace(area.Name)) return area;
 
             // Nominatim gave nothing usable (often unreachable from mainland China) — try city level.
             var city = await ReverseGeocodeCityAsync(latitude, longitude);
             if (!string.IsNullOrWhiteSpace(city))
                 return new ReverseGeocodeResult { Name = city, Source = "bigdatacloud" };
 
-            return new ReverseGeocodeResult { Name = null, Source = street.Source };
+            return new ReverseGeocodeResult { Name = null, Source = area.Source };
         }
 
-        /// <summary>Street-level reverse geocode via OpenStreetMap Nominatim (localized).</summary>
+        /// <summary>Street-level reverse geocode via OpenStreetMap Nominatim.</summary>
         private async Task<ReverseGeocodeResult> ReverseGeocodeStreetAsync(double latitude, double longitude)
         {
             try
@@ -650,23 +665,18 @@ namespace Task_Flyout.Services
                     addr.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String
                         ? v.GetString()?.Trim() : null;
 
+                string? province = Pick("state") ?? Pick("province") ?? Pick("region");
+                string? city = Pick("city") ?? Pick("municipality") ?? Pick("town")
+                               ?? Pick("county");
+                string? district = Pick("city_district") ?? Pick("district") ?? Pick("county");
+                string? township = Pick("town") ?? Pick("village") ?? Pick("suburb")
+                                   ?? Pick("neighbourhood") ?? Pick("quarter");
                 string? street = Pick("road") ?? Pick("pedestrian") ?? Pick("residential")
                                  ?? Pick("footway") ?? Pick("path");
-                string? context = Pick("neighbourhood") ?? Pick("suburb") ?? Pick("quarter")
-                                  ?? Pick("city_district") ?? Pick("city") ?? Pick("town")
-                                  ?? Pick("village") ?? Pick("county");
-
-                if (!string.IsNullOrWhiteSpace(street))
-                    return new ReverseGeocodeResult
-                    {
-                        Name = string.IsNullOrWhiteSpace(context) ? street : $"{street} · {context}",
-                        Source = "osm-road"
-                    };
-
-                // Reachable, but OSM had no road at this point — return the locality we found.
-                return string.IsNullOrWhiteSpace(context)
+                string label = WeatherLocationLabelPolicy.FormatDetailed(province, city, district, township, street);
+                return string.IsNullOrWhiteSpace(label)
                     ? new ReverseGeocodeResult { Source = "osm-empty" }
-                    : new ReverseGeocodeResult { Name = context, Source = "osm-area" };
+                    : new ReverseGeocodeResult { Name = label, Source = string.IsNullOrWhiteSpace(street) ? "osm-area" : "osm-road" };
             }
             catch (Exception ex)
             {
@@ -694,10 +704,11 @@ namespace Task_Flyout.Services
                     root.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String
                         ? v.GetString() : null;
 
-                var name = Pick("city");
-                if (string.IsNullOrWhiteSpace(name)) name = Pick("locality");
-                if (string.IsNullOrWhiteSpace(name)) name = Pick("principalSubdivision");
-                return string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+                string? province = Pick("principalSubdivision");
+                string? city = Pick("city");
+                if (string.IsNullOrWhiteSpace(city)) city = Pick("locality");
+                string label = WeatherLocationLabelPolicy.FormatProvinceCity(province, city);
+                return string.IsNullOrWhiteSpace(label) ? null : label;
             }
             catch
             {
