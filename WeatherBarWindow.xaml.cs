@@ -4,6 +4,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
@@ -53,6 +55,9 @@ namespace Task_Flyout
         private const double AlertDescriptionMaxWidth = 170;
         private bool _subclassInstalled;
         private string _lastWeatherLayerKey = "";
+        private WeatherAlert? _activeAlert;
+        private WeatherInfo? _activeWeatherInfo;
+        private string _activeAlertBarLabel = "";
         private readonly StringBuilder _classNameBuffer = new(256);
 
         #region P/Invoke
@@ -1545,6 +1550,9 @@ namespace Task_Flyout
                 {
                     if (generation != _weatherRefreshGeneration || _userHidden) return;
                     _barAlertActive = false;
+                    _activeAlert = null;
+                    _activeWeatherInfo = null;
+                    _activeAlertBarLabel = "";
                     if (this.Content is FrameworkElement root)
                         ApplyWeatherBarTextBrush(root, includeDescription: true);
                     WeatherIcon.Text = "--";
@@ -1569,6 +1577,9 @@ namespace Task_Flyout
                 if (info == null)
                 {
                     _barAlertActive = false;
+                    _activeAlert = null;
+                    _activeWeatherInfo = null;
+                    _activeAlertBarLabel = "";
                     if (this.Content is FrameworkElement root)
                         ApplyWeatherBarTextBrush(root, includeDescription: true);
                     WeatherIcon.Text = "--";
@@ -1581,6 +1592,8 @@ namespace Task_Flyout
                 }
 
                 _barAlertActive = alert != null;
+                _activeAlert = alert;
+                _activeWeatherInfo = info;
                 if (this.Content is FrameworkElement contentRoot)
                     ApplyWeatherBarTextBrush(contentRoot, includeDescription: alert == null);
 
@@ -1637,6 +1650,7 @@ namespace Task_Flyout
                 if (showDesc)
                 {
                     TxtDesc.Text = alert != null ? weatherService.FormatBarAlert(alert) : (info.Description ?? "");
+                    _activeAlertBarLabel = alert != null ? TxtDesc.Text : "";
                     if (alert != null)
                     {
                         TxtDesc.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 170, 80));
@@ -1801,7 +1815,108 @@ namespace Task_Flyout
 
         private void ContentPanel_Click(object sender, RoutedEventArgs e)
         {
+            if (_activeAlert != null && _activeWeatherInfo != null)
+            {
+                ShowAlertDetails();
+                return;
+            }
             App.OpenMainWindowInternal(win => win.NavigateToWeather());
+        }
+
+        private void MainBorder_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (!e.GetCurrentPoint(MainBorder).Properties.IsRightButtonPressed) return;
+            e.Handled = true;
+            ShowLocationMenu(e.GetCurrentPoint(MainBorder).Position);
+        }
+
+        private void ShowLocationMenu(Windows.Foundation.Point position)
+        {
+            var service = (App.Current as App)?.WeatherService;
+            if (service == null) return;
+            var menu = new MenuFlyout();
+            foreach (var location in service.SavedLocations)
+            {
+                var item = new RadioMenuFlyoutItem
+                {
+                    Text = location.Label,
+                    GroupName = "WeatherLocations",
+                    IsChecked = location.Id == service.ActiveLocationId,
+                    Tag = location.Id
+                };
+                item.Click += async (_, _) =>
+                {
+                    if (item.Tag is string id && service.SelectLocation(id))
+                    {
+                        ShowCachedLocationPreview(service, service.GetActiveCachedWeather());
+                        await RefreshWeatherAsync(forceRefresh: true);
+                    }
+                };
+                menu.Items.Add(item);
+            }
+            if (menu.Items.Count > 0) menu.Items.Add(new MenuFlyoutSeparator());
+            var manage = new MenuFlyoutItem { Text = GetResource("WeatherBar_ManageLocations", "Manage locations") };
+            manage.Click += (_, _) => App.OpenMainWindowInternal(win => win.NavigateToWeather());
+            menu.Items.Add(manage);
+            menu.ShowAt(MainBorder, new FlyoutShowOptions { Position = position });
+        }
+
+        private void ShowCachedLocationPreview(WeatherService service, WeatherInfo? info)
+        {
+            if (info == null) return;
+            _activeWeatherInfo = info;
+            _activeAlert = service.BarAlertsEnabled ? service.DetectUpcomingAlert(info) : null;
+            _barAlertActive = _activeAlert != null;
+            WeatherIcon.Text = _activeAlert?.Icon ?? info.Icon;
+            WeatherIcon.FontFamily = new FontFamily(info.IconFont);
+            TxtTemp.Text = info.Temperature;
+            TxtDesc.Text = _activeAlert != null ? service.FormatBarAlert(_activeAlert) : info.Description;
+            _activeAlertBarLabel = _activeAlert != null ? TxtDesc.Text : "";
+            TxtLocation.Text = service.City;
+            RecomputeBarWidth();
+        }
+
+        private void ShowAlertDetails()
+        {
+            var alert = _activeAlert;
+            var info = _activeWeatherInfo;
+            if (alert == null || info == null) return;
+            var service = (App.Current as App)?.WeatherService;
+            if (service == null) return;
+            var type = WeatherService.AllAlertTypes.First(x => x.Type == alert.Type);
+            var panel = new StackPanel { Spacing = 8, MaxWidth = 380 };
+            panel.Children.Add(new TextBlock { Text = _activeAlertBarLabel, FontSize = 18, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+            panel.Children.Add(new TextBlock { Text = $"{GetResource("WeatherAlertDetail_Type", "Type")}: {GetResource(type.ResourceKey, type.EnLabel)}", TextWrapping = TextWrapping.Wrap });
+            if (alert.StartTime.HasValue)
+                panel.Children.Add(new TextBlock { Text = $"{GetResource("WeatherAlertDetail_Start", "Start")}: {alert.StartTime.Value:g}" });
+            if (alert.EndTime.HasValue)
+                panel.Children.Add(new TextBlock { Text = $"{GetResource("WeatherAlertDetail_End", "End")}: {alert.EndTime.Value:g}" });
+            foreach (string value in WeatherAlertDetailPolicy.FormatValues(alert,
+                GetResource("WeatherAlertDetail_Precipitation", "Precipitation probability"),
+                GetResource("WeatherAlertDetail_Wind", "Wind"),
+                GetResource("WeatherAlertDetail_Temperature", "Temperature"),
+                GetResource("WeatherAlertDetail_Threshold", "Detection threshold"),
+                GetResource($"WeatherAlertDetail_Threshold_{alert.Type}", WeatherAlertDetailPolicy.GetThreshold(alert.Type))))
+                panel.Children.Add(new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap });
+            panel.Children.Add(new TextBlock { Text = $"{GetResource("WeatherAlertDetail_Location", "Location")}: {service.ActiveLocationDisplayLabel}", TextWrapping = TextWrapping.WrapWholeWords });
+            panel.Children.Add(new TextBlock
+            {
+                Text = GetResource("WeatherAlertDetail_Disclaimer", "Forecast-derived indication only; not an official weather warning."),
+                FontSize = 12,
+                Foreground = CreateWeatherBarTextBrush(),
+                Opacity = 0.75,
+                TextWrapping = TextWrapping.Wrap
+            });
+            var open = new Button { Content = GetResource("WeatherAlertDetail_OpenWeather", "Open Weather"), HorizontalAlignment = HorizontalAlignment.Left };
+            open.Click += (_, _) => App.OpenMainWindowInternal(win => win.NavigateToWeather());
+            panel.Children.Add(open);
+            new Flyout { Content = panel, Placement = FlyoutPlacementMode.Top }.ShowAt(MainBorder);
+        }
+
+        private static string GetResource(string key, string fallback)
+        {
+            try { return new Microsoft.Windows.ApplicationModel.Resources.ResourceLoader().GetStringOrDefault(key) ?? fallback; }
+            catch { return fallback; }
         }
 
         private bool IsCompactTaskbar()

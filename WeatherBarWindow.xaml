@@ -19,6 +19,7 @@
                 HorizontalContentAlignment="Stretch"
                 VerticalContentAlignment="Stretch"
                 Click="ContentPanel_Click"
+                PointerPressed="MainBorder_PointerPressed"
                 PointerEntered="MainBorder_PointerEntered"
                 PointerExited="MainBorder_PointerExited">
 

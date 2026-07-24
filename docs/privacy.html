@@ -62,7 +62,7 @@
                         <li><strong>邮件：</strong>账户配置与邮件元数据（发件人、主题、预览）以 Windows 数据保护接口（DPAPI）加密后缓存在本地；邮件正文按需从您的邮件服务器加载，通常不持久化保存。</li>
                         <li><strong>日历与任务：</strong>同步得到的日程与任务缓存经 DPAPI 加密后保存在本地，用于离线查看。</li>
                         <li><strong>RSS：</strong>订阅列表与文章保存在本地的 SQLite 数据库中。订阅、文件夹和文章的标题、URL、摘要、正文与远程图片 URL 使用 Windows DPAPI（CurrentUser）保护；ID、发布时间和本地图片路径保留为明文，以支持本地关联、排序和图片缓存。删除订阅会从应用数据库移除其记录，但系统备份、文件系统快照或 SQLite 空闲页可能在一段时间内仍保留历史数据。</li>
-                        <li><strong>天气：</strong>您选择的城市、坐标与显示设置保存在本地应用设置中。</li>
+                        <li><strong>天气：</strong>最多五个已保存地点（名称、别名和坐标）及其最近成功天气和重试状态，经 Windows DPAPI 加密后保存在本地 SQLite 数据库中；坐标不会写入 LocalSettings。请求天气时，所选地点会直接发送给 Open-Meteo 或 wttr.in。</li>
                     </ul>
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">2. 是否上传服务器</h2>
@@ -101,7 +101,7 @@
                         <li><strong>Mail:</strong> Account configuration and message metadata (sender, subject, preview) are cached locally, encrypted with the Windows Data Protection API (DPAPI). Full message bodies are loaded on demand from your mail server and are generally not persisted. One active unsent compose draft may be stored locally as a DPAPI-protected recovery record until it is sent or discarded.</li>
                         <li><strong>Calendar &amp; tasks:</strong> Synced events and tasks are cached locally, encrypted with DPAPI, for offline viewing.</li>
                         <li><strong>RSS:</strong> Your subscriptions and articles are stored in a local SQLite database. Subscription, folder, and article titles, URLs, summaries, bodies, and remote image URLs are protected with Windows DPAPI (CurrentUser); IDs, publication times, and local image paths remain plaintext to support local association, sorting, and image caching. Deleting a feed removes its records from the app database, but system backups, filesystem snapshots, or SQLite free pages can retain historic data for a period of time.</li>
-                        <li><strong>Weather:</strong> Your chosen city, coordinates, and display preferences are stored in local app settings.</li>
+                        <li><strong>Weather:</strong> Up to five saved locations (name, alias, and coordinates), their last successful weather, and retry state are encrypted with Windows DPAPI in the local SQLite database; coordinates are not written to LocalSettings. The selected location is sent directly to Open-Meteo or wttr.in when weather is requested.</li>
                     </ul>
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">2. Is anything uploaded to a server?</h2>

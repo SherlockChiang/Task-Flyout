@@ -61,6 +61,7 @@ namespace Task_Flyout.Views
 
             WeatherToggle.IsOn = _weatherService.IsEnabled;
             CitySearchBox.Text = _weatherService.City;
+            BuildSavedLocations();
             if (_weatherService.AutoFollowLocation && !_weatherService.IsLocationTrackingActive)
                 _weatherService.AutoFollowLocation = false;
             AutoFollowLocationToggle.IsOn = _weatherService.IsLocationTrackingActive;
@@ -662,6 +663,104 @@ namespace Task_Flyout.Views
 
         #region Toggle & City
 
+        private void BuildSavedLocations()
+        {
+            if (SavedLocationsPanel == null || _weatherService == null) return;
+            SavedLocationsPanel.Children.Clear();
+            var locations = _weatherService.SavedLocations;
+            foreach (var location in locations)
+            {
+                var row = new Grid { ColumnSpacing = 8, Tag = location.Id };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var select = new RadioButton
+                {
+                    IsChecked = location.Id == _weatherService.ActiveLocationId,
+                    GroupName = "WeatherSavedLocations",
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Tag = location.Id
+                };
+                select.Click += SavedLocation_Click;
+                var alias = new TextBox
+                {
+                    Text = location.Label,
+                    PlaceholderText = location.DisplayLabel,
+                    Tag = location.Id,
+                    MaxLength = 80
+                };
+                alias.LostFocus += SavedLocationAlias_LostFocus;
+                var remove = new Button
+                {
+                    Content = GetSafeString("WeatherPage_RemoveLocation", "Remove"),
+                    Tag = location.Id
+                };
+                remove.Click += RemoveSavedLocation_Click;
+                Grid.SetColumn(alias, 1);
+                Grid.SetColumn(remove, 2);
+                row.Children.Add(select);
+                row.Children.Add(alias);
+                row.Children.Add(remove);
+                SavedLocationsPanel.Children.Add(row);
+            }
+            SavedLocationsFeedback.Text = string.Format(
+                GetSafeString("WeatherPage_LocationCount", "{0} of {1} saved locations"),
+                locations.Count, WeatherLocationPolicy.MaxLocations);
+            CitySearchBox.IsEnabled = locations.Count < WeatherLocationPolicy.MaxLocations;
+        }
+
+        private async void SavedLocation_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not RadioButton { Tag: string id } || !_weatherService.SelectLocation(id)) return;
+            CitySearchBox.Text = _weatherService.City;
+            var cached = _weatherService.GetActiveCachedWeather();
+            if (cached != null)
+            {
+                UpdateCurrentWeatherCard(cached);
+                UpdateDailyForecast(cached);
+            }
+            BuildSavedLocations();
+            await LoadWeatherDataAsync(forceRefresh: true);
+        }
+
+        private void SavedLocationAlias_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox { Tag: string id } box)
+            {
+                _weatherService.RenameLocation(id, box.Text);
+                CitySearchBox.Text = _weatherService.City;
+                BuildSavedLocations();
+                App.RefreshWeatherBar();
+            }
+        }
+
+        private async void RemoveSavedLocation_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: string id }) return;
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = GetSafeString("WeatherPage_RemoveLocationTitle", "Remove saved location?"),
+                Content = GetSafeString("WeatherPage_RemoveLocationConfirm", "This removes its saved weather cache from this device."),
+                PrimaryButtonText = GetSafeString("WeatherPage_RemoveLocation", "Remove"),
+                CloseButtonText = GetSafeString("TextCancel", "Cancel"),
+                DefaultButton = ContentDialogButton.Close
+            };
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+            _weatherService.RemoveLocation(id);
+            CitySearchBox.Text = _weatherService.City;
+            BuildSavedLocations();
+            if (string.IsNullOrWhiteSpace(_weatherService.City))
+            {
+                UpdateCurrentWeatherCard(null);
+                ForecastPanel.Visibility = Visibility.Collapsed;
+                DailyForecastPanel.Visibility = Visibility.Collapsed;
+                App.RefreshWeatherBar(forceRefresh: true);
+                return;
+            }
+            await LoadWeatherDataAsync(forceRefresh: true);
+        }
+
         private async void WeatherToggle_Toggled(object sender, RoutedEventArgs e)
         {
             if (_isInitializing || _weatherService == null) return;
@@ -733,6 +832,7 @@ namespace Task_Flyout.Views
             {
                 sender.Text = selectedCity.DisplayName;
                 _weatherService.SelectCity(selectedCity);
+                BuildSavedLocations();
                 await LoadWeatherDataAsync(forceRefresh: true);
             }
         }
@@ -742,6 +842,7 @@ namespace Task_Flyout.Views
             if (args.ChosenSuggestion is CitySuggestion suggestion)
             {
                 _weatherService.SelectCity(suggestion);
+                BuildSavedLocations();
                 await LoadWeatherDataAsync(forceRefresh: true);
                 return;
             }
@@ -762,6 +863,7 @@ namespace Task_Flyout.Views
 
                     sender.Text = match.DisplayName;
                     _weatherService.SelectCity(match);
+                    BuildSavedLocations();
                     await LoadWeatherDataAsync(forceRefresh: true);
                 }
                 catch (OperationCanceledException) when (cts.IsCancellationRequested)
@@ -807,6 +909,7 @@ namespace Task_Flyout.Views
                     ? geo.Name!
                     : (_loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location");
                 _weatherService.SetCoordinates(point.Latitude, point.Longitude, label);
+                BuildSavedLocations();
                 CitySearchBox.Text = label;
 
                 ShowLocationStatus(string.Format(
@@ -866,6 +969,7 @@ namespace Task_Flyout.Views
             {
                 if (_weatherService == null) return;
                 CitySearchBox.Text = _weatherService.City;
+                BuildSavedLocations();
                 await LoadWeatherDataAsync(forceRefresh: true);
             });
         }

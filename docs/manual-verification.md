@@ -65,6 +65,17 @@ Use this checklist for flows that require real Windows credentials, DPAPI, Passw
 
 ## Weather Bar Multi-Display And Explorer Recovery
 
+## Weather Saved Locations And Alert Details
+
+1. Migrate from a build containing one `location_v1` and `cache_v1` record; confirm it appears as the active saved location and no weather coordinates remain in LocalSettings.
+2. Add five cities through the existing city search and confirm the sixth is blocked with `5 of 5` feedback.
+3. Rename locations, switch among them, and confirm each switch immediately displays that location's last successful protected cache before refreshing it; restart and confirm IDs, aliases, active selection, retry state, and caches persist.
+4. Use current location repeatedly and confirm one current-location entry is updated rather than additional entries being created. Confirm no automatic location rotation occurs.
+5. Remove a location, accept confirmation, and confirm another stable entry becomes active; verify the removed cache is not retained after the next weather cache write.
+6. Right-click Weather Bar and confirm its menu dynamically lists all saved locations as one radio group plus `Manage locations`; select each and confirm refresh targets it.
+7. With no alert, left-click Weather Bar and confirm direct Weather navigation is unchanged.
+8. With a forecast-derived alert, left-click and confirm the detail flyout header exactly matches the bar label, and shows type, derivable start/end, precipitation probability, wind and temperature values, thresholds, the full untruncated active location, disclaimer, and `Open Weather`.
+
 1. Enable Weather and the taskbar Weather Bar with two displays connected and taskbars visible on both displays.
 2. Confirm the bar remains on its currently attached valid taskbar across normal polling; if no attachment exists, confirm the primary taskbar is preferred and a secondary taskbar is used when the primary is unavailable.
 3. Change one display's scale/DPI and taskbar position, then confirm the bar remains inside the selected taskbar and does not overlap native Widgets or active FluentFlyout media controls.

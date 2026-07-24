@@ -1533,6 +1533,31 @@
   <data name="WeatherAlert_ExtremeCold" xml:space="preserve">
     <value>严寒</value>
   </data>
+  <data name="WeatherPage_RemoveLocation" xml:space="preserve"><value>移除</value></data>
+  <data name="WeatherPage_RemoveLocationTitle" xml:space="preserve"><value>移除已保存地点？</value></data>
+  <data name="WeatherPage_RemoveLocationConfirm" xml:space="preserve"><value>这也会移除此设备上保存的该地点天气缓存。</value></data>
+  <data name="WeatherPage_LocationCount" xml:space="preserve"><value>已保存 {0}/{1} 个地点</value></data>
+  <data name="WeatherBar_ManageLocations" xml:space="preserve"><value>管理地点</value></data>
+  <data name="WeatherAlertDetail_Type" xml:space="preserve"><value>类型</value></data>
+  <data name="WeatherAlertDetail_Start" xml:space="preserve"><value>开始</value></data>
+  <data name="WeatherAlertDetail_End" xml:space="preserve"><value>结束</value></data>
+  <data name="WeatherAlertDetail_Precipitation" xml:space="preserve"><value>降水概率</value></data>
+  <data name="WeatherAlertDetail_Wind" xml:space="preserve"><value>风速</value></data>
+  <data name="WeatherAlertDetail_Temperature" xml:space="preserve"><value>温度</value></data>
+  <data name="WeatherAlertDetail_Threshold" xml:space="preserve"><value>检测阈值</value></data>
+  <data name="WeatherAlertDetail_Location" xml:space="preserve"><value>地点</value></data>
+  <data name="WeatherAlertDetail_Disclaimer" xml:space="preserve"><value>仅根据天气预报推导，并非官方天气预警。</value></data>
+  <data name="WeatherAlertDetail_OpenWeather" xml:space="preserve"><value>打开天气</value></data>
+  <data name="WeatherAlertDetail_Threshold_HeavyRain" xml:space="preserve"><value>降水概率 &gt;= 50%</value></data>
+  <data name="WeatherAlertDetail_Threshold_Rain" xml:space="preserve"><value>降水概率 &gt;= 50%</value></data>
+  <data name="WeatherAlertDetail_Threshold_HighWind" xml:space="preserve"><value>风速 &gt;= 40 km/h</value></data>
+  <data name="WeatherAlertDetail_Threshold_ExtremeHeat" xml:space="preserve"><value>温度 &gt;= 35 C</value></data>
+  <data name="WeatherAlertDetail_Threshold_ExtremeCold" xml:space="preserve"><value>温度 &lt;= -10 C</value></data>
+  <data name="WeatherAlertDetail_Threshold_Thunderstorm" xml:space="preserve"><value>预报天气状况代码</value></data>
+  <data name="WeatherAlertDetail_Threshold_FreezingRain" xml:space="preserve"><value>预报天气状况代码</value></data>
+  <data name="WeatherAlertDetail_Threshold_HeavySnow" xml:space="preserve"><value>预报天气状况代码</value></data>
+  <data name="WeatherAlertDetail_Threshold_Snow" xml:space="preserve"><value>预报天气状况代码</value></data>
+  <data name="WeatherAlertDetail_Threshold_Fog" xml:space="preserve"><value>预报天气状况代码</value></data>
   <data name="RssPage_AllSubscriptions.Text" xml:space="preserve">
     <value>全部订阅文章</value>
   </data>

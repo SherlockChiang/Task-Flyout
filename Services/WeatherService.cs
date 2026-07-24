@@ -80,29 +80,6 @@ namespace Task_Flyout.Services
         public string IconLayer3Uri => IconLayerUris.Length > 3 ? IconLayerUris[3] : "";
     }
 
-    public enum WeatherAlertType
-    {
-        HeavyRain,
-        Rain,
-        FreezingRain,
-        HeavySnow,
-        Snow,
-        Thunderstorm,
-        Fog,
-        HighWind,
-        ExtremeHeat,
-        ExtremeCold
-    }
-
-    public class WeatherAlert
-    {
-        public WeatherAlertType Type { get; set; }
-        public int HoursAhead { get; set; }
-        public int? MinutesUntilEnd { get; set; }
-        public string Icon { get; set; } = "";
-        public string Message { get; set; } = "";
-    }
-
     public class WeatherInfo
     {
         public string Temperature { get; set; } = "";
@@ -134,12 +111,18 @@ namespace Task_Flyout.Services
     // always waiting on the network.
     public class WeatherCacheEnvelope
     {
+        public string LocationId { get; set; } = "";
         public string Key { get; set; } = "";
         public long FetchedTicks { get; set; }
         public WeatherInfo? Info { get; set; }
         public string? FailureKey { get; set; }
         public long FailureUtcTicks { get; set; }
         public int FailureCount { get; set; }
+    }
+
+    public sealed class WeatherCacheStore
+    {
+        public List<WeatherCacheEnvelope> Entries { get; set; } = new();
     }
 
     public sealed record CitySuggestion(string DisplayName, double Latitude, double Longitude)
@@ -166,26 +149,64 @@ namespace Task_Flyout.Services
         private bool _persistentWeatherLoaded;
         private static string PersistentWeatherPath => AppDataPathHelper.ResolveLocal("WeatherCache.json");
         private const string ProtectedWeatherScope = "weather";
-        private const string ProtectedLocationKey = "location_v1";
-        private const string ProtectedCacheKey = "cache_v1";
+        private const string ProtectedLocationKey = "locations_v2";
+        private const string LegacyProtectedLocationKey = "location_v1";
+        private const string ProtectedCacheKey = "cache_v2";
+        private const string LegacyProtectedCacheKey = "cache_v1";
         private readonly object _locationLock = new();
         private WeatherLocationSettings _location = new();
+        private WeatherFavoritesStore _favorites = new();
+        private WeatherCacheStore _persistentCacheStore = new();
         private bool _locationLoaded;
         private long _weatherDataGeneration;
         private readonly SemaphoreSlim _weatherPersistenceGate = new(1, 1);
         private sealed record WeatherRequestContext(
             long Generation,
+            string LocationId,
             bool IsEnabled,
             string Source,
             string City,
+            string ProviderCity,
             double Latitude,
             double Longitude,
             string IconFont,
             CancellationToken ServiceCancellationToken)
         {
-            public string Key => $"{Source}|{City}|{Latitude.ToString(CultureInfo.InvariantCulture)}|{Longitude.ToString(CultureInfo.InvariantCulture)}";
+            public string Key => $"{Source}|{ProviderCity}|{Latitude.ToString(CultureInfo.InvariantCulture)}|{Longitude.ToString(CultureInfo.InvariantCulture)}";
             public string CoordinatorKey => $"{Generation}|{Key}";
         }
+
+        public event EventHandler? LocationsChanged;
+
+        public IReadOnlyList<SavedWeatherLocation> SavedLocations
+        {
+            get { EnsureLocationLoaded(); lock (_locationLock) return _favorites.Locations.Select(CloneLocation).ToList(); }
+        }
+
+        public string ActiveLocationId
+        {
+            get { EnsureLocationLoaded(); lock (_locationLock) return _favorites.ActiveId; }
+        }
+
+        public string ActiveLocationDisplayLabel
+        {
+            get
+            {
+                EnsureLocationLoaded();
+                lock (_locationLock)
+                    return _favorites.Locations.FirstOrDefault(x => x.Id == _favorites.ActiveId)?.DisplayLabel ?? _location.City;
+            }
+        }
+
+        private static SavedWeatherLocation CloneLocation(SavedWeatherLocation location) => new()
+        {
+            Id = location.Id,
+            Alias = location.Alias,
+            DisplayLabel = location.DisplayLabel,
+            Latitude = location.Latitude,
+            Longitude = location.Longitude,
+            IsCurrentLocation = location.IsCurrentLocation
+        };
 
         private static async Task<string> GetStringWithAgentAsync(string url, string userAgent, CancellationToken ct = default)
         {
@@ -350,7 +371,12 @@ namespace Task_Flyout.Services
                     HoursAhead = 0,
                     MinutesUntilEnd = GetRainDurationMinutes(stopHour, now, forecast.LastOrDefault()?.RawTime),
                     Icon = GetAlertIcon(currentRainType),
-                    Message = BuildRainEndingMessage(stopHour, now, forecast.LastOrDefault()?.RawTime, lang)
+                    Message = BuildRainEndingMessage(stopHour, now, forecast.LastOrDefault()?.RawTime, lang),
+                    StartTime = currentHour.RawTime,
+                    EndTime = stopHour?.RawTime,
+                    PrecipProbability = currentHour.PrecipProbValue,
+                    WindSpeed = currentHour.WindSpeedValue,
+                    Temperature = currentHour.TempValue
                 };
             }
 
@@ -376,12 +402,18 @@ namespace Task_Flyout.Services
                 if (hit != null)
                 {
                     int hoursAhead = Math.Max(0, (int)Math.Round((hit.RawTime - now).TotalHours));
+                    var end = forecast.FirstOrDefault(h => h.RawTime > hit.RawTime && !MatchAlert(h, type));
                     return new WeatherAlert
                     {
                         Type = type,
                         HoursAhead = hoursAhead,
                         Icon = GetAlertIcon(type),
-                        Message = BuildAlertMessage(type, hoursAhead, lang)
+                        Message = BuildAlertMessage(type, hoursAhead, lang),
+                        StartTime = hit.RawTime,
+                        EndTime = end?.RawTime,
+                        PrecipProbability = hit.PrecipProbValue,
+                        WindSpeed = hit.WindSpeedValue,
+                        Temperature = hit.TempValue
                     };
                 }
             }
@@ -568,44 +600,42 @@ namespace Task_Flyout.Services
             {
                 if (_locationLoaded) return;
 
-                WeatherLocationSettings? loaded = null;
+                WeatherFavoritesStore? favorites = null;
                 try
                 {
                     string? protectedJson = LocalSqliteStore.ReadProtectedText(ProtectedWeatherScope, ProtectedLocationKey);
                     if (!string.IsNullOrWhiteSpace(protectedJson))
-                        loaded = JsonSerializer.Deserialize(protectedJson, AppJsonContext.Default.WeatherLocationSettings);
+                        favorites = JsonSerializer.Deserialize(protectedJson, AppJsonContext.Default.WeatherFavoritesStore);
                 }
                 catch
                 {
                 }
 
-                if (loaded == null)
+                if (favorites == null)
                 {
-                    var values = ApplicationData.Current.LocalSettings.Values;
-                    loaded = WeatherLocationPolicy.Normalize(
-                        values["WeatherCity"] as string,
-                        values["WeatherCityLat"] as double? ?? 0,
-                        values["WeatherCityLon"] as double? ?? 0);
-
-                    if (WeatherLocationPolicy.HasPersistableData(loaded))
+                    WeatherLocationSettings? legacy = null;
+                    try
                     {
-                        try
-                        {
-                            string json = JsonSerializer.Serialize(loaded, AppJsonContext.Default.WeatherLocationSettings);
-                            LocalSqliteStore.WriteProtectedText(ProtectedWeatherScope, ProtectedLocationKey, json);
-                            RemoveLegacyLocationSettings();
-                        }
-                        catch
-                        {
-                        }
+                        string? legacyJson = LocalSqliteStore.ReadProtectedText(ProtectedWeatherScope, LegacyProtectedLocationKey);
+                        if (!string.IsNullOrWhiteSpace(legacyJson))
+                            legacy = JsonSerializer.Deserialize(legacyJson, AppJsonContext.Default.WeatherLocationSettings);
                     }
+                    catch { }
+                    if (legacy == null)
+                    {
+                        var values = ApplicationData.Current.LocalSettings.Values;
+                        legacy = WeatherLocationPolicy.Normalize(values["WeatherCity"] as string,
+                            values["WeatherCityLat"] as double? ?? 0, values["WeatherCityLon"] as double? ?? 0);
+                    }
+                    favorites = new WeatherFavoritesStore();
+                    if (WeatherLocationPolicy.HasPersistableData(legacy))
+                        WeatherLocationPolicy.TryAdd(favorites, legacy.City, legacy.Latitude, legacy.Longitude, false, out _);
+                    PersistFavorites(favorites);
                 }
-                else
-                {
-                    RemoveLegacyLocationSettings();
-                }
-
-                _location = loaded;
+                _favorites = WeatherLocationPolicy.Normalize(favorites);
+                var active = _favorites.Locations.FirstOrDefault(x => x.Id == _favorites.ActiveId);
+                _location = active == null ? new WeatherLocationSettings() : WeatherLocationPolicy.Normalize(active.Label, active.Latitude, active.Longitude);
+                RemoveLegacyLocationSettings();
                 _locationLoaded = true;
             }
         }
@@ -618,13 +648,121 @@ namespace Task_Flyout.Services
             values.Remove("WeatherCityLon");
         }
 
-        public void SelectCity(CitySuggestion suggestion)
-            => SetCoordinates(suggestion.Latitude, suggestion.Longitude, suggestion.DisplayName);
+        public bool SelectCity(CitySuggestion suggestion)
+            => AddLocation(suggestion.Latitude, suggestion.Longitude, suggestion.DisplayName, false);
 
         /// <summary>Set the weather location directly from coordinates (e.g. device GPS),
         /// with a display label. Open-Meteo uses the coordinates directly.</summary>
         public void SetCoordinates(double latitude, double longitude, string displayName)
-            => SetCoordinates(latitude, longitude, displayName, expectedGeneration: null);
+            => AddLocation(latitude, longitude, displayName, true);
+
+        public bool AddLocation(double latitude, double longitude, string displayName, bool currentLocation)
+        {
+            EnsureLocationLoaded();
+            lock (_locationLock)
+            {
+                if (!WeatherLocationPolicy.TryAdd(_favorites, displayName, latitude, longitude, currentLocation, out var added)) return false;
+                _location = WeatherLocationPolicy.Normalize(added!.Label, added.Latitude, added.Longitude);
+                PersistFavorites(_favorites);
+            }
+            InvalidateWeatherContext();
+            LocationsChanged?.Invoke(this, EventArgs.Empty);
+            return true;
+        }
+
+        public bool SelectLocation(string id)
+        {
+            EnsureLocationLoaded();
+            lock (_locationLock)
+            {
+                var selected = _favorites.Locations.FirstOrDefault(x => x.Id == id);
+                if (selected == null || _favorites.ActiveId == id) return selected != null;
+                _favorites.ActiveId = id;
+                _location = WeatherLocationPolicy.Normalize(selected.Label, selected.Latitude, selected.Longitude);
+                PersistFavorites(_favorites);
+                TryHydrateLocationCache(id);
+            }
+            InvalidateWeatherContext();
+            LocationsChanged?.Invoke(this, EventArgs.Empty);
+            return true;
+        }
+
+        public WeatherInfo? GetActiveCachedWeather()
+        {
+            EnsureLocationLoaded();
+            lock (_weatherLock) return _cachedWeatherKey == BuildCurrentWeatherKey() ? _cachedWeather : null;
+        }
+
+        private string BuildCurrentWeatherKey()
+        {
+            string providerCity = _favorites.Locations.FirstOrDefault(x => x.Id == _favorites.ActiveId)?.DisplayLabel ?? _location.City;
+            return $"{WeatherSource}|{providerCity}|{_location.Latitude.ToString(CultureInfo.InvariantCulture)}|{_location.Longitude.ToString(CultureInfo.InvariantCulture)}";
+        }
+
+        private void TryHydrateLocationCache(string locationId)
+        {
+            try
+            {
+                if (_persistentCacheStore.Entries.Count == 0)
+                {
+                    string? json = LocalSqliteStore.ReadProtectedText(ProtectedWeatherScope, ProtectedCacheKey);
+                    if (!string.IsNullOrWhiteSpace(json))
+                        _persistentCacheStore = JsonSerializer.Deserialize(json, AppJsonContext.Default.WeatherCacheStore) ?? new();
+                }
+                var envelope = _persistentCacheStore.Entries.FirstOrDefault(x => x.LocationId == locationId);
+                lock (_weatherLock)
+                {
+                    _cachedWeather = envelope?.Info;
+                    _cachedWeatherKey = envelope?.Key;
+                    _lastFetchTime = envelope?.FetchedTicks > 0 ? new DateTime(envelope.FetchedTicks, DateTimeKind.Local) : DateTime.MinValue;
+                    _lastFailureWeatherKey = envelope?.FailureKey;
+                    _lastFailureUtc = envelope?.FailureUtcTicks > 0 ? new DateTimeOffset(envelope.FailureUtcTicks, TimeSpan.Zero) : DateTimeOffset.MinValue;
+                    _consecutiveFailures = envelope?.FailureCount ?? 0;
+                    _persistentWeatherLoaded = envelope != null;
+                }
+            }
+            catch { }
+        }
+
+        public bool RenameLocation(string id, string alias)
+        {
+            EnsureLocationLoaded();
+            lock (_locationLock)
+            {
+                var location = _favorites.Locations.FirstOrDefault(x => x.Id == id);
+                if (location == null) return false;
+                location.Alias = alias?.Trim() ?? "";
+                if (_favorites.ActiveId == id)
+                    _location = WeatherLocationPolicy.Normalize(location.Label, location.Latitude, location.Longitude);
+                PersistFavorites(_favorites);
+            }
+            LocationsChanged?.Invoke(this, EventArgs.Empty);
+            return true;
+        }
+
+        public bool RemoveLocation(string id)
+        {
+            EnsureLocationLoaded();
+            lock (_locationLock)
+            {
+                if (!WeatherLocationPolicy.Remove(_favorites, id)) return false;
+                _persistentCacheStore.Entries.RemoveAll(x => x.LocationId == id);
+                var active = _favorites.Locations.FirstOrDefault(x => x.Id == _favorites.ActiveId);
+                _location = active == null ? new WeatherLocationSettings() : WeatherLocationPolicy.Normalize(active.Label, active.Latitude, active.Longitude);
+                PersistFavorites(_favorites);
+                string cacheJson = JsonSerializer.Serialize(_persistentCacheStore, AppJsonContext.Default.WeatherCacheStore);
+                LocalSqliteStore.WriteProtectedText(ProtectedWeatherScope, ProtectedCacheKey, cacheJson);
+            }
+            InvalidateWeatherContext();
+            LocationsChanged?.Invoke(this, EventArgs.Empty);
+            return true;
+        }
+
+        private static void PersistFavorites(WeatherFavoritesStore favorites)
+        {
+            string json = JsonSerializer.Serialize(favorites, AppJsonContext.Default.WeatherFavoritesStore);
+            LocalSqliteStore.WriteProtectedText(ProtectedWeatherScope, ProtectedLocationKey, json);
+        }
 
         private void SetCoordinates(double latitude, double longitude, string displayName, long? expectedGeneration)
         {
@@ -639,12 +777,24 @@ namespace Task_Flyout.Services
 
                 lock (_locationLock)
                 {
-                    if (_location.City == normalized.City &&
+                    var current = _favorites.Locations.FirstOrDefault(x => x.IsCurrentLocation);
+                    if (current != null && _location.City == normalized.City &&
                         _location.Latitude == normalized.Latitude &&
                         _location.Longitude == normalized.Longitude)
                         return;
-                    _location = normalized;
-                    json = JsonSerializer.Serialize(_location, AppJsonContext.Default.WeatherLocationSettings);
+                    if (current == null)
+                    {
+                        if (!WeatherLocationPolicy.TryAdd(_favorites, displayName, latitude, longitude, true, out current)) return;
+                    }
+                    else
+                    {
+                        current.DisplayLabel = normalized.City;
+                        current.Latitude = normalized.Latitude;
+                        current.Longitude = normalized.Longitude;
+                        _favorites.ActiveId = current.Id;
+                    }
+                    _location = WeatherLocationPolicy.Normalize(current!.Label, current.Latitude, current.Longitude);
+                    json = JsonSerializer.Serialize(_favorites, AppJsonContext.Default.WeatherFavoritesStore);
                 }
                 InvalidateWeatherContext();
                 generation = Volatile.Read(ref _weatherDataGeneration);
@@ -934,9 +1084,11 @@ namespace Task_Flyout.Services
             {
                 return new WeatherRequestContext(
                     Volatile.Read(ref _weatherDataGeneration),
+                    _favorites.ActiveId,
                     IsEnabled,
                     WeatherSource,
-                    _location.City,
+                    _favorites.Locations.FirstOrDefault(x => x.Id == _favorites.ActiveId)?.Label ?? _location.City,
+                    _favorites.Locations.FirstOrDefault(x => x.Id == _favorites.ActiveId)?.DisplayLabel ?? _location.City,
                     _location.Latitude,
                     _location.Longitude,
                     IconFontFamily,
@@ -981,7 +1133,7 @@ namespace Task_Flyout.Services
                         _lastFailureUtc = DateTimeOffset.MinValue;
                         _consecutiveFailures = 0;
                         _persistentWeatherLoaded = true;
-                        persistJson = SerializePersistentWeatherLocked();
+                        persistJson = SerializePersistentWeatherLocked(context.LocationId);
                     }
                 }
                 if (persistJson != null)
@@ -1008,7 +1160,7 @@ namespace Task_Flyout.Services
                             _consecutiveFailures = 1;
                         }
                         _lastFailureUtc = DateTimeOffset.UtcNow;
-                        persistJson = SerializePersistentWeatherLocked();
+                        persistJson = SerializePersistentWeatherLocked(context.LocationId);
                     }
                 }
                 if (persistJson != null)
@@ -1049,13 +1201,19 @@ namespace Task_Flyout.Services
                             return protectedJson;
                         }
 
+                        string legacyJson = LocalSqliteStore.ReadProtectedText(ProtectedWeatherScope, LegacyProtectedCacheKey) ?? "";
                         var path = PersistentWeatherPath;
-                        if (!File.Exists(path)) return "";
-
-                        string legacyJson = File.ReadAllText(path);
+                        if (string.IsNullOrWhiteSpace(legacyJson) && File.Exists(path)) legacyJson = File.ReadAllText(path);
                         if (!string.IsNullOrWhiteSpace(legacyJson))
                         {
-                            LocalSqliteStore.WriteProtectedText(ProtectedWeatherScope, ProtectedCacheKey, legacyJson);
+                            var old = JsonSerializer.Deserialize(legacyJson, AppJsonContext.Default.WeatherCacheEnvelope);
+                            if (old != null)
+                            {
+                                old.LocationId = context.LocationId;
+                                var migrated = new WeatherCacheStore { Entries = new List<WeatherCacheEnvelope> { old } };
+                                legacyJson = JsonSerializer.Serialize(migrated, AppJsonContext.Default.WeatherCacheStore);
+                                LocalSqliteStore.WriteProtectedText(ProtectedWeatherScope, ProtectedCacheKey, legacyJson);
+                            }
                             TryDeleteLegacyWeatherCache();
                         }
                         return legacyJson;
@@ -1075,7 +1233,10 @@ namespace Task_Flyout.Services
                     return;
                 }
 
-                var envelope = JsonSerializer.Deserialize(json, AppJsonContext.Default.WeatherCacheEnvelope);
+                var store = JsonSerializer.Deserialize(json, AppJsonContext.Default.WeatherCacheStore);
+                if (store != null) _persistentCacheStore = store;
+                var envelope = store?.Entries.FirstOrDefault(x => x.LocationId == context.LocationId)
+                    ?? store?.Entries.FirstOrDefault(x => x.Key == context.Key);
                 if (envelope == null) return;
 
                 // Always adopt the saved entry as a baseline so the bar shows the last-known
@@ -1115,21 +1276,31 @@ namespace Task_Flyout.Services
             }
         }
 
-        private string? SerializePersistentWeatherLocked()
+        private string? SerializePersistentWeatherLocked(string locationId)
         {
             try
             {
+                var envelope = _persistentCacheStore.Entries.FirstOrDefault(x => x.LocationId == locationId);
+                if (envelope == null)
+                {
+                    envelope = new WeatherCacheEnvelope { LocationId = locationId };
+                    _persistentCacheStore.Entries.Add(envelope);
+                }
+                envelope.Key = _cachedWeatherKey ?? "";
+                envelope.FetchedTicks = _lastFetchTime.Ticks;
+                envelope.Info = _cachedWeather;
+                envelope.FailureKey = _lastFailureWeatherKey;
+                envelope.FailureUtcTicks = _lastFailureUtc == DateTimeOffset.MinValue ? 0 : _lastFailureUtc.UtcTicks;
+                envelope.FailureCount = _consecutiveFailures;
+                var validIds = _favorites.Locations.Select(x => x.Id).ToHashSet();
+                _persistentCacheStore.Entries = _persistentCacheStore.Entries
+                    .Where(x => validIds.Contains(x.LocationId))
+                    .OrderByDescending(x => x.LocationId == locationId)
+                    .Take(WeatherLocationPolicy.MaxLocations)
+                    .ToList();
                 return JsonSerializer.Serialize(
-                    new WeatherCacheEnvelope
-                    {
-                        Key = _cachedWeatherKey ?? "",
-                        FetchedTicks = _lastFetchTime.Ticks,
-                        Info = _cachedWeather,
-                        FailureKey = _lastFailureWeatherKey,
-                        FailureUtcTicks = _lastFailureUtc == DateTimeOffset.MinValue ? 0 : _lastFailureUtc.UtcTicks,
-                        FailureCount = _consecutiveFailures
-                    },
-                    AppJsonContext.Default.WeatherCacheEnvelope);
+                    _persistentCacheStore,
+                    AppJsonContext.Default.WeatherCacheStore);
             }
             catch
             {
@@ -1178,6 +1349,7 @@ namespace Task_Flyout.Services
             lock (_locationLock)
             {
                 _location = new WeatherLocationSettings();
+                _favorites = new WeatherFavoritesStore();
                 _locationLoaded = true;
                 RemoveLegacyLocationSettings();
             }
@@ -1191,6 +1363,7 @@ namespace Task_Flyout.Services
                 _lastFailureUtc = DateTimeOffset.MinValue;
                 _consecutiveFailures = 0;
                 _persistentWeatherLoaded = true;
+                _persistentCacheStore = new WeatherCacheStore();
             }
 
             await _weatherPersistenceGate.WaitAsync();
@@ -1611,7 +1784,7 @@ namespace Task_Flyout.Services
         {
             string lang = GetCurrentLanguage();
             string wttrLang = lang == "en" ? "en" : "zh";
-            string searchCity = context.City.Split(',')[0].Trim();
+            string searchCity = context.ProviderCity.Split(',')[0].Trim();
             string url = $"https://wttr.in/{Uri.EscapeDataString(searchCity)}?format=j1&lang={wttrLang}";
 
             var response = await GetStringWithAgentAsync(url, "curl/7.68.0", cancellationToken);
@@ -1783,7 +1956,7 @@ namespace Task_Flyout.Services
                     {
                         Hour = displayHour,
                         RawTime = DateTime.Today.AddHours(targetHour),
-                        WeatherCode = rawCode,
+                        WeatherCode = WeatherConditionCodePolicy.WttrToOpenMeteo(rawCode),
                         TempValue = rawTemp,
                         WindSpeedValue = rawWs,
                         PrecipProbValue = rawPp,

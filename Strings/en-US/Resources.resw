@@ -1533,6 +1533,31 @@
   <data name="WeatherAlert_ExtremeCold" xml:space="preserve">
     <value>Extreme cold</value>
   </data>
+  <data name="WeatherPage_RemoveLocation" xml:space="preserve"><value>Remove</value></data>
+  <data name="WeatherPage_RemoveLocationTitle" xml:space="preserve"><value>Remove saved location?</value></data>
+  <data name="WeatherPage_RemoveLocationConfirm" xml:space="preserve"><value>This removes its saved weather cache from this device.</value></data>
+  <data name="WeatherPage_LocationCount" xml:space="preserve"><value>{0} of {1} saved locations</value></data>
+  <data name="WeatherBar_ManageLocations" xml:space="preserve"><value>Manage locations</value></data>
+  <data name="WeatherAlertDetail_Type" xml:space="preserve"><value>Type</value></data>
+  <data name="WeatherAlertDetail_Start" xml:space="preserve"><value>Start</value></data>
+  <data name="WeatherAlertDetail_End" xml:space="preserve"><value>End</value></data>
+  <data name="WeatherAlertDetail_Precipitation" xml:space="preserve"><value>Precipitation probability</value></data>
+  <data name="WeatherAlertDetail_Wind" xml:space="preserve"><value>Wind</value></data>
+  <data name="WeatherAlertDetail_Temperature" xml:space="preserve"><value>Temperature</value></data>
+  <data name="WeatherAlertDetail_Threshold" xml:space="preserve"><value>Detection threshold</value></data>
+  <data name="WeatherAlertDetail_Location" xml:space="preserve"><value>Location</value></data>
+  <data name="WeatherAlertDetail_Disclaimer" xml:space="preserve"><value>Forecast-derived indication only; not an official weather warning.</value></data>
+  <data name="WeatherAlertDetail_OpenWeather" xml:space="preserve"><value>Open Weather</value></data>
+  <data name="WeatherAlertDetail_Threshold_HeavyRain" xml:space="preserve"><value>precipitation probability &gt;= 50%</value></data>
+  <data name="WeatherAlertDetail_Threshold_Rain" xml:space="preserve"><value>precipitation probability &gt;= 50%</value></data>
+  <data name="WeatherAlertDetail_Threshold_HighWind" xml:space="preserve"><value>wind &gt;= 40 km/h</value></data>
+  <data name="WeatherAlertDetail_Threshold_ExtremeHeat" xml:space="preserve"><value>temperature &gt;= 35 C</value></data>
+  <data name="WeatherAlertDetail_Threshold_ExtremeCold" xml:space="preserve"><value>temperature &lt;= -10 C</value></data>
+  <data name="WeatherAlertDetail_Threshold_Thunderstorm" xml:space="preserve"><value>forecast condition code</value></data>
+  <data name="WeatherAlertDetail_Threshold_FreezingRain" xml:space="preserve"><value>forecast condition code</value></data>
+  <data name="WeatherAlertDetail_Threshold_HeavySnow" xml:space="preserve"><value>forecast condition code</value></data>
+  <data name="WeatherAlertDetail_Threshold_Snow" xml:space="preserve"><value>forecast condition code</value></data>
+  <data name="WeatherAlertDetail_Threshold_Fog" xml:space="preserve"><value>forecast condition code</value></data>
   <data name="RssPage_AllSubscriptions.Text" xml:space="preserve">
     <value>All subscriptions</value>
   </data>

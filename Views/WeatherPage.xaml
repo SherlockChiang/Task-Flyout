@@ -204,6 +204,8 @@
 
                 <StackPanel Spacing="8">
                     <TextBlock x:Uid="WeatherPage_CityHeader" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    <StackPanel x:Name="SavedLocationsPanel" Spacing="6" MaxWidth="640" HorizontalAlignment="Stretch"/>
+                    <TextBlock x:Name="SavedLocationsFeedback" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
                     <Grid x:Name="LocationInputGrid" ColumnSpacing="12" RowSpacing="8" HorizontalAlignment="Stretch" MaxWidth="640">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
