@@ -116,15 +116,13 @@ namespace Task_Flyout.Views
             _searchCts?.Cancel();
             ScheduleComposeDraft();
             _messageLoadVersion++;
-            ReleaseMessageBodies();
+            CleanupRenderedMailContent(clearAllBodies: true);
             _selectedItem = null;
-            _selectedAccount = null;
+            SetActiveAccount(null);
             _selectedFolder = null;
             _selectedAccountForRemoval = null;
             _refreshAccountsTask = null;
 
-            ReleaseMailWebView();
-            _isInternalMailHtmlNavigation = false;
             MailListView.ItemsSource = null;
             _items.Clear();
             _displayedItems.Clear();
@@ -132,6 +130,31 @@ namespace Task_Flyout.Views
             _accountsById.Clear();
             _accountNodes.Clear();
             _folderNodes.Clear();
+        }
+
+        public void ReleaseForMemoryPressure()
+        {
+            _bodyLoadCts?.Cancel();
+            CleanupRenderedMailContent(clearAllBodies: true);
+            _selectedItem = null;
+            _mailService?.UpdateActiveBodyCacheContext(_selectedAccount?.Id);
+            DetailPanel.Visibility = Visibility.Collapsed;
+            EmptyDetailPanel.Visibility = Visibility.Visible;
+        }
+
+        private void SetActiveAccount(MailAccount? account)
+        {
+            if (!string.Equals(_selectedAccount?.Id, account?.Id, StringComparison.Ordinal))
+            {
+                _bodyLoadCts?.Cancel();
+                _selectedItem = null;
+                ClearRenderedMailBody();
+            }
+            _selectedAccount = account;
+            var protectedItem = string.Equals(_selectedItem?.AccountId, account?.Id, StringComparison.Ordinal)
+                ? _selectedItem
+                : null;
+            _mailService?.UpdateActiveBodyCacheContext(account?.Id, protectedItem);
         }
 
         private async void MailPage_Loaded(object sender, RoutedEventArgs e)
@@ -214,7 +237,7 @@ namespace Task_Flyout.Views
             if (!hasAccounts)
             {
                 _items.Clear();
-                _selectedAccount = null;
+                SetActiveAccount(null);
                 _selectedFolder = null;
                 _selectedAccountForRemoval = null;
                 RemoveMailButton.IsEnabled = false;
@@ -326,7 +349,7 @@ namespace Task_Flyout.Views
 
             AccountTree.SelectedNode = folderNode;
             var selected = _folderNodes[folderNode];
-            _selectedAccount = selected.Account;
+            SetActiveAccount(selected.Account);
             _selectedFolder = selected.Folder;
                 await LoadMessagesAsync();
         }
@@ -361,7 +384,7 @@ namespace Task_Flyout.Views
 
             AccountTree.SelectedNode = folderNode;
             var selected = _folderNodes[folderNode];
-            _selectedAccount = selected.Account;
+            SetActiveAccount(selected.Account);
             _selectedFolder = selected.Folder;
             _selectedAccountForRemoval = selected.Account;
             RemoveMailButton.IsEnabled = true;
@@ -376,7 +399,7 @@ namespace Task_Flyout.Views
                 if (target != null)
                 {
                     _items.Insert(0, target);
-                    SetMessageListStatus($"{_selectedAccount.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}");
+                    SetMessageListStatus($"{selected.Account.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}");
                 }
             }
 
@@ -426,7 +449,7 @@ namespace Task_Flyout.Views
 
             if (!_folderNodes.TryGetValue(node, out var selection)) return;
 
-            _selectedAccount = selection.Account;
+            SetActiveAccount(selection.Account);
             _selectedFolder = selection.Folder;
             _selectedAccountForRemoval = selection.Account;
             RemoveMailButton.IsEnabled = true;
@@ -491,7 +514,7 @@ namespace Task_Flyout.Views
 
             AccountTree.SelectedNode = folderNode;
             var selected = _folderNodes[folderNode];
-            _selectedAccount = selected.Account;
+            SetActiveAccount(selected.Account);
             _selectedFolder = selected.Folder;
             await LoadMessagesAsync();
         }
@@ -765,7 +788,7 @@ namespace Task_Flyout.Views
             await WebView2RuntimeService.ClearSensitiveBrowsingDataAsync();
             _items.Clear();
             _displayedItems.Clear();
-            _selectedAccount = null;
+            SetActiveAccount(null);
             _selectedFolder = null;
             _selectedItem = null;
             _selectedAccountForRemoval = null;
@@ -777,7 +800,7 @@ namespace Task_Flyout.Views
         public async Task RefreshAfterProviderDisconnectAsync()
         {
             _items.Clear();
-            _selectedAccount = null;
+            SetActiveAccount(null);
             _selectedFolder = null;
             _selectedItem = null;
             _selectedAccountForRemoval = null;
@@ -1308,6 +1331,8 @@ namespace Task_Flyout.Views
             }
 
             _selectedItem = item;
+            _mailService?.UpdateActiveBodyCacheContext(_selectedAccount?.Id, item);
+            ClearRenderedMailBody();
             ShowMailPane(MailPane.Detail);
             _bodyLoadCts?.Cancel();
             var bodyCts = CancellationTokenSource.CreateLinkedTokenSource(_pageRequestCts.Token);
@@ -1428,10 +1453,9 @@ namespace Task_Flyout.Views
         {
             _bodyLoadCts?.Cancel();
             _selectedItem = null;
+            _mailService?.UpdateActiveBodyCacheContext(_selectedAccount?.Id);
             DetailPanel.Visibility = Visibility.Collapsed;
-            DetailHtmlViewHost.Visibility = Visibility.Collapsed;
-            DetailTextScrollViewer.Visibility = Visibility.Visible;
-            DetailPreview.Text = "";
+            ClearRenderedMailBody();
             TrustSenderButton.IsEnabled = false;
             if (AddAccountPanel.Visibility != Visibility.Visible && ComposePanel.Visibility != Visibility.Visible)
                 EmptyDetailPanel.Visibility = Visibility.Visible;
@@ -1452,6 +1476,23 @@ namespace Task_Flyout.Views
             }
 
             _mailService?.ClearVolatileMessageBodies();
+        }
+
+        private void CleanupRenderedMailContent(bool clearAllBodies)
+        {
+            ClearRenderedMailBody();
+            if (clearAllBodies)
+                ReleaseMessageBodies();
+            _isInternalMailHtmlNavigation = false;
+        }
+
+        private void ClearRenderedMailBody()
+        {
+            RemoteImageBanner.Visibility = Visibility.Collapsed;
+            DetailHtmlViewHost.Visibility = Visibility.Collapsed;
+            DetailTextScrollViewer.Visibility = Visibility.Visible;
+            DetailPreview.Text = "";
+            ReleaseMailWebView();
         }
 
         private bool _webView2Configured;
@@ -1699,6 +1740,7 @@ namespace Task_Flyout.Views
 
         private void ShowPlainTextMailBody(MailItem item)
         {
+            ReleaseMailWebView();
             DetailHtmlViewHost.Visibility = Visibility.Collapsed;
             DetailTextScrollViewer.Visibility = Visibility.Visible;
             var fallbackText = item.BodyText;

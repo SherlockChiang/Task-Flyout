@@ -3,6 +3,7 @@ using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Storage;
@@ -59,7 +60,7 @@ namespace Task_Flyout.Services
 
             File.WriteAllText(
                 _logPath,
-                "timestamp,working_set_mb,private_memory_mb,managed_heap_mb,gc0,gc1,gc2,handle_count,threads,current_page,has_webview2,main_window_created,flyout_created,weather_bar_created" + Environment.NewLine,
+                "timestamp,working_set_mb,private_memory_mb,managed_heap_mb,gc0,gc1,gc2,handle_count,threads,current_page,has_webview2,main_window_created,flyout_created,weather_bar_created,mail_body_cache_bytes,mail_body_cache_accounts" + Environment.NewLine,
                 Encoding.UTF8);
         }
 
@@ -76,6 +77,8 @@ namespace Task_Flyout.Services
                 var mainWindow = App.MyMainWindow;
                 string currentPage = mainWindow?.GetDiagnosticsCurrentPageName() ?? "";
                 bool hasWebView2 = mainWindow?.HasDiagnosticsWebView2() ?? false;
+                var mailBodySizes = (App.Current as App)?.MailService.GetVolatileBodyCacheSizes()
+                    ?? Array.Empty<MailService.MailBodyCacheAccountSize>();
 
                 var line = string.Join(
                     ",",
@@ -92,7 +95,9 @@ namespace Task_Flyout.Services
                     Bool(hasWebView2),
                     Bool(mainWindow != null),
                     Bool(App.MyFlyoutWindow != null),
-                    Bool(App.MyWeatherBar != null));
+                    Bool(App.MyWeatherBar != null),
+                    mailBodySizes.Sum(size => size.RetainedBytes).ToString(CultureInfo.InvariantCulture),
+                    Escape(string.Join(";", mailBodySizes.Select(size => $"{size.AccountId}:{size.RetainedBytes}"))));
 
                 QueueLogWrite(_logPath, line + Environment.NewLine);
             }
@@ -116,7 +121,7 @@ namespace Task_Flyout.Services
                             {
                                 File.WriteAllText(
                                     path,
-                                    "timestamp,working_set_mb,private_memory_mb,managed_heap_mb,gc0,gc1,gc2,handle_count,threads,current_page,has_webview2,main_window_created,flyout_created,weather_bar_created" + Environment.NewLine,
+                                    "timestamp,working_set_mb,private_memory_mb,managed_heap_mb,gc0,gc1,gc2,handle_count,threads,current_page,has_webview2,main_window_created,flyout_created,weather_bar_created,mail_body_cache_bytes,mail_body_cache_accounts" + Environment.NewLine,
                                     Encoding.UTF8);
                             }
                             File.AppendAllText(path, line, Encoding.UTF8);

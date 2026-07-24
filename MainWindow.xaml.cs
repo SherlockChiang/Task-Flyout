@@ -264,6 +264,12 @@ namespace Task_Flyout
             return ContainsWebView2(content);
         }
 
+        public void ReleaseMailForMemoryPressure()
+        {
+            if (ContentFrame.Content is Views.MailPage mailPage)
+                mailPage.ReleaseForMemoryPressure();
+        }
+
         private void ReleaseContentForBackground()
         {
             if (ContentFrame.Content == null) return;

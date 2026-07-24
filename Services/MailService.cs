@@ -137,11 +137,16 @@ namespace Task_Flyout.Services
         private Task _accountSaveQueue = Task.CompletedTask;
         private readonly object _bodyCacheLock = new();
         private readonly Dictionary<string, WeakReference<MailItem>> _bodyCacheItems = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, long> _bodyCacheAccessTicks = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, BodyCacheMetadata> _bodyCacheMetadata = new(StringComparer.Ordinal);
+        private long _bodyCacheAccessSequence;
+        private string? _activeBodyCacheAccountId;
+        private string? _protectedBodyCacheKey;
         private const int MaxBodyTextChars = 80_000;
         private const int MaxHtmlBodyChars = 160_000;
-        private const int MaxVolatileBodyCacheChars = 1_000_000;
-        private const int TargetVolatileBodyCacheChars = 750_000;
+        private const long PerAccountMaxVolatileBodyCacheBytes = 1_000_000;
+        private const long PerAccountTargetVolatileBodyCacheBytes = 750_000;
+        private const long GlobalMaxVolatileBodyCacheBytes = 2_000_000;
+        private const long GlobalTargetVolatileBodyCacheBytes = 1_500_000;
         private const int MaxConcurrentGoogleMessageMetadataRequests = 6;
         private const int PersistentCacheSaveDebounceMs = 1500;
         public event EventHandler<NewMailNotificationEventArgs>? NewMailArrived;
@@ -151,6 +156,9 @@ namespace Task_Flyout.Services
             public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
             public T Value { get; set; } = default!;
         }
+
+        private readonly record struct BodyCacheMetadata(string AccountId, long RetainedBytes, long AccessSequence);
+        public readonly record struct MailBodyCacheAccountSize(string AccountId, int MessageCount, long RetainedBytes);
 
         // Lower/upper bounds for how many messages a single fetch returns. The upper
         // bound is the ceiling the "Load more" UI can grow a folder's window to; older
@@ -843,6 +851,7 @@ namespace Task_Flyout.Services
             if (!string.IsNullOrWhiteSpace(item.BodyText) || !string.IsNullOrWhiteSpace(item.HtmlBody))
             {
                 TouchVolatileMessageBody(item);
+                PruneVolatileMessageBodies();
                 return;
             }
 
@@ -906,9 +915,16 @@ namespace Task_Flyout.Services
                 await client.DisconnectAsync(true);
             }
 
+            if (cancellationToken.IsCancellationRequested)
+            {
+                item.BodyText = "";
+                item.HtmlBody = "";
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             LimitMailBody(item);
             TouchVolatileMessageBody(item);
-            PruneVolatileMessageBodies(GetBodyCacheKey(item));
+            PruneVolatileMessageBodies();
             UpdatePersistentMessageBody(item);
         }
 
@@ -920,112 +936,143 @@ namespace Task_Flyout.Services
                     _messageCache[key].Value = StripBodies(_messageCache[key].Value);
             }
 
+            List<MailItem> items;
             lock (_bodyCacheLock)
             {
-                foreach (var reference in _bodyCacheItems.Values)
-                {
-                    if (reference.TryGetTarget(out var item))
-                    {
-                        item.BodyText = "";
-                        item.HtmlBody = "";
-                    }
-                }
-
+                items = _bodyCacheItems.Values
+                    .Select(reference => reference.TryGetTarget(out var item) ? item : null)
+                    .Where(item => item != null)
+                    .Cast<MailItem>()
+                    .Distinct()
+                    .ToList();
                 _bodyCacheItems.Clear();
-                _bodyCacheAccessTicks.Clear();
+                _bodyCacheMetadata.Clear();
             }
+            ClearBodies(items);
         }
 
-        public (int MessageCount, int CharacterCount) GetVolatileBodyCacheStats()
+        public IReadOnlyList<MailBodyCacheAccountSize> GetVolatileBodyCacheSizes()
         {
             lock (_bodyCacheLock)
             {
-                int count = 0;
-                int chars = 0;
-                foreach (var key in _bodyCacheItems.Keys.ToList())
-                {
-                    if (!_bodyCacheItems[key].TryGetTarget(out var item) || GetBodyCharCount(item) == 0)
-                    {
-                        _bodyCacheItems.Remove(key);
-                        _bodyCacheAccessTicks.Remove(key);
-                        continue;
-                    }
-
-                    count++;
-                    chars += GetBodyCharCount(item);
-                }
-
-                return (count, chars);
+                RemoveDeadBodyCacheEntriesLocked();
+                return _bodyCacheMetadata.Values
+                    .GroupBy(entry => entry.AccountId, StringComparer.Ordinal)
+                    .OrderBy(group => group.Key, StringComparer.Ordinal)
+                    .Select(group => new MailBodyCacheAccountSize(
+                        group.Key,
+                        group.Count(),
+                        group.Sum(entry => entry.RetainedBytes)))
+                    .ToList();
             }
+        }
+
+        public (int MessageCount, long RetainedBytes) GetVolatileBodyCacheStats()
+        {
+            var sizes = GetVolatileBodyCacheSizes();
+            return (sizes.Sum(size => size.MessageCount), sizes.Sum(size => size.RetainedBytes));
+        }
+
+        public void UpdateActiveBodyCacheContext(string? accountId, MailItem? activeItem = null)
+        {
+            lock (_bodyCacheLock)
+            {
+                _activeBodyCacheAccountId = accountId;
+                _protectedBodyCacheKey = activeItem == null ? null : GetBodyCacheKey(activeItem);
+            }
+            PruneVolatileMessageBodies();
+        }
+
+        public void TrimVolatileMessageBodies() => PruneVolatileMessageBodies();
+
+        public void ClearAccountVolatileMessageBodies(string accountId)
+        {
+            List<MailItem> items;
+            lock (_bodyCacheLock)
+            {
+                var keys = _bodyCacheMetadata
+                    .Where(pair => string.Equals(pair.Value.AccountId, accountId, StringComparison.Ordinal))
+                    .Select(pair => pair.Key)
+                    .ToList();
+                items = RemoveBodyCacheEntriesLocked(keys);
+                if (string.Equals(_activeBodyCacheAccountId, accountId, StringComparison.Ordinal))
+                {
+                    _activeBodyCacheAccountId = null;
+                    _protectedBodyCacheKey = null;
+                }
+            }
+            ClearBodies(items);
         }
 
         private void TouchVolatileMessageBody(MailItem item)
         {
-            if (GetBodyCharCount(item) == 0) return;
+            long retainedBytes = MailBodyCachePolicy.GetRetainedUtf16Bytes(item.BodyText, item.HtmlBody);
+            if (retainedBytes == 0) return;
 
             var key = GetBodyCacheKey(item);
             lock (_bodyCacheLock)
             {
                 _bodyCacheItems[key] = new WeakReference<MailItem>(item);
-                _bodyCacheAccessTicks[key] = DateTimeOffset.UtcNow.UtcTicks;
+                _bodyCacheMetadata[key] = new BodyCacheMetadata(item.AccountId, retainedBytes, ++_bodyCacheAccessSequence);
             }
         }
 
-        private void PruneVolatileMessageBodies(string currentKey)
+        private void PruneVolatileMessageBodies()
         {
+            List<MailItem> items;
             lock (_bodyCacheLock)
             {
-                var live = new List<(string Key, MailItem Item, int Chars, long AccessTicks)>();
-                int totalChars = 0;
+                RemoveDeadBodyCacheEntriesLocked();
+                var evictions = MailBodyCachePolicy.SelectEvictions(
+                    _bodyCacheMetadata.Select(pair => new MailBodyCacheEntry(
+                        pair.Key,
+                        pair.Value.AccountId,
+                        pair.Value.RetainedBytes,
+                        pair.Value.AccessSequence)),
+                    PerAccountMaxVolatileBodyCacheBytes,
+                    PerAccountTargetVolatileBodyCacheBytes,
+                    GlobalMaxVolatileBodyCacheBytes,
+                    GlobalTargetVolatileBodyCacheBytes,
+                    _activeBodyCacheAccountId,
+                    _protectedBodyCacheKey);
+                items = RemoveBodyCacheEntriesLocked(evictions);
+            }
+            ClearBodies(items);
+        }
 
-                foreach (var key in _bodyCacheItems.Keys.ToList())
-                {
-                    if (!_bodyCacheItems[key].TryGetTarget(out var item))
-                    {
-                        _bodyCacheItems.Remove(key);
-                        _bodyCacheAccessTicks.Remove(key);
-                        continue;
-                    }
+        private void RemoveDeadBodyCacheEntriesLocked()
+        {
+            foreach (var key in _bodyCacheItems.Keys.ToList())
+            {
+                if (_bodyCacheItems[key].TryGetTarget(out _) && _bodyCacheMetadata.ContainsKey(key)) continue;
+                _bodyCacheItems.Remove(key);
+                _bodyCacheMetadata.Remove(key);
+            }
+        }
 
-                    int chars = GetBodyCharCount(item);
-                    if (chars == 0)
-                    {
-                        _bodyCacheItems.Remove(key);
-                        _bodyCacheAccessTicks.Remove(key);
-                        continue;
-                    }
+        private List<MailItem> RemoveBodyCacheEntriesLocked(IEnumerable<string> keys)
+        {
+            var items = new List<MailItem>();
+            foreach (var key in keys)
+            {
+                if (_bodyCacheItems.Remove(key, out var reference) && reference.TryGetTarget(out var item))
+                    items.Add(item);
+                _bodyCacheMetadata.Remove(key);
+            }
+            return items.Distinct().ToList();
+        }
 
-                    totalChars += chars;
-                    live.Add((key, item, chars, _bodyCacheAccessTicks.TryGetValue(key, out var ticks) ? ticks : 0));
-                }
-
-                if (totalChars <= MaxVolatileBodyCacheChars) return;
-
-                var pruneKeys = CachePrunePolicy.SelectLeastRecentlyUsedUntilTarget(
-                    live.Select(entry => new SizedCacheEntry(entry.Key, entry.Chars, entry.AccessTicks)),
-                    MaxVolatileBodyCacheChars,
-                    TargetVolatileBodyCacheChars,
-                    currentKey).ToHashSet(StringComparer.Ordinal);
-
-                foreach (var entry in live)
-                {
-                    if (!pruneKeys.Contains(entry.Key)) continue;
-
-                    entry.Item.BodyText = "";
-                    entry.Item.HtmlBody = "";
-                    _bodyCacheItems.Remove(entry.Key);
-                    _bodyCacheAccessTicks.Remove(entry.Key);
-                    totalChars -= entry.Chars;
-                    if (totalChars <= TargetVolatileBodyCacheChars) break;
-                }
+        private static void ClearBodies(IEnumerable<MailItem> items)
+        {
+            foreach (var item in items)
+            {
+                item.BodyText = "";
+                item.HtmlBody = "";
             }
         }
 
         private static string GetBodyCacheKey(MailItem item)
             => $"{item.AccountId}|{item.FolderId}|{item.Id}";
-
-        private static int GetBodyCharCount(MailItem item)
-            => (item.BodyText?.Length ?? 0) + (item.HtmlBody?.Length ?? 0);
 
         private async Task SendOutlookMailAsync(MailAccount account, string to, string subject, string body, IReadOnlyList<MailAttachmentData> attachments, IProgress<MailSendProgress>? progress, CancellationToken cancellationToken)
         {
@@ -2408,6 +2455,7 @@ namespace Task_Flyout.Services
 
         private void ClearAccountCache(string accountId)
         {
+            ClearAccountVolatileMessageBodies(accountId);
             EnsurePersistentCacheLoaded();
             lock (_mailCacheLock)
             {

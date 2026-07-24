@@ -96,6 +96,7 @@
     <Compile Include="..\..\Services\MailCacheModels.cs" Link="Source\MailCacheModels.cs" />
     <Compile Include="..\..\Services\MailPersistentCachePolicy.cs" Link="Source\MailPersistentCachePolicy.cs" />
     <Compile Include="..\..\Services\MailSendConfirmationPolicy.cs" Link="Source\MailSendConfirmationPolicy.cs" />
+    <Compile Include="..\..\Services\MailBodyCachePolicy.cs" Link="Source\MailBodyCachePolicy.cs" />
     <Compile Include="..\..\Services\PerformanceDiagnosticsPolicy.cs" Link="Source\PerformanceDiagnosticsPolicy.cs" />
     <Compile Include="..\..\Services\CalendarDotRenderPolicy.cs" Link="Source\CalendarDotRenderPolicy.cs" />
   </ItemGroup>

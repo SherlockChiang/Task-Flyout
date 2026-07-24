@@ -112,6 +112,7 @@ namespace Task_Flyout
             PerformanceDiagnostics.Initialize(performanceDiagnosticsEnabled);
             var startup = PerformanceDiagnostics.StartProcessSpanOnce("startup.tray", "startup", "tray_interactive", "process");
             MainDispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+            Windows.System.MemoryManager.AppMemoryUsageIncreased += MemoryManager_AppMemoryUsageIncreased;
             ApplyConfiguredThemeToOpenWindows();
 
             NotificationService = new NotificationService(SyncManager);
@@ -319,6 +320,25 @@ namespace Task_Flyout
             }
 
             _trayIcon.ToolTipText = _trayToolTipText;
+        }
+
+        private void MemoryManager_AppMemoryUsageIncreased(object? sender, object e)
+        {
+            var level = Windows.System.MemoryManager.AppMemoryUsageLevel;
+            if (level < Windows.System.AppMemoryUsageLevel.Medium) return;
+
+            MainDispatcherQueue.TryEnqueue(() =>
+            {
+                if (level >= Windows.System.AppMemoryUsageLevel.High)
+                {
+                    MyMainWindow?.ReleaseMailForMemoryPressure();
+                    MailService.ClearVolatileMessageBodies();
+                }
+                else
+                {
+                    MailService.TrimVolatileMessageBodies();
+                }
+            });
         }
 
         private void MailService_NewMailArrived(object? sender, NewMailNotificationEventArgs e)
@@ -637,6 +657,7 @@ namespace Task_Flyout
             MailService.StopMailPolling();
             MailService.StopPendingMutationRetryScheduler();
             MemoryDiagnostics.Stop();
+            Windows.System.MemoryManager.AppMemoryUsageIncreased -= MemoryManager_AppMemoryUsageIncreased;
             await PerformanceDiagnostics.FlushAsync();
             MailService.NewMailArrived -= MailService_NewMailArrived;
             await FlushPendingSavesBeforeExitAsync();
