@@ -2,7 +2,10 @@ using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Input;
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
@@ -21,8 +24,13 @@ namespace Task_Flyout
 
         private ResourceLoader _loader;
         private bool _pendingMailMessageNavigation;
+        private bool _pendingCachedMailNavigation;
         private bool _isClampingToWorkArea;
         private Type _lastContentPageType = typeof(Views.CalendarPage);
+        private readonly ObservableCollection<GlobalSearchResultGroup> _globalSearchGroups = new();
+        private IReadOnlyList<GlobalSearchCandidate> _globalSearchSnapshot = Array.Empty<GlobalSearchCandidate>();
+        private readonly Dictionary<string, object> _globalSearchPayloads = new(StringComparer.Ordinal);
+        private DependencyObject? _globalSearchPreviousFocus;
 
         public MainWindow()
         {
@@ -46,6 +54,7 @@ namespace Task_Flyout
             SizeToCurrentWorkArea();
 
             ContentFrame.Navigated += ContentFrame_Navigated;
+            GlobalSearchResultsSource.Source = _globalSearchGroups;
 
             _ = RefreshWeatherNavIconAsync();
 
@@ -144,7 +153,7 @@ namespace Task_Flyout
             else if (ContentFrame.SourcePageType == typeof(Views.MailPage))
             {
                 MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Mail");
-                if (_pendingMailMessageNavigation && e.Content is Views.MailPage mailPage)
+                if ((_pendingMailMessageNavigation || _pendingCachedMailNavigation) && e.Content is Views.MailPage mailPage)
                 {
                     mailPage.IsOpeningFromNotification = true;
                 }
@@ -519,6 +528,368 @@ namespace Task_Flyout
             ContentFrame.Navigate(typeof(Views.MailPage));
         }
 
+        public void NavigateToCachedMailMessage(string accountId, string folderId, string messageId)
+        {
+            async void Open(Views.MailPage page)
+            {
+                try { await page.OpenCachedMessageAsync(accountId, folderId, messageId); }
+                finally
+                {
+                    page.IsOpeningFromNotification = false;
+                    _pendingCachedMailNavigation = false;
+                }
+            }
+            if (ContentFrame.Content is Views.MailPage existing)
+            {
+                Open(existing);
+                return;
+            }
+
+            void OpenAfterNavigate(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs args)
+            {
+                if (args.SourcePageType != typeof(Views.MailPage)) return;
+                ContentFrame.Navigated -= OpenAfterNavigate;
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (ContentFrame.Content is Views.MailPage page)
+                    {
+                        page.IsOpeningFromNotification = true;
+                        Open(page);
+                    }
+                });
+            }
+
+            _pendingCachedMailNavigation = true;
+            ContentFrame.Navigated += OpenAfterNavigate;
+            MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Mail");
+            ContentFrame.Navigate(typeof(Views.MailPage));
+        }
+
+        private void GlobalSearchAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+        {
+            args.Handled = true;
+            if (GlobalSearchOverlay.Visibility == Visibility.Visible)
+                CloseGlobalSearch();
+            else
+                OpenGlobalSearch();
+        }
+
+        private void OpenGlobalSearch()
+        {
+            EnsureContentLoaded();
+            _globalSearchPreviousFocus = FocusManager.GetFocusedElement(RootGrid.XamlRoot) as DependencyObject;
+            BuildGlobalSearchSnapshot();
+            GlobalSearchBox.Text = "";
+            ApplyGlobalSearch("");
+            MainNav.IsEnabled = false;
+            GlobalSearchOverlay.Visibility = Visibility.Visible;
+            UpdateGlobalSearchSize(RootGrid.ActualWidth, RootGrid.ActualHeight);
+            DispatcherQueue.TryEnqueue(() => GlobalSearchBox.Focus(FocusState.Programmatic));
+        }
+
+        private void CloseGlobalSearch()
+        {
+            if (GlobalSearchOverlay.Visibility != Visibility.Visible) return;
+            GlobalSearchOverlay.Visibility = Visibility.Collapsed;
+            MainNav.IsEnabled = true;
+            GlobalSearchResultsList.SelectedItem = null;
+            if (_globalSearchPreviousFocus is Control control && control.IsEnabled && control.Visibility == Visibility.Visible)
+                control.Focus(FocusState.Programmatic);
+            else
+                MainNav.Focus(FocusState.Programmatic);
+            _globalSearchPreviousFocus = null;
+        }
+
+        private void BuildGlobalSearchSnapshot()
+        {
+            _globalSearchPayloads.Clear();
+            var candidates = new List<GlobalSearchCandidate>();
+            AddGlobalSearchCommands(candidates);
+
+            if (App.Current is App app)
+            {
+                var accountManager = app.SyncManager.AccountManager;
+                foreach (var item in app.SyncManager.GetLocalCache().DayItems.Values.SelectMany(items => items)
+                             .Where(accountManager.IsItemVisible)
+                             .GroupBy(item => $"{item.Provider}|{item.CalendarId}|{item.Id}|{item.DateKey}", StringComparer.Ordinal)
+                             .Select(group => group.First()))
+                {
+                    var group = item.IsTask ? GlobalSearchGroupKind.Tasks : GlobalSearchGroupKind.Calendar;
+                    var id = $"agenda:{group}:{item.Provider}:{item.CalendarId}:{item.Id}:{item.DateKey}";
+                    _globalSearchPayloads[id] = item;
+                    candidates.Add(new GlobalSearchCandidate(id, group, item.Title,
+                        string.Join(" · ", new[] { item.DateKey, item.Location, item.Provider }.Where(value => !string.IsNullOrWhiteSpace(value))),
+                        $"{item.Title} {item.Description} {item.Subtitle} {item.DateKey} {item.Location}",
+                        item.StartDateTime.HasValue ? new DateTimeOffset(item.StartDateTime.Value) : null));
+                }
+
+                foreach (var mail in app.MailService.GetCachedMetadataSnapshot())
+                {
+                    var id = $"mail:{mail.AccountId}:{mail.FolderId}:{mail.MessageId}";
+                    _globalSearchPayloads[id] = mail;
+                    candidates.Add(new GlobalSearchCandidate(id, GlobalSearchGroupKind.Mail,
+                        string.IsNullOrWhiteSpace(mail.Subject) ? GetSafeString("GlobalSearch_Untitled", "Untitled") : mail.Subject,
+                        string.Join(" · ", new[] { mail.Sender, mail.ReceivedTime }.Where(value => !string.IsNullOrWhiteSpace(value))),
+                        $"{mail.Subject} {mail.Sender} {mail.SenderAddress} {mail.Preview} {mail.ReceivedTime}", mail.ReceivedAt));
+                }
+            }
+
+            var rssService = new RssService();
+            var cachedArticles = new List<RssArticle>();
+            for (int skip = 0; skip < 1_000; skip += 100)
+            {
+                var page = rssService.GetCachedArticlesPage(null, null, skip, 100);
+                cachedArticles.AddRange(page);
+                if (page.Count < 100) break;
+            }
+            foreach (var source in cachedArticles)
+            {
+                var article = new RssArticle
+                {
+                    Id = source.Id,
+                    SubscriptionId = source.SubscriptionId,
+                    FeedTitle = source.FeedTitle,
+                    Title = source.Title,
+                    Link = source.Link,
+                    Summary = source.Summary,
+                    HtmlContent = source.HtmlContent,
+                    ImageUrl = source.ImageUrl,
+                    LocalImagePath = source.LocalImagePath,
+                    PublishedAt = source.PublishedAt,
+                    IsRead = source.IsRead,
+                    IsStarred = source.IsStarred
+                };
+                var id = $"rss:{article.SubscriptionId}:{article.Id}";
+                _globalSearchPayloads[id] = article;
+                candidates.Add(new GlobalSearchCandidate(id, GlobalSearchGroupKind.Rss, article.Title,
+                    $"{article.FeedTitle} · {article.PublishedText}",
+                    $"{article.Title} {article.Summary} {article.FeedTitle}", article.PublishedAt));
+            }
+
+            _globalSearchSnapshot = candidates;
+        }
+
+        private void AddGlobalSearchCommands(List<GlobalSearchCandidate> candidates)
+        {
+            AddCommand(candidates, "01-new-task", "GlobalSearch_CommandNewTask", "New task", "\uE73E");
+            AddCommand(candidates, "02-new-event", "GlobalSearch_CommandNewEvent", "New event", "\uE787");
+            AddCommand(candidates, "03-compose-mail", "GlobalSearch_CommandComposeMail", "Compose mail", "\uE70F");
+            AddCommand(candidates, "04-sync-calendar", "GlobalSearch_CommandSyncCalendar", "Sync calendar", "\uE895");
+            AddCommand(candidates, "05-sync-tasks", "GlobalSearch_CommandSyncTasks", "Sync tasks", "\uE895");
+            AddCommand(candidates, "06-open-calendar", "GlobalSearch_CommandOpenCalendar", "Open calendar", "\uE787");
+            AddCommand(candidates, "07-open-tasks", "GlobalSearch_CommandOpenTasks", "Open tasks", "\uE73E");
+            AddCommand(candidates, "08-open-mail", "GlobalSearch_CommandOpenMail", "Open mail", "\uE715");
+            AddCommand(candidates, "09-open-rss", "GlobalSearch_CommandOpenRss", "Open RSS", "\uE789");
+            AddCommand(candidates, "10-open-settings", "GlobalSearch_CommandOpenSettings", "Open settings", "\uE713");
+            AddCommand(candidates, "11-open-accounts", "GlobalSearch_CommandOpenAccounts", "Open accounts", "\uE77B");
+            AddCommand(candidates, "12-cache-settings", "GlobalSearch_CommandCacheSettings", "Manage cache settings", "\uE74D");
+            AddCommand(candidates, "13-open-weather", "GlobalSearch_CommandOpenWeather", "Open weather", "\uE706");
+            AddCommand(candidates, "14-toggle-weather-bar", "GlobalSearch_CommandToggleWeatherBar", "Toggle Weather Bar", "\uE7F4");
+        }
+
+        private void AddCommand(List<GlobalSearchCandidate> candidates, string id, string resourceKey, string fallback, string glyph)
+        {
+            var title = GetSafeString(resourceKey, fallback);
+            _globalSearchPayloads[id] = glyph;
+            candidates.Add(new GlobalSearchCandidate(id, GlobalSearchGroupKind.Commands, title, "", title));
+        }
+
+        private void GlobalSearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+        {
+            if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
+                ApplyGlobalSearch(sender.Text);
+        }
+
+        private void ApplyGlobalSearch(string query)
+        {
+            _globalSearchGroups.Clear();
+            foreach (var group in GlobalSearchPolicy.Search(_globalSearchSnapshot, query).GroupBy(item => item.Group))
+            {
+                var resultGroup = new GlobalSearchResultGroup(GetGlobalSearchGroupName(group.Key));
+                foreach (var item in group)
+                {
+                    var glyph = item.Group == GlobalSearchGroupKind.Commands && _globalSearchPayloads.TryGetValue(item.Id, out var payload)
+                        ? payload as string ?? "\uE71D"
+                        : GetGlobalSearchGlyph(item.Group);
+                    resultGroup.Add(new GlobalSearchResultViewModel(item, glyph));
+                }
+                _globalSearchGroups.Add(resultGroup);
+            }
+            GlobalSearchResultsList.SelectedItem = _globalSearchGroups.SelectMany(group => group).FirstOrDefault();
+        }
+
+        private string GetGlobalSearchGroupName(GlobalSearchGroupKind group) => group switch
+        {
+            GlobalSearchGroupKind.Commands => GetSafeString("GlobalSearch_GroupCommands", "Commands"),
+            GlobalSearchGroupKind.Tasks => GetSafeString("GlobalSearch_GroupTasks", "Tasks"),
+            GlobalSearchGroupKind.Calendar => GetSafeString("GlobalSearch_GroupCalendar", "Calendar"),
+            GlobalSearchGroupKind.Mail => GetSafeString("GlobalSearch_GroupMail", "Mail"),
+            _ => GetSafeString("GlobalSearch_GroupRss", "RSS")
+        };
+
+        private static string GetGlobalSearchGlyph(GlobalSearchGroupKind group) => group switch
+        {
+            GlobalSearchGroupKind.Tasks => "\uE73E",
+            GlobalSearchGroupKind.Calendar => "\uE787",
+            GlobalSearchGroupKind.Mail => "\uE715",
+            GlobalSearchGroupKind.Rss => "\uE789",
+            _ => "\uE71D"
+        };
+
+        private void GlobalSearchBox_KeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key == Windows.System.VirtualKey.Escape)
+            {
+                CloseGlobalSearch();
+                e.Handled = true;
+            }
+            else if (e.Key == Windows.System.VirtualKey.Enter)
+            {
+                ActivateSelectedGlobalSearchResult();
+                e.Handled = true;
+            }
+            else if (e.Key == Windows.System.VirtualKey.Down)
+            {
+                GlobalSearchResultsList.Focus(FocusState.Programmatic);
+                e.Handled = true;
+            }
+        }
+
+        private void RootGrid_KeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (GlobalSearchOverlay.Visibility == Visibility.Visible && e.Key == Windows.System.VirtualKey.Escape)
+            {
+                CloseGlobalSearch();
+                e.Handled = true;
+            }
+        }
+
+        private void GlobalSearchResultsList_KeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key == Windows.System.VirtualKey.Enter)
+            {
+                ActivateSelectedGlobalSearchResult();
+                e.Handled = true;
+            }
+        }
+
+        private void GlobalSearchResultsList_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            if (e.ClickedItem is GlobalSearchResultViewModel result) ActivateGlobalSearchResult(result);
+        }
+
+        private void ActivateSelectedGlobalSearchResult()
+        {
+            if (GlobalSearchResultsList.SelectedItem is GlobalSearchResultViewModel result)
+                ActivateGlobalSearchResult(result);
+        }
+
+        private void ActivateGlobalSearchResult(GlobalSearchResultViewModel result)
+        {
+            CloseGlobalSearch();
+            var item = result.Candidate;
+            if (item.Group == GlobalSearchGroupKind.Commands)
+            {
+                ExecuteGlobalSearchCommand(item.Id);
+                return;
+            }
+            if (!_globalSearchPayloads.TryGetValue(item.Id, out var payload)) return;
+
+            if (payload is AgendaItem agenda)
+            {
+                NavigateToCalendarAndEdit(agenda);
+            }
+            else if (payload is CachedMailMetadata mail)
+            {
+                NavigateToCachedMailMessage(mail.AccountId, mail.FolderId, mail.MessageId);
+            }
+            else if (payload is RssArticle article)
+            {
+                NavigateToCachedRssArticle(article);
+            }
+        }
+
+        private void ExecuteGlobalSearchCommand(string id)
+        {
+            switch (id)
+            {
+                case "01-new-task": NavigateToCalendarAndCreate(isTask: true); break;
+                case "02-new-event": NavigateToCalendarAndCreate(isTask: false); break;
+                case "03-compose-mail": NavigateToMailCompose(); break;
+                case "04-sync-calendar": NavigateToCalendarAndSync(); break;
+                case "05-sync-tasks": NavigateToTasksAndSync(); break;
+                case "06-open-calendar": NavigateToCalendar(); break;
+                case "07-open-tasks": NavigateToTasks(); break;
+                case "08-open-mail": NavigateToMail(); break;
+                case "09-open-rss": NavigateToRss(); break;
+                case "10-open-settings":
+                case "12-cache-settings": NavigateToSettings(); break;
+                case "11-open-accounts": NavigateToAddAccount(); break;
+                case "13-open-weather": NavigateToWeather(); break;
+                case "14-toggle-weather-bar": ToggleWeatherBarFromPalette(); break;
+            }
+        }
+
+        private static void ToggleWeatherBarFromPalette()
+        {
+            bool enabled = ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false;
+            App.ToggleWeatherBar(!enabled);
+        }
+
+        private void NavigateToCalendar()
+        {
+            MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Calendar");
+            ContentFrame.Navigate(typeof(Views.CalendarPage));
+        }
+
+        private void NavigateToRss()
+        {
+            MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Rss");
+            ContentFrame.Navigate(typeof(Views.RssPage));
+        }
+
+        private void NavigateToCalendarAndCreate(bool isTask)
+        {
+            NavigateToCalendar();
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (ContentFrame.Content is Views.CalendarPage page) page.OpenNewDialog(isTask);
+            });
+        }
+
+        private void NavigateToCalendarAndSync()
+        {
+            NavigateToCalendar();
+            DispatcherQueue.TryEnqueue(() => (ContentFrame.Content as Views.CalendarPage)?.ForceSync());
+        }
+
+        private void NavigateToTasksAndSync()
+        {
+            NavigateToTasks();
+            DispatcherQueue.TryEnqueue(() => (ContentFrame.Content as Views.TasksPage)?.ForceSync());
+        }
+
+        private void NavigateToCachedRssArticle(RssArticle article)
+        {
+            NavigateToRss();
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (ContentFrame.Content is Views.RssPage page) _ = page.OpenCachedArticleAsync(article);
+            });
+        }
+
+        private void GlobalSearchCloseButton_Click(object sender, RoutedEventArgs e) => CloseGlobalSearch();
+
+        private void RootGrid_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateGlobalSearchSize(e.NewSize.Width, e.NewSize.Height);
+
+        private void UpdateGlobalSearchSize(double width, double height)
+        {
+            if (GlobalSearchPanel == null) return;
+            GlobalSearchPanel.Width = Math.Max(280, Math.Min(720, width - 32));
+            GlobalSearchPanel.MaxHeight = Math.Max(260, Math.Min(640, height - 96));
+            GlobalSearchPanel.Margin = new Thickness(16, height < 560 ? 24 : 72, 16, 16);
+        }
+
         private async void OpenMailMessageOnPage(Views.MailPage mailPage, string accountId, string folderId, string messageId)
         {
             mailPage.IsOpeningFromNotification = true;
@@ -621,5 +992,26 @@ namespace Task_Flyout
                 _ => "\uF8BA"                                    // default: sunny
             };
         }
+    }
+
+    public sealed class GlobalSearchResultGroup : ObservableCollection<GlobalSearchResultViewModel>
+    {
+        public GlobalSearchResultGroup(string name) => Name = name;
+        public string Name { get; }
+    }
+
+    public sealed class GlobalSearchResultViewModel
+    {
+        public GlobalSearchResultViewModel(GlobalSearchCandidate candidate, string glyph)
+        {
+            Candidate = candidate;
+            Glyph = glyph;
+        }
+
+        public GlobalSearchCandidate Candidate { get; }
+        public string Title => Candidate.Title;
+        public string Detail => Candidate.Detail;
+        public string Glyph { get; }
+        public string AutomationId => $"GlobalSearchResult_{Candidate.Id}";
     }
 }

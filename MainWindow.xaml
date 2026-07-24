@@ -10,10 +10,14 @@
         <MicaBackdrop Kind="BaseAlt"/>
     </Window.SystemBackdrop>
 
-    <Grid>
+    <Grid x:Name="RootGrid" KeyDown="RootGrid_KeyDown" SizeChanged="RootGrid_SizeChanged">
         <Grid.Resources>
             <views:ProviderToBrushConverter x:Key="ColorHexToBrushConverter"/>
+            <CollectionViewSource x:Name="GlobalSearchResultsSource" IsSourceGrouped="True"/>
         </Grid.Resources>
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="K" Modifiers="Control" Invoked="GlobalSearchAccelerator_Invoked"/>
+        </Grid.KeyboardAccelerators>
         <NavigationView x:Name="MainNav" AutomationProperties.AutomationId="MainNavigation" PaneDisplayMode="Auto" IsSettingsVisible="True"
                         ItemInvoked="MainNav_ItemInvoked" BackRequested="MainNav_BackRequested">
 
@@ -52,5 +56,105 @@
 
             <Frame x:Name="ContentFrame"/>
         </NavigationView>
+
+        <Grid x:Name="GlobalSearchOverlay"
+              x:Uid="GlobalSearch_Overlay"
+              AutomationProperties.AutomationId="GlobalSearchOverlay"
+              AutomationProperties.Name="Global search and command palette"
+              Background="#66000000"
+              Visibility="Collapsed"
+              IsTabStop="False"
+              Canvas.ZIndex="100">
+            <Border x:Name="GlobalSearchPanel"
+                    AutomationProperties.AutomationId="GlobalSearchPanel"
+                    Width="720"
+                    MaxWidth="720"
+                    MaxHeight="640"
+                    Margin="20,72,20,20"
+                    Padding="16"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top"
+                    Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12">
+                <Border.Shadow>
+                    <ThemeShadow/>
+                </Border.Shadow>
+                <Grid RowSpacing="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <AutoSuggestBox x:Name="GlobalSearchBox"
+                                        x:Uid="GlobalSearch_SearchBox"
+                                        AutomationProperties.AutomationId="GlobalSearchBox"
+                                        PlaceholderText="Search local data or run a command"
+                                        QueryIcon="Find"
+                                        TextChanged="GlobalSearchBox_TextChanged"
+                                        KeyDown="GlobalSearchBox_KeyDown"/>
+                        <Button x:Name="GlobalSearchCloseButton"
+                                x:Uid="GlobalSearch_Close"
+                                AutomationProperties.AutomationId="GlobalSearchCloseButton"
+                                Grid.Column="1"
+                                Width="40"
+                                Height="40"
+                                Padding="0"
+                                Click="GlobalSearchCloseButton_Click"
+                                ToolTipService.ToolTip="Close">
+                            <FontIcon Glyph="&#xE711;"/>
+                        </Button>
+                    </Grid>
+                    <ListView x:Name="GlobalSearchResultsList"
+                              AutomationProperties.AutomationId="GlobalSearchResults"
+                              Grid.Row="1"
+                              ItemsSource="{Binding Source={StaticResource GlobalSearchResultsSource}}"
+                              IsItemClickEnabled="True"
+                              ItemClick="GlobalSearchResultsList_ItemClick"
+                              SelectionMode="Single"
+                              KeyDown="GlobalSearchResultsList_KeyDown">
+                        <ListView.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.HeaderTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}" Margin="12,12,12,4" FontSize="12" FontWeight="SemiBold"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    </DataTemplate>
+                                </GroupStyle.HeaderTemplate>
+                            </GroupStyle>
+                        </ListView.GroupStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid AutomationProperties.AutomationId="{Binding AutomationId}" Padding="8,6" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="32"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="{Binding Glyph}" FontSize="18" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding Detail}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <TextBlock x:Name="GlobalSearchHint"
+                               x:Uid="GlobalSearch_Hint"
+                               AutomationProperties.AutomationId="GlobalSearchHint"
+                               Grid.Row="2"
+                               Text="Local cached data only · Enter to open · Esc to close"
+                               FontSize="12"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

@@ -744,6 +744,9 @@ namespace Task_Flyout.Views
         }
 
         private void BtnAddNew_Click(object sender, RoutedEventArgs e)
+            => OpenNewDialog(isTask: false);
+
+        public void OpenNewDialog(bool isTask)
         {
             _itemBeingEdited = null;
             EditDialog.Title = _loader.GetStringOrDefault("TextNewItem") ?? "New Event / Task";
@@ -752,6 +755,9 @@ namespace Task_Flyout.Views
             EditCmbProvider.IsEnabled = true;
             EditRadioEvent.IsEnabled = true;
             EditRadioTask.IsEnabled = true;
+            EditRadioTask.IsChecked = isTask;
+            EditRadioEvent.IsChecked = !isTask;
+            EditRadioType_Changed(null, null);
             EditRecurrenceComboBox.SelectedIndex = 0;
             EditRecurrenceComboBox.IsEnabled = true;
 

@@ -1201,6 +1201,29 @@ namespace Task_Flyout.Views
                 span?.Complete("failure");
         }
 
+        public Task OpenCachedArticleAsync(RssArticle article)
+        {
+            if (XamlRoot != null) return OpenArticleReaderAsync(article);
+
+            var completion = new TaskCompletionSource();
+            RoutedEventHandler? loaded = null;
+            loaded = async (_, _) =>
+            {
+                Loaded -= loaded;
+                try
+                {
+                    await OpenArticleReaderAsync(article);
+                    completion.SetResult();
+                }
+                catch (Exception ex)
+                {
+                    completion.SetException(ex);
+                }
+            };
+            Loaded += loaded;
+            return completion.Task;
+        }
+
         private void RssArticle_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs args)
         {
             args.Handled = true;

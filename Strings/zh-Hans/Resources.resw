@@ -1767,4 +1767,30 @@ Microsoft：{1}
   <data name="TextTaskUnsupportedFields" xml:space="preserve"><value>当前连接的服务不支持任务到期时间、重复规则或在账号/列表间移动，这些字段不会被更改。</value></data>
   <data name="TextTitleRequired" xml:space="preserve"><value>标题不能为空。</value></data>
   <data name="TextSaveFailed" xml:space="preserve"><value>无法保存，请重试。</value></data>
+  <data name="GlobalSearch_SearchBox.PlaceholderText" xml:space="preserve"><value>搜索本地数据或运行命令</value></data>
+  <data name="GlobalSearch_Close.ToolTipService.ToolTip" xml:space="preserve"><value>关闭</value></data>
+  <data name="GlobalSearch_Hint.Text" xml:space="preserve"><value>仅搜索本地缓存 · Enter 打开 · Esc 关闭</value></data>
+  <data name="GlobalSearch_GroupCommands" xml:space="preserve"><value>命令</value></data>
+  <data name="GlobalSearch_GroupTasks" xml:space="preserve"><value>任务</value></data>
+  <data name="GlobalSearch_GroupCalendar" xml:space="preserve"><value>日历</value></data>
+  <data name="GlobalSearch_GroupMail" xml:space="preserve"><value>邮件</value></data>
+  <data name="GlobalSearch_GroupRss" xml:space="preserve"><value>RSS</value></data>
+  <data name="GlobalSearch_Untitled" xml:space="preserve"><value>无标题</value></data>
+  <data name="GlobalSearch_CachedMailContext" xml:space="preserve"><value>已从本地邮件缓存打开</value></data>
+  <data name="GlobalSearch_CommandNewTask" xml:space="preserve"><value>新建任务</value></data>
+  <data name="GlobalSearch_CommandNewEvent" xml:space="preserve"><value>新建日程</value></data>
+  <data name="GlobalSearch_CommandComposeMail" xml:space="preserve"><value>撰写邮件</value></data>
+  <data name="GlobalSearch_CommandSyncCalendar" xml:space="preserve"><value>同步日历</value></data>
+  <data name="GlobalSearch_CommandSyncTasks" xml:space="preserve"><value>同步任务</value></data>
+  <data name="GlobalSearch_CommandOpenCalendar" xml:space="preserve"><value>打开日历</value></data>
+  <data name="GlobalSearch_CommandOpenTasks" xml:space="preserve"><value>打开任务</value></data>
+  <data name="GlobalSearch_CommandOpenMail" xml:space="preserve"><value>打开邮件</value></data>
+  <data name="GlobalSearch_CommandOpenRss" xml:space="preserve"><value>打开 RSS</value></data>
+  <data name="GlobalSearch_CommandOpenSettings" xml:space="preserve"><value>打开设置</value></data>
+  <data name="GlobalSearch_CommandOpenAccounts" xml:space="preserve"><value>打开账户</value></data>
+  <data name="GlobalSearch_CommandCacheSettings" xml:space="preserve"><value>管理缓存设置</value></data>
+  <data name="GlobalSearch_Overlay.AutomationProperties.Name" xml:space="preserve"><value>全局搜索与命令面板</value></data>
+  <data name="GlobalSearch_Close.AutomationProperties.Name" xml:space="preserve"><value>关闭全局搜索</value></data>
+  <data name="GlobalSearch_CommandOpenWeather" xml:space="preserve"><value>打开天气</value></data>
+  <data name="GlobalSearch_CommandToggleWeatherBar" xml:space="preserve"><value>切换天气栏</value></data>
 </root>

@@ -1767,4 +1767,30 @@ Weather: {3}</value></data>
   <data name="TextTaskUnsupportedFields" xml:space="preserve"><value>Due time, recurrence, and moving between accounts or lists are not supported by the connected provider and will not be changed.</value></data>
   <data name="TextTitleRequired" xml:space="preserve"><value>Title is required.</value></data>
   <data name="TextSaveFailed" xml:space="preserve"><value>Unable to save. Please try again.</value></data>
+  <data name="GlobalSearch_SearchBox.PlaceholderText" xml:space="preserve"><value>Search local data or run a command</value></data>
+  <data name="GlobalSearch_Close.ToolTipService.ToolTip" xml:space="preserve"><value>Close</value></data>
+  <data name="GlobalSearch_Hint.Text" xml:space="preserve"><value>Local cached data only · Enter to open · Esc to close</value></data>
+  <data name="GlobalSearch_GroupCommands" xml:space="preserve"><value>Commands</value></data>
+  <data name="GlobalSearch_GroupTasks" xml:space="preserve"><value>Tasks</value></data>
+  <data name="GlobalSearch_GroupCalendar" xml:space="preserve"><value>Calendar</value></data>
+  <data name="GlobalSearch_GroupMail" xml:space="preserve"><value>Mail</value></data>
+  <data name="GlobalSearch_GroupRss" xml:space="preserve"><value>RSS</value></data>
+  <data name="GlobalSearch_Untitled" xml:space="preserve"><value>Untitled</value></data>
+  <data name="GlobalSearch_CachedMailContext" xml:space="preserve"><value>Opened from the local mail cache</value></data>
+  <data name="GlobalSearch_CommandNewTask" xml:space="preserve"><value>New task</value></data>
+  <data name="GlobalSearch_CommandNewEvent" xml:space="preserve"><value>New event</value></data>
+  <data name="GlobalSearch_CommandComposeMail" xml:space="preserve"><value>Compose mail</value></data>
+  <data name="GlobalSearch_CommandSyncCalendar" xml:space="preserve"><value>Sync calendar</value></data>
+  <data name="GlobalSearch_CommandSyncTasks" xml:space="preserve"><value>Sync tasks</value></data>
+  <data name="GlobalSearch_CommandOpenCalendar" xml:space="preserve"><value>Open calendar</value></data>
+  <data name="GlobalSearch_CommandOpenTasks" xml:space="preserve"><value>Open tasks</value></data>
+  <data name="GlobalSearch_CommandOpenMail" xml:space="preserve"><value>Open mail</value></data>
+  <data name="GlobalSearch_CommandOpenRss" xml:space="preserve"><value>Open RSS</value></data>
+  <data name="GlobalSearch_CommandOpenSettings" xml:space="preserve"><value>Open settings</value></data>
+  <data name="GlobalSearch_CommandOpenAccounts" xml:space="preserve"><value>Open accounts</value></data>
+  <data name="GlobalSearch_CommandCacheSettings" xml:space="preserve"><value>Manage cache settings</value></data>
+  <data name="GlobalSearch_Overlay.AutomationProperties.Name" xml:space="preserve"><value>Global search and command palette</value></data>
+  <data name="GlobalSearch_Close.AutomationProperties.Name" xml:space="preserve"><value>Close global search</value></data>
+  <data name="GlobalSearch_CommandOpenWeather" xml:space="preserve"><value>Open weather</value></data>
+  <data name="GlobalSearch_CommandToggleWeatherBar" xml:space="preserve"><value>Toggle Weather Bar</value></data>
 </root>

@@ -95,6 +95,17 @@ namespace Task_Flyout.Services
         }
     }
 
+    public sealed record CachedMailMetadata(
+        string AccountId,
+        string FolderId,
+        string MessageId,
+        string Subject,
+        string Sender,
+        string SenderAddress,
+        string Preview,
+        string ReceivedTime,
+        DateTimeOffset? ReceivedAt);
+
     public class MailService
     {
         private readonly ResourceLoader _loader = new();
@@ -949,6 +960,38 @@ namespace Task_Flyout.Services
                 _bodyCacheMetadata.Clear();
             }
             ClearBodies(items);
+        }
+
+        public IReadOnlyList<CachedMailMetadata> GetCachedMetadataSnapshot()
+        {
+            EnsureAccountsLoaded();
+            EnsurePersistentCacheLoaded();
+            var visibleAccountIds = _accounts
+                .Where(account => account.IsSetupComplete)
+                .Select(account => account.Id)
+                .ToHashSet(StringComparer.Ordinal);
+
+            lock (_mailCacheLock)
+            {
+                var volatileMessages = _messageCache.Values.SelectMany(entry => entry.Value);
+                var persistentMessages = _persistentCache?.Messages.Values.SelectMany(messages => messages)
+                    ?? Enumerable.Empty<MailItem>();
+                return volatileMessages.Concat(persistentMessages)
+                    .Where(item => visibleAccountIds.Contains(item.AccountId))
+                    .GroupBy(item => $"{item.AccountId}|{item.FolderId}|{item.Id}", StringComparer.Ordinal)
+                    .Select(group => group
+                        .OrderByDescending(item => item.RawReceivedTime)
+                        .ThenBy(item => item.Id, StringComparer.Ordinal)
+                        .First())
+                    .Select(item => new CachedMailMetadata(
+                        item.AccountId, item.FolderId, item.Id, item.Subject, item.Sender,
+                        item.SenderAddress, item.Preview, item.ReceivedTime, item.RawReceivedTime))
+                    .OrderByDescending(item => item.ReceivedAt)
+                    .ThenBy(item => item.AccountId, StringComparer.Ordinal)
+                    .ThenBy(item => item.FolderId, StringComparer.Ordinal)
+                    .ThenBy(item => item.MessageId, StringComparer.Ordinal)
+                    .ToList();
+            }
         }
 
         public IReadOnlyList<MailBodyCacheAccountSize> GetVolatileBodyCacheSizes()

@@ -87,6 +87,8 @@ namespace Task_Flyout.Views
             ActualThemeChanged += MailPage_ActualThemeChanged;
         }
 
+        private bool _openingCachedMetadataOnly;
+
         private string GetResourceStringOrDefault(string resourceId, string fallback)
         {
             try
@@ -1346,6 +1348,17 @@ namespace Task_Flyout.Views
             DetailSubject.Text = item.Subject;
             DetailSender.Text = item.Sender;
             DetailTime.Text = item.RawReceivedTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? item.ReceivedTime;
+            if (_openingCachedMetadataOnly)
+            {
+                _openingCachedMetadataOnly = false;
+                DetailHtmlViewHost.Visibility = Visibility.Collapsed;
+                DetailTextScrollViewer.Visibility = Visibility.Visible;
+                DetailPreview.Text = item.Preview;
+                ReplyButton.IsEnabled = false;
+                OpenInBrowserButton.IsEnabled = false;
+                CompleteBodyLoad(bodyCts);
+                return;
+            }
             var markAsReadTask = MarkSelectedMailReadOptimistically(item);
             UpdateTrustButton(item);
 
@@ -1476,6 +1489,30 @@ namespace Task_Flyout.Views
             }
 
             _mailService?.ClearVolatileMessageBodies();
+        }
+
+        public async Task OpenCachedMessageAsync(string accountId, string folderId, string messageId)
+        {
+            if (!IsLoaded)
+                await WaitUntilLoadedAsync();
+
+            _mailService ??= (App.Current as App)?.MailService;
+            var target = _mailService?.TryGetCachedMessage(accountId, folderId, messageId);
+            if (target == null)
+            {
+                SetMessageListStatus(_loader.GetStringOrDefault("TextMailNotFound") ?? "This message is no longer in the local cache.", isError: true);
+                return;
+            }
+
+            _items.Clear();
+            _displayedItems.Clear();
+            _items.Add(target);
+            _displayedItems.Add(target);
+            MailListView.ItemsSource = _displayedItems;
+            _openingCachedMetadataOnly = true;
+            MailListView.SelectedItem = target;
+            MailListView.ScrollIntoView(target);
+            SetMessageListStatus(_loader.GetStringOrDefault("GlobalSearch_CachedMailContext") ?? "Opened from the local mail cache");
         }
 
         private void CleanupRenderedMailContent(bool clearAllBodies)
