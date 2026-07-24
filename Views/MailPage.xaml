@@ -135,6 +135,10 @@
                         <AppBarButton x:Uid="MailPage_MarkUnread" Label="Mark unread" Icon="Mail" Click="MarkUnreadButton_Click"/>
                         <AppBarButton x:Uid="MailPage_Flag" Label="Flag" Icon="Flag" Click="FlagButton_Click"/>
                         <AppBarButton x:Uid="MailPage_Unflag" Label="Unflag" Icon="UnFavorite" Click="UnflagButton_Click"/>
+                        <AppBarSeparator x:Name="OutlookMoveSeparator" Visibility="Collapsed"/>
+                        <AppBarButton x:Uid="MailPage_Archive" x:Name="ArchiveButton" Label="Archive" Icon="Archive" Visibility="Collapsed" IsEnabled="False" Click="ArchiveButton_Click"/>
+                        <AppBarButton x:Uid="MailPage_Move" x:Name="MoveButton" Label="Move" Icon="MoveToFolder" Visibility="Collapsed" IsEnabled="False" Click="MoveButton_Click"/>
+                        <AppBarButton x:Uid="MailPage_Delete" x:Name="DeleteButton" Label="Delete" Icon="Delete" Visibility="Collapsed" IsEnabled="False" Click="DeleteButton_Click"/>
                     </CommandBar>
 
                     <ListView Grid.Row="2"

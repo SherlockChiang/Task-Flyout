@@ -38,6 +38,7 @@ namespace Task_Flyout.Views
         private readonly ResourceLoader _loader = new();
         private readonly Dictionary<string, long> _mailIntentVersions = new(StringComparer.Ordinal);
         private List<MailUndoState> _undoStates = new();
+        private MailMoveUndoState? _moveUndoState;
         private MailMutationKind _undoKind;
         private long _nextMailIntentVersion;
 
@@ -81,6 +82,7 @@ namespace Task_Flyout.Views
 
         private enum MailPane { Accounts, Messages, Detail }
         private sealed record MailUndoState(MailItem Item, bool PreviousValue, int PreviousIndex);
+        private sealed record MailMoveUndoState(MailAccount Account, MailItem MovedItem, string ReturnFolderId);
 
         public MailPage()
         {
@@ -158,6 +160,7 @@ namespace Task_Flyout.Views
                 ClearRenderedMailBody();
             }
             _selectedAccount = account;
+            UpdateOutlookMoveCommands();
             var protectedItem = string.Equals(_selectedItem?.AccountId, account?.Id, StringComparison.Ordinal)
                 ? _selectedItem
                 : null;
@@ -1330,6 +1333,7 @@ namespace Task_Flyout.Views
 
         private async void MailListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            UpdateOutlookMoveCommands();
             if (MailListView.SelectedItems.Count != 1)
             {
                 if (MailListView.SelectedItems.Count > 1)
@@ -1536,6 +1540,157 @@ namespace Task_Flyout.Views
         private async void UnflagButton_Click(object sender, RoutedEventArgs e)
             => await MutateSelectedMailAsync(MailMutationKind.SetFlagged, false);
 
+        private async void ArchiveButton_Click(object sender, RoutedEventArgs e)
+            => await MoveSelectedOutlookMailAsync((service, account, item, token) =>
+                service.ArchiveOutlookMessageAsync(account, item, token));
+
+        private async void DeleteButton_Click(object sender, RoutedEventArgs e)
+            => await MoveSelectedOutlookMailAsync((service, account, item, token) =>
+                service.TrashOutlookMessageAsync(account, item, token));
+
+        private async void MoveButton_Click(object sender, RoutedEventArgs e)
+        {
+            var service = _mailService;
+            var account = _selectedAccount;
+            var item = GetSingleSelectedOutlookItem();
+            if (service == null || account == null || item == null) return;
+
+            SetOutlookMoveCommandsEnabled(false);
+            try
+            {
+                var destinations = await service.FetchOutlookMoveDestinationsAsync(account, item.FolderId, _pageRequestCts.Token);
+                if (destinations.Count == 0)
+                {
+                    SetMessageListStatus(GetResourceStringOrDefault("TextMailMoveNoDestinations", "No destination folders are available."), isError: true);
+                    return;
+                }
+
+                var picker = new ComboBox
+                {
+                    Header = GetResourceStringOrDefault("TextMailMoveDestination", "Destination folder"),
+                    ItemsSource = destinations,
+                    SelectedIndex = 0,
+                    MinWidth = 360,
+                    HorizontalAlignment = HorizontalAlignment.Stretch
+                };
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = XamlRoot,
+                    Title = GetResourceStringOrDefault("TextMailMoveTitle", "Move message"),
+                    Content = picker,
+                    PrimaryButtonText = GetResourceStringOrDefault("MailPage_Move.Label", "Move"),
+                    CloseButtonText = GetResourceStringOrDefault("CalendarDialog.CloseButtonText", "Cancel"),
+                    DefaultButton = ContentDialogButton.Primary
+                };
+                if (await dialog.ShowAsync() != ContentDialogResult.Primary || picker.SelectedItem is not OutlookMoveDestination destination)
+                    return;
+
+                await MoveSelectedOutlookMailAsync((mailService, selectedAccount, selectedItem, token) =>
+                    mailService.MoveOutlookMessageAsync(selectedAccount, selectedItem, destination.Id, token));
+            }
+            catch (OperationCanceledException) when (_pageRequestCts.IsCancellationRequested) { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Load Outlook move destinations failed: {ex.Message}");
+                SetMessageListStatus(GetResourceStringOrDefault("TextMailMoveDestinationsFailed", "Failed to load destination folders."), isError: true);
+            }
+            finally
+            {
+                UpdateOutlookMoveCommands();
+            }
+        }
+
+        private MailItem? GetSingleSelectedOutlookItem()
+            => _selectedAccount?.Kind == MailAccountKind.Outlook && MailListView.SelectedItems.Count == 1
+                ? MailListView.SelectedItems[0] as MailItem
+                : null;
+
+        private void UpdateOutlookMoveCommands()
+        {
+            if (ArchiveButton == null) return;
+            bool visible = _selectedAccount?.Kind == MailAccountKind.Outlook;
+            OutlookMoveSeparator.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            ArchiveButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            MoveButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            DeleteButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            SetOutlookMoveCommandsEnabled(visible && MailListView.SelectedItems.Count == 1 && !_isLoadingMessages);
+        }
+
+        private void SetOutlookMoveCommandsEnabled(bool enabled)
+        {
+            ArchiveButton.IsEnabled = enabled;
+            MoveButton.IsEnabled = enabled;
+            DeleteButton.IsEnabled = enabled;
+        }
+
+        private async Task MoveSelectedOutlookMailAsync(
+            Func<MailService, MailAccount, MailItem, CancellationToken, Task<MailMoveResult>> move)
+        {
+            var service = _mailService;
+            var account = _selectedAccount;
+            var item = GetSingleSelectedOutlookItem();
+            if (service == null || account == null || item == null) return;
+
+            SetOutlookMoveCommandsEnabled(false);
+            try
+            {
+                var result = await move(service, account, item, _pageRequestCts.Token);
+                _moveUndoState = new MailMoveUndoState(account, result.Item, result.SourceFolderId);
+                _undoStates.Clear();
+                _suppressSelectionClear = true;
+                try
+                {
+                    MailListView.SelectedItems.Clear();
+                    _items.Remove(item);
+                }
+                finally
+                {
+                    _suppressSelectionClear = false;
+                }
+                ClearDetail();
+                ApplyMailSearch();
+                RefreshAllFolderCounts();
+                SetMessageListStatus($"{account.DisplayTitle} · {string.Format(GetResourceStringOrDefault("TextNMailItems", "{0} messages"), _items.Count)}");
+                MailUndoBar.Message = GetResourceStringOrDefault("TextMailMoveComplete", "Message moved.");
+                MailUndoBar.IsOpen = true;
+            }
+            catch (OperationCanceledException) when (_pageRequestCts.IsCancellationRequested) { }
+            catch (MailMoveOutcomeUnknownException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Outlook move outcome unknown: {ex.Message}");
+                await ReconcileOutlookMoveAsync();
+                SetMessageListStatus(GetResourceStringOrDefault("TextMailMoveOutcomeUnknown", "The move outcome is unknown. The folder was refreshed without retrying."), isError: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Outlook move failed: {ex.Message}");
+                SetMessageListStatus(GetResourceStringOrDefault("TextMailMoveFailed", "Failed to move the message."), isError: true);
+            }
+            finally
+            {
+                UpdateOutlookMoveCommands();
+            }
+        }
+
+        private async Task ReconcileOutlookMoveAsync()
+        {
+            string? selectedFolderId = _selectedFolder?.Id;
+            var accountNode = _accountNodes.FirstOrDefault(pair => ReferenceEquals(pair.Value, _selectedAccount)).Key;
+            if (accountNode != null)
+            {
+                await LoadFoldersForNodeAsync(accountNode, forceRefresh: true);
+                var selectedNode = accountNode.Children.FirstOrDefault(node =>
+                    _folderNodes.TryGetValue(node, out var selection) && selection.Folder.Id == selectedFolderId);
+                if (selectedNode != null)
+                {
+                    AccountTree.SelectedNode = selectedNode;
+                    _selectedFolder = _folderNodes[selectedNode].Folder;
+                }
+            }
+            if (_selectedFolder != null)
+                await LoadMessagesAsync(forceRefresh: true, selectFirstWhenNoMatch: false);
+        }
+
         private async Task MutateSelectedMailAsync(MailMutationKind kind, bool value, IReadOnlyList<MailUndoState>? restoreTargets = null)
         {
             var service = _mailService;
@@ -1573,6 +1728,7 @@ namespace Task_Flyout.Views
 
             if (restoreTargets == null)
             {
+                _moveUndoState = null;
                 _undoStates = previous;
                 _undoKind = kind;
                 MailUndoBar.Message = string.Format(GetResourceStringOrDefault("TextMailMutationComplete", "Updated {0} messages."), selected.Count);
@@ -1612,6 +1768,30 @@ namespace Task_Flyout.Views
 
         private async void UndoMailMutationButton_Click(object sender, RoutedEventArgs e)
         {
+            var moveState = _moveUndoState;
+            if (moveState != null)
+            {
+                _moveUndoState = null;
+                MailUndoBar.IsOpen = false;
+                try
+                {
+                    await _mailService!.MoveOutlookMessageAsync(moveState.Account, moveState.MovedItem, moveState.ReturnFolderId, _pageRequestCts.Token);
+                    await ReconcileOutlookMoveAsync();
+                    SetMessageListStatus(GetResourceStringOrDefault("TextMailMoveUndone", "Move undone."));
+                }
+                catch (MailMoveOutcomeUnknownException)
+                {
+                    await ReconcileOutlookMoveAsync();
+                    SetMessageListStatus(GetResourceStringOrDefault("TextMailMoveUndoOutcomeUnknown", "The undo outcome is unknown. The folder was refreshed without retrying."), isError: true);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Undo Outlook move failed: {ex.Message}");
+                    SetMessageListStatus(GetResourceStringOrDefault("TextMailMoveUndoFailed", "Failed to undo the move."), isError: true);
+                }
+                return;
+            }
+
             var states = _undoStates;
             MailUndoBar.IsOpen = false;
             _undoStates = new();
@@ -1637,6 +1817,12 @@ namespace Task_Flyout.Views
             if (_selectedFolder == null) return;
             foreach (var pair in _folderNodes.Where(pair => ReferenceEquals(pair.Value.Folder, _selectedFolder)))
                 pair.Key.Content = FormatFolderContent(_selectedFolder);
+        }
+
+        private void RefreshAllFolderCounts()
+        {
+            foreach (var pair in _folderNodes)
+                pair.Key.Content = FormatFolderContent(pair.Value.Folder);
         }
 
         public async Task OpenCachedMessageAsync(string accountId, string folderId, string messageId)

@@ -11,6 +11,7 @@ using Microsoft.Windows.AppNotifications.Builder;
 using Microsoft.Windows.ApplicationModel.Resources;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
+using Microsoft.Graph.Me.Messages.Item.Move;
 using MimeKit;
 using System;
 using System.Collections.Concurrent;
@@ -91,6 +92,14 @@ namespace Task_Flyout.Services
     {
         public MailMutationSyncQueuedException(Exception innerException)
             : base("The mail update was queued for a later retry.", innerException)
+        {
+        }
+    }
+
+    public sealed class MailMoveOutcomeUnknownException : Exception
+    {
+        public MailMoveOutcomeUnknownException(Exception innerException)
+            : base("Microsoft Graph may have moved the message before the connection was interrupted.", innerException)
         {
         }
     }
@@ -616,6 +625,195 @@ namespace Task_Flyout.Services
             folders = ApplyFolderOrder(cacheKey, folders);
             UpdateFolderWindow(cacheKey, folders);
             return folders;
+        }
+
+        public async Task<List<OutlookMoveDestination>> FetchOutlookMoveDestinationsAsync(
+            MailAccount account,
+            string currentFolderId,
+            CancellationToken cancellationToken = default)
+        {
+            if (account.Kind != MailAccountKind.Outlook)
+                return new List<OutlookMoveDestination>();
+
+            await EnsureOutlookMailWriteAuthorizedAsync(cancellationToken);
+            if (_outlookClient == null) return new List<OutlookMoveDestination>();
+
+            var result = new List<OutlookMoveDestination>();
+            await FetchOutlookFolderPageAsync(null, "", currentFolderId, result, cancellationToken);
+            return result.OrderBy(folder => folder.Breadcrumb, StringComparer.CurrentCultureIgnoreCase).ToList();
+        }
+
+        private async Task FetchOutlookFolderPageAsync(
+            string? parentFolderId,
+            string parentBreadcrumb,
+            string currentFolderId,
+            List<OutlookMoveDestination> result,
+            CancellationToken cancellationToken)
+        {
+            string? nextLink = null;
+            do
+            {
+                Microsoft.Graph.Models.MailFolderCollectionResponse? response;
+                if (nextLink != null)
+                {
+                    if (!MailPaginationPolicy.IsAllowedGraphNextLink(nextLink))
+                        throw new InvalidOperationException("Mail folder continuation URL is invalid.");
+                    response = parentFolderId == null
+                        ? await _outlookClient!.Me.MailFolders.WithUrl(nextLink).GetAsync(cancellationToken: cancellationToken)
+                        : await _outlookClient!.Me.MailFolders[parentFolderId].ChildFolders.WithUrl(nextLink).GetAsync(cancellationToken: cancellationToken);
+                }
+                else if (parentFolderId == null)
+                {
+                    response = await _outlookClient!.Me.MailFolders.GetAsync(request =>
+                    {
+                        request.QueryParameters.Top = 100;
+                        request.QueryParameters.Select = new[] { "id", "displayName", "childFolderCount" };
+                    }, cancellationToken);
+                }
+                else
+                {
+                    response = await _outlookClient!.Me.MailFolders[parentFolderId].ChildFolders.GetAsync(request =>
+                    {
+                        request.QueryParameters.Top = 100;
+                        request.QueryParameters.Select = new[] { "id", "displayName", "childFolderCount" };
+                    }, cancellationToken);
+                }
+
+                foreach (var folder in response?.Value ?? Enumerable.Empty<Microsoft.Graph.Models.MailFolder>())
+                {
+                    if (string.IsNullOrWhiteSpace(folder.Id)) continue;
+                    string name = folder.DisplayName ?? folder.Id;
+                    string breadcrumb = string.IsNullOrWhiteSpace(parentBreadcrumb) ? name : $"{parentBreadcrumb} / {name}";
+                    if (!string.Equals(folder.Id, currentFolderId, StringComparison.Ordinal))
+                        result.Add(new OutlookMoveDestination { Id = folder.Id, DisplayName = name, Breadcrumb = breadcrumb });
+                    if (folder.ChildFolderCount > 0)
+                        await FetchOutlookFolderPageAsync(folder.Id, breadcrumb, currentFolderId, result, cancellationToken);
+                }
+                nextLink = response?.OdataNextLink;
+            }
+            while (!string.IsNullOrWhiteSpace(nextLink));
+        }
+
+        public async Task<MailMoveResult> ArchiveOutlookMessageAsync(MailAccount account, MailItem item, CancellationToken cancellationToken = default)
+        {
+            string destinationId = await ResolveOutlookWellKnownFolderIdAsync("archive", cancellationToken)
+                ?? throw new InvalidOperationException("The Outlook archive folder is unavailable.");
+            return await MoveOutlookMessageAsync(account, item, destinationId, cancellationToken);
+        }
+
+        public async Task<MailMoveResult> TrashOutlookMessageAsync(MailAccount account, MailItem item, CancellationToken cancellationToken = default)
+        {
+            string destinationId = await ResolveOutlookWellKnownFolderIdAsync("deleteditems", cancellationToken)
+                ?? throw new InvalidOperationException("The Outlook Deleted Items folder is unavailable.");
+            return await MoveOutlookMessageAsync(account, item, destinationId, cancellationToken);
+        }
+
+        public async Task<MailMoveResult> MoveOutlookMessageAsync(
+            MailAccount account,
+            MailItem item,
+            string destinationFolderId,
+            CancellationToken cancellationToken = default)
+        {
+            if (account.Kind != MailAccountKind.Outlook || !MailMutationCapabilityPolicy.For(account.Kind).Move)
+                throw new NotSupportedException("Only Outlook message moves are supported.");
+            if (string.IsNullOrWhiteSpace(destinationFolderId) || string.Equals(item.FolderId, destinationFolderId, StringComparison.Ordinal))
+                throw new InvalidOperationException("Choose a different destination folder.");
+
+            await EnsureOutlookMailWriteAuthorizedAsync(cancellationToken);
+            if (_outlookClient == null) throw new InvalidOperationException("Outlook authorization failed.");
+
+            string sourceFolderId = item.FolderId;
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            GraphMessage? moved;
+            try
+            {
+                moved = await _outlookClient.Me.Messages[item.Id].Move.PostAsync(
+                    new MovePostRequestBody { DestinationId = destinationFolderId },
+                    requestConfiguration: null,
+                    cancellationToken: operationCts.Token);
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested && IsAmbiguousMoveFailure(ex, timeoutCts.IsCancellationRequested))
+            {
+                RemoveBodyCacheIdentity(item);
+                InvalidateMoveWindows(account.Id, sourceFolderId, destinationFolderId, item.IsRead, adjustCounts: false);
+                throw new MailMoveOutcomeUnknownException(ex);
+            }
+
+            if (string.IsNullOrWhiteSpace(moved?.Id) || string.IsNullOrWhiteSpace(moved.ParentFolderId))
+            {
+                RemoveBodyCacheIdentity(item);
+                InvalidateMoveWindows(account.Id, sourceFolderId, destinationFolderId, item.IsRead, adjustCounts: false);
+                throw new MailMoveOutcomeUnknownException(new InvalidOperationException("Microsoft Graph did not return the moved message identity."));
+            }
+
+            var authoritativeItem = CloneMailItem(item, includeBodies: false);
+            authoritativeItem.Id = moved.Id;
+            authoritativeItem.FolderId = moved.ParentFolderId;
+            RemoveBodyCacheIdentity(item);
+            InvalidateMoveWindows(account.Id, sourceFolderId, moved.ParentFolderId, item.IsRead, adjustCounts: true);
+            return new MailMoveResult(authoritativeItem, sourceFolderId, moved.ParentFolderId);
+        }
+
+        private static bool IsAmbiguousMoveFailure(Exception exception, bool timedOut)
+            => timedOut || exception is HttpRequestException or IOException ||
+               exception is Microsoft.Kiota.Abstractions.ApiException { ResponseStatusCode: 0 };
+
+        private async Task<string?> ResolveOutlookWellKnownFolderIdAsync(string wellKnownName, CancellationToken cancellationToken)
+        {
+            await EnsureOutlookMailWriteAuthorizedAsync(cancellationToken);
+            if (_outlookClient == null) return null;
+            var folder = await _outlookClient.Me.MailFolders[wellKnownName].GetAsync(request =>
+                request.QueryParameters.Select = new[] { "id" }, cancellationToken);
+            return string.IsNullOrWhiteSpace(folder?.Id) ? null : folder.Id;
+        }
+
+        private void InvalidateMoveWindows(string accountId, string sourceFolderId, string destinationFolderId, bool isRead, bool adjustCounts)
+        {
+            EnsurePersistentCacheLoaded();
+            lock (_mailCacheLock)
+            {
+                foreach (string key in MailMoveCachePolicy.InvalidatedWindowKeys(accountId, sourceFolderId, destinationFolderId))
+                {
+                    _messageCache.Remove(key);
+                    _persistentCache?.Messages.Remove(key);
+                    _persistentCache?.MessageCursors.Remove(key);
+                    _persistentCache?.MessageHasMore.Remove(key);
+                }
+
+                if (_persistentCache != null && adjustCounts && _persistentCache.Folders.TryGetValue(accountId, out var folders))
+                {
+                    var source = folders.FirstOrDefault(folder => folder.Id == sourceFolderId);
+                    var destination = folders.FirstOrDefault(folder => folder.Id == destinationFolderId);
+                    if (source != null) source.UnreadCount = MailMoveCachePolicy.AdjustSourceUnreadCount(source.UnreadCount, isRead);
+                    if (destination != null) destination.UnreadCount = MailMoveCachePolicy.AdjustDestinationUnreadCount(destination.UnreadCount, isRead);
+                }
+                if (adjustCounts && _folderCache.TryGetValue(accountId, out var cachedFolders) &&
+                    (_persistentCache == null ||
+                     !_persistentCache.Folders.TryGetValue(accountId, out var persistentFolders) ||
+                     !ReferenceEquals(cachedFolders.Value, persistentFolders)))
+                {
+                    var source = cachedFolders.Value.FirstOrDefault(folder => folder.Id == sourceFolderId);
+                    var destination = cachedFolders.Value.FirstOrDefault(folder => folder.Id == destinationFolderId);
+                    if (source != null) source.UnreadCount = MailMoveCachePolicy.AdjustSourceUnreadCount(source.UnreadCount, isRead);
+                    if (destination != null) destination.UnreadCount = MailMoveCachePolicy.AdjustDestinationUnreadCount(destination.UnreadCount, isRead);
+                }
+            }
+            SavePersistentCache();
+        }
+
+        private void RemoveBodyCacheIdentity(MailItem item)
+        {
+            string key = GetBodyCacheKey(item);
+            lock (_bodyCacheLock)
+            {
+                _bodyCacheItems.Remove(key);
+                _bodyCacheMetadata.Remove(key);
+                if (string.Equals(_protectedBodyCacheKey, key, StringComparison.Ordinal))
+                    _protectedBodyCacheKey = null;
+            }
+            item.BodyText = "";
+            item.HtmlBody = "";
         }
 
         public async Task<MailMessageWindow> FetchMessagesAsync(
@@ -1191,7 +1389,7 @@ namespace Task_Flyout.Services
             }
             catch
             {
-                await TryDeleteOutlookDraftAsync(draft.Id);
+                await TryMoveOutlookDraftToDeletedItemsAsync(draft.Id);
                 throw;
             }
         }
@@ -1225,15 +1423,18 @@ namespace Task_Flyout.Services
             return false;
         }
 
-        private async Task TryDeleteOutlookDraftAsync(string draftId)
+        private async Task TryMoveOutlookDraftToDeletedItemsAsync(string draftId)
         {
             if (_outlookClient == null || string.IsNullOrWhiteSpace(draftId)) return;
 
             using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             try
             {
-                await _outlookClient.Me.Messages[draftId].DeleteAsync(request =>
-                    request.Headers.Add("Prefer", "IdType=\"ImmutableId\""), cleanupCts.Token);
+                string? deletedItemsId = await ResolveOutlookWellKnownFolderIdAsync("deleteditems", cleanupCts.Token);
+                if (string.IsNullOrWhiteSpace(deletedItemsId)) return;
+                await _outlookClient.Me.Messages[draftId].Move.PostAsync(
+                    new MovePostRequestBody { DestinationId = deletedItemsId },
+                    requestConfiguration: null, cancellationToken: cleanupCts.Token);
             }
             catch (Exception ex)
             {

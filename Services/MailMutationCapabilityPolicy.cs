@@ -12,7 +12,7 @@ namespace Task_Flyout.Services
     {
         public static MailMutationCapabilities For(MailAccountKind providerKind) => providerKind switch
         {
-            MailAccountKind.Outlook => new(true, true, false, false, false, false),
+            MailAccountKind.Outlook => new(true, true, true, true, true, false),
             MailAccountKind.Google => new(true, true, false, false, false, false),
             MailAccountKind.Imap => new(true, true, false, false, false, false),
             _ => new(false, false, false, false, false, false)

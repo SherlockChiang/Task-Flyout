@@ -1825,4 +1825,17 @@ Microsoft：{1}
   <data name="MailPage_Undo.Content" xml:space="preserve"><value>撤销</value></data>
   <data name="TextMailMutationComplete" xml:space="preserve"><value>已更新 {0} 封邮件。</value></data>
   <data name="TextMailMutationFailed" xml:space="preserve"><value>部分邮件无法更新。</value></data>
+  <data name="MailPage_Archive.Label" xml:space="preserve"><value>存档</value></data>
+  <data name="MailPage_Move.Label" xml:space="preserve"><value>移动</value></data>
+  <data name="MailPage_Delete.Label" xml:space="preserve"><value>删除</value></data>
+  <data name="TextMailMoveTitle" xml:space="preserve"><value>移动邮件</value></data>
+  <data name="TextMailMoveDestination" xml:space="preserve"><value>目标文件夹</value></data>
+  <data name="TextMailMoveNoDestinations" xml:space="preserve"><value>没有可用的目标文件夹。</value></data>
+  <data name="TextMailMoveDestinationsFailed" xml:space="preserve"><value>无法加载目标文件夹。</value></data>
+  <data name="TextMailMoveComplete" xml:space="preserve"><value>邮件已移动。</value></data>
+  <data name="TextMailMoveFailed" xml:space="preserve"><value>无法移动邮件。</value></data>
+  <data name="TextMailMoveOutcomeUnknown" xml:space="preserve"><value>移动结果未知。已刷新文件夹，且未重试操作。</value></data>
+  <data name="TextMailMoveUndone" xml:space="preserve"><value>已撤销移动。</value></data>
+  <data name="TextMailMoveUndoFailed" xml:space="preserve"><value>无法撤销移动。</value></data>
+  <data name="TextMailMoveUndoOutcomeUnknown" xml:space="preserve"><value>撤销结果未知。已刷新文件夹，且未重试操作。</value></data>
 </root>

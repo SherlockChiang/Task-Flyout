@@ -15,6 +15,16 @@ namespace Task_Flyout.Services
         public string CountText => UnreadCount.HasValue && UnreadCount.Value > 0 ? UnreadCount.Value.ToString() : "";
     }
 
+    public sealed class OutlookMoveDestination
+    {
+        public string Id { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public string Breadcrumb { get; set; } = "";
+        public override string ToString() => Breadcrumb;
+    }
+
+    public sealed record MailMoveResult(MailItem Item, string SourceFolderId, string DestinationFolderId);
+
     public class MailItem : INotifyPropertyChanged
     {
         private bool _isRead;

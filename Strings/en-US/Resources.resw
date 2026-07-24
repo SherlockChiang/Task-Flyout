@@ -1825,4 +1825,17 @@ Weather: {3}</value></data>
   <data name="MailPage_Undo.Content" xml:space="preserve"><value>Undo</value></data>
   <data name="TextMailMutationComplete" xml:space="preserve"><value>Updated {0} messages.</value></data>
   <data name="TextMailMutationFailed" xml:space="preserve"><value>Some messages could not be updated.</value></data>
+  <data name="MailPage_Archive.Label" xml:space="preserve"><value>Archive</value></data>
+  <data name="MailPage_Move.Label" xml:space="preserve"><value>Move</value></data>
+  <data name="MailPage_Delete.Label" xml:space="preserve"><value>Delete</value></data>
+  <data name="TextMailMoveTitle" xml:space="preserve"><value>Move message</value></data>
+  <data name="TextMailMoveDestination" xml:space="preserve"><value>Destination folder</value></data>
+  <data name="TextMailMoveNoDestinations" xml:space="preserve"><value>No destination folders are available.</value></data>
+  <data name="TextMailMoveDestinationsFailed" xml:space="preserve"><value>Failed to load destination folders.</value></data>
+  <data name="TextMailMoveComplete" xml:space="preserve"><value>Message moved.</value></data>
+  <data name="TextMailMoveFailed" xml:space="preserve"><value>Failed to move the message.</value></data>
+  <data name="TextMailMoveOutcomeUnknown" xml:space="preserve"><value>The move outcome is unknown. The folder was refreshed without retrying.</value></data>
+  <data name="TextMailMoveUndone" xml:space="preserve"><value>Move undone.</value></data>
+  <data name="TextMailMoveUndoFailed" xml:space="preserve"><value>Failed to undo the move.</value></data>
+  <data name="TextMailMoveUndoOutcomeUnknown" xml:space="preserve"><value>The undo outcome is unknown. The folder was refreshed without retrying.</value></data>
 </root>
