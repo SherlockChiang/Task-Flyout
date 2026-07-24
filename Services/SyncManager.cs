@@ -27,6 +27,10 @@ namespace Task_Flyout.Services
         DateTimeOffset? LastSuccessUtc,
         bool HasCachedData);
 
+    public sealed record VersionedDayItemsSnapshot(
+        long Version,
+        Dictionary<string, List<AgendaItem>> DayItems);
+
     public class SyncManager
     {
         private readonly List<ISyncProvider> _providers = new();
@@ -122,6 +126,9 @@ namespace Task_Flyout.Services
         }
 
         public Dictionary<string, List<AgendaItem>> GetDayItemsSnapshot(IEnumerable<string> dateKeys)
+            => GetVersionedDayItemsSnapshot(dateKeys).DayItems;
+
+        public VersionedDayItemsSnapshot GetVersionedDayItemsSnapshot(IEnumerable<string> dateKeys)
         {
             EnsureCacheLoaded();
             var keys = dateKeys
@@ -129,7 +136,8 @@ namespace Task_Flyout.Services
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
 
-            var cache = Volatile.Read(ref _publishedCache).Cache;
+            var published = Volatile.Read(ref _publishedCache);
+            var cache = published.Cache;
             var result = new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal);
             foreach (var key in keys)
             {
@@ -137,7 +145,7 @@ namespace Task_Flyout.Services
                     result[key] = items.Select(CloneAgendaItem).ToList();
             }
 
-            return result;
+            return new VersionedDayItemsSnapshot(published.Version, result);
         }
 
         public AppCache GetRangeCacheSnapshot(DateTime min, DateTime max, bool tasksOnly = false)

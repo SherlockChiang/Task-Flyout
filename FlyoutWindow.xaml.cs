@@ -89,8 +89,13 @@ namespace Task_Flyout
         private bool _isDotRefreshPending = false;
 
         private ScrollViewer? _activeScrollViewer;
-        private List<CalendarViewDayItem>? _visibleDayItemCache;
-        private bool _visibleDayItemCacheDirty = true;
+        private readonly Dictionary<CalendarViewDayItem, DateTime> _realizedDayItems = new();
+        private readonly Dictionary<CalendarViewDayItem, List<Color>> _semanticDotColors = new();
+        private long _dayItemGeneration;
+        private long _agendaCacheVersion;
+        private long _filterVersion;
+        private DateTime _displayedMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+        private CalendarDotRenderKey? _lastDotRenderKey;
         private string? _failedTaskMutationKey;
         private Func<Task>? _retryTaskMutationSucceeded;
         private readonly List<DotSpec> _dotSpecs = new();
@@ -174,7 +179,6 @@ namespace Task_Flyout
 
             MainCalendar.RegisterPropertyChangedCallback(CalendarView.DisplayModeProperty, (s, args) =>
             {
-                InvalidateVisibleDayItemCache();
                 RequestDotRefresh();
             });
 
@@ -186,27 +190,18 @@ namespace Task_Flyout
 
         private void HookActiveScrollViewer()
         {
-            var dayItems = GetVisibleDayItems();
-            if (dayItems.Count == 0) return;
+            if (_activeScrollViewer != null) return;
+            var dayItem = _realizedDayItems.Keys.FirstOrDefault();
+            if (dayItem == null) return;
 
-            DependencyObject current = dayItems[0];
+            DependencyObject current = dayItem;
             while (current != null && current != MainCalendar)
             {
                 if (current is ScrollViewer sv)
                 {
-                    if (_activeScrollViewer != sv)
-                    {
-                        if (_activeScrollViewer != null)
-                        {
-                            _activeScrollViewer.ViewChanging -= OnScrollViewerViewChanging;
-                            _activeScrollViewer.ViewChanged -= OnScrollViewerViewChanged;
-                        }
-
-                        _activeScrollViewer = sv;
-
-                        _activeScrollViewer.ViewChanging += OnScrollViewerViewChanging;
-                        _activeScrollViewer.ViewChanged += OnScrollViewerViewChanged;
-                    }
+                    _activeScrollViewer = sv;
+                    _activeScrollViewer.ViewChanging += OnScrollViewerViewChanging;
+                    _activeScrollViewer.ViewChanged += OnScrollViewerViewChanged;
                     break;
                 }
                 current = VisualTreeHelper.GetParent(current);
@@ -286,12 +281,13 @@ namespace Task_Flyout
             {
                 if (_syncManager != null)
                 {
-                    var dayItems = _syncManager.GetDayItemsSnapshot(GetVisibleCacheDateKeys(anchorDate));
+                    var snapshot = _syncManager.GetVersionedDayItemsSnapshot(GetVisibleCacheDateKeys(anchorDate));
                     _localCache = new AppCache
                     {
-                        DayItems = dayItems,
-                        MarkedDates = dayItems.Keys.ToHashSet(StringComparer.Ordinal)
+                        DayItems = snapshot.DayItems,
+                        MarkedDates = snapshot.DayItems.Keys.ToHashSet(StringComparer.Ordinal)
                     };
+                    _agendaCacheVersion = snapshot.Version;
                     MarkedDates = new HashSet<string>(_localCache.MarkedDates);
                     EventCounts.Clear();
                     foreach (var kvp in _localCache.DayItems)
@@ -301,7 +297,12 @@ namespace Task_Flyout
                     }
                 }
             }
-            catch { _localCache = new(); }
+            catch
+            {
+                _localCache = new();
+                _agendaCacheVersion = -1;
+                _lastDotRenderKey = null;
+            }
         }
 
         private static IEnumerable<string> GetVisibleCacheDateKeys(DateTime anchorDate)
@@ -342,26 +343,39 @@ namespace Task_Flyout
 
         private void MainCalendar_CalendarViewDayItemChanging(CalendarView sender, CalendarViewDayItemChangingEventArgs args)
         {
+            if (args.InRecycleQueue)
+            {
+                if (_realizedDayItems.Remove(args.Item))
+                {
+                    _semanticDotColors.Remove(args.Item);
+                    _dayItemGeneration++;
+                }
+                args.Item.Loaded -= DayItem_Loaded;
+                RequestDotRefresh();
+                return;
+            }
+
             if (args.Phase == 0)
             {
+                var date = args.Item.Date.Date;
+                if (!_realizedDayItems.TryGetValue(args.Item, out var previousDate) || previousDate != date)
+                {
+                    _realizedDayItems[args.Item] = date;
+                    _semanticDotColors.Remove(args.Item);
+                    _dayItemGeneration++;
+                }
+
                 args.Item.CornerRadius = new CornerRadius(16);
                 args.Item.SetDensityColors(null);
 
-                var dateStr = args.Item.Date.Date.ToString("yyyy-MM-dd");
-                bool hasEvent = EventCounts.TryGetValue(dateStr, out int count) && count > 0;
-
-                args.Item.FontWeight = hasEvent
-                    ? Microsoft.UI.Text.FontWeights.Bold
-                    : Microsoft.UI.Text.FontWeights.Normal;
-
                 args.Item.Loaded -= DayItem_Loaded;
                 args.Item.Loaded += DayItem_Loaded;
+                RequestDotRefresh();
             }
         }
 
         private void DayItem_Loaded(object sender, RoutedEventArgs e)
         {
-            InvalidateVisibleDayItemCache();
             ScheduleDotRefresh(TimeSpan.FromMilliseconds(200));
         }
 
@@ -400,12 +414,40 @@ namespace Task_Flyout
 
             if (MainCalendar.DisplayMode != CalendarViewDisplayMode.Month)
             {
-                ClearDotOverlay();
+                var nonMonthKey = new CalendarDotRenderKey(
+                    _displayedMonth.Year,
+                    _displayedMonth.Month,
+                    _agendaCacheVersion,
+                    (int)MainCalendar.DisplayMode,
+                    _dayItemGeneration,
+                    _filterVersion);
+                if (CalendarDotRenderPolicy.RequiresSemanticRender(_lastDotRenderKey, nonMonthKey))
+                {
+                    ClearDotOverlay();
+                    _semanticDotColors.Clear();
+                    _lastDotRenderKey = nonMonthKey;
+                }
                 return;
             }
 
             HookActiveScrollViewer();
             _dotSpecs.Clear();
+
+            var dayItems = GetRealizedDayItems();
+            UpdateDisplayedMonth(dayItems);
+
+            var renderKey = new CalendarDotRenderKey(
+                _displayedMonth.Year,
+                _displayedMonth.Month,
+                _agendaCacheVersion,
+                (int)MainCalendar.DisplayMode,
+                _dayItemGeneration,
+                _filterVersion);
+            if (CalendarDotRenderPolicy.RequiresSemanticRender(_lastDotRenderKey, renderKey))
+            {
+                RebuildSemanticDotCache(dayItems);
+                _lastDotRenderKey = renderKey;
+            }
 
             if (EventCounts == null || EventCounts.Count == 0)
             {
@@ -413,13 +455,9 @@ namespace Task_Flyout
                 return;
             }
 
-            var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
-
-            var dayItems = GetVisibleDayItems();
             foreach (var item in dayItems)
             {
-                var dateStr = item.Date.Date.ToString("yyyy-MM-dd");
-                if (!EventCounts.TryGetValue(dateStr, out int count) || count <= 0)
+                if (!_semanticDotColors.TryGetValue(item, out var dotColors) || dotColors.Count == 0)
                     continue;
 
                 try
@@ -442,23 +480,6 @@ namespace Task_Flyout
                     var transformToCanvas = item.TransformToVisual(DotOverlay);
                     var posInCanvas = transformToCanvas.TransformPoint(new Windows.Foundation.Point(0, 0));
 
-                    var dotColors = new List<Color>();
-                    if (_localCache.DayItems.TryGetValue(dateStr, out var agendaItems))
-                    {
-                        foreach (var ai in agendaItems)
-                        {
-                            if (accountMgr != null && !accountMgr.IsItemVisible(ai)) continue;
-                            accountMgr?.PopulateItemColor(ai);
-                            var c = !string.IsNullOrEmpty(ai.ColorHex)
-                                ? Services.ColorHelper.ParseHex(ai.ColorHex)
-                                : Color.FromArgb(255, 0, 120, 215);
-                            if (!dotColors.Any(dc => dc.R == c.R && dc.G == c.G && dc.B == c.B))
-                                dotColors.Add(c);
-                        }
-                    }
-                    if (dotColors.Count == 0)
-                        dotColors.Add(Color.FromArgb(255, 0, 120, 215));
-
                     int dotsToShow = Math.Min(dotColors.Count, 3);
                     double totalWidth = (dotsToShow * dotSize) + ((dotsToShow - 1) * spacing);
 
@@ -479,6 +500,65 @@ namespace Task_Flyout
             }
 
             ApplyDotOverlay(_dotSpecs);
+        }
+
+        private void UpdateDisplayedMonth(IReadOnlyList<CalendarViewDayItem> dayItems)
+        {
+            if (_activeScrollViewer == null || dayItems.Count == 0) return;
+
+            var visibleDays = new List<RealizedDayVisibility>(dayItems.Count);
+            foreach (var item in dayItems)
+            {
+                try
+                {
+                    var point = item.TransformToVisual(_activeScrollViewer)
+                        .TransformPoint(new Windows.Foundation.Point(0, 0));
+                    visibleDays.Add(new RealizedDayVisibility(item.Date.Date, point.Y, point.Y + item.ActualHeight));
+                }
+                catch { }
+            }
+
+            var detected = CalendarDotRenderPolicy.DetectDisplayedMonth(
+                visibleDays,
+                _activeScrollViewer.ActualHeight);
+            if (detected == null || detected.Value == _displayedMonth) return;
+
+            _displayedMonth = detected.Value;
+            LoadCacheForDate(_displayedMonth);
+        }
+
+        private void RebuildSemanticDotCache(IReadOnlyList<CalendarViewDayItem> dayItems)
+        {
+            _semanticDotColors.Clear();
+            var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
+
+            foreach (var item in dayItems)
+            {
+                var dateStr = item.Date.Date.ToString("yyyy-MM-dd");
+                bool hasEvent = EventCounts.TryGetValue(dateStr, out int count) && count > 0;
+                item.FontWeight = hasEvent
+                    ? Microsoft.UI.Text.FontWeights.Bold
+                    : Microsoft.UI.Text.FontWeights.Normal;
+                if (!hasEvent) continue;
+
+                var colors = new List<Color>();
+                if (_localCache.DayItems.TryGetValue(dateStr, out var agendaItems))
+                {
+                    foreach (var agendaItem in agendaItems)
+                    {
+                        if (accountMgr != null && !accountMgr.IsItemVisible(agendaItem)) continue;
+                        accountMgr?.PopulateItemColor(agendaItem);
+                        var color = !string.IsNullOrEmpty(agendaItem.ColorHex)
+                            ? Services.ColorHelper.ParseHex(agendaItem.ColorHex)
+                            : Color.FromArgb(255, 0, 120, 215);
+                        if (!colors.Any(existing => existing.R == color.R && existing.G == color.G && existing.B == color.B))
+                            colors.Add(color);
+                    }
+                }
+                if (colors.Count == 0)
+                    colors.Add(Color.FromArgb(255, 0, 120, 215));
+                _semanticDotColors[item] = colors;
+            }
         }
 
         private void ApplyDotOverlay(IReadOnlyList<DotSpec> dots)
@@ -525,42 +605,8 @@ namespace Task_Flyout
             return brush;
         }
 
-        private List<CalendarViewDayItem> GetVisibleDayItems()
-        {
-            if (!_visibleDayItemCacheDirty && _visibleDayItemCache != null)
-                return _visibleDayItemCache;
-
-            _visibleDayItemCache = FindAllDayItems(MainCalendar);
-            _visibleDayItemCacheDirty = false;
-            return _visibleDayItemCache;
-        }
-
-        private void InvalidateVisibleDayItemCache()
-        {
-            _visibleDayItemCacheDirty = true;
-            _visibleDayItemCache = null;
-        }
-
-        private List<CalendarViewDayItem> FindAllDayItems(DependencyObject parent)
-        {
-            var result = new List<CalendarViewDayItem>();
-            if (parent == null) return result;
-
-            int count = VisualTreeHelper.GetChildrenCount(parent);
-            for (int i = 0; i < count; i++)
-            {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is CalendarViewDayItem dayItem)
-                {
-                    result.Add(dayItem);
-                }
-                else
-                {
-                    result.AddRange(FindAllDayItems(child));
-                }
-            }
-            return result;
-        }
+        private List<CalendarViewDayItem> GetRealizedDayItems()
+            => _realizedDayItems.Keys.Where(item => item.IsLoaded).ToList();
 
         private void MainCalendar_SelectedDatesChanged(CalendarView sender, CalendarViewSelectedDatesChangedEventArgs args)
         {
@@ -573,7 +619,6 @@ namespace Task_Flyout
             }
 
             _selectedDay = args.AddedDates[0].Date;
-            LoadCacheForDate(_selectedDay);
             UpdateSelectedDateHeader();
             ShowDataForDate(_selectedDay);
         }
@@ -715,57 +760,11 @@ namespace Task_Flyout
                 var min = fullSync ? DateTime.Today.AddYears(-1) : DateTime.Today.AddDays(-QuickSyncPastDays);
                 var max = fullSync ? DateTime.Today.AddYears(3) : DateTime.Today.AddDays(QuickSyncFutureDays);
 
-                var allItems = await _syncManager.GetAllDataAsync(min, max, forceRefresh);
+                await _syncManager.GetAllDataAsync(min, max, forceRefresh);
 
-                var tempDayItems = new Dictionary<string, List<AgendaItem>>();
-                var tempMarkedDates = new HashSet<string>();
-                var tempEventCounts = new Dictionary<string, int>();
-
-                foreach (var item in allItems)
-                {
-                    if (string.IsNullOrEmpty(item.DateKey)) continue;
-
-                    if (!tempDayItems.ContainsKey(item.DateKey))
-                        tempDayItems[item.DateKey] = new List<AgendaItem>();
-
-                    tempDayItems[item.DateKey].Add(item);
-
-                    if (IsItemVisible(item))
-                    {
-                        tempMarkedDates.Add(item.DateKey);
-                        if (!tempEventCounts.ContainsKey(item.DateKey)) tempEventCounts[item.DateKey] = 0;
-                        tempEventCounts[item.DateKey]++;
-                    }
-                }
-
-                bool dataChanged = tempDayItems.Count != _localCache.DayItems.Count
-                    || tempEventCounts.Count != EventCounts.Count;
-                if (!dataChanged)
-                {
-                    foreach (var kvp in tempEventCounts)
-                    {
-                        if (!EventCounts.TryGetValue(kvp.Key, out int oldCount) || oldCount != kvp.Value)
-                        { dataChanged = true; break; }
-                    }
-                }
-
-                _localCache = new AppCache
-                {
-                    DayItems = tempDayItems,
-                    MarkedDates = tempMarkedDates
-                };
-                MarkedDates = tempMarkedDates;
-                EventCounts = tempEventCounts;
-
-                if (dataChanged)
-                {
-                    RequestDotRefresh();
-                    ShowDataForDate(_selectedDay);
-                }
-                else
-                {
-                    RequestDotRefresh();
-                }
+                LoadCacheForDate(_displayedMonth);
+                RequestDotRefresh();
+                ShowDataForDate(_selectedDay);
 
                 if (App.Current is App app) app.NotificationService?.CheckUpcomingEvents();
                 _lastSyncSucceededAt = DateTimeOffset.Now;
@@ -1166,6 +1165,7 @@ namespace Task_Flyout
 
         public void ReloadFilters()
         {
+            _filterVersion++;
             EventCounts.Clear();
             if (_localCache?.DayItems != null)
             {
