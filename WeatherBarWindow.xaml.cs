@@ -377,6 +377,8 @@ namespace Task_Flyout
             _isParented = SetParent(hWnd, _taskbarHwnd) != IntPtr.Zero || GetParent(hWnd) == _taskbarHwnd;
             if (_isParented)
             {
+                NextRenderHelper.RunOnce(() =>
+                    PerformanceDiagnostics.MarkOnce("weatherbar.attach", "weather_bar", "first_attach", source: "shell"));
                 ResetCachedWindowPlacement();
                 SuppressDwmBorder(hWnd);
                 ApplyWindowsTheme();
@@ -1661,6 +1663,8 @@ namespace Task_Flyout
                 RecomputeBarWidth();
                 QueueBarWidthRecompute();
                 UpdateWeatherIconGlow();
+                NextRenderHelper.RunOnce(() =>
+                    PerformanceDiagnostics.MarkOnce("weatherbar.display", "weather_bar", "first_weather_display", source: "ui"));
             });
         }
 

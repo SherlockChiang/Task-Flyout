@@ -53,6 +53,8 @@ namespace Task_Flyout.Views
         private bool _isInternalArticleNavigation;
         private WebView2? _rssArticleWebView;
         private CancellationTokenSource? _rssResourceCts;
+        private PerformanceDiagnostics.Span? _rssNavigationSpan;
+        private ulong _rssNavigationId;
         private DateTimeOffset? _lastArticleLoadSucceededAt;
         private int _pageGeneration;
         private CancellationTokenSource? _pageLifetimeCts;
@@ -1085,7 +1087,18 @@ namespace Task_Flyout.Views
             try
             {
                 var webView = EnsureRssArticleWebView();
-                await webView.EnsureCoreWebView2Async();
+                var environmentSpan = PerformanceDiagnostics.StartSpanUntilSuccess(
+                    "webview2.environment.init", "webview2", "first_environment_init", "runtime");
+                try
+                {
+                    await webView.EnsureCoreWebView2Async();
+                    environmentSpan.Complete();
+                }
+                catch
+                {
+                    environmentSpan.Complete("failure");
+                    throw;
+                }
                 if (!_rssWebViewConfigured && webView.CoreWebView2 != null)
                 {
                     WebView2RuntimeService.RegisterProfile(webView.CoreWebView2.Profile);
@@ -1112,6 +1125,8 @@ namespace Task_Flyout.Views
                 }
 
                 _isInternalArticleNavigation = true;
+                _rssNavigationSpan = PerformanceDiagnostics.StartSpanUntilSuccess(
+                    "rss.article.display", "rss", "first_article_navigation_display", "webview2");
                 webView.NavigateToString(BuildArticleHtml(article, IsDarkThemeActive()));
             }
             catch (Exception ex)
@@ -1162,7 +1177,10 @@ namespace Task_Flyout.Views
         private void RssArticle_NavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
         {
             if (_isInternalArticleNavigation)
+            {
+                _rssNavigationId = args.NavigationId;
                 return;
+            }
 
             if (args.Uri == "about:blank") return;
             args.Cancel = true;
@@ -1171,7 +1189,16 @@ namespace Task_Flyout.Views
 
         private void RssArticle_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs args)
         {
+            if (args.NavigationId != _rssNavigationId) return;
+
             _isInternalArticleNavigation = false;
+            _rssNavigationId = 0;
+            var span = _rssNavigationSpan;
+            _rssNavigationSpan = null;
+            if (args.IsSuccess)
+                NextRenderHelper.RunOnce(() => span?.Complete());
+            else
+                span?.Complete("failure");
         }
 
         private void RssArticle_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs args)

@@ -297,6 +297,12 @@ namespace Task_Flyout.Views
                     node.Children.Add(child);
                     _folderNodes[child] = (account, folder);
                 }
+                if (folders.Count > 0)
+                {
+                    NextRenderHelper.RunOnce(() =>
+                        PerformanceDiagnostics.MarkOnce(
+                            "mail.folders.visible", "mail", "first_folders_visible", source: "ui"));
+                }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
             catch (Exception ex)
@@ -1452,6 +1458,8 @@ namespace Task_Flyout.Views
         private bool _isInternalMailHtmlNavigation;
         private WebView2? _detailHtmlView;
         private CancellationTokenSource? _mailResourceCts;
+        private PerformanceDiagnostics.Span? _mailNavigationSpan;
+        private ulong _mailNavigationId;
 
         // Per-message "show images this once" override for the remote-image privacy block.
         private bool _showRemoteImagesForCurrentMessage;
@@ -1489,7 +1497,18 @@ namespace Task_Flyout.Views
                         DetailHtmlViewHost.Visibility = Visibility.Visible;
                         RemoteImageBanner.Visibility = remoteBlocked ? Visibility.Visible : Visibility.Collapsed;
                         var htmlView = EnsureDetailHtmlView();
-                        await htmlView.EnsureCoreWebView2Async();
+                        var environmentSpan = PerformanceDiagnostics.StartSpanUntilSuccess(
+                            "webview2.environment.init", "webview2", "first_environment_init", "runtime");
+                        try
+                        {
+                            await htmlView.EnsureCoreWebView2Async();
+                            environmentSpan.Complete();
+                        }
+                        catch
+                        {
+                            environmentSpan.Complete("failure");
+                            throw;
+                        }
                         if (!_webView2Configured)
                         {
                             var coreWebView = htmlView.CoreWebView2;
@@ -1516,6 +1535,8 @@ namespace Task_Flyout.Views
                         CancelMailResourceRequests();
                         _mailResourceCts = new CancellationTokenSource();
                         _isInternalMailHtmlNavigation = true;
+                        _mailNavigationSpan = PerformanceDiagnostics.StartSpanUntilSuccess(
+                            "mail.html.render", "mail", "first_html_navigation_render", "webview2");
                         htmlView.NavigateToString(htmlDocument);
                         return;
                     }
@@ -1542,7 +1563,10 @@ namespace Task_Flyout.Views
         private void MailHtml_NavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
         {
             if (_isInternalMailHtmlNavigation)
+            {
+                _mailNavigationId = args.NavigationId;
                 return;
+            }
 
             if (!args.IsRedirected && args.Uri != "about:blank")
             {
@@ -1553,7 +1577,16 @@ namespace Task_Flyout.Views
 
         private void MailHtml_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs args)
         {
+            if (args.NavigationId != _mailNavigationId) return;
+
             _isInternalMailHtmlNavigation = false;
+            _mailNavigationId = 0;
+            var span = _mailNavigationSpan;
+            _mailNavigationSpan = null;
+            if (args.IsSuccess)
+                NextRenderHelper.RunOnce(() => span?.Complete());
+            else
+                span?.Complete("failure");
         }
 
         private void MailHtml_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs args)

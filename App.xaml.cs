@@ -106,17 +106,19 @@ namespace Task_Flyout
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
-            var startup = StartupDiagnostics.Start();
+            bool performanceDiagnosticsEnabled =
+                (ApplicationData.Current.LocalSettings.Values["PerformanceDiagnosticsEnabled"] as bool? ?? false)
+                || string.Equals(Environment.GetEnvironmentVariable("TASKFLYOUT_PERFORMANCE_DIAGNOSTICS"), "1", StringComparison.Ordinal);
+            PerformanceDiagnostics.Initialize(performanceDiagnosticsEnabled);
+            var startup = PerformanceDiagnostics.StartProcessSpanOnce("startup.tray", "startup", "tray_interactive", "process");
             MainDispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
             ApplyConfiguredThemeToOpenWindows();
-            startup.Mark("dispatcher-theme");
 
             NotificationService = new NotificationService(SyncManager);
             NotificationService.Initialize();
             _backgroundRefresh = new BackgroundRefreshCoordinator(MainDispatcherQueue, NotificationService, MailService);
             MailService.NewMailArrived += MailService_NewMailArrived;
             MemoryDiagnostics.StartIfEnabled();
-            startup.Mark("services");
 
             _trayIcon = (H.NotifyIcon.TaskbarIcon)Resources["MyTrayIcon"];
             _uiSettings = new UISettings();
@@ -126,7 +128,6 @@ namespace Task_Flyout
             _trayIcon.ForceCreate(enablesEfficiencyMode: EfficiencyModeEnabledSetting);
             _ = EnsureAccountsHydratedAsync();
             QueueBackgroundRefreshStart();
-            startup.Mark("tray-mail");
 
             _trayIcon.LeftClickCommand = new RelayCommand(async () =>
             {
@@ -138,7 +139,6 @@ namespace Task_Flyout
             InitWeatherBar();
             if (ShouldWeatherBarBeEnabled())
                 StartWeatherBarWatchdog();
-            startup.Mark("weatherbar");
 
             // Subscribe for user-started location tracking updates. Do not request location
             // permission during app startup; only WeatherPage user actions may start tracking.
@@ -179,12 +179,10 @@ namespace Task_Flyout
 
             HandleLaunchActivation(args);
             QueueFlyoutPrewarmIfEnabled();
-            startup.Mark("activation");
 
             // Launched into the tray with no window on screen — start throttled.
             UpdateEfficiencyMode();
-            startup.Mark("efficiency-mode");
-            _ = startup.FlushAsync();
+            startup.Complete();
         }
 
         public static bool EfficiencyModeEnabledSetting =>
@@ -639,6 +637,7 @@ namespace Task_Flyout
             MailService.StopMailPolling();
             MailService.StopPendingMutationRetryScheduler();
             MemoryDiagnostics.Stop();
+            await PerformanceDiagnostics.FlushAsync();
             MailService.NewMailArrived -= MailService_NewMailArrived;
             await FlushPendingSavesBeforeExitAsync();
             if (_uiSettings != null) _uiSettings.ColorValuesChanged -= UiSettings_ColorValuesChanged;

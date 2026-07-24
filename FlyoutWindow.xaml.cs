@@ -821,6 +821,8 @@ namespace Task_Flyout
             AdjustWindowHeight();
             Activate();
             _appWindow.Show();
+            NextRenderHelper.RunOnce(() =>
+                PerformanceDiagnostics.MarkOnce("flyout.visible", "flyout", "first_visible", source: "ui"));
             App.UpdateEfficiencyMode();
             _clockTimer?.Start();
             _syncTimer?.Start();

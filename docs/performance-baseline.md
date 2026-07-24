@@ -1,4 +1,4 @@
-# Performance Baseline Checklist
+# Performance Baseline
 
 Use this checklist before and after performance-sensitive changes. Record results in the PR or release notes so optimizations have comparable numbers.
 
@@ -10,11 +10,29 @@ Use this checklist before and after performance-sensitive changes. Record result
 - Accounts: connected providers enabled for the run, with private account names omitted.
 - Data size: approximate mail folders/messages, RSS subscriptions/articles, calendars/tasks.
 
+## Automatic Diagnostics
+
+Performance diagnostics are off by default. Enable them with the local setting `PerformanceDiagnosticsEnabled=true` or set `TASKFLYOUT_PERFORMANCE_DIAGNOSTICS=1` before starting the process. Restart the app after changing either option.
+
+Each process gets a random `run_id`. Records are appended in the background to `%LOCALAPPDATA%\TaskFlyout\Logs\performance-diagnostics.csv` (or the corresponding packaged local app-data location). The log rotates to one `.1` backup at 2 MB. Exit performs a best-effort two-second flush.
+
+The long-form CSV schema is `run_id,sequence,timestamp,scenario,metric,start,end,duration,outcome,source`. These fields contain fixed diagnostic identifiers and timings only. Do not add account names, message/feed/calendar content, URLs, locations, identifiers, or arbitrary content fields.
+
+Captured milestones include process start to interactive tray, first flyout display, Calendar cached display and actual remote completion, Mail folders and successful HTML render, RSS successful article display, process-wide WebView2 initialization, and Weather Bar attachment/display. Calendar cache short-circuits are intentionally excluded from the remote-sync metric.
+
+Collect at least 20 independent runs, then summarize one or more current/rotated files:
+
+```powershell
+.\scripts\summarize-performance.ps1 "$env:LOCALAPPDATA\TaskFlyout\Logs\performance-diagnostics.csv"
+```
+
+The summarizer uses nearest-rank percentiles. It always reports P50, reports P95 only with at least 20 successful samples, and includes success, failure, and per-run missing counts where the log permits them.
+
 ## Metrics
 
 | Area | How to Measure | Record |
 | --- | --- | --- |
-| Cold startup | Start app after process exit. Use `%LOCALAPPDATA%\Packages\TaskFlyout*\RoamingState\Logs\startup.csv` if packaged, or the app roaming log path used by the dev run. | `totalMs`, key startup marks, visible tray time. |
+| Cold startup | Start app after process exit with performance diagnostics enabled. | `startup/tray_interactive` duration. |
 | Tray idle memory | Wait 60 seconds with flyout closed. Capture Task Manager working set/private bytes. | Working set, private bytes, CPU idle %. |
 | Flyout first open | Start app, open flyout once after tray appears. Measure stopwatch or screen recording. | Time to visible shell, time to populated agenda. |
 | Mail first HTML render | Open Mail page and first HTML message after cold start. | Time to list, time to body visible, WebView2 initialization delay. |
@@ -25,8 +43,8 @@ Use this checklist before and after performance-sensitive changes. Record result
 
 1. Close existing Task Flyout processes.
 2. Clear only measurement noise if needed; do not clear app data unless the test explicitly says cold profile.
-3. Run each scenario three times.
-4. Record median and worst run.
+3. Run each scenario at least 20 times when establishing an automatic P95 baseline.
+4. Record nearest-rank P50/P95 plus success, failure, and missing counts.
 5. Note any external service failure instead of hiding it.
 
 ## Guardrails

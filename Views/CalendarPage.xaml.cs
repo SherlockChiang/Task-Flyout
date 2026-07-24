@@ -184,6 +184,9 @@ namespace Task_Flyout.Views
                 UpdateSideBar(targetCell);
             }
 
+            NextRenderHelper.RunOnce(() =>
+                PerformanceDiagnostics.MarkOnce("calendar.cache.display", "calendar", "first_cached_display", source: "cache"));
+
             _ = SyncMonthDataAsync();
         }
 

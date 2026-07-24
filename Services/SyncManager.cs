@@ -318,6 +318,12 @@ namespace Task_Flyout.Services
             if (!forceRefresh && IsRangeCached(min, max, activeProviders.Select(provider => provider.ProviderName)))
                 return GetCachedItems(min, max);
 
+            var remoteSpan = PerformanceDiagnostics.StartSpanUntilSuccess(
+                "calendar.remote.sync",
+                "calendar",
+                "first_remote_sync_completion",
+                "remote");
+
             var allItems = new List<AgendaItem>();
             var successfulProviders = new List<string>();
             var attemptedProviders = activeProviders.Select(provider => provider.ProviderName).ToList();
@@ -345,8 +351,21 @@ namespace Task_Flyout.Services
                 }
             });
 
-            var results = await Task.WhenAll(fetchTasks);
-            cancellationToken.ThrowIfCancellationRequested();
+            (string Provider, List<AgendaItem> Items, bool Success)[] results;
+            try
+            {
+                results = await Task.WhenAll(fetchTasks);
+            }
+            catch
+            {
+                remoteSpan.Complete("failure");
+                throw;
+            }
+            if (cancellationToken.IsCancellationRequested)
+            {
+                remoteSpan.Complete("failure");
+                cancellationToken.ThrowIfCancellationRequested();
+            }
             foreach (var result in results)
             {
                 if (result.Success)
@@ -356,9 +375,19 @@ namespace Task_Flyout.Services
                 }
             }
 
-            bool changed = await MergeIntoCacheAsync(min, max, allItems, successfulProviders, attemptedProviders);
-            if (changed)
-                await SaveCacheAsync();
+            try
+            {
+                bool changed = await MergeIntoCacheAsync(min, max, allItems, successfulProviders, attemptedProviders);
+                if (changed)
+                    await SaveCacheAsync();
+            }
+            catch
+            {
+                remoteSpan.Complete("failure");
+                throw;
+            }
+
+            remoteSpan.Complete(successfulProviders.Count > 0 ? "success" : "failure");
 
             return GetCachedItems(min, max);
         }
