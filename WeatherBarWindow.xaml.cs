@@ -109,8 +109,23 @@ namespace Task_Flyout
         [DllImport("user32.dll")]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
+        [DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT { public int Left, Top, Right, Bottom; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MONITORINFO
+        {
+            public int Size;
+            public RECT Monitor;
+            public RECT Work;
+            public uint Flags;
+        }
 
         private delegate IntPtr SUBCLASSPROC(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, IntPtr uIdSubclass, IntPtr dwRefData);
 
@@ -151,10 +166,15 @@ namespace Task_Flyout
         private const uint WM_SETTINGCHANGE = 0x001A;
         private const uint WM_DPICHANGED = 0x02E0;
         private const uint WM_PARENTNOTIFY = 0x0210;
+        private const uint MONITOR_DEFAULTTONEAREST = 2;
 
         private SUBCLASSPROC? _subclassProc;
 
         #endregion
+
+        private WeatherBarDiagnostics _diagnostics = WeatherBarDiagnostics.Unavailable();
+
+        public WeatherBarDiagnostics Diagnostics => _diagnostics;
 
         // System child-window class names inside Shell_TrayWnd (not widgets, skip these)
         private static readonly HashSet<string> SystemTaskbarClasses = new(StringComparer.Ordinal)
@@ -284,19 +304,18 @@ namespace Task_Flyout
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
 
-                IntPtr currentTaskbar = FindWindow("Shell_TrayWnd", null);
+                IntPtr currentTaskbar = FindTaskbarWindow();
                 if (currentTaskbar == IntPtr.Zero || !IsWindow(currentTaskbar))
                 {
-                    _taskbarHwnd = IntPtr.Zero;
-                    _isParented = false;
+                    InvalidateTaskbarAttachment("No supported taskbar window found");
                     return;
                 }
 
                 bool needsAttach = currentTaskbar != _taskbarHwnd || GetParent(hWnd) != currentTaskbar;
                 if (needsAttach)
                 {
+                    InvalidateTaskbarAttachment("Taskbar window changed");
                     _taskbarHwnd = currentTaskbar;
-                    _isParented = false;
                     AttachToTaskbar();
                 }
 
@@ -313,8 +332,7 @@ namespace Task_Flyout
             }
             catch
             {
-                _taskbarHwnd = IntPtr.Zero;
-                _isParented = false;
+                InvalidateTaskbarAttachment("Taskbar polling failed");
             }
             finally
             {
@@ -348,7 +366,7 @@ namespace Task_Flyout
             if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
 
             if (_taskbarHwnd == IntPtr.Zero)
-                _taskbarHwnd = FindWindow("Shell_TrayWnd", null);
+                _taskbarHwnd = FindTaskbarWindow();
             if (_taskbarHwnd == IntPtr.Zero || !IsWindow(_taskbarHwnd)) return;
 
             int style = GetWindowLong(hWnd, GWL_STYLE);
@@ -423,7 +441,7 @@ namespace Task_Flyout
                     IntPtr parent = GetParent(hWnd);
                     if (parent == IntPtr.Zero || parent != _taskbarHwnd)
                     {
-                        _isParented = false;
+                        InvalidateTaskbarAttachment("Weather bar parent changed");
                         UseFastReparentPolling();
                     }
                 });
@@ -469,11 +487,14 @@ namespace Task_Flyout
                 if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
                 if (_taskbarHwnd == IntPtr.Zero || !IsWindow(_taskbarHwnd) || !_isParented)
                 {
-                    _isParented = false;
+                    InvalidateTaskbarAttachment("Taskbar attachment is not active");
                     return;
                 }
-                if (!GetWindowRect(_taskbarHwnd, out RECT tbRect)) return;
-                if (!GetClientRect(_taskbarHwnd, out RECT tbClient)) return;
+                if (!GetWindowRect(_taskbarHwnd, out RECT tbRect) || !GetClientRect(_taskbarHwnd, out RECT tbClient))
+                {
+                    _diagnostics = WeatherBarDiagnostics.Unavailable("Taskbar geometry is unavailable");
+                    return;
+                }
 
             double scaleFactor = Math.Max(1, GetDpiForWindow(_taskbarHwnd) / 96.0);
             int taskbarHeight = tbClient.Bottom - tbClient.Top;
@@ -518,20 +539,92 @@ namespace Task_Flyout
 
                 if (placementChanged)
                 {
-                    SetWindowPos(hWnd, insertAfter, x, y, pillWidth, pillHeight, flags);
-                    _lastBarX = x;
-                    _lastBarY = y;
-                    _lastBarWidth = pillWidth;
-                    _lastBarHeight = pillHeight;
-                    _lastInsertAfter = insertAfter;
+                    if (SetWindowPos(hWnd, insertAfter, x, y, pillWidth, pillHeight, flags))
+                    {
+                        _lastBarX = x;
+                        _lastBarY = y;
+                        _lastBarWidth = pillWidth;
+                        _lastBarHeight = pillHeight;
+                        _lastInsertAfter = insertAfter;
+                    }
+                    else
+                    {
+                        widgets = widgets with { FallbackReason = "SetWindowPos failed" };
+                        ResetCachedWindowPlacement();
+                    }
                 }
+
+                UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets);
             }
             catch
             {
-                _taskbarHwnd = IntPtr.Zero;
-                _isParented = false;
+                InvalidateTaskbarAttachment("Taskbar placement failed");
             }
         }
+
+        private IntPtr FindTaskbarWindow()
+        {
+            IntPtr primary = FindWindow(TaskbarSelectionPolicy.PrimaryClass, null);
+            IntPtr secondary = FindWindow(TaskbarSelectionPolicy.SecondaryClass, null);
+            string currentClass = GetWindowClassName(_taskbarHwnd);
+            long selected = TaskbarSelectionPolicy.Select(
+                _taskbarHwnd.ToInt64(),
+                _taskbarHwnd != IntPtr.Zero && IsWindow(_taskbarHwnd),
+                currentClass,
+                primary.ToInt64(),
+                secondary.ToInt64());
+            return new IntPtr(selected);
+        }
+
+        private string GetWindowClassName(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return "";
+            _classNameBuffer.Clear();
+            return GetClassName(hWnd, _classNameBuffer, _classNameBuffer.Capacity) > 0
+                ? _classNameBuffer.ToString()
+                : "";
+        }
+
+        private void InvalidateTaskbarAttachment(string reason)
+        {
+            _taskbarHwnd = IntPtr.Zero;
+            _fluentFlyoutHwnd = IntPtr.Zero;
+            _isParented = false;
+            ResetCachedWindowPlacement();
+            _diagnostics = WeatherBarDiagnostics.Unavailable(reason);
+        }
+
+        public void ForceReattach()
+        {
+            if (_userHidden) return;
+            InvalidateTaskbarAttachment("Manual reattach requested");
+            UseFastReparentPolling();
+            ReparentTimer_Tick(null, EventArgs.Empty);
+        }
+
+        private void UpdateDiagnostics(IntPtr barHwnd, RECT taskbarRect, double scaleFactor, TaskbarWidgetGeometry widgets)
+        {
+            string monitorRect = "Unavailable";
+            IntPtr monitor = MonitorFromWindow(_taskbarHwnd, MONITOR_DEFAULTTONEAREST);
+            var monitorInfo = new MONITORINFO { Size = Marshal.SizeOf<MONITORINFO>() };
+            if (monitor != IntPtr.Zero && GetMonitorInfo(monitor, ref monitorInfo))
+                monitorRect = FormatRect(monitorInfo.Monitor);
+
+            string barRect = GetWindowRect(barHwnd, out RECT currentBarRect)
+                ? FormatRect(currentBarRect)
+                : "Unavailable";
+            _diagnostics = new WeatherBarDiagnostics(
+                GetWindowClassName(_taskbarHwnd),
+                widgets.DetectionSource,
+                monitorRect,
+                (uint)Math.Round(scaleFactor * 96),
+                FormatRect(taskbarRect),
+                barRect,
+                widgets.FallbackReason);
+        }
+
+        private static string FormatRect(RECT rect)
+            => $"({rect.Left}, {rect.Top})-({rect.Right}, {rect.Bottom})";
 
         private void ResetCachedWindowPlacement()
         {
@@ -638,7 +731,11 @@ namespace Task_Flyout
             }
         }
 
-        private readonly record struct TaskbarWidgetGeometry(int OccupiedOffset, int NativeWidgetHeight);
+        private readonly record struct TaskbarWidgetGeometry(
+            int OccupiedOffset,
+            int NativeWidgetHeight,
+            string DetectionSource,
+            string FallbackReason);
 
         private TaskbarWidgetGeometry GetTaskbarWidgetGeometry(IntPtr ownHwnd, RECT taskbarScreenRect, double scaleFactor)
         {
@@ -653,7 +750,9 @@ namespace Task_Flyout
 
                 int maxRightScreen = taskbarLeft;
                 int nativeWidgetHeight = GetNativeWidgetContainerHeight(
-                    ownHwnd, taskbarScreenRect, scaleFactor);
+                    ownHwnd, taskbarScreenRect, scaleFactor, out bool usedGlobalBridgeFallback);
+                bool foundDirectBridge = false;
+                bool foundFluentFlyout = false;
                 _fluentFlyoutHwnd = IntPtr.Zero;
 
                 // Enumerate direct children of Shell_TrayWnd (FluentFlyout TaskbarWindow is
@@ -707,7 +806,12 @@ namespace Task_Flyout
 
                         // Remember FluentFlyout's HWND for z-order arrangement
                         if (isFluentFlyout)
+                        {
                             _fluentFlyoutHwnd = child;
+                            foundFluentFlyout = true;
+                        }
+                        if (isBridge)
+                            foundDirectBridge = true;
 
                         int right = Math.Min(visibleRc.Right, taskbarMidX);
                         if (right > maxRightScreen) maxRightScreen = right;
@@ -725,20 +829,33 @@ namespace Task_Flyout
                 }
 
                 int occupiedOffset = maxRightScreen > taskbarLeft ? maxRightScreen - taskbarLeft : 0;
-                return new TaskbarWidgetGeometry(occupiedOffset, nativeWidgetHeight);
+                string source = foundDirectBridge
+                    ? "Taskbar child bridge"
+                    : usedGlobalBridgeFallback
+                        ? "Global bridge fallback"
+                        : foundFluentFlyout
+                            ? "FluentFlyout"
+                            : "None";
+                string fallbackReason = usedGlobalBridgeFallback && !foundDirectBridge
+                    ? "No taskbar child bridge; used global bridge scan"
+                    : source == "None"
+                        ? "No Widgets bridge detected"
+                    : "None";
+                return new TaskbarWidgetGeometry(occupiedOffset, nativeWidgetHeight, source, fallbackReason);
             }
             catch
             {
-                return default;
+                return new TaskbarWidgetGeometry(0, 0, "None", "Widgets bridge detection failed");
             }
         }
 
-        private int GetNativeWidgetContainerHeight(IntPtr ownHwnd, RECT taskbarRect, double scaleFactor)
+        private int GetNativeWidgetContainerHeight(IntPtr ownHwnd, RECT taskbarRect, double scaleFactor, out bool foundBridge)
         {
             GetWindowThreadProcessId(ownHwnd, out uint ownPid);
             int taskbarMidX = (taskbarRect.Left + taskbarRect.Right) / 2;
             int leftTolerance = (int)Math.Ceiling(32 * scaleFactor);
             int detectedHeight = 0;
+            bool bridgeDetected = false;
 
             bool Inspect(IntPtr window)
             {
@@ -756,6 +873,7 @@ namespace Task_Flyout
                 int top = Math.Max(rect.Top, taskbarRect.Top);
                 int bottom = Math.Min(rect.Bottom, taskbarRect.Bottom);
                 detectedHeight = Math.Max(detectedHeight, bottom - top);
+                bridgeDetected = true;
                 return true;
             }
 
@@ -767,6 +885,7 @@ namespace Task_Flyout
                 return true;
             };
             EnumWindows(inspectTree, IntPtr.Zero);
+            foundBridge = bridgeDetected;
             return detectedHeight;
         }
 
@@ -1681,6 +1800,7 @@ namespace Task_Flyout
         /// </summary>
         public void DetachForRecovery()
         {
+            InvalidateTaskbarAttachment("Explorer restarted or the taskbar disappeared");
             try { _refreshTimer?.Stop(); } catch { }
             try { _reparentTimer?.Stop(); } catch { }
             try { _themeRefreshTimer?.Stop(); } catch { }
@@ -1733,8 +1853,7 @@ namespace Task_Flyout
             }
             catch
             {
-                _taskbarHwnd = IntPtr.Zero;
-                _isParented = false;
+                InvalidateTaskbarAttachment("Showing the weather bar failed");
             }
         }
 

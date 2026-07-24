@@ -67,6 +67,7 @@ namespace Task_Flyout.Views
             AllowRssRemoteResourcesToggle.IsOn = settings.Values["AllowRssRemoteResources"] as bool? ?? false;
             ShowSecondsToggle.IsOn = settings.Values["ShowSeconds"] as bool? ?? false;
             AboutVersionText.Text = GetVersionText();
+            UpdateWeatherBarDiagnostics();
             await UpdateWebViewCacheStatusAsync();
 
             // 👉 这里已经支持多语言了！只需在英文 resw 中添加键名 TextMinutes，值为 Minutes 即可。
@@ -122,6 +123,26 @@ namespace Task_Flyout.Views
                     ? loader.GetStringOrDefault("TextVersionUnknown") ?? "Version unknown"
                     : $"{versionPrefix} {version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
             }
+        }
+
+        private void UpdateWeatherBarDiagnostics()
+        {
+            var diagnostics = App.GetWeatherBarDiagnostics();
+            WeatherBarDiagnosticsText.Text = string.Join(Environment.NewLine,
+                $"Taskbar class: {diagnostics.TaskbarClass}",
+                $"Widgets bridge source: {diagnostics.WidgetsBridgeSource}",
+                $"Monitor: {diagnostics.MonitorRect}",
+                $"DPI: {(diagnostics.Dpi == 0 ? "Unavailable" : diagnostics.Dpi)}",
+                $"Taskbar: {diagnostics.TaskbarRect}",
+                $"Weather bar: {diagnostics.BarRect}",
+                $"Fallback: {diagnostics.FallbackReason}");
+        }
+
+        private async void ReattachTaskbarButton_Click(object sender, RoutedEventArgs e)
+        {
+            App.ReattachWeatherBar();
+            await System.Threading.Tasks.Task.Delay(150);
+            UpdateWeatherBarDiagnostics();
         }
 
         private void SelectComboByTag(ComboBox combo, string tag)

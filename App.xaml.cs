@@ -439,7 +439,7 @@ namespace Task_Flyout
             => (ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false)
                && WeatherService.IsEnabled;
 
-        // The weather bar is reparented as a WS_CHILD of Shell_TrayWnd, so an Explorer restart
+        // The weather bar is reparented as a taskbar child, so an Explorer restart
         // destroys its native window and it silently disappears — and any later call into the
         // dead window (e.g. toggling "match taskbar") crashes natively. This watchdog detects
         // the dead/missing bar and rebuilds a fresh one once the taskbar is back.
@@ -469,7 +469,7 @@ namespace Task_Flyout
 
                 // Don't recreate mid-restart before the taskbar exists, or the new bar would
                 // briefly float as a stray top-level window.
-                if (FindWindow("Shell_TrayWnd", null) == IntPtr.Zero) return;
+                if (!IsSupportedTaskbarAvailable()) return;
 
                 var dead = MyWeatherBar;
                 MyWeatherBar = null;
@@ -483,6 +483,28 @@ namespace Task_Flyout
             {
                 System.Diagnostics.Debug.WriteLine($"WeatherBar watchdog failed: {ex.Message}");
             }
+        }
+
+        private static bool IsSupportedTaskbarAvailable()
+            => FindWindow(TaskbarSelectionPolicy.PrimaryClass, null) != IntPtr.Zero
+               || FindWindow(TaskbarSelectionPolicy.SecondaryClass, null) != IntPtr.Zero;
+
+        public static WeatherBarDiagnostics GetWeatherBarDiagnostics()
+            => MyWeatherBar?.Diagnostics ?? WeatherBarDiagnostics.Unavailable();
+
+        public static void ReattachWeatherBar()
+        {
+            MainDispatcherQueue.TryEnqueue(() =>
+            {
+                if (MyWeatherBar != null && MyWeatherBar.IsAlive())
+                {
+                    MyWeatherBar.ForceReattach();
+                    return;
+                }
+
+                if (Current is App app)
+                    app.CheckWeatherBarAlive();
+            });
         }
 
         public static void ToggleWeatherBar(bool enabled)

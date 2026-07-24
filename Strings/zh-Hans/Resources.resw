@@ -1155,6 +1155,15 @@
   <data name="SettingsPage_About.Text" xml:space="preserve">
     <value>关于</value>
   </data>
+  <data name="SettingsPage_WeatherBarDiagnostics.Text" xml:space="preserve">
+    <value>天气栏诊断</value>
+  </data>
+  <data name="SettingsPage_WeatherBarDiagnosticsDesc.Text" xml:space="preserve">
+    <value>只读的附加与布局状态，不收集窗口标题或个人数据。</value>
+  </data>
+  <data name="SettingsPage_ReattachTaskbar.Content" xml:space="preserve">
+    <value>重新附加任务栏</value>
+  </data>
   <data name="SettingsPage_Desc.Text" xml:space="preserve">
     <value>日程、任务、天气、邮件与 RSS 的托盘浮窗效率工具。</value>
   </data>

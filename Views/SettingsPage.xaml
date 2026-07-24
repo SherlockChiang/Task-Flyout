@@ -87,6 +87,13 @@
             </StackPanel>
 
             <StackPanel Spacing="8">
+                <TextBlock x:Uid="SettingsPage_WeatherBarDiagnostics" Text="天气栏诊断" FontWeight="SemiBold" FontSize="16"/>
+                <TextBlock x:Uid="SettingsPage_WeatherBarDiagnosticsDesc" Text="只读的窗口附加与布局状态，不包含窗口标题或个人数据。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                <TextBlock x:Name="WeatherBarDiagnosticsText" FontFamily="Consolas" FontSize="12" IsTextSelectionEnabled="True" TextWrapping="Wrap"/>
+                <Button x:Uid="SettingsPage_ReattachTaskbar" Content="重新附加任务栏" Click="ReattachTaskbarButton_Click" HorizontalAlignment="Left"/>
+            </StackPanel>
+
+            <StackPanel Spacing="8">
                 <TextBlock x:Uid="SettingsPage_About" Text="关于" FontWeight="SemiBold" FontSize="16"/>
                 <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
