@@ -14,7 +14,7 @@ namespace Task_Flyout.Services
         {
             MailAccountKind.Outlook => new(true, true, true, true, true, false),
             MailAccountKind.Google => new(true, true, true, true, true, false),
-            MailAccountKind.Imap => new(true, true, false, false, false, false),
+            MailAccountKind.Imap => new(true, true, true, true, true, false),
             _ => new(false, false, false, false, false, false)
         };
 

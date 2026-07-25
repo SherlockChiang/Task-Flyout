@@ -110,6 +110,18 @@ namespace Task_Flyout.Services
             : base("Gmail may have completed the action before the connection was interrupted.", innerException) { }
     }
 
+    public sealed class ImapMoveOutcomeUnknownException : Exception
+    {
+        public ImapMoveOutcomeUnknownException(Exception innerException)
+            : base("The IMAP server may have moved the message before the connection was interrupted.", innerException) { }
+    }
+
+    public sealed class ImapMoveIdentityUnavailableException : Exception
+    {
+        public ImapMoveIdentityUnavailableException()
+            : base("The IMAP server moved the message but did not return its destination identity.") { }
+    }
+
     public sealed record CachedMailMetadata(
         string AccountId,
         string FolderId,
@@ -760,6 +772,176 @@ namespace Task_Flyout.Services
             InvalidateMoveWindows(account.Id, sourceFolderId, moved.ParentFolderId, item.IsRead, adjustCounts: true);
             return new MailMoveResult(authoritativeItem, sourceFolderId, moved.ParentFolderId);
         }
+
+        public async Task<List<ImapMoveDestination>> FetchImapMoveDestinationsAsync(
+            MailAccount account,
+            string currentFolderFullName,
+            CancellationToken cancellationToken = default)
+        {
+            if (account.Kind != MailAccountKind.Imap) throw new NotSupportedException("Only IMAP folders are supported.");
+            using var client = new ImapClient();
+            await ConnectImapAsync(client, account, GetImapPassword(account.Id), cancellationToken);
+            EnsureSafeImapMoveCapabilities(client);
+
+            var result = new List<ImapMoveDestination>();
+            foreach (var folderNamespace in client.PersonalNamespaces)
+            {
+                var folders = await client.GetFoldersAsync(folderNamespace, cancellationToken: cancellationToken);
+                foreach (var folder in folders)
+                {
+                    bool noSelect = (folder.Attributes & FolderAttributes.NoSelect) != 0;
+                    bool nonExistent = (folder.Attributes & FolderAttributes.NonExistent) != 0;
+                    if (!ImapMovePolicy.IsSelectableDestination(folder.FullName, currentFolderFullName, noSelect, nonExistent)) continue;
+                    result.Add(new ImapMoveDestination
+                    {
+                        FullName = folder.FullName,
+                        Breadcrumb = BuildImapFolderBreadcrumb(folder)
+                    });
+                }
+            }
+            await client.DisconnectAsync(true, cancellationToken);
+            return result
+                .GroupBy(folder => folder.FullName, StringComparer.Ordinal)
+                .Select(group => group.First())
+                .OrderBy(folder => folder.Breadcrumb, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+        }
+
+        public Task<ImapMoveResult> ArchiveImapMessageAsync(MailAccount account, MailItem item, CancellationToken cancellationToken = default)
+            => MoveImapMessageInternalAsync(account, item, null, MailKit.SpecialFolder.Archive, cancellationToken);
+
+        public Task<ImapMoveResult> TrashImapMessageAsync(MailAccount account, MailItem item, CancellationToken cancellationToken = default)
+            => MoveImapMessageInternalAsync(account, item, null, MailKit.SpecialFolder.Trash, cancellationToken);
+
+        public Task<ImapMoveResult> MoveImapMessageAsync(MailAccount account, MailItem item, string destinationFolderFullName, CancellationToken cancellationToken = default)
+            => MoveImapMessageInternalAsync(account, item, destinationFolderFullName, null, cancellationToken);
+
+        public Task<ImapMoveResult> UndoImapMoveAsync(MailAccount account, ImapMoveResult forward, CancellationToken cancellationToken = default)
+            => MoveImapMessageInternalAsync(account, forward.Item, forward.Source.FolderFullName, null, cancellationToken);
+
+        private async Task<ImapMoveResult> MoveImapMessageInternalAsync(
+            MailAccount account,
+            MailItem item,
+            string? destinationFolderFullName,
+            MailKit.SpecialFolder? specialFolder,
+            CancellationToken cancellationToken)
+        {
+            if (account.Kind != MailAccountKind.Imap || !string.Equals(account.Id, item.AccountId, StringComparison.Ordinal))
+                throw new InvalidOperationException("The IMAP message does not belong to the selected account.");
+            if (!uint.TryParse(item.Id, out uint sourceUid) || item.ImapUidValidity is not > 0)
+                throw new InvalidOperationException("The IMAP message identity is invalid.");
+
+            var gates = new[] { MailMutationKind.SetReadState, MailMutationKind.SetFlagged }
+                .Select(kind => _mutationGates.GetOrAdd(GetMutationKey(account.Id, item.FolderId, item.Id, kind), _ => new SemaphoreSlim(1, 1)))
+                .ToList();
+            var acquiredGates = new List<SemaphoreSlim>();
+            try
+            {
+                foreach (var gate in gates)
+                {
+                    await gate.WaitAsync(cancellationToken);
+                    acquiredGates.Add(gate);
+                }
+                EnsurePersistentCacheLoaded();
+                lock (_mailCacheLock)
+                {
+                    if (_persistentCache?.PendingMutations.Any(mutation =>
+                            mutation.AccountId == account.Id && mutation.FolderId == item.FolderId && mutation.MessageId == item.Id) == true)
+                        throw new InvalidOperationException("Sync pending read or flag changes before moving this IMAP message.");
+                }
+                return await MoveImapMessageCoreAsync(account, item, sourceUid, destinationFolderFullName, specialFolder, cancellationToken);
+            }
+            finally
+            {
+                foreach (var gate in acquiredGates)
+                    gate.Release();
+            }
+        }
+
+        private async Task<ImapMoveResult> MoveImapMessageCoreAsync(
+            MailAccount account,
+            MailItem item,
+            uint sourceUid,
+            string? destinationFolderFullName,
+            MailKit.SpecialFolder? specialFolder,
+            CancellationToken cancellationToken)
+        {
+
+            using var client = new ImapClient();
+            await ConnectImapAsync(client, account, GetImapPassword(account.Id), cancellationToken);
+            EnsureSafeImapMoveCapabilities(client);
+
+            var source = await client.GetFolderAsync(item.FolderId, cancellationToken);
+            IMailFolder? destination = specialFolder.HasValue
+                ? client.GetFolder(specialFolder.Value)
+                : await client.GetFolderAsync(destinationFolderFullName!, cancellationToken);
+            if (destination == null ||
+                !ImapMovePolicy.IsSelectableDestination(destination.FullName, source.FullName,
+                    (destination.Attributes & FolderAttributes.NoSelect) != 0,
+                    (destination.Attributes & FolderAttributes.NonExistent) != 0))
+                throw new InvalidOperationException("The requested IMAP destination folder is unavailable.");
+
+            await source.OpenAsync(FolderAccess.ReadWrite, cancellationToken);
+            if (!MailPaginationPolicy.IsValidImapMutation(item.ImapUidValidity, source.UidValidity, sourceUid))
+            {
+                InvalidateMoveWindows(account.Id, item.FolderId, destination.FullName, item.IsRead, adjustCounts: false);
+                throw new InvalidOperationException("The IMAP message identity is no longer valid for this folder.");
+            }
+
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            UniqueId? movedUid;
+            try
+            {
+                movedUid = await source.MoveToAsync(new UniqueId(sourceUid), destination, operationCts.Token);
+            }
+            catch (OperationCanceledException ex)
+            {
+                RemoveBodyCacheIdentity(item);
+                InvalidateMoveWindows(account.Id, source.FullName, destination.FullName, item.IsRead, adjustCounts: false);
+                throw new ImapMoveOutcomeUnknownException(ex);
+            }
+            catch (Exception ex) when (IsAmbiguousImapMoveFailure(ex))
+            {
+                RemoveBodyCacheIdentity(item);
+                InvalidateMoveWindows(account.Id, source.FullName, destination.FullName, item.IsRead, adjustCounts: false);
+                throw new ImapMoveOutcomeUnknownException(ex);
+            }
+
+            if (!movedUid.HasValue || !ImapMovePolicy.HasAuthoritativeIdentity(movedUid.Value.Id, movedUid.Value.Validity))
+            {
+                RemoveBodyCacheIdentity(item);
+                InvalidateMoveWindows(account.Id, source.FullName, destination.FullName, item.IsRead, adjustCounts: false);
+                throw new ImapMoveIdentityUnavailableException();
+            }
+
+            var authoritativeItem = CloneMailItem(item, includeBodies: false);
+            authoritativeItem.FolderId = destination.FullName;
+            authoritativeItem.Id = movedUid.Value.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            authoritativeItem.ImapUidValidity = movedUid.Value.Validity;
+            RemoveBodyCacheIdentity(item);
+            InvalidateMoveWindows(account.Id, source.FullName, destination.FullName, item.IsRead, adjustCounts: true);
+            try { await client.DisconnectAsync(true, CancellationToken.None); } catch { }
+            return new ImapMoveResult(authoritativeItem,
+                new ImapMessageIdentity(source.FullName, source.UidValidity, sourceUid),
+                new ImapMessageIdentity(destination.FullName, movedUid.Value.Validity, movedUid.Value.Id));
+        }
+
+        private static void EnsureSafeImapMoveCapabilities(ImapClient client)
+        {
+            bool nativeMove = (client.Capabilities & ImapCapabilities.Move) != 0;
+            bool uidPlus = (client.Capabilities & ImapCapabilities.UidPlus) != 0;
+            if (!ImapMovePolicy.SupportsSafeMove(nativeMove, uidPlus))
+                throw new NotSupportedException("This IMAP server does not support safe online moves with authoritative destination identity.");
+        }
+
+        private static string BuildImapFolderBreadcrumb(IMailFolder folder)
+            => folder.DirectorySeparator == '\0'
+                ? folder.FullName
+                : folder.FullName.Replace(folder.DirectorySeparator.ToString(), " / ", StringComparison.Ordinal);
+
+        private static bool IsAmbiguousImapMoveFailure(Exception exception)
+            => exception is IOException or ServiceNotConnectedException or ProtocolException;
 
         public async Task<List<GmailLabelDestination>> FetchGmailMoveDestinationsAsync(
             MailAccount account,

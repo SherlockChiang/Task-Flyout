@@ -5,7 +5,7 @@
 - Outlook, Gmail, and IMAP: mark read/unread and flag/unflag for one or multiple messages.
 - Offline/transient failures: optimistic state remains visible and the latest intent for each message and mutation kind is retried.
 - Undo: restores each message's prior state and replaces any queued forward intent.
-- Outlook: archive, move, and move-to-Deleted-Items operate on exactly one selected message online. Gmail: archive removes `INBOX`, move adds a user label and removes the current movable label, and trash uses Gmail's safe trash endpoint. These operations are never retried or queued offline.
+- Outlook: archive, move, and move-to-Deleted-Items operate on exactly one selected message online. Gmail: archive removes `INBOX`, move adds a user label and removes the current movable label, and trash uses Gmail's safe trash endpoint. IMAP: archive, move, and trash require native MOVE plus UIDPLUS, validate UIDVALIDITY, and use server special-use folders. These operations are never retried or queued offline.
 
 ## Manual checks
 
@@ -24,7 +24,12 @@
 13. Select Undo and verify the returned Graph message ID is moved online to the original folder. Confirm the source folder force-refreshes and the restored message receives Graph's newest returned identity.
 14. Interrupt the network after submitting a move. Verify the operation is not retried or queued, both folder caches/cursors are invalidated, and the source folder is force-refreshed with an outcome-unknown status.
 15. Force Outlook draft send failure and verify cleanup moves the draft to canonical Deleted Items when that folder resolves; verify no message DELETE request is sent.
+16. On an IMAP server with MOVE and UIDPLUS, move one message and verify the returned target UID and UIDVALIDITY are used for online Undo. Verify the restored UID may differ from the original.
+17. Repeat on servers without MOVE and without UIDPLUS. Verify no MOVE, COPY, `\\Deleted`, or EXPUNGE command is sent and the action reports unsupported.
+18. Change source UIDVALIDITY before a move and target UIDVALIDITY before Undo. Verify each operation is rejected before UID MOVE and the folder is refreshed.
+19. Verify IMAP Archive and Trash use only special-use metadata, never localized folder-name guesses. If the special folder is absent, verify the action fails without moving the message.
+20. Make a server return tagged MOVE success without COPYUID. Verify folders refresh, no retry occurs, and Undo is not offered.
 
 ## Limitations
 
-IMAP archive/move/trash remain unsupported. Permanent delete is unsupported for every provider. Outlook and Gmail membership-changing operations require a live connection and provider mail-write authorization. A timeout or transport break can occur after the provider accepted an action, so the app invalidates and reconciles without retrying; it cannot promise whether that individual operation completed.
+IMAP archive/move/trash require native MOVE, UIDPLUS, stable UIDVALIDITY, and authoritative target identity for Undo; unsupported servers are never downgraded to copy/delete/expunge. Permanent delete is unsupported for every provider. Membership-changing operations require a live connection. A timeout or transport break can occur after the provider accepted an action, so the app invalidates and reconciles without retrying; it cannot promise whether that individual operation completed.

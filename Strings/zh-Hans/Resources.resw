@@ -1852,4 +1852,14 @@ Microsoft：{1}
   <data name="TextGmailUndoComplete" xml:space="preserve"><value>已撤销 Gmail 操作。</value></data>
   <data name="TextGmailUndoFailed" xml:space="preserve"><value>无法撤销 Gmail 操作。</value></data>
   <data name="TextGmailUndoOutcomeUnknown" xml:space="preserve"><value>Gmail 撤销结果未知。已刷新标签，且未重试操作。</value></data>
+  <data name="TextImapMoveNoDestinations" xml:space="preserve"><value>没有可用的 IMAP 目标文件夹。</value></data>
+  <data name="TextImapMoveDestinationsFailed" xml:space="preserve"><value>无法加载 IMAP 目标文件夹。服务器可能不支持安全移动。</value></data>
+  <data name="TextImapMoveComplete" xml:space="preserve"><value>邮件已移动。</value></data>
+  <data name="TextImapMoveFailed" xml:space="preserve"><value>无法移动 IMAP 邮件。</value></data>
+  <data name="TextImapMoveIdentityUnavailable" xml:space="preserve"><value>邮件已移动，但服务器未返回新身份，因此无法撤销。</value></data>
+  <data name="TextImapMoveOutcomeUnknown" xml:space="preserve"><value>移动结果未知。已刷新文件夹，且未重试操作。</value></data>
+  <data name="TextImapUndoComplete" xml:space="preserve"><value>已撤销 IMAP 移动。</value></data>
+  <data name="TextImapUndoFailed" xml:space="preserve"><value>无法撤销 IMAP 移动。</value></data>
+  <data name="TextImapUndoIdentityUnavailable" xml:space="preserve"><value>邮件已移回，但服务器未返回新的邮件身份。</value></data>
+  <data name="TextImapUndoOutcomeUnknown" xml:space="preserve"><value>撤销结果未知。已刷新文件夹，且未重试操作。</value></data>
 </root>

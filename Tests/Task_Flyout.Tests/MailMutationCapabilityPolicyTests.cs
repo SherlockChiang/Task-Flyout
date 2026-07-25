@@ -5,15 +5,15 @@ namespace Task_Flyout.Tests;
 public class MailMutationCapabilityPolicyTests
 {
     [Fact]
-    public void Imap_safe_state_mutations_are_supported_but_move_operations_are_not()
+    public void Imap_is_potentially_move_capable_but_never_supports_permanent_delete()
     {
         var capabilities = MailMutationCapabilityPolicy.For(MailAccountKind.Imap);
 
         Assert.True(capabilities.SetReadState);
         Assert.True(capabilities.SetFlagged);
-        Assert.False(capabilities.Archive);
-        Assert.False(capabilities.Move);
-        Assert.False(capabilities.Trash);
+        Assert.True(capabilities.Archive);
+        Assert.True(capabilities.Move);
+        Assert.True(capabilities.Trash);
         Assert.False(capabilities.PermanentDelete);
     }
 

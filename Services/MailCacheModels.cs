@@ -26,6 +26,16 @@ namespace Task_Flyout.Services
 
     public sealed record MailMoveResult(MailItem Item, string SourceFolderId, string DestinationFolderId);
 
+    public sealed class ImapMoveDestination
+    {
+        public string FullName { get; set; } = "";
+        public string Breadcrumb { get; set; } = "";
+        public override string ToString() => Breadcrumb;
+    }
+
+    public sealed record ImapMessageIdentity(string FolderFullName, uint UidValidity, uint Uid);
+    public sealed record ImapMoveResult(MailItem Item, ImapMessageIdentity Source, ImapMessageIdentity Destination);
+
     public sealed class GmailLabelDestination
     {
         public string Id { get; set; } = "";
