@@ -131,14 +131,14 @@
                     </Grid>
 
                     <CommandBar Grid.Row="1" x:Name="MailMutationCommandBar" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True">
-                        <AppBarButton x:Uid="MailPage_MarkRead" Label="Mark read" Icon="Mail" Click="MarkReadButton_Click"/>
-                        <AppBarButton x:Uid="MailPage_MarkUnread" Label="Mark unread" Icon="Mail" Click="MarkUnreadButton_Click"/>
-                        <AppBarButton x:Uid="MailPage_Flag" Label="Flag" Icon="Flag" Click="FlagButton_Click"/>
-                        <AppBarButton x:Uid="MailPage_Unflag" Label="Unflag" Icon="UnFavorite" Click="UnflagButton_Click"/>
+                        <AppBarButton x:Uid="MailPage_MarkRead" Label="Mark read" Click="MarkReadButton_Click"><AppBarButton.Icon><FontIcon Glyph="&#xE8C3;"/></AppBarButton.Icon></AppBarButton>
+                        <AppBarButton x:Uid="MailPage_MarkUnread" Label="Mark unread" Click="MarkUnreadButton_Click"><AppBarButton.Icon><FontIcon Glyph="&#xE715;"/></AppBarButton.Icon></AppBarButton>
+                        <AppBarButton x:Uid="MailPage_Flag" Label="Flag" Click="FlagButton_Click"><AppBarButton.Icon><FontIcon Glyph="&#xE7C1;"/></AppBarButton.Icon></AppBarButton>
+                        <AppBarButton x:Uid="MailPage_Unflag" Label="Unflag" Click="UnflagButton_Click"><AppBarButton.Icon><FontIcon Glyph="&#xE734;"/></AppBarButton.Icon></AppBarButton>
                         <AppBarSeparator x:Name="OutlookMoveSeparator" Visibility="Collapsed"/>
-                        <AppBarButton x:Uid="MailPage_Archive" x:Name="ArchiveButton" Label="Archive" Icon="Archive" Visibility="Collapsed" IsEnabled="False" Click="ArchiveButton_Click"/>
-                        <AppBarButton x:Uid="MailPage_Move" x:Name="MoveButton" Label="Move" Icon="MoveToFolder" Visibility="Collapsed" IsEnabled="False" Click="MoveButton_Click"/>
-                        <AppBarButton x:Uid="MailPage_Delete" x:Name="DeleteButton" Label="Delete" Icon="Delete" Visibility="Collapsed" IsEnabled="False" Click="DeleteButton_Click"/>
+                        <AppBarButton x:Uid="MailPage_Archive" x:Name="ArchiveButton" Label="Archive" Visibility="Collapsed" IsEnabled="False" Click="ArchiveButton_Click"><AppBarButton.Icon><FontIcon Glyph="&#xE7B8;"/></AppBarButton.Icon></AppBarButton>
+                        <AppBarButton x:Uid="MailPage_Move" x:Name="MoveButton" Label="Move" Visibility="Collapsed" IsEnabled="False" Click="MoveButton_Click"><AppBarButton.Icon><FontIcon Glyph="&#xE8DE;"/></AppBarButton.Icon></AppBarButton>
+                        <AppBarButton x:Uid="MailPage_Delete" x:Name="DeleteButton" Label="Delete" Visibility="Collapsed" IsEnabled="False" Click="DeleteButton_Click"><AppBarButton.Icon><FontIcon Glyph="&#xE74D;"/></AppBarButton.Icon></AppBarButton>
                     </CommandBar>
 
                     <ListView Grid.Row="2"
