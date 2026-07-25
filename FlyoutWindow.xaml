@@ -13,7 +13,7 @@
     PopupDirection="Vertical"
     ActivationMode="Activate"
     HideOnLostFocus="True"
-    IsTransitionAnimationEnabled="False"
+    IsTransitionAnimationEnabled="True"
     IsSwipeToDismissEnabled="False"
     IsBackdropEnabled="True"
     BackdropKind="Mica">
