@@ -104,6 +104,12 @@ namespace Task_Flyout.Services
         }
     }
 
+    public sealed class GmailActionOutcomeUnknownException : Exception
+    {
+        public GmailActionOutcomeUnknownException(Exception innerException)
+            : base("Gmail may have completed the action before the connection was interrupted.", innerException) { }
+    }
+
     public sealed record CachedMailMetadata(
         string AccountId,
         string FolderId,
@@ -753,6 +759,254 @@ namespace Task_Flyout.Services
             RemoveBodyCacheIdentity(item);
             InvalidateMoveWindows(account.Id, sourceFolderId, moved.ParentFolderId, item.IsRead, adjustCounts: true);
             return new MailMoveResult(authoritativeItem, sourceFolderId, moved.ParentFolderId);
+        }
+
+        public async Task<List<GmailLabelDestination>> FetchGmailMoveDestinationsAsync(
+            MailAccount account,
+            string currentLabelId,
+            CancellationToken cancellationToken = default)
+        {
+            if (account.Kind != MailAccountKind.Google) throw new NotSupportedException("Only Gmail labels are supported.");
+            var gmail = await EnsureGoogleMailModifyAuthorizedAsync(cancellationToken);
+            var response = await gmail.Users.Labels.List("me").ExecuteAsync(cancellationToken);
+            return GmailLabelMutationPolicy.Destinations(
+                response?.Labels?.Where(label => label != null).Select(label => new GmailLabelDestination
+                {
+                    Id = label.Id ?? "",
+                    DisplayName = label.Name ?? label.Id ?? "",
+                    IsUserLabel = string.Equals(label.Type, "user", StringComparison.OrdinalIgnoreCase)
+                }) ?? Enumerable.Empty<GmailLabelDestination>(),
+                currentLabelId).ToList();
+        }
+
+        public Task<GmailLabelMutationResult> ArchiveGmailMessageAsync(MailAccount account, MailItem item, CancellationToken cancellationToken = default)
+        {
+            if (!string.Equals(item.FolderId, "INBOX", StringComparison.Ordinal))
+                throw new InvalidOperationException("Gmail archive is available from Inbox only.");
+            return MutateGmailMessageAsync(account, item, GmailOnlineActionKind.Archive, null, cancellationToken);
+        }
+
+        public Task<GmailLabelMutationResult> MoveGmailMessageToLabelAsync(MailAccount account, MailItem item, string destinationLabelId, CancellationToken cancellationToken = default)
+            => MutateGmailMessageAsync(account, item, GmailOnlineActionKind.MoveToLabel, destinationLabelId, cancellationToken);
+
+        public Task<GmailLabelMutationResult> TrashGmailMessageAsync(MailAccount account, MailItem item, CancellationToken cancellationToken = default)
+            => MutateGmailMessageAsync(account, item, GmailOnlineActionKind.Trash, null, cancellationToken);
+
+        private async Task<GmailLabelMutationResult> MutateGmailMessageAsync(
+            MailAccount account,
+            MailItem item,
+            GmailOnlineActionKind kind,
+            string? destinationLabelId,
+            CancellationToken cancellationToken)
+        {
+            if (account.Kind != MailAccountKind.Google) throw new NotSupportedException("Only Gmail label actions are supported.");
+            if (!string.Equals(account.Id, item.AccountId, StringComparison.Ordinal))
+                throw new InvalidOperationException("The Gmail message does not belong to the selected account.");
+            if (kind == GmailOnlineActionKind.Trash && string.Equals(item.FolderId, "TRASH", StringComparison.Ordinal))
+                throw new InvalidOperationException("The message is already in trash.");
+
+            var gmail = await EnsureGoogleMailModifyAuthorizedAsync(cancellationToken);
+            var labelsResponse = await gmail.Users.Labels.List("me").ExecuteAsync(cancellationToken);
+            var labels = labelsResponse?.Labels ?? new List<Label>();
+            bool sourceIsUser = labels.Any(label => string.Equals(label.Id, item.FolderId, StringComparison.Ordinal) &&
+                                                   string.Equals(label.Type, "user", StringComparison.OrdinalIgnoreCase));
+            if (kind == GmailOnlineActionKind.MoveToLabel)
+            {
+                bool destinationIsUser = labels.Any(label => string.Equals(label.Id, destinationLabelId, StringComparison.Ordinal) &&
+                                                            string.Equals(label.Type, "user", StringComparison.OrdinalIgnoreCase));
+                if (!destinationIsUser || string.Equals(destinationLabelId, item.FolderId, StringComparison.Ordinal))
+                    throw new InvalidOperationException("Choose a different custom Gmail label.");
+                if (!GmailLabelMutationPolicy.CanRemoveSource(item.FolderId, sourceIsUser))
+                    throw new InvalidOperationException("Messages cannot be moved from this Gmail system label.");
+            }
+
+            var beforeMessageRequest = gmail.Users.Messages.Get("me", item.Id);
+            beforeMessageRequest.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Minimal;
+            var beforeMessage = await beforeMessageRequest.ExecuteAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(beforeMessage?.Id) || !string.Equals(beforeMessage.Id, item.Id, StringComparison.Ordinal))
+                throw new InvalidOperationException("Gmail did not return the expected message before the action.");
+            var before = (beforeMessage?.LabelIds ?? new List<string>()).Distinct(StringComparer.Ordinal).ToList();
+            var requestedAdds = kind == GmailOnlineActionKind.MoveToLabel ? new[] { destinationLabelId! } : Array.Empty<string>();
+            var requestedRemoves = kind switch
+            {
+                GmailOnlineActionKind.Archive => new[] { "INBOX" },
+                GmailOnlineActionKind.MoveToLabel => new[] { item.FolderId },
+                _ => Array.Empty<string>()
+            };
+            var actualAdds = GmailLabelMutationPolicy.ActualAddedLabels(before, requestedAdds);
+            var actualRemoves = GmailLabelMutationPolicy.ActualRemovedLabels(before, requestedRemoves);
+
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            GmailMessage? afterMessage;
+            try
+            {
+                if (kind == GmailOnlineActionKind.Trash)
+                {
+                    afterMessage = await gmail.Users.Messages.Trash("me", item.Id).ExecuteAsync(operationCts.Token);
+                }
+                else
+                {
+                    afterMessage = await gmail.Users.Messages.Modify(new ModifyMessageRequest
+                    {
+                        AddLabelIds = requestedAdds.Length == 0 ? null : requestedAdds.ToList(),
+                        RemoveLabelIds = requestedRemoves.Length == 0 ? null : requestedRemoves.ToList()
+                    }, "me", item.Id).ExecuteAsync(operationCts.Token);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                InvalidateAmbiguousGmailAction(account.Id, item, requestedAdds.Concat(requestedRemoves).Append("TRASH"));
+                throw;
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested && IsAmbiguousGmailActionFailure(ex, timeoutCts.IsCancellationRequested))
+            {
+                InvalidateAmbiguousGmailAction(account.Id, item, requestedAdds.Concat(requestedRemoves).Append("TRASH"));
+                throw new GmailActionOutcomeUnknownException(ex);
+            }
+
+            if (string.IsNullOrWhiteSpace(afterMessage?.Id) || !string.Equals(afterMessage.Id, item.Id, StringComparison.Ordinal))
+            {
+                InvalidateAmbiguousGmailAction(account.Id, item, requestedAdds.Concat(requestedRemoves).Append("TRASH"));
+                throw new GmailActionOutcomeUnknownException(new InvalidOperationException("Gmail did not return the expected message identity."));
+            }
+
+            var after = (afterMessage.LabelIds ?? new List<string>()).Distinct(StringComparer.Ordinal).ToList();
+            CommitConfirmedGmailAction(account.Id, item, before, after);
+            return new GmailLabelMutationResult(CloneMailItem(item, includeBodies: false), kind, item.FolderId,
+                destinationLabelId, actualAdds, actualRemoves, before, after,
+                GmailLabelMutationPolicy.CanRemoveSource(item.FolderId, sourceIsUser),
+                kind == GmailOnlineActionKind.Trash || !after.Contains(item.FolderId, StringComparer.Ordinal));
+        }
+
+        public async Task<GmailLabelMutationResult> UndoGmailLabelMutationAsync(
+            MailAccount account,
+            GmailLabelMutationResult forward,
+            CancellationToken cancellationToken = default)
+        {
+            if (account.Kind != MailAccountKind.Google || !string.Equals(account.Id, forward.Item.AccountId, StringComparison.Ordinal))
+                throw new InvalidOperationException("The Gmail undo does not belong to the selected account.");
+            var gmail = await EnsureGoogleMailModifyAuthorizedAsync(cancellationToken);
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            GmailMessage? restored;
+            bool untrashCompleted = false;
+            try
+            {
+                if (forward.Kind == GmailOnlineActionKind.Trash)
+                {
+                    restored = await gmail.Users.Messages.Untrash("me", forward.Item.Id).ExecuteAsync(operationCts.Token);
+                    untrashCompleted = true;
+                    if (forward.CanRestoreSourceLabel &&
+                        forward.BeforeLabelIds.Contains(forward.SourceLabelId, StringComparer.Ordinal) &&
+                        restored?.LabelIds?.Contains(forward.SourceLabelId, StringComparer.Ordinal) != true)
+                    {
+                        restored = await gmail.Users.Messages.Modify(new ModifyMessageRequest
+                        {
+                            AddLabelIds = new List<string> { forward.SourceLabelId }
+                        }, "me", forward.Item.Id).ExecuteAsync(operationCts.Token);
+                    }
+                }
+                else
+                {
+                    restored = await gmail.Users.Messages.Modify(new ModifyMessageRequest
+                    {
+                        AddLabelIds = forward.RemovedLabelIds.Count == 0 ? null : forward.RemovedLabelIds.ToList(),
+                        RemoveLabelIds = forward.AddedLabelIds.Count == 0 ? null : forward.AddedLabelIds.ToList()
+                    }, "me", forward.Item.Id).ExecuteAsync(operationCts.Token);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                InvalidateAmbiguousGmailAction(account.Id, forward.Item,
+                    forward.AddedLabelIds.Concat(forward.RemovedLabelIds).Concat(new[] { forward.DestinationLabelId, "TRASH" }).OfType<string>());
+                throw;
+            }
+            catch (Exception ex) when (untrashCompleted)
+            {
+                InvalidateAmbiguousGmailAction(account.Id, forward.Item,
+                    forward.AddedLabelIds.Concat(forward.RemovedLabelIds).Concat(new[] { forward.DestinationLabelId, "TRASH" }).OfType<string>());
+                throw new GmailActionOutcomeUnknownException(ex);
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested && IsAmbiguousGmailActionFailure(ex, timeoutCts.IsCancellationRequested))
+            {
+                InvalidateAmbiguousGmailAction(account.Id, forward.Item,
+                    forward.AddedLabelIds.Concat(forward.RemovedLabelIds).Concat(new[] { forward.DestinationLabelId, "TRASH" }).OfType<string>());
+                throw new GmailActionOutcomeUnknownException(ex);
+            }
+
+            if (string.IsNullOrWhiteSpace(restored?.Id) || !string.Equals(restored.Id, forward.Item.Id, StringComparison.Ordinal))
+            {
+                InvalidateAmbiguousGmailAction(account.Id, forward.Item,
+                    forward.AddedLabelIds.Concat(forward.RemovedLabelIds).Concat(new[] { forward.DestinationLabelId, "TRASH" }).OfType<string>());
+                throw new GmailActionOutcomeUnknownException(new InvalidOperationException("Gmail did not return the expected message identity."));
+            }
+            var after = (restored.LabelIds ?? new List<string>()).Distinct(StringComparer.Ordinal).ToList();
+            CommitConfirmedGmailAction(account.Id, forward.Item, forward.AfterLabelIds, after);
+            return forward with { BeforeLabelIds = forward.AfterLabelIds, AfterLabelIds = after, RemovedFromSource = !after.Contains(forward.SourceLabelId, StringComparer.Ordinal) };
+        }
+
+        private static bool IsAmbiguousGmailActionFailure(Exception exception, bool timedOut)
+            => timedOut || exception is IOException ||
+               exception is HttpRequestException httpException &&
+               (!httpException.StatusCode.HasValue || (int)httpException.StatusCode.Value == 408 ||
+                (int)httpException.StatusCode.Value == 429 || (int)httpException.StatusCode.Value >= 500) ||
+               exception is Google.GoogleApiException googleException &&
+               ((int)googleException.HttpStatusCode == 408 || (int)googleException.HttpStatusCode == 429 || (int)googleException.HttpStatusCode >= 500);
+
+        private void InvalidateAmbiguousGmailAction(string accountId, MailItem item, IEnumerable<string> possiblyAffectedLabels)
+        {
+            RemoveBodyCacheIdentity(item);
+            EnsurePersistentCacheLoaded();
+            lock (_mailCacheLock)
+            {
+                _folderCache.Remove(accountId);
+                _persistentCache?.Folders.Remove(accountId);
+                foreach (string key in GmailLabelMutationPolicy.InvalidatedWindowKeys(accountId, possiblyAffectedLabels.Append(item.FolderId)))
+                {
+                    _messageCache.Remove(key);
+                    _persistentCache?.Messages.Remove(key);
+                    _persistentCache?.MessageCursors.Remove(key);
+                    _persistentCache?.MessageHasMore.Remove(key);
+                }
+            }
+            SavePersistentCache();
+        }
+
+        private void CommitConfirmedGmailAction(string accountId, MailItem item, IReadOnlyList<string> before, IReadOnlyList<string> after)
+        {
+            RemoveBodyCacheIdentity(item);
+            var affected = GmailLabelMutationPolicy.AffectedLabels(before, after, item.FolderId);
+            EnsurePersistentCacheLoaded();
+            lock (_mailCacheLock)
+            {
+                List<MailFolder>? persistentFolders = null;
+                foreach (string key in GmailLabelMutationPolicy.InvalidatedWindowKeys(accountId, affected))
+                {
+                    _messageCache.Remove(key);
+                    _persistentCache?.Messages.Remove(key);
+                    _persistentCache?.MessageCursors.Remove(key);
+                    _persistentCache?.MessageHasMore.Remove(key);
+                }
+                if (_persistentCache?.Folders.TryGetValue(accountId, out var storedFolders) == true)
+                    persistentFolders = storedFolders;
+                bool messageIsRead = !before.Contains("UNREAD", StringComparer.Ordinal);
+                AdjustGmailFolderCounts(persistentFolders, messageIsRead, before, after, affected);
+                if (_folderCache.TryGetValue(accountId, out var cachedFolders) && !ReferenceEquals(cachedFolders.Value, persistentFolders))
+                    AdjustGmailFolderCounts(cachedFolders.Value, messageIsRead, before, after, affected);
+            }
+            SavePersistentCache();
+        }
+
+        private static void AdjustGmailFolderCounts(List<MailFolder>? folders, bool isRead, IReadOnlyCollection<string> before, IReadOnlyCollection<string> after, IEnumerable<string> affected)
+        {
+            if (folders == null) return;
+            foreach (string labelId in affected)
+            {
+                var folder = folders.FirstOrDefault(candidate => candidate.Id == labelId);
+                if (folder != null)
+                    folder.UnreadCount = GmailLabelMutationPolicy.AdjustUnreadCount(folder.UnreadCount, isRead, before.Contains(labelId), after.Contains(labelId));
+            }
         }
 
         private static bool IsAmbiguousMoveFailure(Exception exception, bool timedOut)
@@ -2220,6 +2474,7 @@ namespace Task_Flyout.Services
                     Id = label.Id ?? "",
                     DisplayName = label.Name ?? label.Id ?? "",
                     UnreadCount = label.MessagesUnread
+                    ,IsUserLabel = string.Equals(label.Type, "user", StringComparison.OrdinalIgnoreCase)
                 })
                 .OrderByDescending(folder => folder.Id == "INBOX")
                 .ThenBy(folder => folder.DisplayName)

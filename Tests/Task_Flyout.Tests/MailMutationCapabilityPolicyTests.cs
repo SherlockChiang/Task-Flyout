@@ -4,18 +4,29 @@ namespace Task_Flyout.Tests;
 
 public class MailMutationCapabilityPolicyTests
 {
-    [Theory]
-    [InlineData(MailAccountKind.Google)]
-    [InlineData(MailAccountKind.Imap)]
-    public void Safe_state_mutations_are_supported_but_destructive_operations_are_not(MailAccountKind provider)
+    [Fact]
+    public void Imap_safe_state_mutations_are_supported_but_move_operations_are_not()
     {
-        var capabilities = MailMutationCapabilityPolicy.For(provider);
+        var capabilities = MailMutationCapabilityPolicy.For(MailAccountKind.Imap);
 
         Assert.True(capabilities.SetReadState);
         Assert.True(capabilities.SetFlagged);
         Assert.False(capabilities.Archive);
         Assert.False(capabilities.Move);
         Assert.False(capabilities.Trash);
+        Assert.False(capabilities.PermanentDelete);
+    }
+
+    [Fact]
+    public void Gmail_supports_label_and_trash_actions_but_not_permanent_delete()
+    {
+        var capabilities = MailMutationCapabilityPolicy.For(MailAccountKind.Google);
+
+        Assert.True(capabilities.SetReadState);
+        Assert.True(capabilities.SetFlagged);
+        Assert.True(capabilities.Archive);
+        Assert.True(capabilities.Move);
+        Assert.True(capabilities.Trash);
         Assert.False(capabilities.PermanentDelete);
     }
 

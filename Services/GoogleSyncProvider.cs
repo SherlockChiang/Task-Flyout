@@ -2,6 +2,7 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Gmail.v1;
 using Google.Apis.Services;
+using Google.Apis.Http;
 using Google.Apis.Tasks.v1;
 using Google.Apis.Util.Store;
 using Google.Apis.Auth.OAuth2.Responses;
@@ -105,7 +106,12 @@ namespace Task_Flyout.Services
             var initializer = new BaseClientService.Initializer { HttpClientInitializer = credential, ApplicationName = "Task Flyout" };
             CalendarSvc = new CalendarService(initializer);
             TasksSvc = new TasksService(initializer);
-            GmailSvc = new GmailService(initializer);
+            GmailSvc = new GmailService(new BaseClientService.Initializer
+            {
+                HttpClientInitializer = credential,
+                ApplicationName = "Task Flyout",
+                DefaultExponentialBackOffPolicy = ExponentialBackOffPolicy.None
+            });
         }
 
         private GoogleAuthorizationCodeFlow CreateAuthorizationFlow(IDataStore dataStore)

@@ -12,6 +12,7 @@ namespace Task_Flyout.Services
         public string DisplayName { get; set; } = "";
         public int? UnreadCount { get; set; }
         public bool IsPlaceholder { get; set; }
+        public bool IsUserLabel { get; set; }
         public string CountText => UnreadCount.HasValue && UnreadCount.Value > 0 ? UnreadCount.Value.ToString() : "";
     }
 
@@ -24,6 +25,28 @@ namespace Task_Flyout.Services
     }
 
     public sealed record MailMoveResult(MailItem Item, string SourceFolderId, string DestinationFolderId);
+
+    public sealed class GmailLabelDestination
+    {
+        public string Id { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public bool IsUserLabel { get; set; }
+        public override string ToString() => DisplayName;
+    }
+
+    public enum GmailOnlineActionKind { Archive, MoveToLabel, Trash }
+
+    public sealed record GmailLabelMutationResult(
+        MailItem Item,
+        GmailOnlineActionKind Kind,
+        string SourceLabelId,
+        string? DestinationLabelId,
+        IReadOnlyList<string> AddedLabelIds,
+        IReadOnlyList<string> RemovedLabelIds,
+        IReadOnlyList<string> BeforeLabelIds,
+        IReadOnlyList<string> AfterLabelIds,
+        bool CanRestoreSourceLabel,
+        bool RemovedFromSource);
 
     public class MailItem : INotifyPropertyChanged
     {

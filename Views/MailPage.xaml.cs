@@ -39,6 +39,7 @@ namespace Task_Flyout.Views
         private readonly Dictionary<string, long> _mailIntentVersions = new(StringComparer.Ordinal);
         private List<MailUndoState> _undoStates = new();
         private MailMoveUndoState? _moveUndoState;
+        private GmailUndoState? _gmailUndoState;
         private MailMutationKind _undoKind;
         private long _nextMailIntentVersion;
 
@@ -75,6 +76,7 @@ namespace Task_Flyout.Views
         private string _searchText = "";
         private bool _suppressSearchRefresh;
         private bool _isSendingMail;
+        private bool _isOnlineMailAction;
         private bool _suppressDraftChanges;
         private Task<bool>? _draftRecoveryTask;
         internal bool IsOpeningFromNotification { get; set; }
@@ -83,6 +85,7 @@ namespace Task_Flyout.Views
         private enum MailPane { Accounts, Messages, Detail }
         private sealed record MailUndoState(MailItem Item, bool PreviousValue, int PreviousIndex);
         private sealed record MailMoveUndoState(MailAccount Account, MailItem MovedItem, string ReturnFolderId);
+        private sealed record GmailUndoState(MailAccount Account, GmailLabelMutationResult Result);
 
         public MailPage()
         {
@@ -160,7 +163,7 @@ namespace Task_Flyout.Views
                 ClearRenderedMailBody();
             }
             _selectedAccount = account;
-            UpdateOutlookMoveCommands();
+            UpdateProviderMoveCommands();
             var protectedItem = string.Equals(_selectedItem?.AccountId, account?.Id, StringComparison.Ordinal)
                 ? _selectedItem
                 : null;
@@ -1333,7 +1336,7 @@ namespace Task_Flyout.Views
 
         private async void MailListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            UpdateOutlookMoveCommands();
+            UpdateProviderMoveCommands();
             if (MailListView.SelectedItems.Count != 1)
             {
                 if (MailListView.SelectedItems.Count > 1)
@@ -1541,23 +1544,50 @@ namespace Task_Flyout.Views
             => await MutateSelectedMailAsync(MailMutationKind.SetFlagged, false);
 
         private async void ArchiveButton_Click(object sender, RoutedEventArgs e)
-            => await MoveSelectedOutlookMailAsync((service, account, item, token) =>
-                service.ArchiveOutlookMessageAsync(account, item, token));
+        {
+            if (_selectedAccount?.Kind == MailAccountKind.Google)
+                await MutateSelectedGmailMailAsync((service, account, item, token) => service.ArchiveGmailMessageAsync(account, item, token));
+            else
+                await MoveSelectedOutlookMailAsync((service, account, item, token) => service.ArchiveOutlookMessageAsync(account, item, token));
+        }
 
         private async void DeleteButton_Click(object sender, RoutedEventArgs e)
-            => await MoveSelectedOutlookMailAsync((service, account, item, token) =>
-                service.TrashOutlookMessageAsync(account, item, token));
+        {
+            if (_selectedAccount?.Kind == MailAccountKind.Google)
+                await MutateSelectedGmailMailAsync((service, account, item, token) => service.TrashGmailMessageAsync(account, item, token));
+            else
+                await MoveSelectedOutlookMailAsync((service, account, item, token) => service.TrashOutlookMessageAsync(account, item, token));
+        }
 
         private async void MoveButton_Click(object sender, RoutedEventArgs e)
         {
             var service = _mailService;
             var account = _selectedAccount;
-            var item = GetSingleSelectedOutlookItem();
+            var item = GetSingleSelectedOnlineActionItem();
             if (service == null || account == null || item == null) return;
 
-            SetOutlookMoveCommandsEnabled(false);
+            SetProviderMoveCommandsEnabled(false);
             try
             {
+                if (account.Kind == MailAccountKind.Google)
+                {
+                    var labels = await service.FetchGmailMoveDestinationsAsync(account, item.FolderId, _pageRequestCts.Token);
+                    if (labels.Count == 0)
+                    {
+                        SetMessageListStatus(GetResourceStringOrDefault("TextGmailMoveNoDestinations", "No custom labels are available."), isError: true);
+                        return;
+                    }
+                    var labelPicker = CreateDestinationPicker(labels, "TextGmailMoveDestination", "Destination label");
+                    var labelDialog = CreateMoveDialog(labelPicker, "TextGmailMoveTitle", "Move message to label");
+                    if (await labelDialog.ShowAsync() != ContentDialogResult.Primary || labelPicker.SelectedItem is not GmailLabelDestination label)
+                        return;
+                    if (!ReferenceEquals(item, GetSingleSelectedOnlineActionItem()) || !ReferenceEquals(account, _selectedAccount))
+                        return;
+                    await MutateSelectedGmailMailAsync((mailService, selectedAccount, selectedItem, token) =>
+                        mailService.MoveGmailMessageToLabelAsync(selectedAccount, selectedItem, label.Id, token), item);
+                    return;
+                }
+
                 var destinations = await service.FetchOutlookMoveDestinationsAsync(account, item.FolderId, _pageRequestCts.Token);
                 if (destinations.Count == 0)
                 {
@@ -1591,32 +1621,71 @@ namespace Task_Flyout.Views
             catch (OperationCanceledException) when (_pageRequestCts.IsCancellationRequested) { }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Load Outlook move destinations failed: {ex.Message}");
-                SetMessageListStatus(GetResourceStringOrDefault("TextMailMoveDestinationsFailed", "Failed to load destination folders."), isError: true);
+                System.Diagnostics.Debug.WriteLine($"Load mail move destinations failed: {ex.Message}");
+                SetMessageListStatus(account.Kind == MailAccountKind.Google
+                    ? GetResourceStringOrDefault("TextGmailMoveDestinationsFailed", "Failed to load Gmail labels.")
+                    : GetResourceStringOrDefault("TextMailMoveDestinationsFailed", "Failed to load destination folders."), isError: true);
             }
             finally
             {
-                UpdateOutlookMoveCommands();
+                UpdateProviderMoveCommands();
             }
         }
+
+        private ComboBox CreateDestinationPicker(object items, string headerKey, string headerFallback)
+            => new()
+            {
+                Header = GetResourceStringOrDefault(headerKey, headerFallback),
+                ItemsSource = items,
+                SelectedIndex = 0,
+                MinWidth = 360,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+        private ContentDialog CreateMoveDialog(object content, string titleKey, string titleFallback)
+            => new()
+            {
+                XamlRoot = XamlRoot,
+                Title = GetResourceStringOrDefault(titleKey, titleFallback),
+                Content = content,
+                PrimaryButtonText = GetResourceStringOrDefault("MailPage_Move.Label", "Move"),
+                CloseButtonText = GetResourceStringOrDefault("CalendarDialog.CloseButtonText", "Cancel"),
+                DefaultButton = ContentDialogButton.Primary
+            };
 
         private MailItem? GetSingleSelectedOutlookItem()
             => _selectedAccount?.Kind == MailAccountKind.Outlook && MailListView.SelectedItems.Count == 1
                 ? MailListView.SelectedItems[0] as MailItem
                 : null;
 
-        private void UpdateOutlookMoveCommands()
+        private MailItem? GetSingleSelectedOnlineActionItem()
+            => (_selectedAccount?.Kind is MailAccountKind.Outlook or MailAccountKind.Google) && MailListView.SelectedItems.Count == 1
+                ? MailListView.SelectedItems[0] as MailItem
+                : null;
+
+        private void UpdateProviderMoveCommands()
         {
             if (ArchiveButton == null) return;
-            bool visible = _selectedAccount?.Kind == MailAccountKind.Outlook;
+            bool visible = _selectedAccount?.Kind is MailAccountKind.Outlook or MailAccountKind.Google;
+            bool isGmail = _selectedAccount?.Kind == MailAccountKind.Google;
             OutlookMoveSeparator.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             ArchiveButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             MoveButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             DeleteButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-            SetOutlookMoveCommandsEnabled(visible && MailListView.SelectedItems.Count == 1 && !_isLoadingMessages);
+            ArchiveButton.Label = GetResourceStringOrDefault("MailPage_Archive.Label", "Archive");
+            MoveButton.Label = GetResourceStringOrDefault(isGmail ? "MailPage_MoveToLabel.Label" : "MailPage_MoveToFolder.Label", isGmail ? "Move to label" : "Move to folder");
+            DeleteButton.Label = GetResourceStringOrDefault(isGmail ? "MailPage_MoveToTrash.Label" : "MailPage_MoveToDeletedItems.Label", isGmail ? "Move to trash" : "Move to Deleted Items");
+            bool selected = visible && MailListView.SelectedItems.Count == 1 && !_isLoadingMessages && !_isOnlineMailAction;
+            SetProviderMoveCommandsEnabled(selected);
+            if (isGmail)
+            {
+                ArchiveButton.IsEnabled = selected && string.Equals(_selectedFolder?.Id, "INBOX", StringComparison.Ordinal);
+                MoveButton.IsEnabled = selected && (string.Equals(_selectedFolder?.Id, "INBOX", StringComparison.Ordinal) || _selectedFolder?.IsUserLabel == true);
+                DeleteButton.IsEnabled = selected && !string.Equals(_selectedFolder?.Id, "TRASH", StringComparison.Ordinal);
+            }
         }
 
-        private void SetOutlookMoveCommandsEnabled(bool enabled)
+        private void SetProviderMoveCommandsEnabled(bool enabled)
         {
             ArchiveButton.IsEnabled = enabled;
             MoveButton.IsEnabled = enabled;
@@ -1631,11 +1700,12 @@ namespace Task_Flyout.Views
             var item = GetSingleSelectedOutlookItem();
             if (service == null || account == null || item == null) return;
 
-            SetOutlookMoveCommandsEnabled(false);
+            SetProviderMoveCommandsEnabled(false);
             try
             {
                 var result = await move(service, account, item, _pageRequestCts.Token);
                 _moveUndoState = new MailMoveUndoState(account, result.Item, result.SourceFolderId);
+                _gmailUndoState = null;
                 _undoStates.Clear();
                 _suppressSelectionClear = true;
                 try
@@ -1668,7 +1738,62 @@ namespace Task_Flyout.Views
             }
             finally
             {
-                UpdateOutlookMoveCommands();
+                UpdateProviderMoveCommands();
+            }
+        }
+
+        private async Task MutateSelectedGmailMailAsync(
+            Func<MailService, MailAccount, MailItem, CancellationToken, Task<GmailLabelMutationResult>> mutate,
+            MailItem? expectedItem = null)
+        {
+            var service = _mailService;
+            var account = _selectedAccount;
+            var item = GetSingleSelectedOnlineActionItem();
+            if (service == null || account?.Kind != MailAccountKind.Google || item == null ||
+                _isOnlineMailAction || (expectedItem != null && !ReferenceEquals(expectedItem, item))) return;
+
+            _isOnlineMailAction = true;
+            SetProviderMoveCommandsEnabled(false);
+            try
+            {
+                var result = await mutate(service, account, item, _pageRequestCts.Token);
+                _gmailUndoState = new GmailUndoState(account, result);
+                _moveUndoState = null;
+                _undoStates.Clear();
+                if (result.RemovedFromSource)
+                {
+                    _suppressSelectionClear = true;
+                    try
+                    {
+                        MailListView.SelectedItems.Clear();
+                        _items.Remove(item);
+                    }
+                    finally { _suppressSelectionClear = false; }
+                    ClearDetail();
+                    ApplyMailSearch();
+                }
+                RefreshAllFolderCounts();
+                SetMessageListStatus($"{account.DisplayTitle} · {string.Format(GetResourceStringOrDefault("TextNMailItems", "{0} messages"), _items.Count)}");
+                MailUndoBar.Message = GetResourceStringOrDefault("TextGmailActionComplete", "Gmail action completed.");
+                MailUndoBar.IsOpen = true;
+            }
+            catch (OperationCanceledException) when (_pageRequestCts.IsCancellationRequested) { }
+            catch (GmailActionOutcomeUnknownException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Gmail action outcome unknown: {ex.Message}");
+                _gmailUndoState = null;
+                await ReconcileOutlookMoveAsync();
+                SetMessageListStatus(GetResourceStringOrDefault("TextGmailActionOutcomeUnknown", "The Gmail action outcome is unknown. Labels were refreshed without retrying."), isError: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Gmail action failed: {ex.Message}");
+                SetMessageListStatus(GetResourceStringOrDefault("TextGmailActionFailed", "Failed to update the Gmail message."), isError: true);
+            }
+            finally
+            {
+                _isOnlineMailAction = false;
+                UpdateProviderMoveCommands();
             }
         }
 
@@ -1729,6 +1854,7 @@ namespace Task_Flyout.Views
             if (restoreTargets == null)
             {
                 _moveUndoState = null;
+                _gmailUndoState = null;
                 _undoStates = previous;
                 _undoKind = kind;
                 MailUndoBar.Message = string.Format(GetResourceStringOrDefault("TextMailMutationComplete", "Updated {0} messages."), selected.Count);
@@ -1768,6 +1894,30 @@ namespace Task_Flyout.Views
 
         private async void UndoMailMutationButton_Click(object sender, RoutedEventArgs e)
         {
+            var gmailState = _gmailUndoState;
+            if (gmailState != null)
+            {
+                _gmailUndoState = null;
+                MailUndoBar.IsOpen = false;
+                try
+                {
+                    await _mailService!.UndoGmailLabelMutationAsync(gmailState.Account, gmailState.Result, _pageRequestCts.Token);
+                    await ReconcileOutlookMoveAsync();
+                    SetMessageListStatus(GetResourceStringOrDefault("TextGmailUndoComplete", "Gmail action undone."));
+                }
+                catch (GmailActionOutcomeUnknownException)
+                {
+                    await ReconcileOutlookMoveAsync();
+                    SetMessageListStatus(GetResourceStringOrDefault("TextGmailUndoOutcomeUnknown", "The Gmail undo outcome is unknown. Labels were refreshed without retrying."), isError: true);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Undo Gmail action failed: {ex.Message}");
+                    SetMessageListStatus(GetResourceStringOrDefault("TextGmailUndoFailed", "Failed to undo the Gmail action."), isError: true);
+                }
+                return;
+            }
+
             var moveState = _moveUndoState;
             if (moveState != null)
             {

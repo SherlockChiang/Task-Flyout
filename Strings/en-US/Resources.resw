@@ -1838,4 +1838,18 @@ Weather: {3}</value></data>
   <data name="TextMailMoveUndone" xml:space="preserve"><value>Move undone.</value></data>
   <data name="TextMailMoveUndoFailed" xml:space="preserve"><value>Failed to undo the move.</value></data>
   <data name="TextMailMoveUndoOutcomeUnknown" xml:space="preserve"><value>The undo outcome is unknown. The folder was refreshed without retrying.</value></data>
+  <data name="MailPage_MoveToFolder.Label" xml:space="preserve"><value>Move to folder</value></data>
+  <data name="MailPage_MoveToDeletedItems.Label" xml:space="preserve"><value>Move to Deleted Items</value></data>
+  <data name="MailPage_MoveToLabel.Label" xml:space="preserve"><value>Move to label</value></data>
+  <data name="MailPage_MoveToTrash.Label" xml:space="preserve"><value>Move to trash</value></data>
+  <data name="TextGmailMoveTitle" xml:space="preserve"><value>Move message to label</value></data>
+  <data name="TextGmailMoveDestination" xml:space="preserve"><value>Destination label</value></data>
+  <data name="TextGmailMoveNoDestinations" xml:space="preserve"><value>No custom labels are available.</value></data>
+  <data name="TextGmailMoveDestinationsFailed" xml:space="preserve"><value>Failed to load Gmail labels.</value></data>
+  <data name="TextGmailActionComplete" xml:space="preserve"><value>Gmail action completed.</value></data>
+  <data name="TextGmailActionFailed" xml:space="preserve"><value>Failed to update the Gmail message.</value></data>
+  <data name="TextGmailActionOutcomeUnknown" xml:space="preserve"><value>The Gmail action outcome is unknown. Labels were refreshed without retrying.</value></data>
+  <data name="TextGmailUndoComplete" xml:space="preserve"><value>Gmail action undone.</value></data>
+  <data name="TextGmailUndoFailed" xml:space="preserve"><value>Failed to undo the Gmail action.</value></data>
+  <data name="TextGmailUndoOutcomeUnknown" xml:space="preserve"><value>The Gmail undo outcome is unknown. Labels were refreshed without retrying.</value></data>
 </root>

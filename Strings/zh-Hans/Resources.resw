@@ -1838,4 +1838,18 @@ Microsoft：{1}
   <data name="TextMailMoveUndone" xml:space="preserve"><value>已撤销移动。</value></data>
   <data name="TextMailMoveUndoFailed" xml:space="preserve"><value>无法撤销移动。</value></data>
   <data name="TextMailMoveUndoOutcomeUnknown" xml:space="preserve"><value>撤销结果未知。已刷新文件夹，且未重试操作。</value></data>
+  <data name="MailPage_MoveToFolder.Label" xml:space="preserve"><value>移动到文件夹</value></data>
+  <data name="MailPage_MoveToDeletedItems.Label" xml:space="preserve"><value>移动到“已删除邮件”</value></data>
+  <data name="MailPage_MoveToLabel.Label" xml:space="preserve"><value>移动到标签</value></data>
+  <data name="MailPage_MoveToTrash.Label" xml:space="preserve"><value>移至垃圾箱</value></data>
+  <data name="TextGmailMoveTitle" xml:space="preserve"><value>将邮件移动到标签</value></data>
+  <data name="TextGmailMoveDestination" xml:space="preserve"><value>目标标签</value></data>
+  <data name="TextGmailMoveNoDestinations" xml:space="preserve"><value>没有可用的自定义标签。</value></data>
+  <data name="TextGmailMoveDestinationsFailed" xml:space="preserve"><value>无法加载 Gmail 标签。</value></data>
+  <data name="TextGmailActionComplete" xml:space="preserve"><value>Gmail 操作已完成。</value></data>
+  <data name="TextGmailActionFailed" xml:space="preserve"><value>无法更新 Gmail 邮件。</value></data>
+  <data name="TextGmailActionOutcomeUnknown" xml:space="preserve"><value>Gmail 操作结果未知。已刷新标签，且未重试操作。</value></data>
+  <data name="TextGmailUndoComplete" xml:space="preserve"><value>已撤销 Gmail 操作。</value></data>
+  <data name="TextGmailUndoFailed" xml:space="preserve"><value>无法撤销 Gmail 操作。</value></data>
+  <data name="TextGmailUndoOutcomeUnknown" xml:space="preserve"><value>Gmail 撤销结果未知。已刷新标签，且未重试操作。</value></data>
 </root>
