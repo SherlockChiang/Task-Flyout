@@ -29,7 +29,6 @@ namespace Task_Flyout
         private DispatcherTimer _refreshTimer = null!;
         private DispatcherTimer _reparentTimer = null!;
         private DispatcherTimer? _themeRefreshTimer;
-        private bool _initialActivationDone;
         private IntPtr _taskbarHwnd = IntPtr.Zero;
         private bool _isParented;
         private bool _userHidden;
@@ -322,16 +321,16 @@ namespace Task_Flyout
                 {
                     InvalidateTaskbarAttachment("Taskbar window changed");
                     _taskbarHwnd = currentTaskbar;
-                    AttachToTaskbar();
+                    if (!AttachToTaskbar()) return;
                 }
 
                 if (_mediaSessionManager == null)
                     _ = InitializeMediaSessionManagerAsync();
-                PositionOnTaskbar();
+                if (!PositionOnTaskbar(showWindow: false)) return;
                 RefreshThemeIfTaskbarThemeChanged();
 
                 if ((needsAttach || !IsWindowVisible(hWnd)) && IsWindow(hWnd))
-                    ShowWindow(hWnd, SW_SHOWNOACTIVATE);
+                    _appWindow.Show(activateWindow: false);
 
                 // Keep polling after parenting: taskbar widgets and FluentFlyout media
                 // controls can appear or disappear without changing our parent HWND.
@@ -366,14 +365,14 @@ namespace Task_Flyout
                 _reparentTimer.Interval = desired;
         }
 
-        private void AttachToTaskbar()
+        private bool AttachToTaskbar()
         {
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
+            if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return false;
 
             if (_taskbarHwnd == IntPtr.Zero)
                 _taskbarHwnd = FindTaskbarWindow();
-            if (_taskbarHwnd == IntPtr.Zero || !IsWindow(_taskbarHwnd)) return;
+            if (_taskbarHwnd == IntPtr.Zero || !IsWindow(_taskbarHwnd)) return false;
 
             int style = GetWindowLong(hWnd, GWL_STYLE);
             style &= ~WS_POPUP;
@@ -389,6 +388,7 @@ namespace Task_Flyout
                 SuppressDwmBorder(hWnd);
                 ApplyWindowsTheme();
             }
+            return _isParented;
         }
 
         private void InstallSubclass(IntPtr hWnd)
@@ -484,24 +484,24 @@ namespace Task_Flyout
             SuppressDwmBorder(hWnd);
         }
 
-        public void PositionOnTaskbar()
+        public bool PositionOnTaskbar(bool showWindow = true)
         {
             try
             {
-                if (_userHidden) return;
+                if (_userHidden) return false;
 
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
 
-                if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
+                if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return false;
                 if (_taskbarHwnd == IntPtr.Zero || !IsWindow(_taskbarHwnd) || !_isParented)
                 {
                     InvalidateTaskbarAttachment("Taskbar attachment is not active");
-                    return;
+                    return false;
                 }
                 if (!GetWindowRect(_taskbarHwnd, out RECT tbRect) || !GetClientRect(_taskbarHwnd, out RECT tbClient))
                 {
                     _diagnostics = WeatherBarDiagnostics.Unavailable("Taskbar geometry is unavailable");
-                    return;
+                    return false;
                 }
 
             double scaleFactor = Math.Max(1, GetDpiForWindow(_taskbarHwnd) / 96.0);
@@ -527,7 +527,9 @@ namespace Task_Flyout
 
                 // If FluentFlyout is detected, place ourselves behind it (lower z-order) to avoid overlap
                 IntPtr insertAfter = _fluentFlyoutHwnd != IntPtr.Zero ? _fluentFlyoutHwnd : IntPtr.Zero;
-                uint flags = SWP_NOACTIVATE | SWP_SHOWWINDOW;
+                uint flags = SWP_NOACTIVATE;
+                if (showWindow)
+                    flags |= SWP_SHOWWINDOW;
                 if (_fluentFlyoutHwnd == IntPtr.Zero)
                     flags |= SWP_NOZORDER;
 
@@ -559,14 +561,18 @@ namespace Task_Flyout
                     {
                         widgets = widgets with { FallbackReason = "SetWindowPos failed" };
                         ResetCachedWindowPlacement();
+                        UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets);
+                        return false;
                     }
                 }
 
                 UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets);
+                return true;
             }
             catch
             {
                 InvalidateTaskbarAttachment("Taskbar placement failed");
+                return false;
             }
         }
 
@@ -1981,23 +1987,19 @@ namespace Task_Flyout
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
 
-                if (!_initialActivationDone)
-                {
-                    Activate();
-                    _initialActivationDone = true;
-                }
+                // Never expose the default top-level WinUI geometry. Explorer may not
+                // have created a usable taskbar yet during sign-in or after a restart.
+                ShowWindow(hWnd, 0); // SW_HIDE
 
                 ApplyWindowsTheme();
                 if (!_refreshTimer.IsEnabled)
                     _refreshTimer.Start();
                 UseFastReparentPolling();
 
-                if (!_isParented)
-                    AttachToTaskbar();
+                if (!_isParented && !AttachToTaskbar()) return;
 
-                PositionOnTaskbar();
-                if (IsWindow(hWnd))
-                    ShowWindow(hWnd, SW_SHOWNOACTIVATE);
+                if (PositionOnTaskbar(showWindow: false) && IsWindow(hWnd))
+                    _appWindow.Show(activateWindow: false);
             }
             catch
             {

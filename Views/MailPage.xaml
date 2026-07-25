@@ -131,7 +131,7 @@
                     </Grid>
 
                     <CommandBar Grid.Row="1" x:Name="MailMutationCommandBar" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True">
-                        <AppBarButton x:Uid="MailPage_MarkRead" Label="Mark read" Icon="MailRead" Click="MarkReadButton_Click"/>
+                        <AppBarButton x:Uid="MailPage_MarkRead" Label="Mark read" Icon="Mail" Click="MarkReadButton_Click"/>
                         <AppBarButton x:Uid="MailPage_MarkUnread" Label="Mark unread" Icon="Mail" Click="MarkUnreadButton_Click"/>
                         <AppBarButton x:Uid="MailPage_Flag" Label="Flag" Icon="Flag" Click="FlagButton_Click"/>
                         <AppBarButton x:Uid="MailPage_Unflag" Label="Unflag" Icon="UnFavorite" Click="UnflagButton_Click"/>
