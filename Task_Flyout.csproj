@@ -1,12 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
-        <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-        <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+        <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+        <TargetPlatformMinVersion>10.0.22000.0</TargetPlatformMinVersion>
         <RootNamespace>Task_Flyout</RootNamespace>
         <ApplicationManifest>app.manifest</ApplicationManifest>
-        <Platforms>x86;x64;ARM64</Platforms>
-        <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+        <Platforms>x64</Platforms>
+        <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
         <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(Platform)' == 'AnyCPU'">win-x64</RuntimeIdentifier>
         <PublishProfile Condition="'$(Platform)' == 'AnyCPU'">win-x64.pubxml</PublishProfile>
         <PublishProfile Condition="'$(Platform)' != 'AnyCPU'">win-$(Platform).pubxml</PublishProfile>
@@ -24,8 +24,6 @@
 
     <PropertyGroup>
         <MrmSupportLibraryArchitecture Condition="'$(MrmSupportLibraryArchitecture)' == '' and ('$(Platform)' == 'x64' or '$(RuntimeIdentifier)' == 'win-x64')">x64</MrmSupportLibraryArchitecture>
-        <MrmSupportLibraryArchitecture Condition="'$(MrmSupportLibraryArchitecture)' == '' and ('$(Platform)' == 'x86' or '$(RuntimeIdentifier)' == 'win-x86')">x86</MrmSupportLibraryArchitecture>
-        <MrmSupportLibraryArchitecture Condition="'$(MrmSupportLibraryArchitecture)' == '' and ('$(Platform)' == 'ARM64' or '$(RuntimeIdentifier)' == 'win-arm64')">arm64</MrmSupportLibraryArchitecture>
         <MrmSupportLibraryArchitecture Condition="'$(MrmSupportLibraryArchitecture)' == ''">x64</MrmSupportLibraryArchitecture>
         <MrmSupportLibrarySdkVersion Condition="'$(MrmSupportLibrarySdkVersion)' == '' and Exists('$(MSBuildProgramFiles32)\Windows Kits\10\bin\10.0.26100.0\$(MrmSupportLibraryArchitecture)\MrmSupport.dll')">10.0.26100.0</MrmSupportLibrarySdkVersion>
         <MrmSupportLibraryPath Condition="'$(MrmSupportLibraryPath)' == '' and '$(MrmSupportLibrarySdkVersion)' != ''">$(MSBuildProgramFiles32)\Windows Kits\10\bin\$(MrmSupportLibrarySdkVersion)\$(MrmSupportLibraryArchitecture)\MrmSupport.dll</MrmSupportLibraryPath>
@@ -62,6 +60,7 @@
     
     <ItemGroup>
         <PackageReference Include="Azure.Identity" Version="1.21.0" />
+        <PackageReference Include="DesktopFlyouts.WinUI" Version="1.4.0" />
         <PackageReference Include="Google.Apis.Calendar.v3" Version="1.73.0.4073" />
         <PackageReference Include="Google.Apis.Gmail.v1" Version="1.74.0.4134" />
         <PackageReference Include="Google.Apis.Tasks.v1" Version="1.72.0.3958" />
@@ -86,7 +85,8 @@
       <Content Update="Assets\TrayIcon_Light.ico">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
-      <Content Include="Assets\FluentSystemIcons-Filled.ttf" />
+        <Content Include="Assets\FluentSystemIcons-Filled.ttf" />
+        <Content Include="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
     
     <ItemGroup>
@@ -136,7 +136,7 @@
         <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
         <GenerateTestArtifacts>True</GenerateTestArtifacts>
         <AppxBundle>Always</AppxBundle>
-        <AppxBundlePlatforms>x86|x64|ARM64</AppxBundlePlatforms>
+        <AppxBundlePlatforms>x64</AppxBundlePlatforms>
         <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
     </PropertyGroup>
     <Import Project="Directory.Build.local.props" Condition="Exists('Directory.Build.local.props')" />

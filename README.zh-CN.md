@@ -55,9 +55,13 @@ Task Flyout 作为公共 OAuth 客户端在本地运行。所有凭证、邮件�
 
 **环境要求**
 
-- Windows 11（SDK 10.0.19041 或更高）
+- Windows 11（SDK 10.0.26100 或更高）
 - 安装了 **Windows App SDK** 与 **.NET 桌面**工作负载的 Visual Studio 2022，或 .NET 10 SDK
-- 受支持的平台：`x86`、`x64` 或 `ARM64`
+- 受支持的平台：`x64`
+
+托盘日历使用 [DesktopFlyouts](https://github.com/0x5bfa/DesktopFlyouts)，
+提供接近 Windows 11 原生浮窗的定位、背景、激活和失焦关闭行为。
+DesktopFlyouts.WinUI 1.4.0 当前将 Task Flyout 打包架构限制为 x64。
 
 **构建**
 
@@ -69,8 +73,9 @@ dotnet build Task_Flyout.csproj -c Debug -p:Platform=x64
 
 ## 技术栈
 
-- WinUI 3 / Windows App SDK 1.8
-- .NET 10（`net10.0-windows10.0.19041.0`），C#
+- WinUI 3 / Windows App SDK 2.1
+- .NET 10（`net10.0-windows10.0.26100.0`），C#
+- DesktopFlyouts.WinUI 1.4.0
 - 本地缓存使用 SQLite
 
 ## 许可证

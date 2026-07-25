@@ -10,7 +10,7 @@ Task Flyout 是一个 Windows 11 托盘常驻 WinUI 3 桌面应用，基于 Wind
 
 - 语言：C#，已启用 nullable reference types。
 - UI：WinUI 3 / Windows App SDK。
-- 目标框架：`net10.0-windows10.0.19041.0`。
+- 目标框架：`net10.0-windows10.0.26100.0`，最低运行版本为 Windows 11 22000。
 - 打包：启用 MSIX tooling。
 - 本地数据：SQLite、DPAPI 保护的本地存储。
 - 外部集成：Google Calendar/Tasks/Gmail、Microsoft Graph/To Do、IMAP/SMTP、RSS、Open-Meteo、Windows 位置 API。

@@ -5,7 +5,7 @@
 
 param(
     [string]$AppPackagesPath = (Join-Path $PSScriptRoot "..\AppPackages"),
-    [ValidateSet("x64", "x86", "arm64")]
+    [ValidateSet("x64")]
     [string]$Platform = "x64"
 )
 

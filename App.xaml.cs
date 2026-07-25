@@ -205,7 +205,7 @@ namespace Task_Flyout
 
                 bool windowActive =
                     (MyMainWindow?.AppWindow?.IsVisible == true) ||
-                    (MyFlyoutWindow?.AppWindow?.IsVisible == true);
+                    (MyFlyoutWindow?.IsVisibleOrOpening == true);
 
                 EfficiencyModeService.SetEfficiencyMode(!windowActive);
             }
@@ -406,8 +406,7 @@ namespace Task_Flyout
             if (MyMainWindow?.Content is FrameworkElement mainRoot)
                 mainRoot.RequestedTheme = theme;
 
-            if (MyFlyoutWindow?.Content is FrameworkElement flyoutRoot)
-                flyoutRoot.RequestedTheme = theme;
+            MyFlyoutWindow?.ApplyConfiguredTheme(theme);
         }
 
         private static FlyoutWindow EnsureFlyoutWindow()
@@ -664,7 +663,8 @@ namespace Task_Flyout
             if (_uiSettings != null) _uiSettings.ColorValuesChanged -= UiSettings_ColorValuesChanged;
             _trayIcon?.Dispose();
             MyWeatherBar?.DetachForRecovery();
-            if (!ReferenceEquals(MyFlyoutWindow, closingWindow)) MyFlyoutWindow?.Close();
+            MyFlyoutWindow?.Shutdown();
+            MyFlyoutWindow = null;
             if (!ReferenceEquals(MyMainWindow, closingWindow)) MyMainWindow?.Close();
             Exit();
         }

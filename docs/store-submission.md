@@ -5,7 +5,8 @@
 - Product ID: `9MTFWNB3XQVG`
 - Package identity: `Uranus92.TaskFlyout`
 - Publisher: `CN=FDE9F71C-A397-410B-81EE-36E18F4325E5`
-- Architectures: x86, x64, ARM64
+- Architectures: x64
+- Tray flyout host: DesktopFlyouts.WinUI 1.4.0 (MIT; see `THIRD-PARTY-NOTICES.md`)
 - Privacy policy: https://sherlockchiang.github.io/Task-Flyout/privacy.html
 - Support URL: https://github.com/SherlockChiang/Task-Flyout/issues
 
@@ -23,7 +24,7 @@ msbuild Task_Flyout.csproj /restore `
   /p:GenerateAppxPackageOnBuild=true `
   /p:UapAppxPackageBuildMode=StoreUpload `
   /p:AppxBundle=Always `
-  '/p:AppxBundlePlatforms=x86|x64|ARM64' `
+  /p:AppxBundlePlatforms=x64 `
   /p:AppxPackageSigningEnabled=false `
   /p:AppxPackageDir="StorePackages\"
 ```

@@ -1,3 +1,4 @@
+using DesktopFlyouts;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -15,7 +16,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
 using Task_Flyout.Services;
-using Windows.Graphics;
 using Windows.UI;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System.Globalization;
@@ -72,13 +72,11 @@ namespace Task_Flyout
         public object ConvertBack(object value, Type targetType, object parameter, string language) => throw new NotImplementedException();
     }
 
-    public sealed partial class FlyoutWindow : Window
+    public sealed partial class FlyoutWindow : DesktopFlyout
     {
-        private AppWindow _appWindow;
         private AppCache _localCache = new();
         private DispatcherTimer? _syncTimer;
         private DispatcherTimer? _clockTimer;
-        private DispatcherTimer? _focusTimer;
         private SyncManager _syncManager = null!;
         private ResourceLoader _loader;
 
@@ -112,64 +110,52 @@ namespace Task_Flyout
         private const int VisibleCacheFutureDays = 45;
         private static readonly SemaphoreSlim _syncLock = new(1, 1);
         private bool _backgroundRefreshQueued;
+        private bool _flyoutContentLoaded;
+        private bool _contentInitialized;
+        private bool _showPending;
+        private bool _openRequestIssued;
+        private bool _desiredOpen;
+        private bool _focusNewItemOnOpen;
+        private bool _isShuttingDown;
+        private long _isOpenChangedToken;
         private DateTimeOffset? _lastSyncSucceededAt;
         private CancellationTokenSource? _weatherRefreshCts;
         private long _weatherRefreshGeneration;
 
         private readonly record struct DotSpec(double Left, double Top, SolidColorBrush Fill);
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern uint GetDpiForWindow(IntPtr hwnd);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool BringWindowToTop(IntPtr hWnd);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
-
-        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
-        private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
-        private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
-
-        private const int GWL_STYLE = -16;
-        private const int WS_THICKFRAME = 0x00040000;
-        private const int WS_CAPTION = 0x00C00000;
-
         public FlyoutWindow()
         {
             InitializeComponent();
-            if (this.Content is FrameworkElement fe)
-            {
-                fe.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
-            }
+            RootGrid.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
             _loader = new ResourceLoader();
-
-            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            Microsoft.UI.WindowId windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
-            _appWindow = AppWindow.GetFromWindowId(windowId);
 
             if (Application.Current is App app)
             {
                 _syncManager = app.SyncManager;
             }
 
-            ConfigureFlyoutStyle();
             StartClock();
             SetupPeriodicSync();
             _syncTimer?.Stop();
-            SetupFocusTimer();
-
-            Activated += FlyoutWindow_Activated;
+            _isOpenChangedToken = RegisterPropertyChangedCallback(IsOpenProperty, OnIsOpenChanged);
             RootGrid.Loaded += RootGrid_Loaded;
+            FlyoutIsland.ActualThemeChanged += FlyoutIsland_ActualThemeChanged;
+            ApplyConfiguredTheme(App.GetConfiguredTheme());
+            if (RootGrid.IsLoaded)
+                RootGrid_Loaded(RootGrid, new RoutedEventArgs());
         }
 
         private void RootGrid_Loaded(object sender, RoutedEventArgs e)
         {
+            _flyoutContentLoaded = true;
+            if (_contentInitialized)
+            {
+                if (_showPending && _desiredOpen)
+                    DispatcherQueue.TryEnqueue(OpenPreparedFlyout);
+                return;
+            }
+            _contentInitialized = true;
             if (MainCalendar.SelectedDates.Count == 0)
             {
                 MainCalendar.SelectedDates.Add(DateTime.Today);
@@ -184,7 +170,8 @@ namespace Task_Flyout
                 RequestDotRefresh();
             });
 
-            _ = RefreshWeatherAsync();
+            if (_showPending && _desiredOpen)
+                DispatcherQueue.TryEnqueue(OpenPreparedFlyout);
         }
 
         private void OnScrollViewerViewChanging(object? sender, ScrollViewerViewChangingEventArgs e) => ScheduleDotRefresh(TimeSpan.FromMilliseconds(80));
@@ -257,24 +244,9 @@ namespace Task_Flyout
 
                 _syncTimer.Interval = TimeSpan.FromMinutes(minutes);
 
-                if (wasEnabled || _appWindow.IsVisible)
+                if (wasEnabled || IsOpen)
                     _syncTimer.Start();
             }
-        }
-
-        private void ConfigureFlyoutStyle()
-        {
-            if (_appWindow.Presenter is OverlappedPresenter presenter)
-            {
-                presenter.IsResizable = false; presenter.IsAlwaysOnTop = true; presenter.SetBorderAndTitleBar(false, false);
-            }
-            _appWindow.IsShownInSwitchers = false;
-
-            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            int style = GetWindowLong(hWnd, GWL_STYLE);
-            style &= ~WS_THICKFRAME;
-            style &= ~WS_CAPTION;
-            SetWindowLong(hWnd, GWL_STYLE, style);
         }
 
         private void LoadCacheForDate(DateTime anchorDate)
@@ -763,6 +735,7 @@ namespace Task_Flyout
                 var max = fullSync ? DateTime.Today.AddYears(3) : DateTime.Today.AddDays(QuickSyncFutureDays);
 
                 await _syncManager.GetAllDataAsync(min, max, forceRefresh);
+                if (_isShuttingDown) return;
 
                 LoadCacheForDate(_displayedMonth);
                 RequestDotRefresh();
@@ -773,7 +746,7 @@ namespace Task_Flyout
             }
             catch (Exception ex)
             {
-                if (!silent)
+                if (!silent && !_isShuttingDown)
                 {
                     AgendaItems.Clear();
                     AgendaItems.Add(new AgendaItem
@@ -787,7 +760,7 @@ namespace Task_Flyout
             }
             finally
             {
-                if (!silent)
+                if (!silent && !_isShuttingDown)
                     SetSyncProgressVisible(false);
                 _syncLock.Release();
             }
@@ -804,9 +777,19 @@ namespace Task_Flyout
         {
             if ((DateTime.Now - _lastHideTime).TotalMilliseconds < 250) return;
 
-            if (_appWindow.IsVisible)
+            if (IsOpen)
             {
+                _desiredOpen = false;
                 HideFlyout(autoHide: false);
+            }
+            else if (_showPending)
+            {
+                if (_openRequestIssued) return;
+                _desiredOpen = !_desiredOpen;
+                if (_desiredOpen && _flyoutContentLoaded && !_openRequestIssued)
+                    OpenPreparedFlyout();
+                else if (!_desiredOpen && !_openRequestIssued)
+                    _showPending = false;
             }
             else
             {
@@ -816,21 +799,20 @@ namespace Task_Flyout
 
         private void ShowFlyout()
         {
+            if (_isShuttingDown || IsOpen) return;
+            _desiredOpen = true;
+            _showPending = true;
+            if (!_flyoutContentLoaded) return;
+            OpenPreparedFlyout();
+        }
+
+        private void OpenPreparedFlyout()
+        {
+            if (_isShuttingDown || IsOpen || !_showPending || !_desiredOpen) return;
             LoadCacheForDate(DateTime.Today);
             _selectedDay = DateTime.Today;
             ShowDataForDate(_selectedDay);
             AdjustWindowHeight();
-            Activate();
-            _appWindow.Show();
-            NextRenderHelper.RunOnce(() =>
-                PerformanceDiagnostics.MarkOnce("flyout.visible", "flyout", "first_visible", source: "ui"));
-            App.UpdateEfficiencyMode();
-            _clockTimer?.Start();
-            _syncTimer?.Start();
-            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            SetForegroundWindow(hWnd);
-            BringWindowToTop(hWnd);
-            MainCalendar.Focus(FocusState.Programmatic);
             UpdateClock();
             if (MainCalendar.SelectedDates.Count == 0 || MainCalendar.SelectedDates[0].Date != DateTime.Today)
             {
@@ -840,8 +822,54 @@ namespace Task_Flyout
             }
             UpdateSelectedDateHeader();
             RequestDotRefresh();
-            UpdateAutoHideTimer();
-            QueueBackgroundRefresh();
+            ApplyConfiguredTheme(App.GetConfiguredTheme());
+            _openRequestIssued = true;
+            Show();
+        }
+
+        private void OnIsOpenChanged(DependencyObject sender, DependencyProperty property)
+        {
+            if (IsOpen)
+            {
+                _showPending = false;
+                _openRequestIssued = false;
+                if (!_desiredOpen)
+                {
+                    Hide();
+                    return;
+                }
+
+                ApplyConfiguredTheme(App.GetConfiguredTheme());
+                _clockTimer?.Start();
+                _syncTimer?.Start();
+                App.UpdateEfficiencyMode();
+                NextRenderHelper.RunOnce(() =>
+                    PerformanceDiagnostics.MarkOnce("flyout.visible", "flyout", "first_visible", source: "ui"));
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (!IsOpen) return;
+                    if (_focusNewItemOnOpen)
+                    {
+                        _focusNewItemOnOpen = false;
+                        TxtNewTitle.Focus(FocusState.Programmatic);
+                    }
+                    else
+                    {
+                        MainCalendar.Focus(FocusState.Programmatic);
+                    }
+                });
+                QueueBackgroundRefresh();
+                return;
+            }
+
+            _showPending = false;
+            _openRequestIssued = false;
+            _desiredOpen = false;
+            _clockTimer?.Stop();
+            _syncTimer?.Stop();
+            CancelWeatherRefresh();
+            _lastHideTime = DateTime.Now;
+            App.UpdateEfficiencyMode();
         }
 
         private void QueueBackgroundRefresh()
@@ -856,7 +884,7 @@ namespace Task_Flyout
                 {
                     try
                     {
-                        if (!_appWindow.IsVisible) return;
+                        if (!IsOpen) return;
                         await SyncAllDataAsync(true);
                         await RefreshWeatherAsync();
                     }
@@ -872,15 +900,10 @@ namespace Task_Flyout
 
         private void AdjustWindowHeight()
         {
-            if (_appWindow == null) return;
-
             int logicalWidth = 360;
             double targetLogicalHeight = 0;
-            IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            double scaleFactor = Math.Max(1, GetDpiForWindow(hWnd) / 96.0);
-            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
-            var display = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(windowId, Microsoft.UI.Windowing.DisplayAreaFallback.Nearest);
-            var workArea = display.WorkArea;
+            double scaleFactor = Math.Max(1, RootGrid.XamlRoot?.RasterizationScale ?? 1);
+            var workArea = DisplayArea.Primary.WorkArea;
             double availableLogicalHeight = workArea.Height / scaleFactor;
             double calendarHeight = ResponsiveLayoutPolicy.GetFlyoutCalendarHeight(availableLogicalHeight);
             if (CalendarHost != null) CalendarHost.Height = calendarHeight;
@@ -930,14 +953,10 @@ namespace Task_Flyout
                 ContentRow.Height = new GridLength(1, GridUnitType.Star);
             }
 
-            int physicalWidth = (int)Math.Ceiling(logicalWidth * scaleFactor);
-            int physicalHeight = (int)Math.Ceiling(targetLogicalHeight * scaleFactor);
-
-            int maxPhysicalHeight = Math.Max(1, workArea.Height - (int)Math.Ceiling(24 * scaleFactor));
-
-            if (physicalHeight > maxPhysicalHeight)
+            double maxLogicalHeight = Math.Max(1, availableLogicalHeight - 24);
+            if (targetLogicalHeight > maxLogicalHeight)
             {
-                physicalHeight = maxPhysicalHeight;
+                targetLogicalHeight = maxLogicalHeight;
                 AgendaListControl.SetValue(ScrollViewer.VerticalScrollModeProperty, ScrollMode.Enabled);
 
                 if (AddPanelScrollViewer != null)
@@ -955,66 +974,14 @@ namespace Task_Flyout
                 }
             }
 
-            _appWindow.Resize(new SizeInt32(physicalWidth, physicalHeight));
-
-            int physicalMargin = (int)Math.Ceiling(12 * scaleFactor);
-            int targetX = workArea.X + workArea.Width - physicalWidth - physicalMargin;
-            int targetY = workArea.Y + workArea.Height - physicalHeight - physicalMargin;
-
-            _appWindow.Move(new PointInt32(targetX, targetY));
-        }
-
-        private void SetupFocusTimer()
-        {
-            _focusTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
-            _focusTimer.Tick += (s, e) =>
-            {
-                if (_isPinned || !_appWindow.IsVisible)
-                {
-                    _focusTimer.Stop();
-                    return;
-                }
-
-                IntPtr fg = GetForegroundWindow();
-                IntPtr myHwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-                if (fg != myHwnd && fg != IntPtr.Zero)
-                {
-                    HideFlyout(autoHide: true);
-                }
-            };
-        }
-
-        private void FlyoutWindow_Activated(object sender, WindowActivatedEventArgs args)
-        {
-            if (args.WindowActivationState == WindowActivationState.Deactivated)
-            {
-                HideFlyout(autoHide: true);
-            }
+            FlyoutHeight = new GridLength(Math.Ceiling(targetLogicalHeight));
         }
 
         private void HideFlyout(bool autoHide)
         {
-            if (autoHide && _isPinned)
-            {
-                _focusTimer?.Stop();
-                return;
-            }
-
-            _focusTimer?.Stop();
-            _clockTimer?.Stop();
-            _syncTimer?.Stop();
-            CancelWeatherRefresh();
-            _appWindow.Hide();
-            _lastHideTime = DateTime.Now;
-            App.UpdateEfficiencyMode(); // flyout dismissed — re-evaluate throttle
-        }
-
-        private void UpdateAutoHideTimer()
-        {
-            if (_isPinned || !_appWindow.IsVisible)
-                _focusTimer?.Stop();
-            else
-                _focusTimer?.Start();
+            if (autoHide && _isPinned) return;
+            _desiredOpen = false;
+            Hide();
         }
 
         private bool IsItemVisible(AgendaItem item)
@@ -1074,15 +1041,22 @@ namespace Task_Flyout
 
         public void ShowNewItem()
         {
-            if (!_appWindow.IsVisible)
-                ShowFlyout();
             SetupFlyoutProviderComboBox();
             TimePickerStart.Time = new TimeSpan(DateTime.Now.Hour, (DateTime.Now.Minute / 5) * 5, 0);
             TimePickerEnd.Time = TimePickerStart.Time.Add(TimeSpan.FromHours(1));
             AddPanel.Visibility = Visibility.Visible;
             if (AgendaContainer != null) AgendaContainer.Visibility = Visibility.Collapsed;
             AdjustWindowHeight();
-            TxtNewTitle.Focus(FocusState.Programmatic);
+            if (!IsOpen)
+            {
+                _focusNewItemOnOpen = true;
+                _desiredOpen = true;
+                ShowFlyout();
+            }
+            else
+            {
+                DispatcherQueue.TryEnqueue(() => TxtNewTitle.Focus(FocusState.Programmatic));
+            }
         }
 
         public async Task<bool> RefreshNowAsync()
@@ -1222,7 +1196,7 @@ namespace Task_Flyout
 
             DispatcherQueue.TryEnqueue(() =>
             {
-                if (generation != _weatherRefreshGeneration || !_appWindow.IsVisible) return;
+                if (generation != _weatherRefreshGeneration || !IsOpen) return;
                 if (info != null)
                 {
                     WeatherIcon.Text = info.Icon;
@@ -1400,13 +1374,45 @@ namespace Task_Flyout
             _isPinned = !_isPinned;
             // E718 = Pin (pinned), E77A = Unpin (unpinned)
             PinIcon.Glyph = _isPinned ? "\uE718" : "\uE77A";
-            UpdateAutoHideTimer();
+            HideOnLostFocus = !_isPinned;
+        }
 
-            if (_isPinned)
+        public bool IsVisibleOrOpening => IsOpen || (_showPending && _desiredOpen);
+
+        public void ApplyConfiguredTheme(ElementTheme theme)
+        {
+            var effectiveTheme = theme == ElementTheme.Default
+                ? Application.Current.RequestedTheme == ApplicationTheme.Dark ? ElementTheme.Dark : ElementTheme.Light
+                : theme;
+            RootGrid.RequestedTheme = effectiveTheme;
+            FlyoutIsland.RequestedTheme = effectiveTheme;
+        }
+
+        private void FlyoutIsland_ActualThemeChanged(FrameworkElement sender, object args)
+            => ApplyConfiguredTheme(App.GetConfiguredTheme());
+
+        public void Shutdown()
+        {
+            if (_isShuttingDown) return;
+            _isShuttingDown = true;
+            _syncTimer?.Stop();
+            _clockTimer?.Stop();
+            _dotRefreshTimer?.Stop();
+            CancelWeatherRefresh();
+            if (_activeScrollViewer != null)
             {
-                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-                BringWindowToTop(hWnd);
+                _activeScrollViewer.ViewChanging -= OnScrollViewerViewChanging;
+                _activeScrollViewer.ViewChanged -= OnScrollViewerViewChanged;
+                _activeScrollViewer = null;
             }
+            RootGrid.Loaded -= RootGrid_Loaded;
+            FlyoutIsland.ActualThemeChanged -= FlyoutIsland_ActualThemeChanged;
+            if (_isOpenChangedToken != 0)
+            {
+                UnregisterPropertyChangedCallback(IsOpenProperty, _isOpenChangedToken);
+                _isOpenChangedToken = 0;
+            }
+            Dispose();
         }
 
         private void AgendaListControl_ItemClick(object sender, ItemClickEventArgs e)

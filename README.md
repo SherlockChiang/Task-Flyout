@@ -67,9 +67,13 @@ downloaded code.
 
 **Requirements**
 
-- Windows 11 (SDK 10.0.19041 or later)
+- Windows 11 with SDK 10.0.26100 or later
 - Visual Studio 2022 with the **Windows App SDK** and **.NET desktop** workloads, or the .NET 10 SDK
-- A supported platform: `x86`, `x64`, or `ARM64`
+- A supported platform: `x64`
+
+The tray calendar uses [DesktopFlyouts](https://github.com/0x5bfa/DesktopFlyouts)
+for Windows 11-style placement, backdrop, activation, and light-dismiss behavior.
+DesktopFlyouts.WinUI 1.4.0 currently limits packaged Task Flyout builds to x64.
 
 **Google OAuth credentials**
 
@@ -100,7 +104,8 @@ project.
 ## Tech stack
 
 - WinUI 3 / Windows App SDK 2.1
-- .NET 10 (`net10.0-windows10.0.19041.0`), C#
+- .NET 10 (`net10.0-windows10.0.26100.0`), C#
+- DesktopFlyouts.WinUI 1.4.0
 - SQLite for the local cache
 
 ## License
