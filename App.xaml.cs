@@ -34,6 +34,7 @@ namespace Task_Flyout
 
         private H.NotifyIcon.TaskbarIcon? _trayIcon;
         private Microsoft.UI.Dispatching.DispatcherQueueTimer? _weatherBarWatchdog;
+        private IntPtr _weatherBarRecoveryTaskbar;
         private UISettings _uiSettings = null!;
         private ResourceLoader _loader = new();
         private string _trayToolTipText = "Task Flyout";
@@ -482,16 +483,24 @@ namespace Task_Flyout
 
                 // Alive and well — nothing to do (also covers the user-hidden case: the HWND
                 // still exists when merely hidden).
-                if (MyWeatherBar != null && MyWeatherBar.IsAlive()) return;
+                if (MyWeatherBar != null && MyWeatherBar.IsAlive())
+                {
+                    _weatherBarRecoveryTaskbar = IntPtr.Zero;
+                    return;
+                }
 
                 // Don't recreate mid-restart before the taskbar exists, or the new bar would
                 // briefly float as a stray top-level window.
-                if (!IsSupportedTaskbarAvailable()) return;
+                IntPtr taskbar = GetSupportedTaskbarWindow();
+                if (taskbar == IntPtr.Zero || taskbar == _weatherBarRecoveryTaskbar) return;
 
                 var dead = MyWeatherBar;
                 MyWeatherBar = null;
                 dead?.DetachForRecovery();
 
+                // A replacement must survive until the next watchdog tick before another
+                // attempt is allowed for this taskbar generation.
+                _weatherBarRecoveryTaskbar = taskbar;
                 MyWeatherBar = new WeatherBarWindow();
                 ApplyConfiguredThemeToOpenWindows();
                 MyWeatherBar.ShowBar();
@@ -502,9 +511,13 @@ namespace Task_Flyout
             }
         }
 
-        private static bool IsSupportedTaskbarAvailable()
-            => FindWindow(TaskbarSelectionPolicy.PrimaryClass, null) != IntPtr.Zero
-               || FindWindow(TaskbarSelectionPolicy.SecondaryClass, null) != IntPtr.Zero;
+        private static IntPtr GetSupportedTaskbarWindow()
+        {
+            IntPtr primary = FindWindow(TaskbarSelectionPolicy.PrimaryClass, null);
+            return primary != IntPtr.Zero
+                ? primary
+                : FindWindow(TaskbarSelectionPolicy.SecondaryClass, null);
+        }
 
         public static WeatherBarDiagnostics GetWeatherBarDiagnostics()
             => MyWeatherBar?.Diagnostics ?? WeatherBarDiagnostics.Unavailable();
@@ -529,6 +542,8 @@ namespace Task_Flyout
             MainDispatcherQueue.TryEnqueue(async () =>
             {
                 Windows.Storage.ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] = enabled;
+                if (enabled)
+                    (App.Current as App)!._weatherBarRecoveryTaskbar = IntPtr.Zero;
 
                 if (enabled && (App.Current as App)?.WeatherService?.IsEnabled == true)
                 {
@@ -551,8 +566,8 @@ namespace Task_Flyout
         private void StopWeatherBarWatchdog()
         {
             _weatherBarWatchdog?.Stop();
-            _backgroundRefresh?.Stop();
             _weatherBarWatchdog = null;
+            _weatherBarRecoveryTaskbar = IntPtr.Zero;
         }
 
         public static void RefreshWeatherBar(bool forceRefresh = false)
@@ -652,6 +667,7 @@ namespace Task_Flyout
             _isExiting = true;
 
             _weatherBarWatchdog?.Stop();
+            _backgroundRefresh?.Stop();
             NotificationService?.Stop();
             MailService.StopMailPolling();
             MailService.StopPendingMutationRetryScheduler();

@@ -37,6 +37,7 @@ namespace Task_Flyout
         private CancellationTokenSource? _weatherRefreshCts;
         private long _weatherRefreshGeneration;
         private int _mediaSessionInitializing;
+        private int _detached;
         private GlobalSystemMediaTransportControlsSessionManager? _mediaSessionManager;
         private GlobalSystemMediaTransportControlsSession? _mediaSession;
         private int _lastBarX = int.MinValue;
@@ -244,6 +245,7 @@ namespace Task_Flyout
 
             Closed += (_, _) =>
             {
+                Interlocked.Exchange(ref _detached, 1);
                 _refreshTimer.Stop();
                 _reparentTimer.Stop();
                 _themeRefreshTimer?.Stop();
@@ -676,8 +678,14 @@ namespace Task_Flyout
             try
             {
                 var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+                if (Volatile.Read(ref _detached) != 0)
+                    return;
+
                 DispatcherQueue.TryEnqueue(() =>
                 {
+                    if (Volatile.Read(ref _detached) != 0)
+                        return;
+
                     _mediaSessionManager = manager;
                     _mediaSessionManager.SessionsChanged += MediaSessionsChanged;
                     _mediaSessionManager.CurrentSessionChanged += MediaCurrentSessionChanged;
@@ -1953,6 +1961,7 @@ namespace Task_Flyout
         /// </summary>
         public void DetachForRecovery()
         {
+            Interlocked.Exchange(ref _detached, 1);
             CancelWeatherRefresh();
             InvalidateTaskbarAttachment("Explorer restarted or the taskbar disappeared");
             try { _refreshTimer?.Stop(); } catch { }
