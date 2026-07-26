@@ -32,9 +32,6 @@ public static class TaskFlyoutSoakNativeMethods
     [DllImport("user32.dll")]
     private static extern bool IsWindowVisible(IntPtr hwnd);
 
-    [DllImport("user32.dll")]
-    private static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
-
     public static IntPtr FindMainWindow(int processId)
     {
         IntPtr result = IntPtr.Zero;
@@ -52,8 +49,39 @@ public static class TaskFlyoutSoakNativeMethods
         }, IntPtr.Zero);
         return result;
     }
+}
 
-    public static bool CloseWindow(IntPtr hwnd) => PostMessage(hwnd, 0x0010, IntPtr.Zero, IntPtr.Zero);
+[ComImport]
+[Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")]
+public class ApplicationActivationManager
+{
+}
+
+[ComImport]
+[Guid("2E941141-7F97-4756-BA1D-9DECDE894A3D")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IApplicationActivationManager
+{
+    int ActivateApplication(
+        [MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
+        [MarshalAs(UnmanagedType.LPWStr)] string arguments,
+        uint options,
+        out uint processId);
+}
+
+public static class TaskFlyoutSoakApplicationActivator
+{
+    public static int Activate(string appUserModelId)
+    {
+        var manager = (IApplicationActivationManager)new ApplicationActivationManager();
+        int result = manager.ActivateApplication(
+            appUserModelId,
+            "----AppNotificationActivated:action=openAgenda",
+            0,
+            out uint processId);
+        Marshal.ThrowExceptionForHR(result);
+        return unchecked((int)processId);
+    }
 }
 "@
 
@@ -65,17 +93,17 @@ if (-not (Test-Path -LiteralPath $outputParent)) {
     New-Item -ItemType Directory -Path $outputParent -Force | Out-Null
 }
 
-Start-Process explorer.exe "shell:AppsFolder\$($package.PackageFamilyName)!App"
+$processId = [TaskFlyoutSoakApplicationActivator]::Activate("$($package.PackageFamilyName)!App")
 $deadline = (Get-Date).AddSeconds(30)
 do {
-    $process = Get-Process -Name "Task_Flyout" -ErrorAction SilentlyContinue | Select-Object -First 1
+    $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
     if ($null -ne $process) { break }
     Start-Sleep -Milliseconds 250
 } while ((Get-Date) -lt $deadline)
 if ($null -eq $process) { throw "Task Flyout did not start." }
 
-# The soak measures the documented tray-idle state. A shell activation can expose the
-# main window, especially after the preceding packaged smoke run, so close it to the tray.
+# The notification activation above intentionally has no valid target and must leave the
+# app in its documented tray-idle state without ever constructing the main window.
 $windowDeadline = (Get-Date).AddSeconds(5)
 do {
     $mainWindow = [TaskFlyoutSoakNativeMethods]::FindMainWindow($process.Id)
@@ -83,17 +111,7 @@ do {
     Start-Sleep -Milliseconds 250
 } while ((Get-Date) -lt $windowDeadline)
 if ($mainWindow -ne [IntPtr]::Zero) {
-    if (-not [TaskFlyoutSoakNativeMethods]::CloseWindow($mainWindow)) {
-        throw "The Task Flyout main window could not be closed to the tray."
-    }
-    $closeDeadline = (Get-Date).AddSeconds(10)
-    do {
-        Start-Sleep -Milliseconds 250
-        $mainWindow = [TaskFlyoutSoakNativeMethods]::FindMainWindow($process.Id)
-    } while ($mainWindow -ne [IntPtr]::Zero -and (Get-Date) -lt $closeDeadline)
-    if ($mainWindow -ne [IntPtr]::Zero) {
-        throw "The Task Flyout main window did not close to the tray."
-    }
+    throw "Task Flyout unexpectedly created a main window during tray-idle activation."
 }
 
 # Exclude normal CLR, WinUI, tray-icon, and background-service initialization from the baseline.
