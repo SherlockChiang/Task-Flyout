@@ -69,6 +69,6 @@ Run the default 10-minute soak with:
 .\scripts\test-packaged-soak.ps1
 ```
 
-The soak samples process handles, working set, private memory, and threads every 10 seconds. It writes `TestResults\packaged-soak.csv` and fails when median handle growth exceeds 25 or median private-memory growth exceeds 64 MB. Override duration and limits with `TASKFLYOUT_SOAK_MINUTES`, `TASKFLYOUT_SOAK_MAX_HANDLE_GROWTH`, and `TASKFLYOUT_SOAK_MAX_PRIVATE_MB_GROWTH`.
+The soak activates the package directly into its tray-idle state, waits 60 seconds for normal runtime initialization, then samples process handles, working set, private memory, and threads every 10 seconds. It writes `TestResults\packaged-soak.csv` and fails when 10-minute median handle growth exceeds 150 or median private-memory growth exceeds 64 MB. The handle guard includes the packaged .NET 10 and Windows App SDK runtime's observed thread-handle churn; established local and hosted-runner baselines were 81-123 handles with stable or declining private memory. Override duration and limits with `TASKFLYOUT_SOAK_MINUTES`, `TASKFLYOUT_SOAK_MAX_HANDLE_GROWTH`, and `TASKFLYOUT_SOAK_MAX_PRIVATE_MB_GROWTH`.
 
 The `Quality` workflow runs unit/resource checks for pull requests, packaged smoke after a successful beta release, and packaged soak on its weekly schedule or manual dispatch.

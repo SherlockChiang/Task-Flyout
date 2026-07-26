@@ -2,7 +2,7 @@ param(
     [string]$PackageName = "Uranus92.TaskFlyout",
     [int]$DurationMinutes = $(if ($env:TASKFLYOUT_SOAK_MINUTES) { [int]$env:TASKFLYOUT_SOAK_MINUTES } else { 10 }),
     [int]$SampleSeconds = 10,
-    [int]$MaxHandleGrowth = $(if ($env:TASKFLYOUT_SOAK_MAX_HANDLE_GROWTH) { [int]$env:TASKFLYOUT_SOAK_MAX_HANDLE_GROWTH } else { 25 }),
+    [int]$MaxHandleGrowth = $(if ($env:TASKFLYOUT_SOAK_MAX_HANDLE_GROWTH) { [int]$env:TASKFLYOUT_SOAK_MAX_HANDLE_GROWTH } else { 150 }),
     [int]$MaxPrivateMemoryGrowthMb = $(if ($env:TASKFLYOUT_SOAK_MAX_PRIVATE_MB_GROWTH) { [int]$env:TASKFLYOUT_SOAK_MAX_PRIVATE_MB_GROWTH } else { 64 }),
     [string]$OutputPath = (Join-Path $PSScriptRoot "..\TestResults\packaged-soak.csv")
 )

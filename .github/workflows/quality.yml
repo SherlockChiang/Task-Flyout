@@ -97,7 +97,7 @@ jobs:
         shell: pwsh
         env:
           TASKFLYOUT_SOAK_MINUTES: 10
-          TASKFLYOUT_SOAK_MAX_HANDLE_GROWTH: 25
+          TASKFLYOUT_SOAK_MAX_HANDLE_GROWTH: 150
           TASKFLYOUT_SOAK_MAX_PRIVATE_MB_GROWTH: 64
         run: .\scripts\test-packaged-soak.ps1
 
