@@ -190,13 +190,14 @@ namespace Task_Flyout.Views
                     Microsoft.UI.Colors.Gray),
                 FontSize = 24
             });
-            var inner = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
+            var inner = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center, MinWidth = 0 };
             inner.Children.Add(new TextBlock { Text = name, FontSize = 16, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             inner.Children.Add(new TextBlock
             {
-                Text = status,
-                FontSize = 12,
-                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray)
+                 Text = status,
+                 FontSize = 12,
+                 TextWrapping = TextWrapping.WrapWholeWords,
+                 Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray)
             });
             sp.Children.Add(inner);
             return sp;

@@ -139,5 +139,26 @@
         <AppxBundlePlatforms>x64</AppxBundlePlatforms>
         <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
     </PropertyGroup>
+
+    <Target Name="ResolveLocalVCToolsForAppxSymbols"
+            BeforeTargets="_EnsurePdbCmfExeFullPath"
+            Condition="'$(VCToolsInstallDir)' == '' and Exists('$(MSBuildProgramFiles32)\Microsoft Visual Studio\Installer\vswhere.exe')">
+        <Exec Command="&quot;$(MSBuildProgramFiles32)\Microsoft Visual Studio\Installer\vswhere.exe&quot; -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath"
+              ConsoleToMSBuild="true"
+              StandardOutputImportance="Low">
+            <Output TaskParameter="ConsoleOutput" ItemName="_AppxSymbolVisualStudioPath" />
+        </Exec>
+        <PropertyGroup>
+            <_AppxSymbolVisualStudioPath>@(_AppxSymbolVisualStudioPath)</_AppxSymbolVisualStudioPath>
+            <_AppxSymbolVCToolsVersionFile>$(_AppxSymbolVisualStudioPath)\VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt</_AppxSymbolVCToolsVersionFile>
+        </PropertyGroup>
+        <ReadLinesFromFile File="$(_AppxSymbolVCToolsVersionFile)" Condition="Exists('$(_AppxSymbolVCToolsVersionFile)')">
+            <Output TaskParameter="Lines" ItemName="_AppxSymbolVCToolsVersion" />
+        </ReadLinesFromFile>
+        <PropertyGroup Condition="'@(_AppxSymbolVCToolsVersion)' != ''">
+            <VCToolsInstallDir>$(_AppxSymbolVisualStudioPath)\VC\Tools\MSVC\@(_AppxSymbolVCToolsVersion)\</VCToolsInstallDir>
+        </PropertyGroup>
+    </Target>
+
     <Import Project="Directory.Build.local.props" Condition="Exists('Directory.Build.local.props')" />
 </Project>

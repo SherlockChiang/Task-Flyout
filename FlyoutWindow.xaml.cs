@@ -117,6 +117,7 @@ namespace Task_Flyout
         private bool _desiredOpen;
         private bool _focusNewItemOnOpen;
         private bool _isShuttingDown;
+        private bool _suppressSelectedDateChanged;
         private long _isOpenChangedToken;
         private DateTimeOffset? _lastSyncSucceededAt;
         private CancellationTokenSource? _weatherRefreshCts;
@@ -158,7 +159,9 @@ namespace Task_Flyout
             _contentInitialized = true;
             if (MainCalendar.SelectedDates.Count == 0)
             {
-                MainCalendar.SelectedDates.Add(DateTime.Today);
+                _suppressSelectedDateChanged = true;
+                try { MainCalendar.SelectedDates.Add(DateTime.Today); }
+                finally { _suppressSelectedDateChanged = false; }
             }
 
             UpdateSelectedDateHeader();
@@ -584,7 +587,7 @@ namespace Task_Flyout
 
         private void MainCalendar_SelectedDatesChanged(CalendarView sender, CalendarViewSelectedDatesChangedEventArgs args)
         {
-            if (args.AddedDates.Count == 0) return;
+            if (_suppressSelectedDateChanged || args.AddedDates.Count == 0) return;
 
             if (AddPanel != null && AddPanel.Visibility == Visibility.Visible)
             {
@@ -684,14 +687,35 @@ namespace Task_Flyout
                 }
             }
 
+            if (AgendaItems.Count == tempAgenda.Count && AgendaItems.Zip(tempAgenda, AgendaItemsEqual).All(equal => equal))
+                return;
+
             AgendaItems.Clear();
             foreach (var item in tempAgenda)
-            {
                 AgendaItems.Add(item);
-            }
 
             AdjustWindowHeight();
         }
+
+        private static bool AgendaItemsEqual(AgendaItem left, AgendaItem right)
+            => left.Id == right.Id
+               && left.Title == right.Title
+               && left.Subtitle == right.Subtitle
+               && left.Location == right.Location
+               && left.Description == right.Description
+               && left.IsEvent == right.IsEvent
+               && left.IsTask == right.IsTask
+               && left.IsCompleted == right.IsCompleted
+               && left.Provider == right.Provider
+               && left.CalendarId == right.CalendarId
+               && left.CalendarName == right.CalendarName
+               && left.ColorHex == right.ColorHex
+               && left.DateKey == right.DateKey
+               && left.StartDateTime == right.StartDateTime
+               && left.EndDateTime == right.EndDateTime
+               && left.IsRecurring == right.IsRecurring
+               && left.RecurringEventId == right.RecurringEventId
+               && left.RecurrenceKind == right.RecurrenceKind;
 
         private async Task SyncAllDataAsync(bool silent, bool forceRefresh = false, bool fullSync = false)
         {
@@ -812,7 +836,6 @@ namespace Task_Flyout
             LoadCacheForDate(DateTime.Today);
             _selectedDay = DateTime.Today;
             ShowDataForDate(_selectedDay);
-            AdjustWindowHeight();
             UpdateClock();
             if (MainCalendar.SelectedDates.Count == 0 || MainCalendar.SelectedDates[0].Date != DateTime.Today)
             {

@@ -128,14 +128,17 @@ namespace Task_Flyout.Views
         private void UpdateWeatherBarDiagnostics()
         {
             var diagnostics = App.GetWeatherBarDiagnostics();
-            WeatherBarDiagnosticsText.Text = string.Join(Environment.NewLine,
-                $"Taskbar class: {diagnostics.TaskbarClass}",
-                $"Widgets bridge source: {diagnostics.WidgetsBridgeSource}",
-                $"Monitor: {diagnostics.MonitorRect}",
-                $"DPI: {(diagnostics.Dpi == 0 ? "Unavailable" : diagnostics.Dpi)}",
-                $"Taskbar: {diagnostics.TaskbarRect}",
-                $"Weather bar: {diagnostics.BarRect}",
-                $"Fallback: {diagnostics.FallbackReason}");
+            var unavailable = _loader.GetStringOrDefault("TextUnavailable") ?? "Unavailable";
+            WeatherBarDiagnosticsText.Text = string.Format(
+                _loader.GetStringOrDefault("SettingsPage_WeatherBarDiagnosticsFormat")
+                    ?? "Taskbar class: {0}\nWidgets bridge source: {1}\nMonitor: {2}\nDPI: {3}\nTaskbar: {4}\nWeather bar: {5}\nFallback: {6}",
+                diagnostics.TaskbarClass,
+                diagnostics.WidgetsBridgeSource,
+                diagnostics.MonitorRect,
+                diagnostics.Dpi == 0 ? unavailable : diagnostics.Dpi,
+                diagnostics.TaskbarRect,
+                diagnostics.BarRect,
+                diagnostics.FallbackReason);
         }
 
         private async void ReattachTaskbarButton_Click(object sender, RoutedEventArgs e)

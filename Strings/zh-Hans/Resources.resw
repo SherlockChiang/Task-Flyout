@@ -571,7 +571,7 @@
     <value>城市名称</value>
   </data>
   <data name="SettingsPage_WeatherCity.PlaceholderText" xml:space="preserve">
-    <value>例如：Beijing</value>
+    <value>例如：北京</value>
   </data>
   <data name="SettingsPage_Clock.Text" xml:space="preserve">
     <value>时钟显示</value>
@@ -643,7 +643,7 @@
     <value>图标包</value>
   </data>
   <data name="WeatherPage_IconPackDesc.Text" xml:space="preserve">
-    <value>导入 Breezy 风格图标包（GitHub 源码 zip）。压缩包需包含 drawable_filter.xml 以及 drawable/ 文件夹中的 PNG。默认使用 Windows 11 emoji。</value>
+    <value>导入 Breezy 风格图标包（GitHub 源码 ZIP）。压缩包需包含 drawable_filter.xml 以及 drawable/ 文件夹中的 PNG。默认使用 Windows 11 表情符号。</value>
   </data>
   <data name="WeatherPage_BtnImportIconPack.Content" xml:space="preserve">
     <value>导入 .zip…</value>
@@ -655,10 +655,10 @@
     <value>天气数据源</value>
   </data>
   <data name="WeatherPage_SourceHintOM" xml:space="preserve">
-    <value>Open-Meteo: 免费、无需 API Key、支持空气质量与花粉数据、真正逐时预报</value>
+    <value>Open-Meteo：免费、无需 API 密钥、支持空气质量与花粉数据、真正逐时预报</value>
   </data>
   <data name="WeatherPage_SourceHintWttr" xml:space="preserve">
-    <value>wttr.in: 免费、无需 API Key、仅提供基础天气数据、每 3 小时插值预报</value>
+    <value>wttr.in：免费、无需 API 密钥、仅提供基础天气数据、每 3 小时插值预报</value>
   </data>
   <data name="WeatherPage_FlyoutFields" xml:space="preserve">
     <value>浮窗显示字段</value>
@@ -1192,7 +1192,7 @@
     <value>WebView2 缓存接近上限</value>
   </data>
   <data name="SettingsPage_CacheWarning.Message" xml:space="preserve">
-    <value>建议立即清理以避免下次启动时自动 prune 增加 I/O 开销。</value>
+    <value>建议立即清理，以避免下次启动时自动清理增加 I/O 开销。</value>
   </data>
   <data name="MainWindow_NavTasks.Content" xml:space="preserve">
     <value>任务</value>
@@ -1341,7 +1341,7 @@
   <data name="MailPage_BtnCancel.Content" xml:space="preserve">
     <value>取消</value>
   </data>
-  <data name="MailPage_BtnSaveImap.Content" xml:space="preserve">
+  <data name="MailPage_BtnSaveImapText.Text" xml:space="preserve">
     <value>连接并保存 IMAP 账户</value>
   </data>
   <data name="MailPage_ComposeTitle.Text" xml:space="preserve">
@@ -1441,7 +1441,7 @@
     <value>重度污染</value>
   </data>
   <data name="WeatherPage_IconFontEmoji" xml:space="preserve">
-    <value>Windows 11 风格（emoji）</value>
+    <value>Windows 11 风格（表情符号）</value>
   </data>
   <data name="WeatherPage_IconFontSymbol" xml:space="preserve">
     <value>经典风格（Segoe UI Symbol）</value>
@@ -1713,8 +1713,8 @@ Microsoft：{1}
   <data name="TaskMutation_Retry.AutomationProperties.Name" xml:space="preserve"><value>重试失败的任务更改</value></data>
   <data name="TextProviderRemovalContent" xml:space="preserve"><value>仅从日历和任务中移除 {0}，还是从日历、任务和邮件中完全断开？仅移除此功能会保留共享的服务商授权。</value></data>
   <data name="TextMailProviderRemovalContent" xml:space="preserve"><value>仅从邮件中移除 {0} - {1}，还是从邮件、日历和任务中完全断开此服务商？仅移除邮件会保留共享授权。两种方式都会清除嵌入式浏览器数据。</value></data>
-  <data name="TextRemoveAgendaOnly" xml:space="preserve"><value>仅移除日历/任务</value></data>
-  <data name="TextRemoveMailOnly" xml:space="preserve"><value>仅移除邮件</value></data>
+  <data name="TextRemoveAgendaOnly" xml:space="preserve"><value>仅在此处移除</value></data>
+  <data name="TextRemoveMailOnly" xml:space="preserve"><value>仅在此处移除</value></data>
   <data name="TextDisconnectProvider" xml:space="preserve"><value>完全断开</value></data>
   <data name="TextDisconnectProviderFailed" xml:space="preserve"><value>账户更改未完成，部分本地数据可能仍然保留，请重试。</value></data>
   <data name="MailPage_AccountsButton.AutomationProperties.Name" xml:space="preserve"><value>显示邮件账户和文件夹</value></data>
@@ -1862,4 +1862,38 @@ Microsoft：{1}
   <data name="TextImapUndoFailed" xml:space="preserve"><value>无法撤销 IMAP 移动。</value></data>
   <data name="TextImapUndoIdentityUnavailable" xml:space="preserve"><value>邮件已移回，但服务器未返回新的邮件身份。</value></data>
   <data name="TextImapUndoOutcomeUnknown" xml:space="preserve"><value>撤销结果未知。已刷新文件夹，且未重试操作。</value></data>
+  <data name="TextLastSync" xml:space="preserve"><value>上次同步：{0}</value></data>
+  <data name="TextDeleteFailed" xml:space="preserve"><value>无法删除，请重试。</value></data>
+  <data name="TextDeleteAgendaItem" xml:space="preserve"><value>删除此项目？</value></data>
+  <data name="TextDeleteAgendaItemContent" xml:space="preserve"><value>此项目将从已连接的账户中删除。</value></data>
+  <data name="TextDelete" xml:space="preserve"><value>删除</value></data>
+  <data name="TextDescription" xml:space="preserve"><value>备注</value></data>
+  <data name="TextCleaning" xml:space="preserve"><value>正在清理...</value></data>
+  <data name="TextCleanFailed" xml:space="preserve"><value>清理失败</value></data>
+  <data name="TextClear" xml:space="preserve"><value>清除</value></data>
+  <data name="TextCleaned" xml:space="preserve"><value>已清理</value></data>
+  <data name="TextCancel" xml:space="preserve"><value>取消</value></data>
+  <data name="WeatherPage_LoadFailed" xml:space="preserve"><value>天气不可用，请检查网络、城市和数据源设置。</value></data>
+  <data name="WeatherPage_Updated" xml:space="preserve"><value>更新时间：{0}</value></data>
+  <data name="SettingsPage_HideNotificationContent.Header" xml:space="preserve"><value>在系统通知中隐藏邮件与日程内容</value></data>
+  <data name="RssPage_ArticleStatus.Text" xml:space="preserve"><value>向下滚动加载更多</value></data>
+  <data name="RssPage_Refresh.Text" xml:space="preserve"><value>刷新</value></data>
+  <data name="WeatherPage_BarTitle.OnContent" xml:space="preserve"><value>开启</value></data>
+  <data name="WeatherPage_BarTitle.OffContent" xml:space="preserve"><value>关闭</value></data>
+  <data name="WeatherPage_AutoFollowLocation.OnContent" xml:space="preserve"><value>开启</value></data>
+  <data name="WeatherPage_AutoFollowLocation.OffContent" xml:space="preserve"><value>关闭</value></data>
+  <data name="MailPage_SmtpUserName.PlaceholderText" xml:space="preserve"><value>默认使用 IMAP 用户名</value></data>
+  <data name="TextAttachmentEmpty" xml:space="preserve"><value>不支持空附件。</value></data>
+  <data name="TextAttachmentInvalidFileName" xml:space="preserve"><value>附件文件名无效。</value></data>
+  <data name="TextUnavailable" xml:space="preserve"><value>不可用</value></data>
+  <data name="SettingsPage_WeatherBarDiagnosticsFormat" xml:space="preserve"><value>任务栏类：{0}
+小组件桥接来源：{1}
+显示器：{2}
+DPI：{3}
+任务栏：{4}
+天气栏：{5}
+回退原因：{6}</value></data>
+  <data name="WeatherPage_IconPackError" xml:space="preserve"><value>图标包操作失败：{0}</value></data>
+  <data name="MailPage_ImapDisplayName.PlaceholderText" xml:space="preserve"><value>工作邮箱</value></data>
+  <data name="MailPage_BtnGoogleAccount.Text" xml:space="preserve"><value>Google OAuth</value></data>
 </root>

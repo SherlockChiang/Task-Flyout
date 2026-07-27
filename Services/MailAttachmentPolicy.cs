@@ -23,6 +23,7 @@ namespace Task_Flyout.Services
 
     public enum MailSendStage { Preparing, UploadingAttachments, Sending, Confirming }
     public sealed record MailSendProgress(MailSendStage Stage, int CompletedFiles, int TotalFiles);
+    internal enum MailAttachmentValidationError { TooMany, Empty, FileTooLarge, InvalidFileName, TotalTooLarge }
 
     internal static class MailAttachmentPolicy
     {
@@ -30,22 +31,22 @@ namespace Task_Flyout.Services
         public const long MaximumFileBytes = 3L * 1024 * 1024;
         public const long MaximumTotalBytes = 10L * 1024 * 1024;
 
-        public static string? Validate(IEnumerable<MailAttachmentData> attachments)
+        public static MailAttachmentValidationError? Validate(IEnumerable<MailAttachmentData> attachments)
         {
             var list = attachments.ToList();
-            if (list.Count > MaximumCount) return "Too many attachments.";
+            if (list.Count > MaximumCount) return MailAttachmentValidationError.TooMany;
             long total = 0;
             foreach (var attachment in list)
             {
-                if (attachment.Content == null || attachment.Size <= 0) return "Empty attachments are not supported.";
-                if (attachment.Size > MaximumFileBytes) return "An attachment exceeds the per-file limit.";
-                if (string.IsNullOrWhiteSpace(attachment.FileName)) return "An attachment has an invalid file name.";
+                if (attachment.Content == null || attachment.Size <= 0) return MailAttachmentValidationError.Empty;
+                if (attachment.Size > MaximumFileBytes) return MailAttachmentValidationError.FileTooLarge;
+                if (string.IsNullOrWhiteSpace(attachment.FileName)) return MailAttachmentValidationError.InvalidFileName;
                 if (!string.Equals(attachment.FileName, NormalizeFileName(attachment.FileName), StringComparison.Ordinal))
-                    return "An attachment has an invalid file name.";
+                    return MailAttachmentValidationError.InvalidFileName;
                 try { total = checked(total + attachment.Size); }
-                catch (OverflowException) { return "The attachment total is too large."; }
+                catch (OverflowException) { return MailAttachmentValidationError.TotalTooLarge; }
             }
-            return total > MaximumTotalBytes ? "The attachment total exceeds the limit." : null;
+            return total > MaximumTotalBytes ? MailAttachmentValidationError.TotalTooLarge : null;
         }
 
         public static string NormalizeFileName(string? value)

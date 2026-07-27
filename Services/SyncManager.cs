@@ -125,6 +125,12 @@ namespace Task_Flyout.Services
             return CloneCache(Volatile.Read(ref _publishedCache).Cache);
         }
 
+        public Task WarmCacheAsync() => Task.Run(() =>
+        {
+            try { EnsureCacheLoaded(); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Agenda cache warm failed: {ex.Message}"); }
+        });
+
         public Dictionary<string, List<AgendaItem>> GetDayItemsSnapshot(IEnumerable<string> dateKeys)
             => GetVersionedDayItemsSnapshot(dateKeys).DayItems;
 

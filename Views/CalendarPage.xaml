@@ -176,8 +176,9 @@
                                     </GridView.ItemsPanel>
                                     <GridView.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Width="52" Height="52" CornerRadius="6" Background="Transparent" Margin="2">
-                                                <TextBlock Text="{Binding}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold"/>
+                                             <Border Width="52" Height="52" CornerRadius="6" Background="Transparent" Margin="2">
+                                                 <TextBlock Text="{Binding}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold"
+                                                            TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding}"/>
                                             </Border>
                                         </DataTemplate>
                                     </GridView.ItemTemplate>
@@ -286,13 +287,19 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <Grid Grid.Row="0" Margin="4,0,0,20">
-                <TextBlock x:Uid="CalendarPage_AllAgendas" x:Name="TxtSideBarDate" Text="全部日程" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
-                <Button x:Uid="CalendarPage_BtnCollapseTimeline" HorizontalAlignment="Right" Margin="0,0,72,0" VerticalAlignment="Center" Width="32" Height="32" Padding="0"
-                        Background="Transparent" BorderThickness="0" Click="ToggleTimelinePane_Click">
+            <Grid Grid.Row="0" Margin="4,0,0,20" ColumnSpacing="4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Uid="CalendarPage_AllAgendas" x:Name="TxtSideBarDate" Text="全部日程" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"/>
+                <Button x:Uid="CalendarPage_BtnCollapseTimeline" Grid.Column="1" VerticalAlignment="Center" Width="32" Height="32" Padding="0"
+                         Background="Transparent" BorderThickness="0" Click="ToggleTimelinePane_Click">
                     <FontIcon Glyph="&#xE76C;" FontSize="12"/>
                 </Button>
-                <Button x:Uid="CalendarPage_BtnAdd" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource AccentButtonStyle}" Padding="12,4" Click="BtnAddNew_Click">
+                <Button x:Uid="CalendarPage_BtnAdd" Grid.Column="2" VerticalAlignment="Center" Style="{StaticResource AccentButtonStyle}" Padding="12,4" Click="BtnAddNew_Click">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <FontIcon Glyph="&#xE710;" FontSize="14"/>
                         <TextBlock x:Uid="CalendarPage_BtnAddText" Text="新建" FontSize="13"/>

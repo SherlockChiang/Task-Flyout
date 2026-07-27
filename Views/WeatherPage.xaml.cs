@@ -632,7 +632,9 @@ namespace Task_Flyout.Views
             }
             catch (Exception ex)
             {
-                IconPackStatusText.Text = "Error: " + ex.Message;
+                IconPackStatusText.Text = string.Format(
+                    GetSafeString("WeatherPage_IconPackError", "Icon-pack operation failed: {0}"),
+                    UserSafeErrorMessage.FromException(ex));
             }
             finally
             {

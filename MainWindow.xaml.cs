@@ -885,7 +885,7 @@ namespace Task_Flyout
         private void UpdateGlobalSearchSize(double width, double height)
         {
             if (GlobalSearchPanel == null) return;
-            GlobalSearchPanel.Width = Math.Max(280, Math.Min(720, width - 32));
+            GlobalSearchPanel.Width = Math.Max(0, Math.Min(720, width - 32));
             GlobalSearchPanel.MaxHeight = Math.Max(260, Math.Min(640, height - 96));
             GlobalSearchPanel.Margin = new Thickness(16, height < 560 ? 24 : 72, 16, 16);
         }

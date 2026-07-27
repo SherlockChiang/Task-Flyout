@@ -110,14 +110,24 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <StackPanel Grid.Row="0" Margin="4,0,0,8" Orientation="Horizontal" Spacing="8" Background="Transparent" CornerRadius="4">
-                <TextBlock x:Name="TxtSelectedDateHeader" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                <TextBlock x:Name="TxtRelativeDate" FontSize="13" FontWeight="Bold" Foreground="{ThemeResource SystemAccentColor}" VerticalAlignment="Center" Visibility="Collapsed"/>
-                <TextBlock x:Name="TaskMutationStatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="180" AutomationProperties.LiveSetting="Polite"/>
-                <Button x:Uid="TaskMutation_Retry" x:Name="RetryTaskMutationButton" Content="Retry" Visibility="Collapsed"
+            <Grid Grid.Row="0" Margin="4,0,0,8" ColumnSpacing="8" RowSpacing="4" Background="Transparent" CornerRadius="4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="TxtSelectedDateHeader" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="TxtRelativeDate" Grid.Column="1" FontSize="13" FontWeight="Bold" Foreground="{ThemeResource SystemAccentColor}"
+                           VerticalAlignment="Center" Visibility="Collapsed"/>
+                <TextBlock x:Name="TaskMutationStatusText" Grid.Row="1" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" AutomationProperties.LiveSetting="Polite"/>
+                <Button x:Uid="TaskMutation_Retry" x:Name="RetryTaskMutationButton" Grid.Row="1" Grid.Column="1" Content="Retry" Visibility="Collapsed"
                         Click="RetryTaskMutationButton_Click" Padding="8,2"/>
-            </StackPanel>
+            </Grid>
 
             <Border Grid.Row="1" Background="{ThemeResource ControlFillColorDefaultBrush}"
                     CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">

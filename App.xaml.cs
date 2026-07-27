@@ -129,10 +129,12 @@ namespace Task_Flyout
             UpdateTrayStatus(TrayStatus.Idle);
             _trayIcon.ForceCreate(enablesEfficiencyMode: EfficiencyModeEnabledSetting);
             _ = EnsureAccountsHydratedAsync();
+            _ = SyncManager.WarmCacheAsync();
             QueueBackgroundRefreshStart();
 
             _trayIcon.LeftClickCommand = new RelayCommand(async () =>
             {
+                EfficiencyModeService.SetEfficiencyMode(false);
                 await EnsureAccountsHydratedAsync();
                 EnsureFlyoutWindow().ToggleFlyout();
             });
@@ -356,6 +358,7 @@ namespace Task_Flyout
         {
             try
             {
+                EfficiencyModeService.SetEfficiencyMode(false);
                 await EnsureAccountsHydratedAsync();
                 EnsureFlyoutWindow().ShowNewItem();
             }

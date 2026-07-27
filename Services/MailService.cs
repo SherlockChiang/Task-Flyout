@@ -135,6 +135,7 @@ namespace Task_Flyout.Services
 
     public class MailService
     {
+        private static readonly ResourceLoader _formatLoader = new();
         private readonly ResourceLoader _loader = new();
         private GraphServiceClient? _outlookClient;
         private List<MailAccount> _accounts = new();
@@ -1319,7 +1320,7 @@ namespace Task_Flyout.Services
         {
             attachments ??= Array.Empty<MailAttachmentData>();
             var validationError = MailAttachmentPolicy.Validate(attachments);
-            if (validationError != null) throw new InvalidOperationException(validationError);
+            if (validationError != null) throw new InvalidOperationException(validationError.Value.ToString());
             progress?.Report(new MailSendProgress(MailSendStage.Preparing, 0, attachments.Count));
             using var timeoutCts = new CancellationTokenSource(attachments.Count == 0 ? TimeSpan.FromSeconds(30) : TimeSpan.FromMinutes(2));
             using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
@@ -3844,10 +3845,10 @@ namespace Task_Flyout.Services
             var local = received.Value.ToLocalTime();
             var now = DateTimeOffset.Now;
             if (local.Date == now.Date)
-                return local.ToString("HH:mm");
+                return local.ToString("t", LocalizationHelper.AppCulture);
             if (local.Date == now.Date.AddDays(-1))
-                return "Yesterday";
-            return local.ToString("MM/dd");
+                return _formatLoader.GetStringOrDefault("TextYesterday") ?? "Yesterday";
+            return local.ToString("d", LocalizationHelper.AppCulture);
         }
 
         private static bool IsInboxName(string value)

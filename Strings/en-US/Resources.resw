@@ -1341,7 +1341,7 @@
   <data name="MailPage_BtnCancel.Content" xml:space="preserve">
     <value>Cancel</value>
   </data>
-  <data name="MailPage_BtnSaveImap.Content" xml:space="preserve">
+  <data name="MailPage_BtnSaveImapText.Text" xml:space="preserve">
     <value>Connect and save IMAP account</value>
   </data>
   <data name="MailPage_ComposeTitle.Text" xml:space="preserve">
@@ -1713,9 +1713,9 @@ Weather: {3}</value></data>
   <data name="TaskMutation_Retry.AutomationProperties.Name" xml:space="preserve"><value>Retry failed task change</value></data>
   <data name="TextProviderRemovalContent" xml:space="preserve"><value>Remove {0} from Calendar and Tasks only, or disconnect it completely from Calendar, Tasks, and Mail? Removing only this feature preserves the shared provider authorization.</value></data>
   <data name="TextMailProviderRemovalContent" xml:space="preserve"><value>Remove {0} - {1} from Mail only, or disconnect the provider completely from Mail, Calendar, and Tasks? Removing Mail only preserves the shared provider authorization. Embedded browser data is cleared either way.</value></data>
-  <data name="TextRemoveAgendaOnly" xml:space="preserve"><value>Remove Calendar/Tasks only</value></data>
-  <data name="TextRemoveMailOnly" xml:space="preserve"><value>Remove Mail only</value></data>
-  <data name="TextDisconnectProvider" xml:space="preserve"><value>Disconnect completely</value></data>
+  <data name="TextRemoveAgendaOnly" xml:space="preserve"><value>Remove here only</value></data>
+  <data name="TextRemoveMailOnly" xml:space="preserve"><value>Remove here only</value></data>
+  <data name="TextDisconnectProvider" xml:space="preserve"><value>Disconnect all</value></data>
   <data name="TextDisconnectProviderFailed" xml:space="preserve"><value>The account change did not finish. Existing local data may remain; try again.</value></data>
   <data name="MailPage_AccountsButton.AutomationProperties.Name" xml:space="preserve"><value>Show mail accounts and folders</value></data>
   <data name="MailPage_AccountsButton.ToolTipService.ToolTip" xml:space="preserve"><value>Mail accounts and folders</value></data>
@@ -1862,4 +1862,38 @@ Weather: {3}</value></data>
   <data name="TextImapUndoFailed" xml:space="preserve"><value>Failed to undo the IMAP move.</value></data>
   <data name="TextImapUndoIdentityUnavailable" xml:space="preserve"><value>The message was moved back, but the server did not return its new identity.</value></data>
   <data name="TextImapUndoOutcomeUnknown" xml:space="preserve"><value>The undo outcome is unknown. Folders were refreshed without retrying.</value></data>
+  <data name="TextLastSync" xml:space="preserve"><value>Last sync: {0}</value></data>
+  <data name="TextDeleteFailed" xml:space="preserve"><value>Unable to delete. Please try again.</value></data>
+  <data name="TextDeleteAgendaItem" xml:space="preserve"><value>Delete item?</value></data>
+  <data name="TextDeleteAgendaItemContent" xml:space="preserve"><value>This item will be removed from the connected account.</value></data>
+  <data name="TextDelete" xml:space="preserve"><value>Delete</value></data>
+  <data name="TextDescription" xml:space="preserve"><value>Notes</value></data>
+  <data name="TextCleaning" xml:space="preserve"><value>Cleaning...</value></data>
+  <data name="TextCleanFailed" xml:space="preserve"><value>Clean failed</value></data>
+  <data name="TextClear" xml:space="preserve"><value>Clear</value></data>
+  <data name="TextCleaned" xml:space="preserve"><value>Cleaned</value></data>
+  <data name="TextCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="WeatherPage_LoadFailed" xml:space="preserve"><value>Weather is unavailable. Check network, city, and provider settings.</value></data>
+  <data name="WeatherPage_Updated" xml:space="preserve"><value>Updated: {0}</value></data>
+  <data name="SettingsPage_HideNotificationContent.Header" xml:space="preserve"><value>Hide mail and calendar content in system notifications</value></data>
+  <data name="RssPage_ArticleStatus.Text" xml:space="preserve"><value>Scroll down to load more</value></data>
+  <data name="RssPage_Refresh.Text" xml:space="preserve"><value>Refresh</value></data>
+  <data name="WeatherPage_BarTitle.OnContent" xml:space="preserve"><value>On</value></data>
+  <data name="WeatherPage_BarTitle.OffContent" xml:space="preserve"><value>Off</value></data>
+  <data name="WeatherPage_AutoFollowLocation.OnContent" xml:space="preserve"><value>On</value></data>
+  <data name="WeatherPage_AutoFollowLocation.OffContent" xml:space="preserve"><value>Off</value></data>
+  <data name="MailPage_SmtpUserName.PlaceholderText" xml:space="preserve"><value>Uses the IMAP user name by default</value></data>
+  <data name="TextAttachmentEmpty" xml:space="preserve"><value>Empty attachments are not supported.</value></data>
+  <data name="TextAttachmentInvalidFileName" xml:space="preserve"><value>An attachment has an invalid file name.</value></data>
+  <data name="TextUnavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="SettingsPage_WeatherBarDiagnosticsFormat" xml:space="preserve"><value>Taskbar class: {0}
+Widgets bridge source: {1}
+Monitor: {2}
+DPI: {3}
+Taskbar: {4}
+Weather bar: {5}
+Fallback: {6}</value></data>
+  <data name="WeatherPage_IconPackError" xml:space="preserve"><value>Icon-pack operation failed: {0}</value></data>
+  <data name="MailPage_ImapDisplayName.PlaceholderText" xml:space="preserve"><value>Work Mail</value></data>
+  <data name="MailPage_BtnGoogleAccount.Text" xml:space="preserve"><value>Google OAuth</value></data>
 </root>

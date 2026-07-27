@@ -264,26 +264,34 @@
                                            LineHeight="22"/>
                             </ScrollViewer>
                         </Grid>
-                        <StackPanel Grid.Row="6" Orientation="Horizontal" Spacing="8">
-                            <Button x:Uid="MailPage_TrustSenderButton" x:Name="TrustSenderButton" HorizontalAlignment="Left" Click="TrustSenderButton_Click">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Grid x:Name="MailDetailActions" Grid.Row="6" ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button x:Uid="MailPage_TrustSenderButton" x:Name="TrustSenderButton" MinWidth="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="TrustSenderButton_Click">
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE72E;" FontSize="14"/>
-                                    <TextBlock x:Uid="MailPage_BtnTrustSender" x:Name="TrustSenderButtonText" Text="信任此来源"/>
-                                </StackPanel>
+                                    <TextBlock x:Uid="MailPage_BtnTrustSender" x:Name="TrustSenderButtonText" Grid.Column="1" Text="信任此来源" TextWrapping="WrapWholeWords"/>
+                                </Grid>
                             </Button>
-                            <Button x:Uid="MailPage_ReplyButton" x:Name="ReplyButton" HorizontalAlignment="Left" Click="ReplyButton_Click">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Button x:Uid="MailPage_ReplyButton" x:Name="ReplyButton" Grid.Column="1" MinWidth="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="ReplyButton_Click">
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE97A;" FontSize="14"/>
-                                    <TextBlock x:Uid="MailPage_BtnReply" Text="回复"/>
-                                </StackPanel>
+                                    <TextBlock x:Uid="MailPage_BtnReply" Grid.Column="1" Text="回复" TextWrapping="WrapWholeWords"/>
+                                </Grid>
                             </Button>
-                            <Button x:Uid="MailPage_OpenInBrowserButton" x:Name="OpenInBrowserButton" HorizontalAlignment="Left" Click="OpenInBrowserButton_Click">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Button x:Uid="MailPage_OpenInBrowserButton" x:Name="OpenInBrowserButton" Grid.Column="2" MinWidth="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="OpenInBrowserButton_Click">
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE8A7;" FontSize="14"/>
-                                    <TextBlock x:Uid="MailPage_BtnOpenInBrowser" Text="在浏览器中打开"/>
-                                </StackPanel>
+                                    <TextBlock x:Uid="MailPage_BtnOpenInBrowser" Grid.Column="1" Text="在浏览器中打开" TextWrapping="WrapWholeWords"/>
+                                </Grid>
                             </Button>
-                        </StackPanel>
+                        </Grid>
                     </Grid>
 
                     <Grid x:Name="AddAccountPanel" Visibility="Collapsed"
@@ -358,10 +366,16 @@
                                     </Grid>
                                     <TextBox x:Name="SmtpUserNameBox" x:Uid="MailPage_SmtpUserName" Header="SMTP 用户名" PlaceholderText="默认使用 IMAP 用户名"/>
                                     <ToggleSwitch x:Name="SmtpSslToggle" x:Uid="MailPage_SmtpSsl" Header="SMTP 使用 SSL/TLS" IsOn="False"/>
-                                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                                        <Button x:Uid="MailPage_BtnCancel" Content="取消" Click="CancelImapButton_Click"/>
-                                        <Button x:Name="SaveImapButton" x:Uid="MailPage_BtnSaveImap" Content="连接并保存 IMAP 账户" Click="SaveImapButton_Click"/>
-                                    </StackPanel>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Uid="MailPage_BtnCancel" MinWidth="0" HorizontalAlignment="Stretch" Content="取消" Click="CancelImapButton_Click"/>
+                                        <Button x:Name="SaveImapButton" x:Uid="MailPage_BtnSaveImap" Grid.Column="1" MinWidth="0" HorizontalAlignment="Stretch" Click="SaveImapButton_Click">
+                                            <TextBlock x:Uid="MailPage_BtnSaveImapText" Text="连接并保存 IMAP 账户" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
+                                        </Button>
+                                    </Grid>
                                 </StackPanel>
 
                                 <TextBlock x:Name="AddStatusText" Text="" FontSize="13"

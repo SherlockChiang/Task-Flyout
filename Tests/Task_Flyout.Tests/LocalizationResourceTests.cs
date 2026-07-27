@@ -16,6 +16,45 @@ public class LocalizationResourceTests
     }
 
     [Fact]
+    public void English_and_chinese_format_placeholders_match()
+    {
+        string root = FindRepositoryRoot();
+        var english = LoadResourceValues(Path.Combine(root, "Strings", "en-US", "Resources.resw"));
+        var chinese = LoadResourceValues(Path.Combine(root, "Strings", "zh-Hans", "Resources.resw"));
+        var placeholder = new Regex(@"\{\d+(?:[^}]*)\}", RegexOptions.CultureInvariant);
+
+        foreach (string key in english.Keys)
+        {
+            var englishIndexes = placeholder.Matches(english[key]).Select(match => Regex.Match(match.Value, @"\d+").Value).Order().ToArray();
+            var chineseIndexes = placeholder.Matches(chinese[key]).Select(match => Regex.Match(match.Value, @"\d+").Value).Order().ToArray();
+            Assert.Equal(englishIndexes, chineseIndexes);
+        }
+    }
+
+    [Fact]
+    public void Literal_resource_lookups_reference_existing_keys()
+    {
+        string root = FindRepositoryRoot();
+        var keys = LoadResourceKeys(Path.Combine(root, "Strings", "en-US", "Resources.resw"));
+        var lookup = new Regex("(?:GetStringOrDefault|GetSafeString|GetResourceStringOrDefault)\\(\\s*\"([^\"]+)\"", RegexOptions.CultureInvariant);
+        var sourceFiles = Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}Tests{Path.DirectorySeparatorChar}")
+                && !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"));
+
+        var missing = sourceFiles
+            .SelectMany(path => lookup.Matches(File.ReadAllText(path))
+                .Select(match => match.Groups[1].Value.Replace('/', '.'))
+                .Where(key => !keys.Contains(key))
+                .Select(key => $"{Path.GetRelativePath(root, path)}: {key}"))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Empty(missing);
+    }
+
+    [Fact]
     public void Xaml_accessibility_properties_do_not_hard_code_chinese_text()
     {
         string root = FindRepositoryRoot();
@@ -68,6 +107,15 @@ public class LocalizationResourceTests
         Assert.Equal(keys.Count, keys.Distinct(StringComparer.Ordinal).Count());
         return keys.ToHashSet(StringComparer.Ordinal);
     }
+
+    private static Dictionary<string, string> LoadResourceValues(string path)
+        => XDocument.Load(path)
+            .Root!
+            .Elements("data")
+            .ToDictionary(
+                element => (string)element.Attribute("name")!,
+                element => element.Element("value")?.Value ?? "",
+                StringComparer.Ordinal);
 
     private static string FindRepositoryRoot()
     {

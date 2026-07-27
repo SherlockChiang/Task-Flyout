@@ -8,7 +8,7 @@
     <Grid Padding="24" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="500">
         <StackPanel Spacing="24">
             <TextBlock x:Uid="AddAccount_Title" Text="添加账户" FontSize="28" FontWeight="SemiBold"/>
-            <TextBlock x:Uid="AddAccount_Subtitle" Text="选择要连接的账户类型" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="14"/>
+            <TextBlock x:Uid="AddAccount_Subtitle" Text="选择要连接的账户类型" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="14" TextWrapping="WrapWholeWords"/>
 
             <Border Padding="16" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                 <StackPanel Spacing="8">
@@ -32,10 +32,10 @@
                     HorizontalContentAlignment="Left">
                 <StackPanel Orientation="Horizontal" Spacing="16">
                     <FontIcon Glyph="&#xE77B;" Foreground="#EA4335" FontSize="24"/>
-                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                     <StackPanel Spacing="2" VerticalAlignment="Center" MinWidth="0">
                         <TextBlock x:Uid="AddAccount_GoogleTitle" Text="Google" FontSize="16" FontWeight="SemiBold"/>
                         <TextBlock x:Uid="AddAccount_GoogleDesc" Text="Google 日历与任务" FontSize="12"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="WrapWholeWords"/>
                     </StackPanel>
                 </StackPanel>
             </Button>
@@ -45,17 +45,17 @@
                     HorizontalContentAlignment="Left">
                 <StackPanel Orientation="Horizontal" Spacing="16">
                     <FontIcon Glyph="&#xE77B;" Foreground="#0078D4" FontSize="24"/>
-                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                     <StackPanel Spacing="2" VerticalAlignment="Center" MinWidth="0">
                         <TextBlock x:Uid="AddAccount_MSTitle" Text="Microsoft" FontSize="16" FontWeight="SemiBold"/>
                         <TextBlock x:Uid="AddAccount_MSDesc" Text="Outlook 日历与 To Do" FontSize="12"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="WrapWholeWords"/>
                     </StackPanel>
                 </StackPanel>
             </Button>
 
             <ProgressRing x:Name="AuthProgress" IsActive="False" Width="32" Height="32"/>
             <TextBlock x:Name="StatusText" Text="" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"
-                       HorizontalAlignment="Center"/>
+                       HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="WrapWholeWords"/>
             <StackPanel x:Name="OnboardingActions" Spacing="8" HorizontalAlignment="Stretch">
                 <Button x:Uid="AddAccount_Skip" Content="Skip for now" Click="SkipButton_Click"/>
                 <Button x:Uid="AddAccount_Finish" Content="Finish setup" Style="{StaticResource AccentButtonStyle}" Click="FinishButton_Click"/>

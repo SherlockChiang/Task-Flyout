@@ -4,20 +4,30 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Background="Transparent">
 
+    <Page.Resources>
+        <DataTemplate x:Key="WrappingToggleHeaderTemplate">
+            <TextBlock Text="{Binding}" TextWrapping="WrapWholeWords"/>
+        </DataTemplate>
+        <Style x:Key="WrappingToggleSwitchStyle" TargetType="ToggleSwitch">
+            <Setter Property="HeaderTemplate" Value="{StaticResource WrappingToggleHeaderTemplate}"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+    </Page.Resources>
+
     <ScrollViewer Padding="24">
-        <StackPanel Spacing="28" MaxWidth="800" HorizontalAlignment="Left">
+        <StackPanel Spacing="28" MaxWidth="800" HorizontalAlignment="Stretch">
             <TextBlock x:Uid="SettingsPage_Title" Text="设置" Style="{StaticResource TitleTextBlockStyle}"/>
 
             <StackPanel Spacing="8">
                 <TextBlock x:Uid="SettingsPage_Appearance" Text="外观与语言" FontWeight="SemiBold" FontSize="16"/>
 
-                <ComboBox x:Uid="SettingsPage_ThemeMode" x:Name="ThemeComboBox" Header="应用主题" SelectedIndex="0" Width="200" SelectionChanged="ThemeComboBox_SelectionChanged">
+                <ComboBox x:Uid="SettingsPage_ThemeMode" x:Name="ThemeComboBox" Header="应用主题" SelectedIndex="0" MinWidth="200" MaxWidth="320" HorizontalAlignment="Left" SelectionChanged="ThemeComboBox_SelectionChanged">
                     <ComboBoxItem x:Uid="Theme_System" Content="跟随系统"/>
                     <ComboBoxItem x:Uid="Theme_Light" Content="浅色"/>
                     <ComboBoxItem x:Uid="Theme_Dark" Content="深色"/>
                 </ComboBox>
 
-                <ComboBox x:Uid="SettingsPage_Language" x:Name="LanguageComboBox" Header="界面语言" SelectedIndex="0" Width="200" SelectionChanged="LanguageComboBox_SelectionChanged">
+                <ComboBox x:Uid="SettingsPage_Language" x:Name="LanguageComboBox" Header="界面语言" SelectedIndex="0" MinWidth="200" MaxWidth="320" HorizontalAlignment="Left" SelectionChanged="LanguageComboBox_SelectionChanged">
                     <ComboBoxItem x:Uid="Lang_System" Content="跟随系统"/>
                     <ComboBoxItem Content="简体中文" Tag="zh-Hans"/>
                     <ComboBoxItem Content="English" Tag="en-US"/>
@@ -34,14 +44,14 @@
             <!-- Clock Display Section -->
             <StackPanel Spacing="8">
                 <TextBlock x:Uid="SettingsPage_Clock" Text="时钟显示" FontWeight="SemiBold" FontSize="16"/>
-                <ToggleSwitch x:Uid="SettingsPage_ShowSeconds" x:Name="ShowSecondsToggle" Header="在浮窗时钟中显示秒" IsOn="False" Toggled="ShowSecondsToggle_Toggled"/>
+                <ToggleSwitch x:Uid="SettingsPage_ShowSeconds" x:Name="ShowSecondsToggle" Header="在浮窗时钟中显示秒" IsOn="False" Toggled="ShowSecondsToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
             </StackPanel>
 
             <!-- Notification Section -->
             <StackPanel Spacing="8">
                 <TextBlock x:Uid="SettingsPage_Notification" Text="通知提醒" FontWeight="SemiBold" FontSize="16"/>
-                 <ToggleSwitch x:Uid="SettingsPage_NotifyToggle" x:Name="NotifyToggle" Header="日程开始前弹出通知" IsOn="True" Toggled="NotifyToggle_Toggled"/>
-                  <ToggleSwitch x:Name="HideNotificationContentToggle" Header="在系统通知中隐藏邮件与日程内容" IsOn="True" Toggled="HideNotificationContentToggle_Toggled"/>
+                 <ToggleSwitch x:Uid="SettingsPage_NotifyToggle" x:Name="NotifyToggle" Header="日程开始前弹出通知" IsOn="True" Toggled="NotifyToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                   <ToggleSwitch x:Uid="SettingsPage_HideNotificationContent" x:Name="HideNotificationContentToggle" Header="在系统通知中隐藏邮件与日程内容" IsOn="True" Toggled="HideNotificationContentToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
                  <TextBlock x:Uid="SettingsPage_NotifyDesc" Text="日程提醒只影响日历/任务开始前的提醒通知；天气警报在天气页单独设置。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                 
                 <ComboBox x:Uid="SettingsPage_NotifyTime" x:Name="NotifyTimeComboBox" Header="提前提醒时间" Width="200" SelectionChanged="NotifyTimeComboBox_SelectionChanged" />
@@ -49,13 +59,13 @@
 
             <StackPanel Spacing="8">
                 <TextBlock x:Uid="SettingsPage_MailSync" Text="邮件同步" FontWeight="SemiBold" FontSize="16"/>
-                <ToggleSwitch x:Uid="SettingsPage_MailPolling" x:Name="MailPollingToggle" Header="定时抓取新邮件并显示 Windows 通知" IsOn="True" Toggled="MailPollingToggle_Toggled"/>
+                <ToggleSwitch x:Uid="SettingsPage_MailPolling" x:Name="MailPollingToggle" Header="定时抓取新邮件并显示 Windows 通知" IsOn="True" Toggled="MailPollingToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
                 <TextBlock x:Uid="SettingsPage_MailPollingDesc" Text="新邮件通知只影响邮件轮询；不会改变日程提醒或天气警报设置。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                 <ComboBox x:Uid="SettingsPage_MailInterval" x:Name="MailPollingIntervalComboBox" Header="新邮件检查间隔" Width="200" SelectionChanged="MailPollingIntervalComboBox_SelectionChanged" />
-                 <ToggleSwitch x:Uid="SettingsPage_AutoMarkMailAsRead" x:Name="AutoMarkMailAsReadToggle" Header="打开邮件时自动标记为已读" IsOn="True" Toggled="AutoMarkMailAsReadToggle_Toggled"/>
+                 <ToggleSwitch x:Uid="SettingsPage_AutoMarkMailAsRead" x:Name="AutoMarkMailAsReadToggle" Header="打开邮件时自动标记为已读" IsOn="True" Toggled="AutoMarkMailAsReadToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
                  <TextBlock x:Uid="SettingsPage_AutoMarkMailAsReadDesc" Text="此设置仅控制打开单封邮件时的自动标记；手动的已读、未读和旗标命令仍会写入邮箱。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                 <ToggleSwitch x:Uid="SettingsPage_BlockRemoteImages" x:Name="BlockRemoteImagesToggle" Header="默认阻止未信任发件人的远程图片（防追踪像素）" IsOn="True" Toggled="BlockRemoteImagesToggle_Toggled"/>
-                 <ToggleSwitch x:Uid="SettingsPage_RssRemote" x:Name="AllowRssRemoteResourcesToggle" Header="允许 RSS 文章加载远程图片资源" IsOn="False" Toggled="AllowRssRemoteResourcesToggle_Toggled"/>
+                 <ToggleSwitch x:Uid="SettingsPage_BlockRemoteImages" x:Name="BlockRemoteImagesToggle" Header="默认阻止未信任发件人的远程图片（防追踪像素）" IsOn="True" Toggled="BlockRemoteImagesToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                 <ToggleSwitch x:Uid="SettingsPage_RssRemote" x:Name="AllowRssRemoteResourcesToggle" Header="允许 RSS 文章加载远程图片资源" IsOn="False" Toggled="AllowRssRemoteResourcesToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
                  <StackPanel Spacing="6">
                      <Button x:Uid="SettingsPage_ClearCache" x:Name="ClearWebViewCacheButton" Content="清理 WebView2 缓存" Click="ClearWebViewCacheButton_Click"/>
                       <TextBlock x:Name="WebViewCacheStatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
@@ -80,10 +90,10 @@
                 
                 <ComboBox x:Uid="SettingsPage_SyncInterval" x:Name="SyncIntervalComboBox" Header="自动同步间隔" Width="200" SelectionChanged="SyncIntervalComboBox_SelectionChanged" />
                 
-                <ToggleSwitch x:Uid="SettingsPage_Startup" x:Name="StartupToggle" Header="开机时自动启动" IsOn="False" Toggled="StartupToggle_Toggled"/>
-                <ToggleSwitch x:Uid="SettingsPage_Background" x:Name="BackgroundToggle" Header="关闭主窗口时最小化到托盘 (后台运行)" IsOn="True" Toggled="BackgroundToggle_Toggled"/>
+                <ToggleSwitch x:Uid="SettingsPage_Startup" x:Name="StartupToggle" Header="开机时自动启动" IsOn="False" Toggled="StartupToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                <ToggleSwitch x:Uid="SettingsPage_Background" x:Name="BackgroundToggle" Header="关闭主窗口时最小化到托盘 (后台运行)" IsOn="True" Toggled="BackgroundToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
                 <TextBlock x:Uid="SettingsPage_BackgroundDesc" Text="开启后关闭主窗口仍会保留托盘、同步、提醒和邮件轮询；关闭后会退出应用。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                <ToggleSwitch x:Uid="SettingsPage_EfficiencyMode" x:Name="EfficiencyModeToggle" Header="收起到托盘时启用效能模式 (省电)" IsOn="True" Toggled="EfficiencyModeToggle_Toggled"/>
+                <ToggleSwitch x:Uid="SettingsPage_EfficiencyMode" x:Name="EfficiencyModeToggle" Header="收起到托盘时启用效能模式 (省电)" IsOn="True" Toggled="EfficiencyModeToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
             </StackPanel>
 
             <StackPanel Spacing="8">

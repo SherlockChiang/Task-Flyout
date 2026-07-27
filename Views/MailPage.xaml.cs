@@ -1103,7 +1103,7 @@ namespace Task_Flyout.Views
             }
         }
 
-        private static async Task<byte[]> ReadAttachmentAsync(StorageFile file)
+        private async Task<byte[]> ReadAttachmentAsync(StorageFile file)
         {
             await using var source = await file.OpenStreamForReadAsync();
             using var destination = new MemoryStream();
@@ -1113,11 +1113,11 @@ namespace Task_Flyout.Views
                 int read = await source.ReadAsync(buffer.AsMemory(0, buffer.Length));
                 if (read == 0) break;
                 if (destination.Length + read > MailAttachmentPolicy.MaximumFileBytes)
-                    throw new InvalidOperationException("The attachment exceeds the per-file limit.");
+                    throw new InvalidOperationException(_loader.GetStringOrDefault("TextAttachmentFileLimit") ?? "Attachments may be up to 3 MB each.");
                 await destination.WriteAsync(buffer.AsMemory(0, read));
             }
             if (destination.Length == 0)
-                throw new InvalidOperationException("Empty attachments are not supported.");
+                throw new InvalidOperationException(_loader.GetStringOrDefault("TextAttachmentEmpty") ?? "Empty attachments are not supported.");
             return destination.ToArray();
         }
 
@@ -1625,7 +1625,8 @@ namespace Task_Flyout.Views
                     Header = GetResourceStringOrDefault("TextMailMoveDestination", "Destination folder"),
                     ItemsSource = destinations,
                     SelectedIndex = 0,
-                    MinWidth = 360,
+                    MinWidth = 0,
+                    MaxWidth = 420,
                     HorizontalAlignment = HorizontalAlignment.Stretch
                 };
                 var dialog = new ContentDialog
@@ -1666,7 +1667,8 @@ namespace Task_Flyout.Views
                 Header = GetResourceStringOrDefault(headerKey, headerFallback),
                 ItemsSource = items,
                 SelectedIndex = 0,
-                MinWidth = 360,
+                MinWidth = 0,
+                MaxWidth = 420,
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
 
@@ -2685,7 +2687,7 @@ body { background-color: {{background}} !important; }
             if (attachmentError != null)
             {
                 _isSendingMail = false;
-                SetComposeStatus(attachmentError);
+                SetComposeStatus(GetAttachmentValidationMessage(attachmentError.Value));
                 return;
             }
             Drafts?.Schedule(submitted);
@@ -2751,6 +2753,16 @@ body { background-color: {{background}} !important; }
                     SendComposeButton.Focus(FocusState.Programmatic);
             }
         }
+
+        private string GetAttachmentValidationMessage(MailAttachmentValidationError error)
+            => error switch
+            {
+                MailAttachmentValidationError.TooMany => _loader.GetStringOrDefault("TextAttachmentCountLimit") ?? "You can attach up to 10 files.",
+                MailAttachmentValidationError.Empty => _loader.GetStringOrDefault("TextAttachmentEmpty") ?? "Empty attachments are not supported.",
+                MailAttachmentValidationError.FileTooLarge => _loader.GetStringOrDefault("TextAttachmentFileLimit") ?? "Attachments may be up to 3 MB each.",
+                MailAttachmentValidationError.InvalidFileName => _loader.GetStringOrDefault("TextAttachmentInvalidFileName") ?? "An attachment has an invalid file name.",
+                _ => _loader.GetStringOrDefault("TextAttachmentTotalLimit") ?? "Attachments may total up to 10 MB."
+            };
 
         private async void OpenInBrowserButton_Click(object sender, RoutedEventArgs e)
         {

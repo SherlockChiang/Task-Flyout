@@ -150,9 +150,11 @@
                                x:Uid="GlobalSearch_Hint"
                                AutomationProperties.AutomationId="GlobalSearchHint"
                                Grid.Row="2"
-                               Text="Local cached data only · Enter to open · Esc to close"
-                               FontSize="12"
-                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                Text="Local cached data only · Enter to open · Esc to close"
+                                FontSize="12"
+                                TextAlignment="Center"
+                                TextWrapping="WrapWholeWords"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                 </Grid>
             </Border>
         </Grid>

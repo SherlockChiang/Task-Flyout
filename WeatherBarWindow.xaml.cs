@@ -1806,6 +1806,8 @@ namespace Task_Flyout
                 var panel = _contentPanel;
                 if (panel == null) return;
 
+                ApplyTextWidthBudget(GetMaximumLogicalWidth());
+
                 // Measure after text changes so a newly longer alert description does not
                 // reuse the previous frame's smaller ActualWidth and draw past the pill.
                 panel.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
@@ -1825,6 +1827,42 @@ namespace Task_Flyout
                 }
             }
             catch (Exception ex) { Debug.WriteLine($"RecomputeBarWidth failed: {ex.Message}"); }
+        }
+
+        private double GetMaximumLogicalWidth()
+        {
+            if (_taskbarHwnd != IntPtr.Zero && GetClientRect(_taskbarHwnd, out RECT taskbar))
+            {
+                double scale = Math.Max(1, GetDpiForWindow(_taskbarHwnd) / 96.0);
+                return ResponsiveLayoutPolicy.GetWeatherBarMaximumWidth((taskbar.Right - taskbar.Left) / scale);
+            }
+
+            return MaxLogicalWidth;
+        }
+
+        private void ApplyTextWidthBudget(double maximumWidth)
+        {
+            var fields = new (TextBlock Element, double NaturalWidth)[]
+            {
+                (TxtDesc, TxtDesc.Visibility == Visibility.Visible ? (TxtDesc.TextWrapping == TextWrapping.NoWrap ? NormalDescriptionMaxWidth : AlertDescriptionMaxWidth) : 0),
+                (TxtLocation, TxtLocation.Visibility == Visibility.Visible ? 120 : 0),
+                (TxtFeels, TxtFeels.Visibility == Visibility.Visible ? 90 : 0),
+                (TxtHumidity, TxtHumidity.Visibility == Visibility.Visible ? 90 : 0),
+                (TxtWind, TxtWind.Visibility == Visibility.Visible ? 90 : 0)
+            };
+
+            TxtTemp.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+            int visibleFieldCount = fields.Count(field => field.NaturalWidth > 0);
+            double fixedWidth = 20 + 24 + TxtTemp.DesiredSize.Width + (1 + visibleFieldCount) * 8;
+            double textBudget = Math.Max(24, maximumWidth - fixedWidth);
+            double naturalTotal = fields.Sum(field => field.NaturalWidth);
+            double scale = naturalTotal > 0 ? Math.Min(1, textBudget / naturalTotal) : 1;
+
+            foreach (var field in fields)
+            {
+                if (field.NaturalWidth > 0)
+                    field.Element.MaxWidth = Math.Max(24, Math.Floor(field.NaturalWidth * scale));
+            }
         }
 
         private void ContentPanel_Click(object sender, RoutedEventArgs e)

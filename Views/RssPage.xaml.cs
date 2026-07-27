@@ -46,6 +46,7 @@ namespace Task_Flyout.Views
         private CancellationTokenSource? _articleSearchCts;
         private int _articleQueryGeneration;
         private bool _isNarrowLayout;
+        private bool _useCompactArticleHeader;
         private bool _showSubscriptionsInNarrow;
         private ScrollViewer? _articleScrollViewer;
         private RssArticle? _selectedArticle;
@@ -1296,9 +1297,14 @@ namespace Task_Flyout.Views
         private void RssContentGrid_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             bool narrow = e.NewSize.Width < ResponsiveLayoutPolicy.MediumMinimumWidth;
-            if (_isNarrowLayout == narrow) return;
+            double articlePaneWidth = narrow ? e.NewSize.Width : e.NewSize.Width - 272;
+            bool compactArticleHeader = articlePaneWidth < 600;
+            if (_isNarrowLayout == narrow && _useCompactArticleHeader == compactArticleHeader) return;
+            bool narrowChanged = _isNarrowLayout != narrow;
             _isNarrowLayout = narrow;
-            _showSubscriptionsInNarrow = narrow && _selectedSubscriptionId == null && _selectedFolderId == null && Articles.Count == 0;
+            _useCompactArticleHeader = compactArticleHeader;
+            if (narrowChanged)
+                _showSubscriptionsInNarrow = narrow && _selectedSubscriptionId == null && _selectedFolderId == null && Articles.Count == 0;
             ApplyRssResponsiveLayout();
         }
 
@@ -1322,15 +1328,17 @@ namespace Task_Flyout.Views
                 ShowSubscriptionsButton.Visibility = Visibility.Collapsed;
                 Grid.SetRow(ShowSubscriptionsButton, 0);
                 Grid.SetColumn(ShowSubscriptionsButton, 1);
-                Grid.SetRow(ArticleFilterBox, 0);
-                Grid.SetColumn(ArticleFilterBox, 2);
-                Grid.SetRow(ArticleSearchBox, 0);
-                Grid.SetColumn(ArticleSearchBox, 3);
-                Grid.SetColumnSpan(ArticleSearchBox, 1);
-                Grid.SetRow(RefreshButton, 0);
+                Grid.SetRow(ArticleFilterBox, _useCompactArticleHeader ? 1 : 0);
+                Grid.SetColumn(ArticleFilterBox, _useCompactArticleHeader ? 0 : 2);
+                Grid.SetRow(ArticleSearchBox, _useCompactArticleHeader ? 1 : 0);
+                Grid.SetColumn(ArticleSearchBox, _useCompactArticleHeader ? 1 : 3);
+                Grid.SetColumnSpan(ArticleSearchBox, _useCompactArticleHeader ? 3 : 1);
+                Grid.SetRow(RefreshButton, _useCompactArticleHeader ? 1 : 0);
                 Grid.SetColumn(RefreshButton, 4);
-                Grid.SetColumnSpan(ArticleHeaderTitle, 1);
-                ArticleSearchColumn.Width = new GridLength(200);
+                Grid.SetColumnSpan(ArticleHeaderTitle, _useCompactArticleHeader ? 5 : 1);
+                ArticleSearchColumn.Width = _useCompactArticleHeader
+                    ? new GridLength(1, GridUnitType.Star)
+                    : new GridLength(200);
                 return;
             }
 

@@ -644,9 +644,9 @@ namespace Task_Flyout.Services
             return (feedTitle, feedImageUrl, articles.Where(article => !string.IsNullOrWhiteSpace(article.Title)).ToList());
         }
 
-        private static RssArticle ParseRssItem(RssSubscription subscription, string feedTitle, XElement item)
+        private RssArticle ParseRssItem(RssSubscription subscription, string feedTitle, XElement item)
         {
-            var title = GetElementValue(item, "title") ?? "(Untitled)";
+            var title = GetElementValue(item, "title") ?? (_loader.GetStringOrDefault("TextUntitled") ?? "(Untitled)");
             string link = GetElementValue(item, "link") ?? "";
             var html = GetElementValue(item, "encoded") ?? GetElementValue(item, "description") ?? "";
             var summary = StripHtml(html);
@@ -668,9 +668,9 @@ namespace Task_Flyout.Services
             };
         }
 
-        private static RssArticle ParseAtomEntry(RssSubscription subscription, string feedTitle, XElement entry)
+        private RssArticle ParseAtomEntry(RssSubscription subscription, string feedTitle, XElement entry)
         {
-            var title = GetElementValue(entry, "title") ?? "(Untitled)";
+            var title = GetElementValue(entry, "title") ?? (_loader.GetStringOrDefault("TextUntitled") ?? "(Untitled)");
             string link = entry.Elements().FirstOrDefault(element =>
                 element.Name.LocalName == "link" &&
                 ((string?)element.Attribute("rel") == null || (string?)element.Attribute("rel") == "alternate"))?.Attribute("href")?.Value ?? "";

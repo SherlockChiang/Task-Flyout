@@ -173,8 +173,8 @@
                                                Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer3Uri)}"/>
                                     </Grid>
                                     <TextBlock Text="{x:Bind TemperatureRange}" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="13"/>
-                                    <TextBlock Text="{x:Bind Description}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="WrapWholeWords" FontSize="12"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxHeight="36"/>
+                                     <TextBlock Text="{x:Bind Description}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="WrapWholeWords" FontSize="12"
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxLines="2" TextTrimming="CharacterEllipsis"/>
                                     <StackPanel Spacing="2">
                                         <TextBlock Text="{x:Bind PrecipProbability}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
                                         <TextBlock Text="{x:Bind WindSpeed}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
@@ -206,7 +206,7 @@
                     <TextBlock x:Uid="WeatherPage_CityHeader" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     <StackPanel x:Name="SavedLocationsPanel" Spacing="6" MaxWidth="640" HorizontalAlignment="Stretch"/>
                     <TextBlock x:Name="SavedLocationsFeedback" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
-                    <Grid x:Name="LocationInputGrid" ColumnSpacing="12" RowSpacing="8" HorizontalAlignment="Stretch" MaxWidth="640">
+                    <Grid x:Name="LocationInputGrid" ColumnSpacing="8" RowSpacing="8" HorizontalAlignment="Stretch" MaxWidth="640">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -217,19 +217,19 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <AutoSuggestBox Grid.Column="0" x:Uid="WeatherPage_CitySearchBox" x:Name="CitySearchBox"
-                                        TextChanged="CitySearchBox_TextChanged" QuerySubmitted="CitySearchBox_QuerySubmitted"
-                                        SuggestionChosen="CitySearchBox_SuggestionChosen" VerticalAlignment="Center"/>
+                        <AutoSuggestBox Grid.Column="0" Grid.ColumnSpan="3" x:Uid="WeatherPage_CitySearchBox" x:Name="CitySearchBox"
+                                         TextChanged="CitySearchBox_TextChanged" QuerySubmitted="CitySearchBox_QuerySubmitted"
+                                         SuggestionChosen="CitySearchBox_SuggestionChosen" VerticalAlignment="Center"/>
 
-                        <Button x:Uid="WeatherPage_UseCurrentLocationButton" x:Name="UseCurrentLocationButton" Grid.Column="1" Click="UseCurrentLocationButton_Click"
-                                VerticalAlignment="Center">
+                        <Button x:Uid="WeatherPage_UseCurrentLocationButton" x:Name="UseCurrentLocationButton" Grid.Row="1" Grid.Column="0" Click="UseCurrentLocationButton_Click"
+                                 VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE81D;" FontSize="14"/>
                                 <TextBlock x:Uid="WeatherPage_BtnUseLocation" Text="当前位置"/>
                             </StackPanel>
                         </Button>
 
-                        <Button x:Uid="WeatherPage_BtnRefresh" x:Name="BtnRefresh" Grid.Column="2" Click="BtnRefresh_Click" VerticalAlignment="Center"/>
+                        <Button x:Uid="WeatherPage_BtnRefresh" x:Name="BtnRefresh" Grid.Row="1" Grid.Column="1" Click="BtnRefresh_Click" VerticalAlignment="Center"/>
                     </Grid>
 
                     <TextBlock x:Uid="WeatherPage_LocationPrivacyDesc" Text="使用当前位置或自动跟随定位会调用 Windows 位置权限；坐标仅保存在本机，并只用于向所选天气源请求天气。" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
@@ -266,12 +266,12 @@
                                     SuggestionChosen="CustomFontBox_SuggestionChosen"/>
 
                     <StackPanel x:Name="IconPackButtonPanel" Orientation="Horizontal" Spacing="8">
-                        <Button x:Uid="WeatherPage_BtnImportIconPack" x:Name="BtnImportIconPack" Click="BtnImportIconPack_Click"/>
-                        <Button x:Uid="WeatherPage_BtnDeleteIconPack" x:Name="BtnDeleteIconPack" Click="BtnDeleteIconPack_Click"/>
+                        <Button x:Uid="WeatherPage_BtnImportIconPack" x:Name="BtnImportIconPack" MinWidth="0" Click="BtnImportIconPack_Click"/>
+                        <Button x:Uid="WeatherPage_BtnDeleteIconPack" x:Name="BtnDeleteIconPack" MinWidth="0" Click="BtnDeleteIconPack_Click"/>
                     </StackPanel>
                     <TextBlock x:Uid="WeatherPage_IconPackDesc" FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                    <TextBlock x:Name="IconPackStatusText" FontSize="12"
+                    <TextBlock x:Name="IconPackStatusText" FontSize="12" TextWrapping="WrapWholeWords"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                 </StackPanel>
             </StackPanel>

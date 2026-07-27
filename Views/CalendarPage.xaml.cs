@@ -93,6 +93,7 @@ namespace Task_Flyout.Views
         private bool _isTimelinePaneCollapsed;
         private ResponsiveLayoutMode _layoutMode = ResponsiveLayoutMode.Wide;
         private DateTimeOffset? _lastCalendarSyncSucceededAt;
+        private CalendarMonthRange _displayedRange;
 
         private void TaskCheckBox_Tapped(object sender, TappedRoutedEventArgs e)
         {
@@ -131,38 +132,24 @@ namespace Task_Flyout.Views
             }
         }
 
-        private void LoadCache(DateTime date)
+        private void LoadCache(CalendarMonthRange range)
         {
-            var firstOfMonth = new DateTime(date.Year, date.Month, 1);
-            var start = LocalizationHelper.GetWeekStart(
-                firstOfMonth,
-                LocalizationHelper.AppCulture.DateTimeFormat.FirstDayOfWeek);
-            var end = start.AddDays(42 + 90);
-            _localCache = _syncManager?.GetRangeCacheSnapshot(start, end) ?? new AppCache();
+            _localCache = _syncManager?.GetRangeCacheSnapshot(range.Start, range.EndExclusive) ?? new AppCache();
         }
 
         private void LoadCalendar(DateTime date)
         {
             if (BtnMonthYear == null || CalendarGrid == null) return;
 
-            LoadCache(date);
+            _displayedRange = CalendarMonthRangePolicy.GetRange(
+                date,
+                LocalizationHelper.AppCulture.DateTimeFormat.FirstDayOfWeek);
+            LoadCache(_displayedRange);
             DayCells.Clear();
             BtnMonthYear.Content = date.ToString("Y", LocalizationHelper.AppCulture);
 
-            DateTime firstOfEntry = new DateTime(date.Year, date.Month, 1);
-            int offset = LocalizationHelper.GetDayOffset(
-                firstOfEntry.DayOfWeek,
-                LocalizationHelper.AppCulture.DateTimeFormat.FirstDayOfWeek);
-            DateTime startDate = firstOfEntry.AddDays(-offset);
-
-            int daysInMonth = DateTime.DaysInMonth(date.Year, date.Month);
-            int totalCells = offset + daysInMonth;
-
-            int cellsToGenerate = (int)Math.Ceiling(totalCells / 7.0) * 7;
-
-            for (int i = 0; i < cellsToGenerate; i++)
+            for (var current = _displayedRange.Start; current < _displayedRange.EndExclusive; current = current.AddDays(1))
             {
-                var current = startDate.AddDays(i);
                 var cell = new DayCellViewModel { Date = current, IsCurrentMonth = current.Month == date.Month };
 
                 string key = current.ToString("yyyy-MM-dd");
@@ -219,10 +206,9 @@ namespace Task_Flyout.Views
                 await Task.Delay(TimeSpan.FromMilliseconds(200), token);
                 if (token.IsCancellationRequested) return;
 
-                var start = DayCells.First().Date;
-                var end = DayCells.Last().Date.AddDays(1);
+                var range = _displayedRange;
 
-                var allItems = await _syncManager.GetAllDataAsync(start, end, forceRefresh, token);
+                var allItems = await _syncManager.GetAllDataAsync(range.Start, range.EndExclusive, forceRefresh, token);
 
                 if (token.IsCancellationRequested) return;
 
@@ -303,7 +289,7 @@ namespace Task_Flyout.Views
             _flyoutYear = _viewDate.Year;
             FlyoutYearText.Text = string.Format(_loader.GetStringOrDefault("TextYearFormat") ?? "{0}", _flyoutYear);
 
-            FlyoutMonthGrid.ItemsSource = LocalizationHelper.AppCulture.DateTimeFormat.MonthNames
+            FlyoutMonthGrid.ItemsSource = LocalizationHelper.AppCulture.DateTimeFormat.AbbreviatedMonthNames
                 .Where(m => !string.IsNullOrEmpty(m)).ToArray();
         }
         private void FlyoutPrevYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = string.Format(_loader.GetStringOrDefault("TextYearFormat") ?? "{0}", --_flyoutYear);
@@ -312,8 +298,8 @@ namespace Task_Flyout.Views
         {
             if (e.ClickedItem is string monthStr)
             {
-                var months = LocalizationHelper.AppCulture.DateTimeFormat.MonthNames;
-                int month = Array.IndexOf(months, monthStr) + 1;
+                int month = FlyoutMonthGrid.Items.IndexOf(monthStr) + 1;
+                if (month <= 0) return;
                 _viewDate = new DateTime(_flyoutYear, month, 1);
                 LoadCalendar(_viewDate);
                 MonthYearFlyout.Hide();
@@ -496,12 +482,13 @@ namespace Task_Flyout.Views
         private void UpdateSideBar(DayCellViewModel cell)
         {
             TxtSideBarDate.Text = cell.Date.ToString("M", LocalizationHelper.AppCulture) + " " + (_loader.GetStringOrDefault("TextOnwards") ?? "");
-            SelectedDayItems.Clear();
+            var nextItems = new List<AgendaItem>();
 
             string selectedDateKey = cell.Date.ToString("yyyy-MM-dd");
             var upcomingDates = _localCache.DayItems.Keys
-                .Where(k => string.Compare(k, selectedDateKey) >= 0)
-                .OrderBy(k => k);
+                .Where(k => string.Compare(k, selectedDateKey, StringComparison.Ordinal) >= 0
+                            && _displayedRange.ContainsMonthDateKey(k))
+                .OrderBy(k => k, StringComparer.Ordinal);
 
             bool hasItems = false;
             foreach (var dateKey in upcomingDates)
@@ -534,21 +521,49 @@ namespace Task_Flyout.Views
                         RecurrenceKind = item.RecurrenceKind
                     };
                     PopulateItemColor(displayItem);
-                    SelectedDayItems.Add(displayItem);
+                    nextItems.Add(displayItem);
                     hasItems = true;
                 }
             }
 
             if (!hasItems)
             {
-                SelectedDayItems.Add(new AgendaItem
+                nextItems.Add(new AgendaItem
                 {
                     Title = _loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events",
                     Subtitle = "-",
                     IsEvent = true
                 });
             }
+
+            if (SelectedDayItems.Count == nextItems.Count
+                && SelectedDayItems.Zip(nextItems, SideBarItemsEqual).All(equal => equal))
+                return;
+
+            SelectedDayItems.Clear();
+            foreach (var item in nextItems)
+                SelectedDayItems.Add(item);
         }
+
+        private static bool SideBarItemsEqual(AgendaItem left, AgendaItem right)
+            => left.Id == right.Id
+               && left.Title == right.Title
+               && left.Subtitle == right.Subtitle
+               && left.Location == right.Location
+               && left.Description == right.Description
+               && left.IsEvent == right.IsEvent
+               && left.IsTask == right.IsTask
+               && left.IsCompleted == right.IsCompleted
+               && left.Provider == right.Provider
+               && left.CalendarId == right.CalendarId
+               && left.CalendarName == right.CalendarName
+               && left.ColorHex == right.ColorHex
+               && left.DateKey == right.DateKey
+               && left.StartDateTime == right.StartDateTime
+               && left.EndDateTime == right.EndDateTime
+               && left.IsRecurring == right.IsRecurring
+               && left.RecurringEventId == right.RecurringEventId
+               && left.RecurrenceKind == right.RecurrenceKind;
 
         private async void TaskCheckBox_Click(object sender, RoutedEventArgs e)
         {
@@ -677,7 +692,6 @@ namespace Task_Flyout.Views
                 var max = DateTime.Today.AddYears(3);
                 await _syncManager.GetAllDataAsync(min, max, forceRefresh: true);
                 _lastCalendarSyncSucceededAt = DateTimeOffset.Now;
-                LoadCache(_viewDate);
                 LoadCalendar(_viewDate);
                 SetCalendarStatus(string.Format(_loader.GetStringOrDefault("TextLastSync") ?? "Last sync: {0}", _lastCalendarSyncSucceededAt.Value.LocalDateTime.ToString("g")));
             }
