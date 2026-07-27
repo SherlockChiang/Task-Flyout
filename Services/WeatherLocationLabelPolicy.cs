@@ -40,8 +40,6 @@ namespace Task_Flyout.Services
         {
             if (string.IsNullOrWhiteSpace(location)) return string.Empty;
             string text = location.Trim();
-            if (text.Length <= maximumLength) return text;
-
             var parts = text.Split('·', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             string mostSpecific = parts.Length > 0 ? parts[^1] : text;
             if (mostSpecific.Length <= maximumLength) return mostSpecific;

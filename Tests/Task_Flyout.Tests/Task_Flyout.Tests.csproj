@@ -110,6 +110,7 @@
     <Compile Include="..\..\Services\PerformanceDiagnosticsPolicy.cs" Link="Source\PerformanceDiagnosticsPolicy.cs" />
     <Compile Include="..\..\Services\CalendarDotRenderPolicy.cs" Link="Source\CalendarDotRenderPolicy.cs" />
     <Compile Include="..\..\Services\CalendarMonthRangePolicy.cs" Link="Source\CalendarMonthRangePolicy.cs" />
+    <Compile Include="..\..\Services\WeatherBarLayoutPolicy.cs" Link="Source\WeatherBarLayoutPolicy.cs" />
     <Compile Include="..\..\Services\GlobalSearchPolicy.cs" Link="Source\GlobalSearchPolicy.cs" />
   </ItemGroup>
 

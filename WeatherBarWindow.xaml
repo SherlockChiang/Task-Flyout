@@ -38,7 +38,7 @@
                             HorizontalAlignment="Left"
                             Margin="10,0,10,0"
                             Background="Transparent">
-                    <Grid Width="24" Height="24" VerticalAlignment="Center">
+                    <Grid x:Name="WeatherIconHost" Width="24" Height="24" VerticalAlignment="Center">
                         <!-- Composition host for the icon edge glow; must sit below the icon elements. -->
                         <Canvas x:Name="WeatherIconGlowHost" IsHitTestVisible="False"/>
                         <TextBlock x:Name="WeatherIcon" Text="--" FontSize="20"

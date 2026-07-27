@@ -30,8 +30,10 @@ public class WeatherLocationLabelPolicyTests
 
     [Theory]
     [InlineData("Fusong County · Lushuihe", "Lushuihe")]
-    [InlineData("余杭区 · 仓前街道", "余杭区 · 仓前街道")]
+    [InlineData("抚松县 · 露水河镇", "露水河镇")]
+    [InlineData("余杭区 · 仓前街道", "仓前街道")]
+    [InlineData("杭州市", "杭州市")]
     [InlineData("Very Long Administrative Area · Long Specific Locality", "Long Specific Loc…")]
-    public void Weather_bar_keeps_the_specific_part_when_the_full_location_is_long(string location, string expected)
+    public void Weather_bar_keeps_only_the_most_specific_location_part(string location, string expected)
         => Assert.Equal(expected, WeatherLocationLabelPolicy.FormatForWeatherBar(location));
 }

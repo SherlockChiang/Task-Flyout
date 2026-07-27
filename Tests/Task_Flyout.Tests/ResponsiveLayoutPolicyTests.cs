@@ -30,17 +30,13 @@ public class ResponsiveLayoutPolicyTests
         => Assert.Equal(expected, ResponsiveLayoutPolicy.GetCalendarCellMinimumHeight(availableHeight));
 
     [Theory]
+    [InlineData(0, 0)]
+    [InlineData(200, 64)]
     [InlineData(960, 307.2)]
-    [InlineData(1280, 409.6)]
-    [InlineData(1920, 420)]
+    [InlineData(1280, 320)]
+    [InlineData(1920, 320)]
     public void Caps_weather_bar_to_taskbar_share(double taskbarWidth, double expected)
         => Assert.Equal(expected, ResponsiveLayoutPolicy.GetWeatherBarMaximumWidth(taskbarWidth), 3);
-
-    [Theory]
-    [InlineData(1399, true)]
-    [InlineData(1400, false)]
-    public void Selects_compact_weather_bar(double taskbarWidth, bool expected)
-        => Assert.Equal(expected, ResponsiveLayoutPolicy.UseCompactWeatherBar(taskbarWidth));
 
     [Theory]
     [InlineData(40, 48, 40)]

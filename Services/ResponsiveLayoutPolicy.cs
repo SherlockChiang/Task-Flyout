@@ -13,7 +13,6 @@ namespace Task_Flyout.Services
     {
         public const double MediumMinimumWidth = 720;
         public const double WideMinimumWidth = 1100;
-        public const double ComfortableTaskbarMinimumWidth = 1400;
 
         public static ResponsiveLayoutMode GetMode(double width)
             => width >= WideMinimumWidth
@@ -29,10 +28,7 @@ namespace Task_Flyout.Services
             => availableHeight < 420 ? 40 : 56;
 
         public static double GetWeatherBarMaximumWidth(double taskbarLogicalWidth)
-            => Math.Clamp(taskbarLogicalWidth * 0.32, 80, 420);
-
-        public static bool UseCompactWeatherBar(double taskbarLogicalWidth)
-            => taskbarLogicalWidth < ComfortableTaskbarMinimumWidth;
+            => Math.Min(320, Math.Max(0, taskbarLogicalWidth * 0.32));
 
         public static int GetWeatherBarPhysicalHeight(int detectedWidgetHeight, int taskbarHeight)
         {

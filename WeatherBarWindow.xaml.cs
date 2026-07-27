@@ -32,7 +32,15 @@ namespace Task_Flyout
         private IntPtr _taskbarHwnd = IntPtr.Zero;
         private bool _isParented;
         private bool _userHidden;
-        private double _preferredLogicalWidth = 180;
+        private bool _layoutSuppressed;
+        private bool _requestIcon = true;
+        private bool _requestTemperature = true;
+        private bool _requestDescription;
+        private bool _requestLocation;
+        private bool _requestFeelsLike;
+        private bool _requestHumidity;
+        private bool _requestWind;
+        private bool _layoutShowsIcon;
         private IntPtr _fluentFlyoutHwnd = IntPtr.Zero;
         private CancellationTokenSource? _weatherRefreshCts;
         private long _weatherRefreshGeneration;
@@ -49,10 +57,10 @@ namespace Task_Flyout
         private static readonly TimeSpan NormalReparentInterval = TimeSpan.FromSeconds(8);
         private static readonly TimeSpan FastReparentInterval = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan FastReparentDuration = TimeSpan.FromSeconds(20);
-        private const double MinLogicalWidth = 80;
-        private const double MaxLogicalWidth = 420;
         private const double NormalDescriptionMaxWidth = 170;
         private const double AlertDescriptionMaxWidth = 170;
+        private const double ConservativeWidgetsReservation = 340;
+        private const double TaskbarObstacleClearance = 48;
         private bool _subclassInstalled;
         private string _lastWeatherLayerKey = "";
         private WeatherAlert? _activeAlert;
@@ -166,6 +174,7 @@ namespace Task_Flyout
         private const uint DWMWA_COLOR_NONE = 0xFFFFFFFE;
         private const uint DWMWCP_DONOTROUND = 1;
         private const int SW_SHOWNOACTIVATE = 4;
+        private const int SW_HIDE = 0;
         private const uint WM_MOUSEACTIVATE = 0x0021;
         private const int MA_NOACTIVATE = 3;
         private const uint WM_DISPLAYCHANGE = 0x007E;
@@ -181,6 +190,17 @@ namespace Task_Flyout
         private WeatherBarDiagnostics _diagnostics = WeatherBarDiagnostics.Unavailable();
 
         public WeatherBarDiagnostics Diagnostics => _diagnostics;
+
+        // Shell surfaces that must remain unobstructed by the weather bar.
+        private static readonly HashSet<string> TaskbarObstacleClasses = new(StringComparer.Ordinal)
+        {
+            "TrayNotifyWnd",
+            "MSTaskSwWClass",
+            "MSTaskListWClass",
+            "Start",
+            "TrayButton",
+            "TrayDummySearchControl"
+        };
 
         // System child-window class names inside Shell_TrayWnd (not widgets, skip these)
         private static readonly HashSet<string> SystemTaskbarClasses = new(StringComparer.Ordinal)
@@ -331,7 +351,7 @@ namespace Task_Flyout
                 if (!PositionOnTaskbar(showWindow: false)) return;
                 RefreshThemeIfTaskbarThemeChanged();
 
-                if ((needsAttach || !IsWindowVisible(hWnd)) && IsWindow(hWnd))
+                if (!_layoutSuppressed && (needsAttach || !IsWindowVisible(hWnd)) && IsWindow(hWnd))
                     _appWindow.Show(activateWindow: false);
 
                 // Keep polling after parenting: taskbar widgets and FluentFlyout media
@@ -508,6 +528,14 @@ namespace Task_Flyout
 
             double scaleFactor = Math.Max(1, GetDpiForWindow(_taskbarHwnd) / 96.0);
             int taskbarHeight = tbClient.Bottom - tbClient.Top;
+            int taskbarWidth = tbClient.Right - tbClient.Left;
+            if (taskbarWidth <= taskbarHeight)
+            {
+                _layoutSuppressed = true;
+                ShowWindow(hWnd, SW_HIDE);
+                _diagnostics = WeatherBarDiagnostics.Unavailable("Vertical taskbar layout is not supported");
+                return true;
+            }
 
             IntPtr previousFluentFlyout = _fluentFlyoutHwnd;
             TaskbarWidgetGeometry widgets = GetTaskbarWidgetGeometry(hWnd, tbRect, scaleFactor);
@@ -517,14 +545,32 @@ namespace Task_Flyout
             if (previousFluentFlyout != _fluentFlyoutHwnd)
                 UseFastReparentPolling();
 
-            int fallbackPillWidth = (int)Math.Ceiling(_preferredLogicalWidth * scaleFactor);
-            int minPillWidth = (int)(MinLogicalWidth * scaleFactor);
-            double taskbarLogicalWidth = (tbClient.Right - tbClient.Left) / scaleFactor;
-            int maxPillWidth = (int)(ResponsiveLayoutPolicy.GetWeatherBarMaximumWidth(taskbarLogicalWidth) * scaleFactor);
-            int pillWidth = Math.Clamp(fallbackPillWidth, minPillWidth, maxPillWidth);
-
-            int gap = (int)(6 * scaleFactor);
+            int gap = (int)Math.Ceiling(6 * scaleFactor);
+            int obstacleClearance = (int)Math.Ceiling(TaskbarObstacleClearance * scaleFactor);
             int x = widgets.OccupiedOffset + (widgets.OccupiedOffset > 0 ? gap : 0);
+            int rightBoundary = widgets.RightBoundary > 0 ? widgets.RightBoundary : tbClient.Right;
+            int availablePhysicalWidth = (int)Math.Floor(WeatherBarLayoutPolicy.GetAvailableWidth(
+                taskbarWidth,
+                widgets.OccupiedOffset,
+                rightBoundary,
+                gap,
+                obstacleClearance));
+            double taskbarLogicalWidth = taskbarWidth / scaleFactor;
+            double maximumLogicalWidth = Math.Min(
+                ResponsiveLayoutPolicy.GetWeatherBarMaximumWidth(taskbarLogicalWidth),
+                availablePhysicalWidth / scaleFactor);
+            var layout = ApplyLayoutPlan(maximumLogicalWidth);
+            if (!layout.ShouldShow)
+            {
+                _layoutSuppressed = true;
+                ShowWindow(hWnd, SW_HIDE);
+                widgets = widgets with { FallbackReason = "No unobstructed taskbar space" };
+                UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets);
+                return true;
+            }
+
+            _layoutSuppressed = false;
+            int pillWidth = Math.Min(availablePhysicalWidth, (int)Math.Ceiling(layout.Width * scaleFactor));
             int y = (taskbarHeight - pillHeight) / 2;
 
                 // If FluentFlyout is detected, place ourselves behind it (lower z-order) to avoid overlap
@@ -755,6 +801,7 @@ namespace Task_Flyout
 
         private readonly record struct TaskbarWidgetGeometry(
             int OccupiedOffset,
+            int RightBoundary,
             int NativeWidgetHeight,
             string DetectionSource,
             string FallbackReason);
@@ -772,10 +819,30 @@ namespace Task_Flyout
 
                 int maxRightScreen = taskbarLeft;
                 int nativeWidgetHeight = GetNativeWidgetContainerHeight(
-                    ownHwnd, taskbarScreenRect, scaleFactor, out bool usedGlobalBridgeFallback);
+                    ownHwnd, taskbarScreenRect, scaleFactor, out bool usedGlobalBridgeFallback, out int globalBridgeRight);
+                if (globalBridgeRight > maxRightScreen)
+                    maxRightScreen = globalBridgeRight;
                 bool foundDirectBridge = false;
                 bool foundFluentFlyout = false;
+                var obstacles = new List<(int Left, int Right)>();
                 _fluentFlyoutHwnd = IntPtr.Zero;
+
+                if (_taskbarHwnd != IntPtr.Zero)
+                {
+                    EnumChildWindows(_taskbarHwnd, (child, _) =>
+                    {
+                        if (child == ownHwnd || !IsWindowVisible(child)) return true;
+                        GetWindowThreadProcessId(child, out uint pid);
+                        if (pid == ownPid) return true;
+                        string cls = GetWindowClassName(child);
+                        if (!TaskbarObstacleClasses.Contains(cls) || !GetWindowRect(child, out RECT rect)) return true;
+                        if (rect.Bottom <= taskbarTop || rect.Top >= taskbarBottom) return true;
+                        int left = Math.Max(taskbarScreenRect.Left, rect.Left);
+                        int right = Math.Min(taskbarScreenRect.Right, rect.Right);
+                        if (right > left) obstacles.Add((left, right));
+                        return true;
+                    }, IntPtr.Zero);
+                }
 
                 // Enumerate direct children of Shell_TrayWnd (FluentFlyout TaskbarWindow is
                 // attached here via SetParent; native Win11 Widgets are DesktopWindowContentBridge children)
@@ -835,7 +902,7 @@ namespace Task_Flyout
                         if (isBridge)
                             foundDirectBridge = true;
 
-                        int right = Math.Min(visibleRc.Right, taskbarMidX);
+                        int right = Math.Min(visibleRc.Right, taskbarScreenRect.Right);
                         if (right > maxRightScreen) maxRightScreen = right;
 
                         int leftTolerance = (int)Math.Ceiling(32 * scaleFactor);
@@ -851,6 +918,15 @@ namespace Task_Flyout
                 }
 
                 int occupiedOffset = maxRightScreen > taskbarLeft ? maxRightScreen - taskbarLeft : 0;
+                int rightBoundaryScreen = taskbarScreenRect.Right;
+                foreach (var obstacle in obstacles)
+                {
+                    if (obstacle.Right <= maxRightScreen) continue;
+                    int boundary = obstacle.Left <= maxRightScreen ? maxRightScreen : obstacle.Left;
+                    if (boundary < rightBoundaryScreen)
+                        rightBoundaryScreen = boundary;
+                }
+                int rightBoundary = Math.Max(0, rightBoundaryScreen - taskbarLeft);
                 string source = foundDirectBridge
                     ? "Taskbar child bridge"
                     : usedGlobalBridgeFallback
@@ -863,20 +939,27 @@ namespace Task_Flyout
                     : source == "None"
                         ? "No Widgets bridge detected"
                     : "None";
-                return new TaskbarWidgetGeometry(occupiedOffset, nativeWidgetHeight, source, fallbackReason);
+                return new TaskbarWidgetGeometry(occupiedOffset, rightBoundary, nativeWidgetHeight, source, fallbackReason);
             }
             catch
             {
-                return new TaskbarWidgetGeometry(0, 0, "None", "Widgets bridge detection failed");
+                int taskbarWidth = Math.Max(0, taskbarScreenRect.Right - taskbarScreenRect.Left);
+                return new TaskbarWidgetGeometry(0, taskbarWidth, 0, "None", "Widgets bridge detection failed");
             }
         }
 
-        private int GetNativeWidgetContainerHeight(IntPtr ownHwnd, RECT taskbarRect, double scaleFactor, out bool foundBridge)
+        private int GetNativeWidgetContainerHeight(
+            IntPtr ownHwnd,
+            RECT taskbarRect,
+            double scaleFactor,
+            out bool foundBridge,
+            out int bridgeRight)
         {
             GetWindowThreadProcessId(ownHwnd, out uint ownPid);
             int taskbarMidX = (taskbarRect.Left + taskbarRect.Right) / 2;
             int leftTolerance = (int)Math.Ceiling(32 * scaleFactor);
             int detectedHeight = 0;
+            int detectedRight = taskbarRect.Left;
             bool bridgeDetected = false;
 
             bool Inspect(IntPtr window)
@@ -894,7 +977,19 @@ namespace Task_Flyout
 
                 int top = Math.Max(rect.Top, taskbarRect.Top);
                 int bottom = Math.Min(rect.Bottom, taskbarRect.Bottom);
+                if (bottom <= top) return true;
                 detectedHeight = Math.Max(detectedHeight, bottom - top);
+                int taskbarWidth = taskbarRect.Right - taskbarRect.Left;
+                int bridgeWidth = Math.Min(rect.Right, taskbarRect.Right) - Math.Max(rect.Left, taskbarRect.Left);
+                int maximumPlausibleWidth = (int)Math.Ceiling(taskbarWidth * 0.60);
+                if (bridgeWidth > 0 && bridgeWidth <= maximumPlausibleWidth)
+                    detectedRight = Math.Max(detectedRight, Math.Min(rect.Right, taskbarRect.Right));
+                else if (bridgeWidth > maximumPlausibleWidth)
+                    detectedRight = Math.Max(
+                        detectedRight,
+                        Math.Min(
+                            taskbarRect.Right,
+                            taskbarRect.Left + (int)Math.Ceiling(ConservativeWidgetsReservation * scaleFactor)));
                 bridgeDetected = true;
                 return true;
             }
@@ -908,6 +1003,7 @@ namespace Task_Flyout
             };
             EnumWindows(inspectTree, IntPtr.Zero);
             foundBridge = bridgeDetected;
+            bridgeRight = detectedRight;
             return detectedHeight;
         }
 
@@ -1573,7 +1669,17 @@ namespace Task_Flyout
                     TxtTemp.Text = "--";
                     TxtDesc.Text = "";
                     TxtLocation.Text = "";
-                    TxtLocation.Visibility = Visibility.Collapsed;
+                    TxtFeels.Text = "";
+                    TxtHumidity.Text = "";
+                    TxtWind.Text = "";
+                    _requestIcon = true;
+                    _requestTemperature = true;
+                    _requestDescription = false;
+                    _requestLocation = false;
+                    _requestFeelsLike = false;
+                    _requestHumidity = false;
+                    _requestWind = false;
+                    RecomputeBarWidth();
                     UpdateWeatherIconGlow();
                 });
                 return;
@@ -1600,7 +1706,17 @@ namespace Task_Flyout
                     TxtTemp.Text = "--";
                     TxtDesc.Text = "";
                     TxtLocation.Text = "";
-                    TxtLocation.Visibility = Visibility.Collapsed;
+                    TxtFeels.Text = "";
+                    TxtHumidity.Text = "";
+                    TxtWind.Text = "";
+                    _requestIcon = true;
+                    _requestTemperature = true;
+                    _requestDescription = false;
+                    _requestLocation = false;
+                    _requestFeelsLike = false;
+                    _requestHumidity = false;
+                    _requestWind = false;
+                    RecomputeBarWidth();
                     UpdateWeatherIconGlow();
                     return;
                 }
@@ -1617,6 +1733,8 @@ namespace Task_Flyout
                 // drawable first so imported icon packs are honored; otherwise fall back to the
                 // emoji alert glyph.
                 bool showIcon = enabledFields.Contains("icon");
+                _requestIcon = showIcon;
+                WeatherIconHost.Visibility = showIcon ? Visibility.Visible : Visibility.Collapsed;
                 bool packActive = info.IconLayerUris != null && info.IconLayerUris.Length > 0;
                 string[]? displayLayers = null;
                 if (showIcon)
@@ -1652,14 +1770,26 @@ namespace Task_Flyout
                     WeatherIcon.FontFamily = new FontFamily(info.IconFont);
                 }
 
+                if (showIcon)
+                {
+                    NextRenderHelper.RunOnce(() =>
+                    {
+                        if (generation != _weatherRefreshGeneration || !_requestIcon || !_layoutShowsIcon) return;
+                        WeatherIconHost.Visibility = Visibility.Visible;
+                        if (useBitmap)
+                            ApplyWeatherIconLayerImages(displayLayers!, layerImages);
+                        UpdateWeatherIconGlow();
+                    });
+                }
+
                 // Temperature
                 bool showTemp = enabledFields.Contains("temperature");
-                TxtTemp.Visibility = showTemp ? Visibility.Visible : Visibility.Collapsed;
+                _requestTemperature = showTemp;
                 if (showTemp) TxtTemp.Text = info.Temperature ?? "";
 
                 // Description (alert message replaces description text when active)
                 bool showDesc = enabledFields.Contains("description") || alert != null;
-                TxtDesc.Visibility = showDesc ? Visibility.Visible : Visibility.Collapsed;
+                _requestDescription = showDesc && !string.IsNullOrWhiteSpace(alert != null ? weatherService.FormatBarAlert(alert) : info.Description);
                 ApplyDescriptionLayout(alert != null);
                 if (showDesc)
                 {
@@ -1675,28 +1805,28 @@ namespace Task_Flyout
                     }
                 }
 
-                // Hide secondary fields when an alert is active to avoid text crowding
+                // Alerts request only the alert description. Normal secondary fields are
+                // candidates; the width policy decides which candidates actually fit.
                 bool hasAlert = alert != null;
-                bool compactBar = IsCompactTaskbar();
 
                 // Location
-                bool showLocation = !hasAlert && !compactBar && enabledFields.Contains("location") && !string.IsNullOrWhiteSpace(info.City);
-                TxtLocation.Visibility = showLocation ? Visibility.Visible : Visibility.Collapsed;
+                bool showLocation = !hasAlert && enabledFields.Contains("location") && !string.IsNullOrWhiteSpace(info.City);
+                _requestLocation = showLocation;
                 if (showLocation) TxtLocation.Text = FormatBarLocation(info.City);
 
                 // Feels like
-                bool showFeels = !hasAlert && !compactBar && enabledFields.Contains("feelslike") && !string.IsNullOrEmpty(info.FeelsLike);
-                TxtFeels.Visibility = showFeels ? Visibility.Visible : Visibility.Collapsed;
+                bool showFeels = !hasAlert && enabledFields.Contains("feelslike") && !string.IsNullOrEmpty(info.FeelsLike);
+                _requestFeelsLike = showFeels;
                 if (showFeels) TxtFeels.Text = info.FeelsLike;
 
                 // Humidity
-                bool showHum = !hasAlert && !compactBar && enabledFields.Contains("humidity") && !string.IsNullOrEmpty(info.Humidity);
-                TxtHumidity.Visibility = showHum ? Visibility.Visible : Visibility.Collapsed;
+                bool showHum = !hasAlert && enabledFields.Contains("humidity") && !string.IsNullOrEmpty(info.Humidity);
+                _requestHumidity = showHum;
                 if (showHum) TxtHumidity.Text = info.Humidity;
 
                 // Wind
-                bool showWind = !hasAlert && !compactBar && enabledFields.Contains("wind") && !string.IsNullOrEmpty(info.WindSpeed);
-                TxtWind.Visibility = showWind ? Visibility.Visible : Visibility.Collapsed;
+                bool showWind = !hasAlert && enabledFields.Contains("wind") && !string.IsNullOrEmpty(info.WindSpeed);
+                _requestWind = showWind;
                 if (showWind) TxtWind.Text = info.WindSpeed;
 
                 RecomputeBarWidth();
@@ -1806,63 +1936,66 @@ namespace Task_Flyout
                 var panel = _contentPanel;
                 if (panel == null) return;
 
-                ApplyTextWidthBudget(GetMaximumLogicalWidth());
-
-                // Measure after text changes so a newly longer alert description does not
-                // reuse the previous frame's smaller ActualWidth and draw past the pill.
-                panel.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
-                double desiredLogical = panel.DesiredSize.Width;
-                double contentLogical = desiredLogical > 0 ? desiredLogical : panel.ActualWidth;
-                if (contentLogical <= 0) return;
-
-                // DesiredSize already includes ContentPanel's horizontal margin.
-                double logical = Math.Ceiling(contentLogical);
-
-                logical = Math.Clamp(logical, MinLogicalWidth, MaxLogicalWidth);
-
-                if (Math.Abs(logical - _preferredLogicalWidth) > 1)
-                {
-                    _preferredLogicalWidth = logical;
-                    PositionOnTaskbar();
-                }
+                PositionOnTaskbar();
             }
             catch (Exception ex) { Debug.WriteLine($"RecomputeBarWidth failed: {ex.Message}"); }
         }
 
-        private double GetMaximumLogicalWidth()
+        private WeatherBarLayoutPlan ApplyLayoutPlan(double maximumWidth)
         {
-            if (_taskbarHwnd != IntPtr.Zero && GetClientRect(_taskbarHwnd, out RECT taskbar))
-            {
-                double scale = Math.Max(1, GetDpiForWindow(_taskbarHwnd) / 96.0);
-                return ResponsiveLayoutPolicy.GetWeatherBarMaximumWidth((taskbar.Right - taskbar.Left) / scale);
-            }
+            WeatherIconHost.Visibility = _requestIcon ? Visibility.Visible : Visibility.Collapsed;
+            TxtTemp.Visibility = _requestTemperature ? Visibility.Visible : Visibility.Collapsed;
+            TxtDesc.Visibility = _requestDescription ? Visibility.Visible : Visibility.Collapsed;
+            TxtLocation.Visibility = _requestLocation ? Visibility.Visible : Visibility.Collapsed;
+            TxtFeels.Visibility = _requestFeelsLike ? Visibility.Visible : Visibility.Collapsed;
+            TxtHumidity.Visibility = _requestHumidity ? Visibility.Visible : Visibility.Collapsed;
+            TxtWind.Visibility = _requestWind ? Visibility.Visible : Visibility.Collapsed;
+            TxtDesc.MaxWidth = _barAlertActive ? AlertDescriptionMaxWidth : NormalDescriptionMaxWidth;
+            TxtLocation.MaxWidth = 120;
+            TxtFeels.MaxWidth = 90;
+            TxtHumidity.MaxWidth = 90;
+            TxtWind.MaxWidth = 90;
 
-            return MaxLogicalWidth;
-        }
-
-        private void ApplyTextWidthBudget(double maximumWidth)
-        {
-            var fields = new (TextBlock Element, double NaturalWidth)[]
+            double iconWidth = _requestIcon ? 24 : 0;
+            double temperatureWidth = _requestTemperature ? MeasureTextWidth(TxtTemp, 80) : 0;
+            var fields = new[]
             {
-                (TxtDesc, TxtDesc.Visibility == Visibility.Visible ? (TxtDesc.TextWrapping == TextWrapping.NoWrap ? NormalDescriptionMaxWidth : AlertDescriptionMaxWidth) : 0),
-                (TxtLocation, TxtLocation.Visibility == Visibility.Visible ? 120 : 0),
-                (TxtFeels, TxtFeels.Visibility == Visibility.Visible ? 90 : 0),
-                (TxtHumidity, TxtHumidity.Visibility == Visibility.Visible ? 90 : 0),
-                (TxtWind, TxtWind.Visibility == Visibility.Visible ? 90 : 0)
+                new WeatherBarFieldRequest(WeatherBarOptionalField.Description, _requestDescription, MeasureTextWidth(TxtDesc, _barAlertActive ? AlertDescriptionMaxWidth : NormalDescriptionMaxWidth), 56),
+                new WeatherBarFieldRequest(WeatherBarOptionalField.Location, _requestLocation, MeasureTextWidth(TxtLocation, 120), 48),
+                new WeatherBarFieldRequest(WeatherBarOptionalField.FeelsLike, _requestFeelsLike, MeasureTextWidth(TxtFeels, 90), 44),
+                new WeatherBarFieldRequest(WeatherBarOptionalField.Humidity, _requestHumidity, MeasureTextWidth(TxtHumidity, 90), 44),
+                new WeatherBarFieldRequest(WeatherBarOptionalField.Wind, _requestWind, MeasureTextWidth(TxtWind, 90), 44)
             };
 
-            TxtTemp.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
-            int visibleFieldCount = fields.Count(field => field.NaturalWidth > 0);
-            double fixedWidth = 20 + 24 + TxtTemp.DesiredSize.Width + (1 + visibleFieldCount) * 8;
-            double textBudget = Math.Max(24, maximumWidth - fixedWidth);
-            double naturalTotal = fields.Sum(field => field.NaturalWidth);
-            double scale = naturalTotal > 0 ? Math.Min(1, textBudget / naturalTotal) : 1;
+            var plan = WeatherBarLayoutPolicy.Compute(
+                maximumWidth,
+                horizontalMargins: 20,
+                itemSpacing: 8,
+                iconWidth,
+                temperatureWidth,
+                fields);
+            _layoutShowsIcon = plan.ShouldShow && _requestIcon;
+            WeatherIconHost.Visibility = _layoutShowsIcon ? Visibility.Visible : Visibility.Collapsed;
+            TxtTemp.Visibility = plan.ShouldShow && _requestTemperature ? Visibility.Visible : Visibility.Collapsed;
+            ApplyOptionalFieldLayout(TxtDesc, plan.DescriptionWidth);
+            ApplyOptionalFieldLayout(TxtLocation, plan.LocationWidth);
+            ApplyOptionalFieldLayout(TxtFeels, plan.FeelsLikeWidth);
+            ApplyOptionalFieldLayout(TxtHumidity, plan.HumidityWidth);
+            ApplyOptionalFieldLayout(TxtWind, plan.WindWidth);
+            return plan;
+        }
 
-            foreach (var field in fields)
-            {
-                if (field.NaturalWidth > 0)
-                    field.Element.MaxWidth = Math.Max(24, Math.Floor(field.NaturalWidth * scale));
-            }
+        private static double MeasureTextWidth(TextBlock text, double maximumWidth)
+        {
+            text.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+            double measured = text.DesiredSize.Width;
+            return Math.Min(maximumWidth, Math.Max(0, measured));
+        }
+
+        private static void ApplyOptionalFieldLayout(TextBlock text, double width)
+        {
+            text.Visibility = width > 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (width > 0) text.MaxWidth = Math.Floor(width);
         }
 
         private void ContentPanel_Click(object sender, RoutedEventArgs e)
@@ -1971,13 +2104,6 @@ namespace Task_Flyout
             catch { return fallback; }
         }
 
-        private bool IsCompactTaskbar()
-        {
-            if (_taskbarHwnd == IntPtr.Zero || !GetClientRect(_taskbarHwnd, out RECT client)) return false;
-            double scale = Math.Max(1, GetDpiForWindow(_taskbarHwnd) / 96d);
-            return ResponsiveLayoutPolicy.UseCompactWeatherBar((client.Right - client.Left) / scale);
-        }
-
         /// <summary>True while the underlying native window still exists. Returns false once
         /// Explorer has destroyed the taskbar (and with it this WS_CHILD window).</summary>
         public bool IsAlive()
@@ -2045,7 +2171,7 @@ namespace Task_Flyout
 
                 if (!_isParented && !AttachToTaskbar()) return;
 
-                if (PositionOnTaskbar(showWindow: false) && IsWindow(hWnd))
+                if (PositionOnTaskbar(showWindow: false) && !_layoutSuppressed && IsWindow(hWnd))
                     _appWindow.Show(activateWindow: false);
             }
             catch
