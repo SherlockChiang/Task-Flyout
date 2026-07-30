@@ -692,7 +692,7 @@ namespace Task_Flyout.Views
 
         private void LayoutRoot_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            var mode = ResponsiveLayoutPolicy.GetMode(e.NewSize.Width);
+            var mode = ResponsiveLayoutPolicy.GetTasksMode(e.NewSize.Width);
             if (_layoutMode == mode) return;
             _layoutMode = mode;
             if (mode != ResponsiveLayoutMode.Wide)
@@ -704,7 +704,7 @@ namespace Task_Flyout.Views
         {
             bool showAccounts = !_isAccountPaneCollapsed;
             bool showContent = _layoutMode != ResponsiveLayoutMode.Narrow || !showAccounts;
-            AccountColumn.MinWidth = showAccounts && _layoutMode == ResponsiveLayoutMode.Wide ? 200 : 0;
+            AccountColumn.MinWidth = showAccounts && _layoutMode == ResponsiveLayoutMode.Wide ? 240 : 0;
             AccountColumn.Width = showAccounts
                 ? (_layoutMode == ResponsiveLayoutMode.Narrow ? new GridLength(1, GridUnitType.Star) : new GridLength(2, GridUnitType.Star))
                 : new GridLength(0);

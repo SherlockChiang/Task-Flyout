@@ -18,7 +18,10 @@
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Key="K" Modifiers="Control" Invoked="GlobalSearchAccelerator_Invoked"/>
         </Grid.KeyboardAccelerators>
-        <NavigationView x:Name="MainNav" AutomationProperties.AutomationId="MainNavigation" PaneDisplayMode="Auto" IsSettingsVisible="True"
+        <NavigationView x:Name="MainNav" AutomationProperties.AutomationId="MainNavigation" PaneDisplayMode="Auto"
+                        CompactPaneLength="48" OpenPaneLength="168" IsPaneOpen="False" IsSettingsVisible="True"
+                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                        HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                         ItemInvoked="MainNav_ItemInvoked" BackRequested="MainNav_BackRequested">
 
             <NavigationView.MenuItems>
@@ -54,7 +57,8 @@
 
             </NavigationView.MenuItems>
 
-            <Frame x:Name="ContentFrame"/>
+            <Frame x:Name="ContentFrame" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                   HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
         </NavigationView>
 
         <Grid x:Name="GlobalSearchOverlay"

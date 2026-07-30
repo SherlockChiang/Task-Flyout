@@ -17,7 +17,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
-using Windows.Media.Control;
 using Windows.UI;
 
 
@@ -44,10 +43,7 @@ namespace Task_Flyout
         private IntPtr _fluentFlyoutHwnd = IntPtr.Zero;
         private CancellationTokenSource? _weatherRefreshCts;
         private long _weatherRefreshGeneration;
-        private int _mediaSessionInitializing;
         private int _detached;
-        private GlobalSystemMediaTransportControlsSessionManager? _mediaSessionManager;
-        private GlobalSystemMediaTransportControlsSession? _mediaSession;
         private int _lastBarX = int.MinValue;
         private int _lastBarY = int.MinValue;
         private int _lastBarWidth = int.MinValue;
@@ -247,8 +243,6 @@ namespace Task_Flyout
             _reparentTimer.Tick += ReparentTimer_Tick;
             _reparentTimer.Start();
 
-            _ = InitializeMediaSessionManagerAsync();
-
             HookIconGlowInvalidation();
 
             RootGrid.Loaded += async (s, e) =>
@@ -269,13 +263,6 @@ namespace Task_Flyout
                 _refreshTimer.Stop();
                 _reparentTimer.Stop();
                 _themeRefreshTimer?.Stop();
-                UnsubscribeMediaSession();
-                if (_mediaSessionManager != null)
-                {
-                    _mediaSessionManager.SessionsChanged -= MediaSessionsChanged;
-                    _mediaSessionManager.CurrentSessionChanged -= MediaCurrentSessionChanged;
-                    _mediaSessionManager = null;
-                }
                 DetachContentPanelEvents();
                 UninstallSubclassIfAlive();
                 SystemBackdrop = null;
@@ -346,8 +333,6 @@ namespace Task_Flyout
                     if (!AttachToTaskbar()) return;
                 }
 
-                if (_mediaSessionManager == null)
-                    _ = InitializeMediaSessionManagerAsync();
                 if (!PositionOnTaskbar(showWindow: false)) return;
                 RefreshThemeIfTaskbarThemeChanged();
 
@@ -711,93 +696,10 @@ namespace Task_Flyout
 
         /// <summary>
         /// Detects taskbar widgets. FluentFlyout TaskbarWidget is a transparent top-level window
-        /// spanning the full screen; its visible area is clipped via a window region — we must
-        /// use GetWindowRgn to obtain the real bounding rectangle.
+        /// spanning the full screen; its visible media controls are clipped via a window region.
+        /// Reading GlobalSystemMediaTransportControlsSession playback state has caused native
+        /// AccessViolation crashes on some systems, so region visibility is the crash-safe signal.
         /// </summary>
-        private bool _isMediaActive;
-
-        private async Task InitializeMediaSessionManagerAsync()
-        {
-            if (Interlocked.CompareExchange(ref _mediaSessionInitializing, 1, 0) != 0)
-                return;
-
-            try
-            {
-                var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
-                if (Volatile.Read(ref _detached) != 0)
-                    return;
-
-                DispatcherQueue.TryEnqueue(() =>
-                {
-                    if (Volatile.Read(ref _detached) != 0)
-                        return;
-
-                    _mediaSessionManager = manager;
-                    _mediaSessionManager.SessionsChanged += MediaSessionsChanged;
-                    _mediaSessionManager.CurrentSessionChanged += MediaCurrentSessionChanged;
-                    UpdateCurrentMediaSession();
-                });
-            }
-            catch
-            {
-                DispatcherQueue.TryEnqueue(() => _isMediaActive = false);
-                Interlocked.Exchange(ref _mediaSessionInitializing, 0);
-            }
-        }
-
-        private void MediaSessionsChanged(GlobalSystemMediaTransportControlsSessionManager sender, SessionsChangedEventArgs args)
-            => DispatcherQueue.TryEnqueue(UpdateCurrentMediaSession);
-
-        private void MediaCurrentSessionChanged(GlobalSystemMediaTransportControlsSessionManager sender, CurrentSessionChangedEventArgs args)
-            => DispatcherQueue.TryEnqueue(UpdateCurrentMediaSession);
-
-        private void MediaPlaybackInfoChanged(GlobalSystemMediaTransportControlsSession sender, PlaybackInfoChangedEventArgs args)
-            => DispatcherQueue.TryEnqueue(() =>
-            {
-                UpdateMediaPlaybackState(sender);
-                PositionOnTaskbar();
-                UseFastReparentPolling();
-            });
-
-        private void UpdateCurrentMediaSession()
-        {
-            var current = _mediaSessionManager?.GetCurrentSession();
-            if (!ReferenceEquals(current, _mediaSession))
-            {
-                UnsubscribeMediaSession();
-                _mediaSession = current;
-                if (_mediaSession != null)
-                    _mediaSession.PlaybackInfoChanged += MediaPlaybackInfoChanged;
-            }
-
-            UpdateMediaPlaybackState(_mediaSession);
-            PositionOnTaskbar();
-            UseFastReparentPolling();
-        }
-
-        private void UpdateMediaPlaybackState(GlobalSystemMediaTransportControlsSession? session)
-        {
-            try
-            {
-                var status = session?.GetPlaybackInfo()?.PlaybackStatus;
-                // FluentFlyout shows media controls in both Playing and Paused states
-                _isMediaActive = status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
-                              || status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused;
-            }
-            catch
-            {
-                _isMediaActive = false;
-            }
-        }
-
-        private void UnsubscribeMediaSession()
-        {
-            if (_mediaSession != null)
-            {
-                _mediaSession.PlaybackInfoChanged -= MediaPlaybackInfoChanged;
-                _mediaSession = null;
-            }
-        }
 
         private readonly record struct TaskbarWidgetGeometry(
             int OccupiedOffset,
@@ -870,14 +772,12 @@ namespace Task_Flyout
 
                         if (!isBridge && !isFluentFlyout) continue;
 
-                        // FluentFlyout: only dodge when media is actively playing
-                        if (isFluentFlyout && !_isMediaActive) continue;
-
                         if (!GetWindowRect(child, out RECT rc)) continue;
 
                         // FluentFlyout TaskbarWindow spans the full taskbar width; we need
                         // the window region to determine the actual visible widget area
                         bool hasRegion = TryGetWindowVisibleRect(child, rc, out RECT rgnRc);
+                        if (isFluentFlyout && !hasRegion) continue;
                         RECT visibleRc = hasRegion ? rgnRc : rc;
 
                         int vw = visibleRc.Right - visibleRc.Left;
@@ -891,7 +791,7 @@ namespace Task_Flyout
                         Debug.WriteLine($"[WeatherBar] Widget detected: cls={cls} " +
                                         $"fullRc={rc.Left},{rc.Top},{rc.Right},{rc.Bottom} " +
                                         $"visibleRc={visibleRc.Left},{visibleRc.Top},{visibleRc.Right},{visibleRc.Bottom} " +
-                                        $"hasRegion={hasRegion} mediaPlaying={_isMediaActive}");
+                                        $"hasRegion={hasRegion}");
 
                         // Remember FluentFlyout's HWND for z-order arrangement
                         if (isFluentFlyout)
@@ -2131,19 +2031,8 @@ namespace Task_Flyout
             try { _refreshTimer?.Stop(); } catch { }
             try { _reparentTimer?.Stop(); } catch { }
             try { _themeRefreshTimer?.Stop(); } catch { }
-            try { UnsubscribeMediaSession(); } catch { }
             try { DetachContentPanelEvents(); } catch { }
             try { UninstallSubclassIfAlive(); } catch { }
-            try
-            {
-                if (_mediaSessionManager != null)
-                {
-                    _mediaSessionManager.SessionsChanged -= MediaSessionsChanged;
-                    _mediaSessionManager.CurrentSessionChanged -= MediaCurrentSessionChanged;
-                    _mediaSessionManager = null;
-                }
-            }
-            catch { }
             try
             {
                 if (IsAlive())

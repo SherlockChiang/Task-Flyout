@@ -29,6 +29,16 @@ namespace Task_Flyout.Services
 
     internal static class CalendarMonthRangePolicy
     {
+        public static CalendarMonthRange GetWeekRange(DateTime displayedDate, DayOfWeek firstDayOfWeek)
+        {
+            var start = LocalizationHelper.GetWeekStart(displayedDate.Date, firstDayOfWeek);
+            return new CalendarMonthRange(
+                start,
+                start.AddDays(7),
+                start,
+                start.AddDays(7));
+        }
+
         public static CalendarMonthRange GetRange(DateTime displayedMonth, DayOfWeek firstDayOfWeek)
         {
             var firstOfMonth = new DateTime(displayedMonth.Year, displayedMonth.Month, 1);
@@ -41,6 +51,12 @@ namespace Task_Flyout.Services
                 start.Date.AddDays(cellCount),
                 firstOfMonth,
                 firstOfMonth.AddMonths(1));
+        }
+
+        public static CalendarMonthRange GetYearRange(int year)
+        {
+            var start = new DateTime(year, 1, 1);
+            return new CalendarMonthRange(start, start.AddYears(1), start, start.AddYears(1));
         }
     }
 }

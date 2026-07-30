@@ -10,6 +10,20 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
 
+            <Thickness x:Key="TaskFlyoutPagePadding">24,28,28,28</Thickness>
+            <Thickness x:Key="TaskFlyoutSectionPadding">16</Thickness>
+            <Thickness x:Key="TaskFlyoutCompactSectionPadding">8</Thickness>
+            <Thickness x:Key="TaskFlyoutPanelPadding">24</Thickness>
+            <CornerRadius x:Key="TaskFlyoutSectionCornerRadius">8</CornerRadius>
+            <Thickness x:Key="TaskFlyoutSectionBorderThickness">1</Thickness>
+            <SolidColorBrush x:Key="TaskFlyoutPageBackgroundBrush" Color="Transparent"/>
+            <StaticResource x:Key="TaskFlyoutSidePaneBackgroundBrush" ResourceKey="LayerFillColorAltBrush"/>
+            <StaticResource x:Key="TaskFlyoutSectionBackgroundBrush" ResourceKey="LayerFillColorDefaultBrush"/>
+            <StaticResource x:Key="TaskFlyoutCardBackgroundBrush" ResourceKey="CardBackgroundFillColorDefaultBrush"/>
+            <StaticResource x:Key="TaskFlyoutSectionBorderBrush" ResourceKey="CardStrokeColorDefaultBrush"/>
+            <StaticResource x:Key="TaskFlyoutSidePaneBorderBrush" ResourceKey="SurfaceStrokeColorDefaultBrush"/>
+            <StaticResource x:Key="TaskFlyoutDividerBrush" ResourceKey="DividerStrokeColorDefaultBrush"/>
+
             <tb:TaskbarIcon x:Key="MyTrayIcon"
                 ToolTipText="Task Flyout">
                 <tb:TaskbarIcon.ContextFlyout>

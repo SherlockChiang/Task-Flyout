@@ -89,6 +89,105 @@ public class LocalizationResourceTests
 
         foreach (string automationId in requiredIds)
             Assert.Contains($"AutomationProperties.AutomationId=\"{automationId}\"", xaml, StringComparison.Ordinal);
+
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var mainNavigation = XDocument.Load(Path.Combine(root, "MainWindow.xaml"))
+            .Descendants()
+            .Single(element => (string?)element.Attribute(x + "Name") == "MainNav");
+        Assert.Equal("48", (string?)mainNavigation.Attribute("CompactPaneLength"));
+        Assert.Equal("168", (string?)mainNavigation.Attribute("OpenPaneLength"));
+        Assert.Equal("False", (string?)mainNavigation.Attribute("IsPaneOpen"));
+    }
+
+    [Fact]
+    public void Mail_list_uses_single_selection_and_click_to_open()
+    {
+        string root = FindRepositoryRoot();
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var list = XDocument.Load(Path.Combine(root, "Views", "MailPage.xaml"))
+            .Descendants()
+            .Single(element => (string?)element.Attribute(x + "Name") == "MailListView");
+
+        Assert.Equal("Single", (string?)list.Attribute("SelectionMode"));
+        Assert.Equal("True", (string?)list.Attribute("IsItemClickEnabled"));
+        Assert.Equal("MailListView_ItemClick", (string?)list.Attribute("ItemClick"));
+    }
+
+    [Fact]
+    public void Full_window_pages_stretch_and_calendar_status_stays_in_layout()
+    {
+        string root = FindRepositoryRoot();
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var mainWindow = XDocument.Load(Path.Combine(root, "MainWindow.xaml"));
+        var frame = mainWindow.Descendants().Single(element => (string?)element.Attribute(x + "Name") == "ContentFrame");
+        Assert.Equal("Stretch", (string?)frame.Attribute("HorizontalContentAlignment"));
+        Assert.Equal("Stretch", (string?)frame.Attribute("VerticalContentAlignment"));
+
+        var calendar = XDocument.Load(Path.Combine(root, "Views", "CalendarPage.xaml"));
+        var status = calendar.Descendants().Single(element => (string?)element.Attribute(x + "Name") == "CalendarStatusText");
+        Assert.Equal("CharacterEllipsis", (string?)status.Attribute("TextTrimming"));
+        Assert.Equal("0", (string?)status.Attribute("MinWidth"));
+
+        var tasks = XDocument.Load(Path.Combine(root, "Views", "TasksPage.xaml"));
+        var accountPane = tasks.Descendants().Single(element => (string?)element.Attribute(x + "Name") == "AccountPane");
+        Assert.Equal("*", accountPane.Elements().Single(element => element.Name.LocalName == "Grid.RowDefinitions")
+            .Elements().ElementAt(1).Attribute("Height")?.Value);
+
+        var calendarAccountPane = calendar.Descendants().Single(element => (string?)element.Attribute(x + "Name") == "AccountPane");
+        Assert.Equal("{ThemeResource TaskFlyoutSectionBackgroundBrush}", (string?)calendarAccountPane.Attribute("Background"));
+        Assert.Equal("{StaticResource TaskFlyoutSectionCornerRadius}", (string?)calendarAccountPane.Attribute("CornerRadius"));
+        var calendarTimelinePane = calendar.Descendants().Single(element => (string?)element.Attribute(x + "Name") == "TimelinePane");
+        Assert.Equal("{ThemeResource TaskFlyoutSectionBackgroundBrush}", (string?)calendarTimelinePane.Attribute("Background"));
+        Assert.Equal("{StaticResource TaskFlyoutSectionCornerRadius}", (string?)calendarTimelinePane.Attribute("CornerRadius"));
+        Assert.Equal("{ThemeResource TaskFlyoutSectionBackgroundBrush}", (string?)accountPane.Attribute("Background"));
+        Assert.Equal("{StaticResource TaskFlyoutSectionCornerRadius}", (string?)accountPane.Attribute("CornerRadius"));
+    }
+
+    [Fact]
+    public void Main_pages_use_shared_design_resources()
+    {
+        string root = FindRepositoryRoot();
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var appResources = XDocument.Load(Path.Combine(root, "App.xaml"))
+            .Descendants()
+            .Select(element => (string?)element.Attribute(x + "Key"))
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .Cast<string>()
+            .ToHashSet(StringComparer.Ordinal);
+        string[] requiredDesignKeys =
+        {
+            "TaskFlyoutPagePadding",
+            "TaskFlyoutSectionCornerRadius",
+            "TaskFlyoutPageBackgroundBrush",
+            "TaskFlyoutSidePaneBackgroundBrush",
+            "TaskFlyoutSectionBackgroundBrush",
+            "TaskFlyoutCardBackgroundBrush",
+            "TaskFlyoutSectionBorderBrush",
+            "TaskFlyoutDividerBrush"
+        };
+
+        foreach (string key in requiredDesignKeys)
+            Assert.Contains(key, appResources);
+
+        string[] pageFiles =
+        {
+            "Views\\AddAccountPage.xaml",
+            "Views\\CalendarPage.xaml",
+            "Views\\MailPage.xaml",
+            "Views\\RssPage.xaml",
+            "Views\\SettingsPage.xaml",
+            "Views\\TasksPage.xaml",
+            "Views\\WeatherPage.xaml"
+        };
+
+        foreach (string relativePath in pageFiles)
+        {
+            var page = XDocument.Load(Path.Combine(root, relativePath)).Root!;
+            Assert.Equal("{ThemeResource TaskFlyoutPageBackgroundBrush}", (string?)page.Attribute("Background"));
+        }
+
+        string settingsXaml = File.ReadAllText(Path.Combine(root, "Views", "SettingsPage.xaml"));
+        Assert.True(Regex.Matches(settingsXaml, "Style=\"\\{StaticResource SettingsSectionStyle\\}\"").Count >= 8);
     }
 
     private static HashSet<string> LoadResourceKeys(string path)

@@ -1296,8 +1296,8 @@ namespace Task_Flyout.Views
 
         private void RssContentGrid_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            bool narrow = e.NewSize.Width < ResponsiveLayoutPolicy.MediumMinimumWidth;
-            double articlePaneWidth = narrow ? e.NewSize.Width : e.NewSize.Width - 272;
+            bool narrow = e.NewSize.Width < ResponsiveLayoutPolicy.RssTwoPaneMinimumWidth;
+            double articlePaneWidth = narrow ? e.NewSize.Width : e.NewSize.Width - 292;
             bool compactArticleHeader = articlePaneWidth < 600;
             if (_isNarrowLayout == narrow && _useCompactArticleHeader == compactArticleHeader) return;
             bool narrowChanged = _isNarrowLayout != narrow;

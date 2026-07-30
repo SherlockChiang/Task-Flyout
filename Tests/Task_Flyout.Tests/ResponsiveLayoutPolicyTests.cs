@@ -6,14 +6,31 @@ public class ResponsiveLayoutPolicyTests
 {
     [Theory]
     [InlineData(0, ResponsiveLayoutMode.Narrow)]
-    [InlineData(719, ResponsiveLayoutMode.Narrow)]
-    [InlineData(720, ResponsiveLayoutMode.Medium)]
-    [InlineData(1099, ResponsiveLayoutMode.Medium)]
-    [InlineData(1100, ResponsiveLayoutMode.Wide)]
+    [InlineData(679, ResponsiveLayoutMode.Narrow)]
+    [InlineData(680, ResponsiveLayoutMode.Medium)]
+    [InlineData(1039, ResponsiveLayoutMode.Medium)]
+    [InlineData(1040, ResponsiveLayoutMode.Wide)]
     [InlineData(1920, ResponsiveLayoutMode.Wide)]
     public void Selects_layout_mode_at_defined_breakpoints(double width, ResponsiveLayoutMode expected)
     {
         Assert.Equal(expected, ResponsiveLayoutPolicy.GetMode(width));
+    }
+
+    [Theory]
+    [InlineData(859, ResponsiveLayoutMode.Medium)]
+    [InlineData(860, ResponsiveLayoutMode.Wide)]
+    public void Tasks_use_available_width_earlier(double width, ResponsiveLayoutMode expected)
+        => Assert.Equal(expected, ResponsiveLayoutPolicy.GetTasksMode(width));
+
+    [Theory]
+    [InlineData(679, ResponsiveLayoutMode.Narrow)]
+    [InlineData(680, ResponsiveLayoutMode.Medium)]
+    [InlineData(1119, ResponsiveLayoutMode.Medium)]
+    [InlineData(1120, ResponsiveLayoutMode.Wide)]
+    public void Three_pane_pages_wait_for_readable_width(double width, ResponsiveLayoutMode expected)
+    {
+        Assert.Equal(expected, ResponsiveLayoutPolicy.GetCalendarMode(width));
+        Assert.Equal(expected, ResponsiveLayoutPolicy.GetMailMode(width));
     }
 
     [Theory]

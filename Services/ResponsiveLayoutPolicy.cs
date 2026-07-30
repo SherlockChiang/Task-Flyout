@@ -11,11 +11,26 @@ namespace Task_Flyout.Services
 
     internal static class ResponsiveLayoutPolicy
     {
-        public const double MediumMinimumWidth = 720;
-        public const double WideMinimumWidth = 1100;
+        public const double MediumMinimumWidth = 680;
+        public const double WideMinimumWidth = 1040;
+        public const double TasksWideMinimumWidth = 860;
+        public const double ThreePaneMinimumWidth = 1120;
+        public const double RssTwoPaneMinimumWidth = 720;
 
         public static ResponsiveLayoutMode GetMode(double width)
-            => width >= WideMinimumWidth
+            => GetMode(width, WideMinimumWidth);
+
+        public static ResponsiveLayoutMode GetCalendarMode(double width)
+            => GetMode(width, ThreePaneMinimumWidth);
+
+        public static ResponsiveLayoutMode GetMailMode(double width)
+            => GetMode(width, ThreePaneMinimumWidth);
+
+        public static ResponsiveLayoutMode GetTasksMode(double width)
+            => GetMode(width, TasksWideMinimumWidth);
+
+        private static ResponsiveLayoutMode GetMode(double width, double wideMinimumWidth)
+            => width >= wideMinimumWidth
                 ? ResponsiveLayoutMode.Wide
                 : width >= MediumMinimumWidth
                     ? ResponsiveLayoutMode.Medium

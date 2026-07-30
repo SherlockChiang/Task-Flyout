@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:Task_Flyout.Models"
     xmlns:views="using:Task_Flyout.Views"
-    Background="Transparent">
+    Background="{ThemeResource TaskFlyoutPageBackgroundBrush}">
 
     <Page.Resources>
         <views:ProviderToBrushConverter x:Key="ProviderToBrushConverter"/>
@@ -12,20 +12,21 @@
         <views:TaskCompletedOpacityConverter x:Key="TaskCompletedOpacityConverter"/>
     </Page.Resources>
 
-    <Grid x:Name="LayoutRoot" AutomationProperties.AutomationId="TasksLayoutRoot" Background="#01000000" SizeChanged="LayoutRoot_SizeChanged">
+    <Grid x:Name="LayoutRoot" AutomationProperties.AutomationId="TasksLayoutRoot" Background="{ThemeResource TaskFlyoutPageBackgroundBrush}" SizeChanged="LayoutRoot_SizeChanged">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="AccountColumn" Width="2*" MinWidth="200" MaxWidth="280"/>
+            <ColumnDefinition x:Name="AccountColumn" Width="2*" MinWidth="240" MaxWidth="320"/>
             <ColumnDefinition x:Name="TaskContentColumn" Width="5*" MinWidth="360"/>
         </Grid.ColumnDefinitions>
 
         <Grid x:Name="AccountPane" AutomationProperties.AutomationId="TasksAccountPane" Grid.Column="0"
-              Background="{ThemeResource LayerFillColorAltBrush}"
-              BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
-              BorderThickness="0,0,1,0"
-              Padding="16,32,16,24"
-              RowSpacing="12">
+              Background="{ThemeResource TaskFlyoutSectionBackgroundBrush}"
+              BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}"
+              BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}"
+              CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
+              Margin="24,28,12,28"
+              Padding="12"
+              RowSpacing="10">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
@@ -133,7 +134,7 @@
             <Button Grid.Row="3" x:Uid="MainWindow_BtnForceSync" Content="强制立即同步" HorizontalAlignment="Stretch" Click="BtnForceSync_Click"/>
         </Grid>
 
-        <Grid x:Name="TaskContent" AutomationProperties.AutomationId="TasksContentPane" Grid.Column="1" Padding="32">
+        <Grid x:Name="TaskContent" AutomationProperties.AutomationId="TasksContentPane" Grid.Column="1" Padding="28,32,28,32">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -211,10 +212,10 @@
                               ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:AgendaItem">
-                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="8"
+                                <Border Background="{ThemeResource TaskFlyoutCardBackgroundBrush}"
+                                        BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}"
+                                        BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}"
+                                        CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
                                         Padding="14"
                                         Margin="0,0,0,10">
                                     <Grid ColumnSpacing="12">
@@ -274,7 +275,7 @@
                                Visibility="Collapsed"/>
                 </Grid>
 
-                <Border Grid.Row="1" Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+                <Border Grid.Row="1" Height="1" Background="{ThemeResource TaskFlyoutDividerBrush}"/>
 
                 <Grid Grid.Row="2" RowSpacing="12">
                     <Grid.RowDefinitions>
@@ -289,10 +290,10 @@
                               ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:AgendaItem">
-                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="8"
+                                <Border Background="{ThemeResource TaskFlyoutCardBackgroundBrush}"
+                                        BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}"
+                                        BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}"
+                                        CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
                                         Padding="14"
                                         Margin="0,0,0,10"
                                         Opacity="0.78">

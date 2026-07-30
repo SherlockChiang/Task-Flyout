@@ -3,9 +3,9 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:Task_Flyout.Services"
-    Background="Transparent">
+    Background="{ThemeResource TaskFlyoutPageBackgroundBrush}">
 
-    <Grid x:Name="LayoutRoot" AutomationProperties.AutomationId="MailLayoutRoot" Padding="28" RowSpacing="14" SizeChanged="LayoutRoot_SizeChanged">
+    <Grid x:Name="LayoutRoot" AutomationProperties.AutomationId="MailLayoutRoot" Padding="{StaticResource TaskFlyoutPagePadding}" RowSpacing="14" SizeChanged="LayoutRoot_SizeChanged">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -54,8 +54,8 @@
             <Grid.ColumnDefinitions>
                 <!-- Proportional so nothing is squeezed unreadable on small screens; the
                      side panes cap on wide screens and the message body keeps a readable floor. -->
-                <ColumnDefinition x:Name="AccountColumn" Width="2*" MinWidth="190" MaxWidth="250"/>
-                <ColumnDefinition x:Name="MessageColumn" Width="3*" MinWidth="280" MaxWidth="380"/>
+                <ColumnDefinition x:Name="AccountColumn" Width="2*" MinWidth="190" MaxWidth="280"/>
+                <ColumnDefinition x:Name="MessageColumn" Width="3*" MinWidth="280" MaxWidth="440"/>
                 <ColumnDefinition x:Name="DetailColumn" Width="5*" MinWidth="340"/>
             </Grid.ColumnDefinitions>
 
@@ -66,11 +66,11 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="8">
+                <Border Background="{ThemeResource TaskFlyoutSectionBackgroundBrush}"
+                        BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}"
+                        BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}"
+                        CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
+                        Padding="{StaticResource TaskFlyoutCompactSectionPadding}">
                     <TreeView x:Name="AccountTree"
                               SelectionMode="Single"
                               CanDragItems="True"
@@ -98,11 +98,11 @@
             </Grid>
 
             <Border x:Name="MailMessagePane" AutomationProperties.AutomationId="MailMessagePane" Grid.Column="1"
-                    Background="{ThemeResource LayerFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="8">
+                    Background="{ThemeResource TaskFlyoutSectionBackgroundBrush}"
+                    BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}"
+                    BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}"
+                    CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
+                    Padding="{StaticResource TaskFlyoutCompactSectionPadding}">
                 <Grid RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -143,7 +143,9 @@
 
                     <ListView Grid.Row="2"
                                x:Name="MailListView"
-                               SelectionMode="Multiple"
+                               SelectionMode="Single"
+                               IsItemClickEnabled="True"
+                               ItemClick="MailListView_ItemClick"
                                SelectionChanged="MailListView_SelectionChanged">
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem">
@@ -195,11 +197,11 @@
             </Border>
 
             <Border x:Name="MailDetailPane" AutomationProperties.AutomationId="MailDetailPane" Grid.Column="2"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="16">
+                    Background="{ThemeResource TaskFlyoutCardBackgroundBrush}"
+                    BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}"
+                    BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}"
+                    CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
+                    Padding="{StaticResource TaskFlyoutSectionPadding}">
                 <Grid>
                     <StackPanel x:Name="EmptyDetailPanel" Spacing="8" VerticalAlignment="Center" HorizontalAlignment="Center">
                         <FontIcon Glyph="&#xE715;" FontSize="36" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
@@ -236,10 +238,10 @@
                             <TextBlock x:Name="DetailRecipient" FontSize="13" TextWrapping="WrapWholeWords"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                         </StackPanel>
-                        <Border Grid.Row="3" Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+                        <Border Grid.Row="3" Height="1" Background="{ThemeResource TaskFlyoutDividerBrush}"/>
                         <Border x:Name="RemoteImageBanner" Grid.Row="4" Visibility="Collapsed"
                                 Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}"
                                 CornerRadius="6" Padding="10,6">
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions>
@@ -295,7 +297,7 @@
                     </Grid>
 
                     <Grid x:Name="AddAccountPanel" Visibility="Collapsed"
-                          Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                          Background="{ThemeResource TaskFlyoutCardBackgroundBrush}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel MaxWidth="560" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="18">
                                 <StackPanel Spacing="4">
@@ -386,7 +388,7 @@
                     </Grid>
 
                     <Grid x:Name="ComposePanel" Visibility="Collapsed"
-                          Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                          Background="{ThemeResource TaskFlyoutCardBackgroundBrush}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled"
                                       HorizontalScrollMode="Disabled">

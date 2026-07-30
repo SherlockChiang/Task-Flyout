@@ -2,15 +2,15 @@
     x:Class="Task_Flyout.Views.AddAccountPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Background="Transparent">
+    Background="{ThemeResource TaskFlyoutPageBackgroundBrush}">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
-    <Grid Padding="24" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="500">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto" HorizontalContentAlignment="Stretch">
+    <Grid Padding="{StaticResource TaskFlyoutPagePadding}" HorizontalAlignment="Stretch">
         <StackPanel Spacing="24">
             <TextBlock x:Uid="AddAccount_Title" Text="添加账户" FontSize="28" FontWeight="SemiBold"/>
             <TextBlock x:Uid="AddAccount_Subtitle" Text="选择要连接的账户类型" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="14" TextWrapping="WrapWholeWords"/>
 
-            <Border Padding="16" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+            <Border Padding="{StaticResource TaskFlyoutSectionPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}">
                 <StackPanel Spacing="8">
                     <TextBlock x:Uid="AddAccount_ChecklistTitle" Text="Setup checklist" FontSize="14" FontWeight="SemiBold"/>
                     <TextBlock x:Name="ChecklistText" Text="" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/>

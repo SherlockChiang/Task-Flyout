@@ -19,9 +19,6 @@ namespace Task_Flyout
 {
     public sealed partial class MainWindow : Window
     {
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern uint GetDpiForWindow(IntPtr hWnd);
-
         private ResourceLoader _loader;
         private bool _pendingMailMessageNavigation;
         private bool _pendingCachedMailNavigation;
@@ -70,7 +67,7 @@ namespace Task_Flyout
             var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
             var display = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(windowId, Microsoft.UI.Windowing.DisplayAreaFallback.Nearest);
             var workArea = display.WorkArea;
-            int margin = (int)Math.Ceiling(12 * Math.Max(1, GetDpiForWindow(hWnd) / 96d));
+            int margin = 0;
             int width = Math.Min(AppWindow.Size.Width, Math.Max(1, workArea.Width - margin * 2));
             int height = Math.Min(AppWindow.Size.Height, Math.Max(1, workArea.Height - margin * 2));
             int x = Math.Clamp(AppWindow.Position.X, workArea.X + margin, workArea.X + workArea.Width - width - margin);
@@ -95,8 +92,7 @@ namespace Task_Flyout
             var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
             var display = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(windowId, Microsoft.UI.Windowing.DisplayAreaFallback.Primary);
             var workArea = display.WorkArea;
-            var scale = Math.Max(1, GetDpiForWindow(hWnd) / 96d);
-            var size = WindowSizingPolicy.Calculate(1200, 800, scale, workArea.Width, workArea.Height, 24);
+            var size = WindowSizingPolicy.CalculateInitialMainWindow(workArea.Width, workArea.Height);
             int width = size.Width;
             int height = size.Height;
             int x = workArea.X + Math.Max(0, (workArea.Width - width) / 2);

@@ -246,6 +246,9 @@
   <data name="TextUpcoming" xml:space="preserve">
     <value>Upcoming</value>
   </data>
+  <data name="TextUpcomingMonth" xml:space="preserve">
+    <value>Next month</value>
+  </data>
   <data name="TextTomorrow" xml:space="preserve">
     <value>Tomorrow</value>
   </data>
@@ -1896,4 +1899,9 @@ Fallback: {6}</value></data>
   <data name="WeatherPage_IconPackError" xml:space="preserve"><value>Icon-pack operation failed: {0}</value></data>
   <data name="MailPage_ImapDisplayName.PlaceholderText" xml:space="preserve"><value>Work Mail</value></data>
   <data name="MailPage_BtnGoogleAccount.Text" xml:space="preserve"><value>Google OAuth</value></data>
+  <data name="CalendarPage_ViewWeek.Content" xml:space="preserve"><value>Week</value></data>
+  <data name="CalendarPage_ViewMonth.Content" xml:space="preserve"><value>Month</value></data>
+  <data name="CalendarPage_ViewYear.Content" xml:space="preserve"><value>Year</value></data>
+  <data name="CalendarPage_YearNoItems.Text" xml:space="preserve"><value>No events</value></data>
+  <data name="CalendarPage_YearItemCount" xml:space="preserve"><value>{0} items</value></data>
 </root>

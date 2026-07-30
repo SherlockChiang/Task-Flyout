@@ -428,6 +428,8 @@ namespace Task_Flyout.Views
             {
                 MailListView.SelectedItem = target;
                 MailListView.ScrollIntoView(target);
+                if (!ReferenceEquals(target, _selectedItem))
+                    await OpenMailItemAsync(target);
             }
             else
             {
@@ -594,12 +596,25 @@ namespace Task_Flyout.Views
                 var itemToSelect = !string.IsNullOrWhiteSpace(previousSelectedId)
                     ? _displayedItems.FirstOrDefault(item => item.Id == previousSelectedId)
                     : null;
+                MailItem? selectedItem;
                 if (itemToSelect != null)
+                {
                     MailListView.SelectedItem = itemToSelect;
+                    selectedItem = itemToSelect;
+                }
                 else if (selectFirstWhenNoMatch)
-                    MailListView.SelectedItem = _displayedItems.Count > 0 ? _displayedItems[0] : null;
+                {
+                    selectedItem = _displayedItems.Count > 0 ? _displayedItems[0] : null;
+                    MailListView.SelectedItem = selectedItem;
+                }
                 else
+                {
                     MailListView.SelectedItem = null;
+                    selectedItem = null;
+                }
+
+                if (selectedItem != null && !ReferenceEquals(selectedItem, _selectedItem))
+                    _ = OpenMailItemAsync(selectedItem);
 
                 if (_items.Count == 0)
                     ClearDetail();
@@ -854,7 +869,7 @@ namespace Task_Flyout.Views
         private void LayoutRoot_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             ComposeBodyBox.MinHeight = e.NewSize.Height < 600 ? 120 : 220;
-            var mode = ResponsiveLayoutPolicy.GetMode(e.NewSize.Width);
+            var mode = ResponsiveLayoutPolicy.GetMailMode(e.NewSize.Width);
             if (_layoutMode == mode) return;
             _layoutMode = mode;
             _showMediumAccounts = false;
@@ -1336,24 +1351,22 @@ namespace Task_Flyout.Views
             SaveImapButton.IsEnabled = isEnabled;
         }
 
-        private async void MailListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void MailListView_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            if (e.ClickedItem is not MailItem item) return;
+            MailListView.SelectedItem = item;
+            await OpenMailItemAsync(item);
+        }
+
+        private void MailListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdateProviderMoveCommands();
-            if (MailListView.SelectedItems.Count != 1)
-            {
-                if (MailListView.SelectedItems.Count > 1)
-                    ClearDetail();
-                else if (!_isLoadingMessages && !_suppressSelectionClear)
-                    ClearDetail();
-                return;
-            }
-            if (MailListView.SelectedItem is not MailItem item)
-            {
-                if (!_isLoadingMessages && !_suppressSelectionClear)
-                    ClearDetail();
-                return;
-            }
+            if (MailListView.SelectedItem == null && !_isLoadingMessages && !_suppressSelectionClear)
+                ClearDetail();
+        }
 
+        private async Task OpenMailItemAsync(MailItem item)
+        {
             _selectedItem = item;
             _mailService?.UpdateActiveBodyCacheContext(_selectedAccount?.Id, item);
             ClearRenderedMailBody();
@@ -1403,6 +1416,11 @@ namespace Task_Flyout.Views
             }
 
             await RenderMailBodyAsync(item);
+            if (bodyCts.IsCancellationRequested || !ReferenceEquals(item, _selectedItem))
+            {
+                CompleteBodyLoad(bodyCts);
+                return;
+            }
             ReplyButton.IsEnabled = _selectedAccount != null;
             OpenInBrowserButton.IsEnabled = !string.IsNullOrWhiteSpace(item.WebLink);
 
@@ -2143,6 +2161,8 @@ namespace Task_Flyout.Views
             _openingCachedMetadataOnly = true;
             MailListView.SelectedItem = target;
             MailListView.ScrollIntoView(target);
+            if (!ReferenceEquals(target, _selectedItem))
+                await OpenMailItemAsync(target);
             SetMessageListStatus(_loader.GetStringOrDefault("GlobalSearch_CachedMailContext") ?? "Opened from the local mail cache");
         }
 

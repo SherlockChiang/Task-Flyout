@@ -44,4 +44,25 @@ public class CalendarMonthRangePolicyTests
         Assert.True(range.ContainsMonthDateKey("2026-08-31"));
         Assert.False(range.ContainsMonthDateKey("2026-09-01"));
     }
+
+    [Fact]
+    public void GetWeekRange_ReturnsSevenDaysFromConfiguredWeekStart()
+    {
+        var range = CalendarMonthRangePolicy.GetWeekRange(new DateTime(2026, 8, 12), DayOfWeek.Monday);
+
+        Assert.Equal(new DateTime(2026, 8, 10), range.Start);
+        Assert.Equal(new DateTime(2026, 8, 17), range.EndExclusive);
+        Assert.Equal(7, (range.EndExclusive - range.Start).Days);
+    }
+
+    [Fact]
+    public void GetYearRange_ReturnsCalendarYear()
+    {
+        var range = CalendarMonthRangePolicy.GetYearRange(2026);
+
+        Assert.Equal(new DateTime(2026, 1, 1), range.Start);
+        Assert.Equal(new DateTime(2027, 1, 1), range.EndExclusive);
+        Assert.True(range.ContainsDateKey("2026-12-31"));
+        Assert.False(range.ContainsDateKey("2027-01-01"));
+    }
 }

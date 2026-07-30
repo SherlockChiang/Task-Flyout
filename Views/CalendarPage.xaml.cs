@@ -16,6 +16,13 @@ using Windows.UI; // 统一引入 Color
 
 namespace Task_Flyout.Views
 {
+    internal enum CalendarViewMode
+    {
+        Week,
+        Month,
+        Year
+    }
+
     public class ProviderToBrushConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
@@ -81,12 +88,20 @@ namespace Task_Flyout.Views
 
     public sealed partial class CalendarPage : Page
     {
+        private const int MonthCellItemLimit = 3;
+        private const double WeekTimelineHourHeight = 58;
+        private const double WeekTimelineTimeAxisWidth = 56;
+        private const double WeekTimelineMinimumDayWidth = 92;
+
         public ObservableCollection<DayCellViewModel> DayCells { get; set; } = new();
         public ObservableCollection<AgendaItem> SelectedDayItems { get; set; } = new();
+        public ObservableCollection<YearMonthViewModel> YearMonths { get; set; } = new();
 
         private DateTime _viewDate = DateTime.Today;
+        private CalendarViewMode _viewMode = CalendarViewMode.Month;
         private SyncManager? _syncManager;
         private AppCache _localCache = new();
+        private AppCache _upcomingCache = new();
         private AgendaItem? _itemBeingEdited;
         private ResourceLoader _loader;
         private bool _isAccountPaneCollapsed;
@@ -135,46 +150,86 @@ namespace Task_Flyout.Views
         private void LoadCache(CalendarMonthRange range)
         {
             _localCache = _syncManager?.GetRangeCacheSnapshot(range.Start, range.EndExclusive) ?? new AppCache();
+            var upcomingRange = GetUpcomingRange();
+            _upcomingCache = _syncManager?.GetRangeCacheSnapshot(upcomingRange.Start, upcomingRange.EndExclusive) ?? new AppCache();
         }
 
         private void LoadCalendar(DateTime date)
         {
             if (BtnMonthYear == null || CalendarGrid == null) return;
 
-            _displayedRange = CalendarMonthRangePolicy.GetRange(
-                date,
-                LocalizationHelper.AppCulture.DateTimeFormat.FirstDayOfWeek);
+            _displayedRange = GetDisplayedRange(date);
             LoadCache(_displayedRange);
+            BtnMonthYear.Content = GetCalendarTitle(date, _displayedRange);
+            CalendarGrid.Visibility = _viewMode == CalendarViewMode.Month ? Visibility.Visible : Visibility.Collapsed;
+            WeekHeaderGrid.Visibility = _viewMode == CalendarViewMode.Month ? Visibility.Visible : Visibility.Collapsed;
+            WeekTimelineView.Visibility = _viewMode == CalendarViewMode.Week ? Visibility.Visible : Visibility.Collapsed;
+            YearGrid.Visibility = _viewMode == CalendarViewMode.Year ? Visibility.Visible : Visibility.Collapsed;
             DayCells.Clear();
-            BtnMonthYear.Content = date.ToString("Y", LocalizationHelper.AppCulture);
+            YearMonths.Clear();
 
-            for (var current = _displayedRange.Start; current < _displayedRange.EndExclusive; current = current.AddDays(1))
+            if (_viewMode == CalendarViewMode.Year)
             {
-                var cell = new DayCellViewModel { Date = current, IsCurrentMonth = current.Month == date.Month };
-
-                string key = current.ToString("yyyy-MM-dd");
-                if (_localCache.DayItems.ContainsKey(key))
+                PopulateYearMonths();
+            }
+            else if (_viewMode == CalendarViewMode.Week)
+            {
+                BuildWeekTimeline();
+            }
+            else
+            {
+                for (var current = _displayedRange.Start; current < _displayedRange.EndExclusive; current = current.AddDays(1))
                 {
-                    foreach (var item in _localCache.DayItems[key].Where(IsItemVisible))
-                    {
-                        PopulateItemColor(item);
-                        cell.Items.Add(item);
-                    }
-                }
-                DayCells.Add(cell);
-            }
+                    var cell = new DayCellViewModel { Date = current, IsCurrentMonth = IsPrimaryDate(current, date) };
 
-            var targetCell = DayCells.FirstOrDefault(c => c.IsToday) ?? DayCells.FirstOrDefault(c => c.Date.Month == date.Month && c.Date.Day == 1);
-            if (targetCell != null)
-            {
-                CalendarGrid.SelectedItem = targetCell;
-                UpdateSideBar(targetCell);
+                    string key = current.ToString("yyyy-MM-dd");
+                    if (_localCache.DayItems.TryGetValue(key, out var cachedItems))
+                        SetCellItems(cell, cachedItems.Where(IsItemVisible));
+                    DayCells.Add(cell);
+                }
+
+                var targetCell = DayCells.FirstOrDefault(c => c.IsToday)
+                    ?? DayCells.FirstOrDefault(c => IsPrimaryDate(c.Date, date));
+                if (targetCell != null)
+                    CalendarGrid.SelectedItem = targetCell;
             }
+            UpdateSideBar();
 
             NextRenderHelper.RunOnce(() =>
                 PerformanceDiagnostics.MarkOnce("calendar.cache.display", "calendar", "first_cached_display", source: "cache"));
 
             _ = SyncMonthDataAsync();
+        }
+
+        private CalendarMonthRange GetDisplayedRange(DateTime date)
+        {
+            var firstDayOfWeek = LocalizationHelper.AppCulture.DateTimeFormat.FirstDayOfWeek;
+            return _viewMode switch
+            {
+                CalendarViewMode.Week => CalendarMonthRangePolicy.GetWeekRange(date, firstDayOfWeek),
+                CalendarViewMode.Year => CalendarMonthRangePolicy.GetYearRange(date.Year),
+                _ => CalendarMonthRangePolicy.GetRange(date, firstDayOfWeek)
+            };
+        }
+
+        private string GetCalendarTitle(DateTime date, CalendarMonthRange range)
+        {
+            return _viewMode switch
+            {
+                CalendarViewMode.Week => $"{range.Start.ToString("M", LocalizationHelper.AppCulture)} - {range.EndExclusive.AddDays(-1).ToString("M", LocalizationHelper.AppCulture)}",
+                CalendarViewMode.Year => string.Format(_loader.GetStringOrDefault("TextYearFormat") ?? "{0}", date.Year),
+                _ => date.ToString("Y", LocalizationHelper.AppCulture)
+            };
+        }
+
+        private bool IsPrimaryDate(DateTime date, DateTime viewDate)
+        {
+            return _viewMode switch
+            {
+                CalendarViewMode.Week => _displayedRange.Contains(date),
+                CalendarViewMode.Year => date.Year == viewDate.Year,
+                _ => date.Month == viewDate.Month && date.Year == viewDate.Year
+            };
         }
 
         private System.Threading.CancellationTokenSource? _syncCts;
@@ -199,7 +254,7 @@ namespace Task_Flyout.Views
 
             try
             {
-                if (DayCells.Count == 0) return;
+                if (_viewMode == CalendarViewMode.Month && DayCells.Count == 0) return;
 
                 // A rapid mouse wheel/month navigation should settle before it starts a
                 // provider request. Providers do not all expose cancellation yet.
@@ -207,41 +262,44 @@ namespace Task_Flyout.Views
                 if (token.IsCancellationRequested) return;
 
                 var range = _displayedRange;
+                var upcomingRange = GetUpcomingRange();
+                var allItemsTask = _syncManager.GetAllDataAsync(range.Start, range.EndExclusive, forceRefresh, token);
+                var upcomingItemsTask = range.Start == upcomingRange.Start && range.EndExclusive == upcomingRange.EndExclusive
+                    ? allItemsTask
+                    : _syncManager.GetAllDataAsync(upcomingRange.Start, upcomingRange.EndExclusive, forceRefresh, token);
 
-                var allItems = await _syncManager.GetAllDataAsync(range.Start, range.EndExclusive, forceRefresh, token);
+                await Task.WhenAll(allItemsTask, upcomingItemsTask);
+                var allItems = await allItemsTask;
+                var upcomingItems = await upcomingItemsTask;
 
                 if (token.IsCancellationRequested) return;
 
                 if (CalendarGrid == null) return;
 
-                var itemsByDate = allItems
-                    .Where(IsItemVisible)
-                    .GroupBy(it => it.DateKey)
-                    .ToDictionary(g => g.Key, g => g.ToList());
-                _localCache = new AppCache
+                _localCache = BuildVisibleCache(allItems);
+                if (_viewMode == CalendarViewMode.Year)
                 {
-                    DayItems = itemsByDate.ToDictionary(
-                        pair => pair.Key,
-                        pair => pair.Value.ToList(),
-                        StringComparer.Ordinal),
-                    MarkedDates = itemsByDate.Keys.ToHashSet(StringComparer.Ordinal)
-                };
+                    PopulateYearMonths();
+                }
+                else if (_viewMode == CalendarViewMode.Week)
+                {
+                    BuildWeekTimeline();
+                }
+                else
+                {
+                    var itemsByDate = _localCache.DayItems;
 
-                foreach (var cell in DayCells)
-                {
-                    cell.Items.Clear();
-                    if (itemsByDate.TryGetValue(cell.Date.ToString("yyyy-MM-dd"), out var dayItems))
+                    foreach (var cell in DayCells)
                     {
-                        foreach (var item in dayItems)
-                        {
-                            PopulateItemColor(item);
-                            cell.Items.Add(item);
-                        }
+                        if (itemsByDate.TryGetValue(cell.Date.ToString("yyyy-MM-dd"), out var dayItems))
+                            SetCellItems(cell, dayItems);
+                        else
+                            SetCellItems(cell, Array.Empty<AgendaItem>());
                     }
                 }
 
-                if (CalendarGrid.SelectedItem is DayCellViewModel selectedCell)
-                    UpdateSideBar(selectedCell);
+                _upcomingCache = BuildVisibleCache(upcomingItems);
+                UpdateSideBar();
 
                 _lastCalendarSyncSucceededAt = DateTimeOffset.Now;
                 SetCalendarStatus(string.Format(_loader.GetStringOrDefault("TextLastSync") ?? "Last sync: {0}", _lastCalendarSyncSucceededAt.Value.LocalDateTime.ToString("g")));
@@ -259,11 +317,327 @@ namespace Task_Flyout.Views
             }
         }
 
+        private void SetCellItems(DayCellViewModel cell, IEnumerable<AgendaItem> items)
+        {
+            var visibleItems = items
+                .Where(IsItemVisible)
+                .OrderBy(i => IsAllDaySubtitle(i.Subtitle) ? 0 : 1)
+                .ThenBy(i => i.Subtitle)
+                .ToList();
+
+            cell.Items.Clear();
+            foreach (var item in visibleItems.Take(MonthCellItemLimit))
+            {
+                PopulateItemColor(item);
+                cell.Items.Add(item);
+            }
+            cell.HiddenItemCount = Math.Max(0, visibleItems.Count - MonthCellItemLimit);
+        }
+
+        private void BuildWeekTimeline()
+        {
+            if (WeekTimelineCanvas == null || WeekTimeAxisCanvas == null || WeekTimelineHeaderCanvas == null)
+                return;
+
+            WeekTimelineCanvas.Children.Clear();
+            WeekTimeAxisCanvas.Children.Clear();
+            WeekTimelineHeaderCanvas.Children.Clear();
+
+            double availableWidth = Math.Max(
+                WeekTimelineMinimumDayWidth * 7,
+                WeekTimelineView.ActualWidth - WeekTimelineTimeAxisWidth - 20);
+            double timelineHeight = WeekTimelineHourHeight * 24;
+            double dayWidth = availableWidth / 7;
+
+            WeekTimelineScrollContent.Height = timelineHeight;
+            WeekTimeAxisCanvas.Height = timelineHeight;
+            WeekTimelineCanvas.Width = availableWidth;
+            WeekTimelineCanvas.Height = timelineHeight;
+            WeekTimelineHeaderCanvas.Width = availableWidth;
+
+            var dividerBrush = GetApplicationBrush("TaskFlyoutDividerBrush", Microsoft.UI.Colors.LightGray);
+            var secondaryBrush = GetApplicationBrush("TextFillColorSecondaryBrush", Microsoft.UI.Colors.Gray);
+            var primaryBrush = GetApplicationBrush("TextFillColorPrimaryBrush", Microsoft.UI.Colors.Black);
+
+            for (int day = 0; day < 7; day++)
+            {
+                var date = _displayedRange.Start.AddDays(day);
+                var header = new Border
+                {
+                    Width = dayWidth,
+                    Height = 48,
+                    BorderBrush = dividerBrush,
+                    BorderThickness = new Thickness(day == 0 ? 0 : 1, 0, 0, 1),
+                    Child = new StackPanel
+                    {
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Children =
+                        {
+                            new TextBlock
+                            {
+                                Text = date.ToString("ddd", LocalizationHelper.AppCulture),
+                                FontSize = 12,
+                                Foreground = secondaryBrush,
+                                HorizontalAlignment = HorizontalAlignment.Center
+                            },
+                            new TextBlock
+                            {
+                                Text = date.ToString("M/d", LocalizationHelper.AppCulture),
+                                FontSize = 15,
+                                FontWeight = date.Date == DateTime.Today ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal,
+                                Foreground = primaryBrush,
+                                HorizontalAlignment = HorizontalAlignment.Center
+                            }
+                        }
+                    }
+                };
+                Canvas.SetLeft(header, day * dayWidth);
+                WeekTimelineHeaderCanvas.Children.Add(header);
+
+                var verticalLine = new Border
+                {
+                    Width = 1,
+                    Height = timelineHeight,
+                    Background = dividerBrush,
+                    Opacity = day == 0 ? 0.9 : 0.55
+                };
+                Canvas.SetLeft(verticalLine, day * dayWidth);
+                WeekTimelineCanvas.Children.Add(verticalLine);
+            }
+
+            var endLine = new Border { Width = 1, Height = timelineHeight, Background = dividerBrush, Opacity = 0.55 };
+            Canvas.SetLeft(endLine, availableWidth - 1);
+            WeekTimelineCanvas.Children.Add(endLine);
+
+            for (int hour = 0; hour <= 24; hour++)
+            {
+                double top = hour * WeekTimelineHourHeight;
+                var line = new Border
+                {
+                    Width = availableWidth,
+                    Height = 1,
+                    Background = dividerBrush,
+                    Opacity = hour % 6 == 0 ? 0.75 : 0.35
+                };
+                Canvas.SetTop(line, top);
+                WeekTimelineCanvas.Children.Add(line);
+
+                if (hour < 24)
+                {
+                    var label = new TextBlock
+                    {
+                        Text = $"{hour:00}:00",
+                        FontSize = 11,
+                        Foreground = secondaryBrush
+                    };
+                    Canvas.SetTop(label, Math.Max(0, top - 7));
+                    Canvas.SetLeft(label, 2);
+                    WeekTimeAxisCanvas.Children.Add(label);
+                }
+            }
+
+            for (int day = 0; day < 7; day++)
+            {
+                var date = _displayedRange.Start.AddDays(day);
+                string key = date.ToString("yyyy-MM-dd");
+                if (!_localCache.DayItems.TryGetValue(key, out var items))
+                    continue;
+
+                foreach (var item in items.Where(IsItemVisible)
+                             .OrderBy(i => GetWeekTimelineStart(i, date))
+                             .ThenBy(i => i.Title))
+                {
+                    AddWeekTimelineEvent(item, date, day, dayWidth);
+                }
+            }
+        }
+
+        private void AddWeekTimelineEvent(AgendaItem item, DateTime date, int dayIndex, double dayWidth)
+        {
+            if (!TryGetWeekTimelineBounds(item, date, out var top, out var height))
+                return;
+
+            PopulateItemColor(item);
+            var background = !string.IsNullOrWhiteSpace(item.ColorHex) && item.ColorHex.StartsWith("#", StringComparison.Ordinal)
+                ? new SolidColorBrush(Services.ColorHelper.ParseHex(item.ColorHex))
+                : GetApplicationBrush("SystemAccentColor", Microsoft.UI.Colors.SteelBlue);
+            var foreground = !string.IsNullOrWhiteSpace(item.ColorHex) && Services.ColorHelper.ShouldUseWhiteText(item.ColorHex)
+                ? new SolidColorBrush(Microsoft.UI.Colors.White)
+                : new SolidColorBrush(Microsoft.UI.Colors.Black);
+
+            var title = new TextBlock
+            {
+                Text = item.Title,
+                FontSize = 12,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Foreground = foreground,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                TextWrapping = TextWrapping.NoWrap
+            };
+            var subtitle = new TextBlock
+            {
+                Text = IsAllDaySubtitle(item.Subtitle) ? (_loader.GetStringOrDefault("TextAllDay") ?? "All Day") : item.Subtitle,
+                FontSize = 11,
+                Foreground = foreground,
+                Opacity = 0.82,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
+            var block = new Border
+            {
+                Width = Math.Max(48, dayWidth - 8),
+                Height = height,
+                CornerRadius = new CornerRadius(5),
+                Padding = new Thickness(6, 4, 6, 4),
+                Background = background,
+                Opacity = item.IsCompleted ? 0.55 : 0.94,
+                DataContext = item,
+                Child = new StackPanel
+                {
+                    Spacing = 1,
+                    Children = { title, subtitle }
+                }
+            };
+            block.Tapped += WeekTimelineEvent_Tapped;
+            Canvas.SetLeft(block, dayIndex * dayWidth + 4);
+            Canvas.SetTop(block, top);
+            Canvas.SetZIndex(block, 10);
+            WeekTimelineCanvas.Children.Add(block);
+        }
+
+        private bool TryGetWeekTimelineBounds(AgendaItem item, DateTime date, out double top, out double height)
+        {
+            DateTime dayStart = date.Date;
+            DateTime dayEnd = dayStart.AddDays(1);
+            bool allDay = IsAllDaySubtitle(item.Subtitle);
+            DateTime start = item.StartDateTime ?? dayStart;
+            DateTime end = item.EndDateTime ?? (allDay ? dayStart.AddMinutes(30) : start.AddHours(1));
+
+            if (allDay || item.StartDateTime == null)
+            {
+                top = 4;
+                height = 26;
+                return true;
+            }
+
+            if (end <= start)
+                end = start.AddMinutes(30);
+
+            DateTime clampedStart = start < dayStart ? dayStart : start;
+            DateTime clampedEnd = end > dayEnd ? dayEnd : end;
+            if (clampedEnd <= dayStart || clampedStart >= dayEnd)
+            {
+                top = 0;
+                height = 0;
+                return false;
+            }
+
+            top = clampedStart.TimeOfDay.TotalHours * WeekTimelineHourHeight + 2;
+            height = Math.Max(26, (clampedEnd - clampedStart).TotalHours * WeekTimelineHourHeight - 4);
+            return true;
+        }
+
+        private DateTime GetWeekTimelineStart(AgendaItem item, DateTime date)
+            => item.StartDateTime ?? date.Date;
+
+        private void PopulateYearMonths()
+        {
+            YearMonths.Clear();
+            var culture = LocalizationHelper.AppCulture;
+            var firstDayOfWeek = culture.DateTimeFormat.FirstDayOfWeek;
+            for (int month = 1; month <= 12; month++)
+            {
+                var monthStart = new DateTime(_viewDate.Year, month, 1);
+                var monthEnd = monthStart.AddMonths(1);
+                var itemsByDate = _localCache.DayItems
+                    .Where(pair => DateKeyInRange(pair.Key, monthStart, monthEnd))
+                    .ToDictionary(
+                        pair => pair.Key,
+                        pair => pair.Value
+                            .Where(IsItemVisible)
+                            .OrderBy(i => IsAllDaySubtitle(i.Subtitle) ? 0 : 1)
+                            .ThenBy(i => i.Subtitle)
+                            .ToList(),
+                        StringComparer.Ordinal);
+                int itemCount = itemsByDate.Values.Sum(items => items.Count);
+
+                var model = new YearMonthViewModel
+                {
+                    MonthStart = monthStart,
+                    Title = monthStart.ToString("MMM", culture),
+                    CountText = itemCount == 0
+                        ? string.Empty
+                        : string.Format(_loader.GetStringOrDefault("CalendarPage_YearItemCount") ?? "{0}", itemCount),
+                    EmptyVisibility = itemCount == 0 ? Visibility.Visible : Visibility.Collapsed
+                };
+
+                int leadingBlankCount = LocalizationHelper.GetDayOffset(monthStart.DayOfWeek, firstDayOfWeek);
+                for (int i = 0; i < leadingBlankCount; i++)
+                    model.Days.Add(new YearDayViewModel());
+
+                int daysInMonth = DateTime.DaysInMonth(monthStart.Year, monthStart.Month);
+                for (int day = 1; day <= daysInMonth; day++)
+                {
+                    var date = new DateTime(monthStart.Year, monthStart.Month, day);
+                    string key = date.ToString("yyyy-MM-dd");
+                    string colorHex = "";
+                    string toolTip = date.ToString("d", culture);
+                    if (itemsByDate.TryGetValue(key, out var dayItems) && dayItems.Count > 0)
+                    {
+                        foreach (var agendaItem in dayItems)
+                            PopulateItemColor(agendaItem);
+                        colorHex = dayItems.FirstOrDefault(item => !string.IsNullOrWhiteSpace(item.ColorHex))?.ColorHex ?? "";
+                        toolTip = $"{toolTip}\n{string.Join("\n", dayItems.Take(4).Select(item => item.Title))}";
+                        if (dayItems.Count > 4)
+                            toolTip += string.Format("\n+{0}", dayItems.Count - 4);
+                    }
+
+                    model.Days.Add(new YearDayViewModel
+                    {
+                        Date = date,
+                        ColorHex = colorHex,
+                        ToolTip = toolTip
+                    });
+                }
+
+                while (model.Days.Count < 42)
+                    model.Days.Add(new YearDayViewModel());
+                YearMonths.Add(model);
+            }
+        }
+
+        private static bool DateKeyInRange(string dateKey, DateTime startInclusive, DateTime endExclusive)
+            => DateTime.TryParseExact(
+                   dateKey,
+                   "yyyy-MM-dd",
+                   CultureInfo.InvariantCulture,
+                   DateTimeStyles.None,
+                   out var date)
+               && date >= startInclusive
+               && date < endExclusive;
+
+        private bool IsAllDaySubtitle(string subtitle)
+            => subtitle == "全天"
+               || subtitle == "All Day"
+               || subtitle == (_loader.GetStringOrDefault("TextAllDay") ?? "All Day");
+
+        private static Brush GetApplicationBrush(string key, Color fallback)
+        {
+            if (Application.Current.Resources.TryGetValue(key, out var resource))
+            {
+                if (resource is Brush brush)
+                    return brush;
+                if (resource is Color color)
+                    return new SolidColorBrush(color);
+            }
+            return new SolidColorBrush(fallback);
+        }
+
         private void Global_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
         {
-            var point = e.GetCurrentPoint(CalendarGrid);
-            if (point.Position.X >= 0 && point.Position.X <= CalendarGrid.ActualWidth &&
-                point.Position.Y >= 0 && point.Position.Y <= CalendarGrid.ActualHeight)
+            var point = e.GetCurrentPoint(CalendarContent);
+            if (point.Position.X >= 0 && point.Position.X <= CalendarContent.ActualWidth &&
+                point.Position.Y >= 0 && point.Position.Y <= CalendarContent.ActualHeight)
             {
                 var delta = e.GetCurrentPoint(this).Properties.MouseWheelDelta;
                 if (delta > 0) BtnPrevMonth_Click(sender, new RoutedEventArgs());
@@ -276,39 +650,76 @@ namespace Task_Flyout.Views
         {
             if (CalendarGrid.ItemsPanelRoot is ItemsWrapGrid wrapGrid)
             {
+                int rowCount = _viewMode == CalendarViewMode.Week ? 1 : 6;
                 wrapGrid.ItemWidth = Math.Max(44, e.NewSize.Width / 7.0);
                 wrapGrid.ItemHeight = Math.Max(
                     ResponsiveLayoutPolicy.GetCalendarCellMinimumHeight(e.NewSize.Height),
-                    e.NewSize.Height / 6.0);
+                    e.NewSize.Height / rowCount);
             }
         }
 
-        private int _flyoutYear;
-        private void MonthYearFlyout_Opened(object sender, object e)
+        private void WeekTimelineView_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            _flyoutYear = _viewDate.Year;
-            FlyoutYearText.Text = string.Format(_loader.GetStringOrDefault("TextYearFormat") ?? "{0}", _flyoutYear);
-
-            FlyoutMonthGrid.ItemsSource = LocalizationHelper.AppCulture.DateTimeFormat.AbbreviatedMonthNames
-                .Where(m => !string.IsNullOrEmpty(m)).ToArray();
-        }
-        private void FlyoutPrevYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = string.Format(_loader.GetStringOrDefault("TextYearFormat") ?? "{0}", --_flyoutYear);
-        private void FlyoutNextYear_Click(object sender, RoutedEventArgs e) => FlyoutYearText.Text = string.Format(_loader.GetStringOrDefault("TextYearFormat") ?? "{0}", ++_flyoutYear);
-        private void FlyoutMonthGrid_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            if (e.ClickedItem is string monthStr)
-            {
-                int month = FlyoutMonthGrid.Items.IndexOf(monthStr) + 1;
-                if (month <= 0) return;
-                _viewDate = new DateTime(_flyoutYear, month, 1);
-                LoadCalendar(_viewDate);
-                MonthYearFlyout.Hide();
-            }
+            if (_viewMode == CalendarViewMode.Week)
+                BuildWeekTimeline();
         }
 
-        private void BtnPrevMonth_Click(object sender, RoutedEventArgs e) => LoadCalendar(_viewDate = _viewDate.AddMonths(-1));
-        private void BtnNextMonth_Click(object sender, RoutedEventArgs e) => LoadCalendar(_viewDate = _viewDate.AddMonths(1));
+        private async void WeekTimelineEvent_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { DataContext: AgendaItem item }) return;
+            e.Handled = true;
+            await ShowEditDialogAsync(item);
+        }
+
+        private void BtnPrevMonth_Click(object sender, RoutedEventArgs e) => LoadCalendar(_viewDate = ShiftViewDate(-1));
+        private void BtnNextMonth_Click(object sender, RoutedEventArgs e) => LoadCalendar(_viewDate = ShiftViewDate(1));
         private void BtnToday_Click(object sender, RoutedEventArgs e) => LoadCalendar(_viewDate = DateTime.Today);
+        private void BtnMonthYear_Click(object sender, RoutedEventArgs e) => SwitchCalendarViewMode(CalendarViewMode.Year, updateSelector: true);
+
+        private DateTime ShiftViewDate(int direction)
+        {
+            return _viewMode switch
+            {
+                CalendarViewMode.Week => _viewDate.AddDays(7 * direction),
+                CalendarViewMode.Year => _viewDate.AddYears(direction),
+                _ => _viewDate.AddMonths(direction)
+            };
+        }
+
+        private void CalendarViewModeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (CalendarViewModeBox.SelectedItem is not ComboBoxItem item || item.Tag is not string tag)
+                return;
+
+            SwitchCalendarViewMode(tag switch
+            {
+                "Week" => CalendarViewMode.Week,
+                "Year" => CalendarViewMode.Year,
+                _ => CalendarViewMode.Month
+            });
+        }
+
+        private void SwitchCalendarViewMode(CalendarViewMode nextMode, bool updateSelector = false)
+        {
+            if (_viewMode == nextMode) return;
+            _viewMode = nextMode;
+            if (updateSelector && CalendarViewModeBox != null)
+                CalendarViewModeBox.SelectedIndex = nextMode switch
+                {
+                    CalendarViewMode.Week => 0,
+                    CalendarViewMode.Year => 2,
+                    _ => 1
+                };
+            if (CalendarContent != null)
+                LoadCalendar(_viewDate);
+        }
+
+        private void YearGrid_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            if (e.ClickedItem is not YearMonthViewModel month) return;
+            _viewDate = month.MonthStart;
+            SwitchCalendarViewMode(CalendarViewMode.Month, updateSelector: true);
+        }
 
         private void ToggleAccountPane_Click(object sender, RoutedEventArgs e)
         {
@@ -320,7 +731,7 @@ namespace Task_Flyout.Views
 
         private void LayoutRoot_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            var mode = ResponsiveLayoutPolicy.GetMode(e.NewSize.Width);
+            var mode = ResponsiveLayoutPolicy.GetCalendarMode(e.NewSize.Width);
             if (_layoutMode == mode) return;
             _layoutMode = mode;
             if (mode == ResponsiveLayoutMode.Wide)
@@ -341,7 +752,7 @@ namespace Task_Flyout.Views
             bool showCalendar = _layoutMode != ResponsiveLayoutMode.Narrow || !showAccounts;
             bool showTimeline = !_isTimelinePaneCollapsed && _layoutMode != ResponsiveLayoutMode.Narrow;
 
-            AccountColumn.MinWidth = showAccounts && _layoutMode == ResponsiveLayoutMode.Wide ? 200 : 0;
+            AccountColumn.MinWidth = showAccounts && _layoutMode == ResponsiveLayoutMode.Wide ? 240 : 0;
             AccountColumn.Width = showAccounts
                 ? (_layoutMode == ResponsiveLayoutMode.Narrow ? new GridLength(1, GridUnitType.Star) : new GridLength(2, GridUnitType.Star))
                 : new GridLength(0);
@@ -354,11 +765,16 @@ namespace Task_Flyout.Views
             TimelinePane.Visibility = showTimeline ? Visibility.Visible : Visibility.Collapsed;
             CalendarContent.Padding = _layoutMode == ResponsiveLayoutMode.Narrow
                 ? new Thickness(12)
-                : new Thickness(32, 32, 24, 32);
+                : new Thickness(28, 32, 28, 32);
             ToggleAccountPaneIcon.Glyph = showAccounts ? "\uE76B" : "\uE76C";
             ToggleTimelinePaneIcon.Glyph = showTimeline ? "\uE76C" : "\uE76B";
             ToggleTimelinePaneButton.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow
                 ? Visibility.Collapsed : Visibility.Visible;
+            Grid.SetRow(CalendarStatusPanel, 1);
+            Grid.SetColumn(CalendarStatusPanel, 0);
+            Grid.SetColumnSpan(CalendarStatusPanel, 2);
+            Grid.SetRow(RetryTaskMutationButton, 1);
+            Grid.SetColumn(RetryTaskMutationButton, 2);
         }
 
         private void ToggleTimelinePane_Click(object sender, RoutedEventArgs e)
@@ -389,6 +805,8 @@ namespace Task_Flyout.Views
                 if (!ReferenceEquals(AccountListRepeater.ItemsSource, mgr.Accounts))
                     AccountListRepeater.ItemsSource = mgr.Accounts;
                 UpdateAccountEmptyState();
+                if (mgr.Accounts.Count > 0)
+                    LoadCalendar(_viewDate);
             }
             catch (Exception ex)
             {
@@ -405,6 +823,10 @@ namespace Task_Flyout.Views
             NoAccountEmptyState.Visibility = hasAccounts ? Visibility.Collapsed : Visibility.Visible;
             CalendarGrid.Opacity = hasAccounts ? 1.0 : 0.25;
             CalendarGrid.IsHitTestVisible = hasAccounts;
+            WeekTimelineView.Opacity = hasAccounts ? 1.0 : 0.25;
+            WeekTimelineView.IsHitTestVisible = hasAccounts;
+            YearGrid.Opacity = hasAccounts ? 1.0 : 0.25;
+            YearGrid.IsHitTestVisible = hasAccounts;
         }
 
         private void BtnAddAccount_Click(object sender, RoutedEventArgs e)
@@ -476,26 +898,29 @@ namespace Task_Flyout.Views
 
         private void CalendarGrid_ItemClick(object sender, ItemClickEventArgs e)
         {
-            if (e.ClickedItem is DayCellViewModel cell) UpdateSideBar(cell);
+            if (e.ClickedItem is DayCellViewModel) UpdateSideBar();
         }
 
-        private void UpdateSideBar(DayCellViewModel cell)
+        private void UpdateSideBar()
         {
-            TxtSideBarDate.Text = cell.Date.ToString("M", LocalizationHelper.AppCulture) + " " + (_loader.GetStringOrDefault("TextOnwards") ?? "");
+            TxtSideBarDate.Text = _loader.GetStringOrDefault("TextUpcomingMonth") ?? "Next month";
             var nextItems = new List<AgendaItem>();
 
-            string selectedDateKey = cell.Date.ToString("yyyy-MM-dd");
-            var upcomingDates = _localCache.DayItems.Keys
-                .Where(k => string.Compare(k, selectedDateKey, StringComparison.Ordinal) >= 0
-                            && _displayedRange.ContainsMonthDateKey(k))
+            var upcomingRange = GetUpcomingRange();
+            var upcomingDates = _upcomingCache.DayItems.Keys
+                .Where(upcomingRange.ContainsDateKey)
                 .OrderBy(k => k, StringComparer.Ordinal);
 
             bool hasItems = false;
             foreach (var dateKey in upcomingDates)
             {
-                var sortedItems = _localCache.DayItems[dateKey]
+                if (!_upcomingCache.DayItems.TryGetValue(dateKey, out var dateItems)
+                    || !DateTime.TryParseExact(dateKey, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var itemDate))
+                    continue;
+
+                var sortedItems = dateItems
                     .Where(IsItemVisible)
-                    .OrderBy(i => (i.Subtitle == "全天" || i.Subtitle == (_loader.GetStringOrDefault("TextAllDay") ?? "All Day")) ? 0 : 1)
+                    .OrderBy(i => IsAllDaySubtitle(i.Subtitle) ? 0 : 1)
                     .ThenBy(i => i.Subtitle);
                 foreach (var item in sortedItems)
                 {
@@ -503,7 +928,7 @@ namespace Task_Flyout.Views
                     {
                         Id = item.Id,
                         Title = item.Title,
-                        Subtitle = $"{DateTime.Parse(dateKey).ToString("M", LocalizationHelper.AppCulture)}\n{(item.Subtitle == "全天" || item.Subtitle == "All Day" ? (_loader.GetStringOrDefault("TextAllDay") ?? "All Day") : item.Subtitle)}",
+                        Subtitle = $"{itemDate.ToString("M", LocalizationHelper.AppCulture)}\n{(IsAllDaySubtitle(item.Subtitle) ? (_loader.GetStringOrDefault("TextAllDay") ?? "All Day") : item.Subtitle)}",
                         Location = item.Location,
                         Description = item.Description,
                         IsEvent = item.IsEvent,
@@ -543,6 +968,30 @@ namespace Task_Flyout.Views
             SelectedDayItems.Clear();
             foreach (var item in nextItems)
                 SelectedDayItems.Add(item);
+        }
+
+        private static CalendarMonthRange GetUpcomingRange()
+        {
+            var start = DateTime.Today.Date;
+            var endExclusive = start.AddMonths(1).AddDays(1);
+            return new CalendarMonthRange(start, endExclusive, start, endExclusive);
+        }
+
+        private AppCache BuildVisibleCache(IEnumerable<AgendaItem> items)
+        {
+            var itemsByDate = items
+                .Where(IsItemVisible)
+                .GroupBy(it => it.DateKey)
+                .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+
+            return new AppCache
+            {
+                DayItems = itemsByDate.ToDictionary(
+                    pair => pair.Key,
+                    pair => pair.Value.ToList(),
+                    StringComparer.Ordinal),
+                MarkedDates = itemsByDate.Keys.ToHashSet(StringComparer.Ordinal)
+            };
         }
 
         private static bool SideBarItemsEqual(AgendaItem left, AgendaItem right)
@@ -835,6 +1284,11 @@ namespace Task_Flyout.Views
             if (e.ClickedItem is not AgendaItem item) return;
             if (item.Title != null && item.Title.Contains(_loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events")) return;
 
+            await ShowEditDialogAsync(item);
+        }
+
+        private async Task ShowEditDialogAsync(AgendaItem item)
+        {
             PrepareDialogForEdit(item);
             EditDialog.XamlRoot = this.XamlRoot;
             PrepareEditDialogSize();

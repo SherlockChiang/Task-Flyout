@@ -4,17 +4,17 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:Task_Flyout.Views"
     xmlns:models="using:Task_Flyout.Services"
-    Background="Transparent">
+    Background="{ThemeResource TaskFlyoutPageBackgroundBrush}">
 
-    <ScrollViewer x:Name="WeatherScrollViewer" Padding="24" SizeChanged="WeatherScrollViewer_SizeChanged">
-        <StackPanel Spacing="28" MaxWidth="1040" HorizontalAlignment="Stretch">
+    <ScrollViewer x:Name="WeatherScrollViewer" Padding="{StaticResource TaskFlyoutPagePadding}" HorizontalContentAlignment="Stretch" SizeChanged="WeatherScrollViewer_SizeChanged">
+        <StackPanel Spacing="28" HorizontalAlignment="Stretch">
             <TextBlock x:Uid="WeatherPage_Title" Style="{StaticResource TitleTextBlockStyle}"/>
             <TextBlock x:Name="WeatherStatusText" FontSize="13" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
 
             <!-- Current Weather Summary Card (top) -->
             <Border x:Name="CurrentWeatherCard" Visibility="Collapsed"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8"
-                    BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="24">
+                    Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
+                    BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}">
                 <Grid x:Name="CurrentWeatherGrid" RowSpacing="12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -47,7 +47,7 @@
             <!-- 24-Hour Forecast -->
             <StackPanel x:Name="ForecastPanel" Spacing="12" Visibility="Collapsed">
                 <TextBlock x:Uid="WeatherPage_24Hour" FontWeight="SemiBold" FontSize="16"/>
-                <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="12">
+                <Border Background="{ThemeResource TaskFlyoutSectionBackgroundBrush}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" Padding="12">
                     <ListView x:Name="HourlyListView" SelectionMode="Single" SelectionChanged="HourlyListView_SelectionChanged"
                               ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
                               ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
@@ -94,8 +94,8 @@
 
                 <!-- Detail Panel for selected hour -->
                 <Border x:Name="HourDetailPanel" Visibility="Collapsed"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8"
-                        BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="24">
+                        Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
+                        BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}">
                     <Grid x:Name="HourDetailGrid" RowSpacing="12">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -131,7 +131,7 @@
             <!-- Daily Forecast -->
             <StackPanel x:Name="DailyForecastPanel" Spacing="12" Visibility="Collapsed">
                 <TextBlock x:Name="DailyForecastTitle" FontWeight="SemiBold" FontSize="16"/>
-                <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Padding="12">
+                <Border Background="{ThemeResource TaskFlyoutSectionBackgroundBrush}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" Padding="12">
                     <ListView x:Name="DailyForecastListView" SelectionMode="None"
                               ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
                               ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
@@ -189,24 +189,24 @@
             <ProgressRing x:Name="LoadingRing" IsActive="False" HorizontalAlignment="Left" Margin="0,12,0,0"/>
 
             <!-- Settings Card (moved to bottom) -->
-            <StackPanel Spacing="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="24" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+            <StackPanel Spacing="16" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}">
 
                 <ToggleSwitch x:Uid="WeatherPage_Toggle" x:Name="WeatherToggle" Toggled="WeatherToggle_Toggled"/>
 
-                <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4"/>
+                <Border Height="1" Background="{ThemeResource TaskFlyoutDividerBrush}" Margin="0,4"/>
 
                 <StackPanel Spacing="4">
                     <ToggleSwitch x:Uid="WeatherPage_BarTitle" x:Name="WeatherBarToggle" Header="Taskbar Weather Bar" OnContent="On" OffContent="Off" Toggled="WeatherBarToggle_Toggled"/>
                     <TextBlock x:Name="WeatherBarDesc" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap"/>
                 </StackPanel>
 
-                <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4"/>
+                <Border Height="1" Background="{ThemeResource TaskFlyoutDividerBrush}" Margin="0,4"/>
 
                 <StackPanel Spacing="8">
                     <TextBlock x:Uid="WeatherPage_CityHeader" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                    <StackPanel x:Name="SavedLocationsPanel" Spacing="6" MaxWidth="640" HorizontalAlignment="Stretch"/>
+                    <StackPanel x:Name="SavedLocationsPanel" Spacing="6" MaxWidth="840" HorizontalAlignment="Stretch"/>
                     <TextBlock x:Name="SavedLocationsFeedback" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
-                    <Grid x:Name="LocationInputGrid" ColumnSpacing="8" RowSpacing="8" HorizontalAlignment="Stretch" MaxWidth="640">
+                    <Grid x:Name="LocationInputGrid" ColumnSpacing="8" RowSpacing="8" HorizontalAlignment="Stretch" MaxWidth="840">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -242,25 +242,25 @@
                                   Toggled="AutoFollowLocationToggle_Toggled"/>
                 </StackPanel>
 
-                <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4"/>
+                <Border Height="1" Background="{ThemeResource TaskFlyoutDividerBrush}" Margin="0,4"/>
 
                 <!-- Weather Source -->
                 <StackPanel Spacing="8">
-                    <ComboBox x:Name="SourceComboBox" x:Uid="WeatherPage_SourceHeader" MaxWidth="460" HorizontalAlignment="Stretch" SelectionChanged="SourceComboBox_SelectionChanged">
+                    <ComboBox x:Name="SourceComboBox" x:Uid="WeatherPage_SourceHeader" MaxWidth="560" HorizontalAlignment="Stretch" SelectionChanged="SourceComboBox_SelectionChanged">
                         <ComboBoxItem Content="Open-Meteo" Tag="OpenMeteo"/>
                         <ComboBoxItem Content="wttr.in" Tag="WttrIn"/>
                     </ComboBox>
-                    <TextBlock x:Name="SourceHintText" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" MaxWidth="680"/>
+                    <TextBlock x:Name="SourceHintText" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" MaxWidth="900"/>
                 </StackPanel>
 
-                <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4"/>
+                <Border Height="1" Background="{ThemeResource TaskFlyoutDividerBrush}" Margin="0,4"/>
 
                 <!-- Weather Icon (emoji / custom font / imported icon pack) -->
                 <StackPanel Spacing="8">
-                    <ComboBox x:Uid="WeatherPage_IconFontHeader" x:Name="IconFontComboBox" MaxWidth="460" HorizontalAlignment="Stretch" SelectionChanged="IconFontComboBox_SelectionChanged"/>
+                    <ComboBox x:Uid="WeatherPage_IconFontHeader" x:Name="IconFontComboBox" MaxWidth="560" HorizontalAlignment="Stretch" SelectionChanged="IconFontComboBox_SelectionChanged"/>
 
                     <AutoSuggestBox x:Uid="WeatherPage_CustomFontBox" x:Name="CustomFontBox"
-                                    MaxWidth="460" HorizontalAlignment="Stretch" Visibility="Collapsed"
+                                    MaxWidth="560" HorizontalAlignment="Stretch" Visibility="Collapsed"
                                     TextChanged="CustomFontBox_TextChanged"
                                     QuerySubmitted="CustomFontBox_QuerySubmitted"
                                     SuggestionChosen="CustomFontBox_SuggestionChosen"/>
@@ -277,7 +277,7 @@
             </StackPanel>
 
             <!-- Flyout Display Fields Card -->
-            <StackPanel Spacing="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="24" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+            <StackPanel Spacing="12" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}">
                 <TextBlock x:Name="FlyoutFieldsHeader" FontWeight="SemiBold" FontSize="16"/>
                 <TextBlock x:Name="FlyoutFieldsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                 <ItemsRepeater x:Name="FieldToggleRepeater">
@@ -288,7 +288,7 @@
             </StackPanel>
 
             <!-- Taskbar Weather Bar Fields Card -->
-            <StackPanel Spacing="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="24" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+            <StackPanel Spacing="12" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}">
                 <TextBlock x:Name="BarFieldsHeader" FontWeight="SemiBold" FontSize="16"/>
                 <TextBlock x:Name="BarFieldsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                 <ItemsRepeater x:Name="BarFieldToggleRepeater">
@@ -299,7 +299,7 @@
             </StackPanel>
 
             <!-- Taskbar Weather Bar Alerts Card -->
-            <StackPanel Spacing="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="24" CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+            <StackPanel Spacing="12" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}">
                 <TextBlock x:Name="AlertsHeader" FontWeight="SemiBold" FontSize="16"/>
                 <TextBlock x:Name="AlertsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                 <ToggleSwitch x:Name="AlertsToggle" Toggled="AlertsToggle_Toggled"/>
