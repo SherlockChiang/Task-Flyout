@@ -551,20 +551,27 @@ INSERT INTO rss_subscriptions(id, title, url) VALUES ('legacy', '', '');
     {
         var databasePath = Path.Combine(_root, "rss.db");
         var firstRepository = new RssSqliteRepository(databasePath);
-        firstRepository.Initialize();
-        using (var connection = firstRepository.OpenConnection())
-        using (var command = connection.CreateCommand())
-        {
-            command.CommandText = "INSERT INTO rss_folders(id, name) VALUES ('folder', $name);";
-            command.Parameters.AddWithValue("$name", RssSensitiveDataProtector.Protect(new string('x', 20_000)));
-            command.ExecuteNonQuery();
-        }
+        firstRepository.UpsertArticle(new RssArticleWriteRecord("old", "subscription", "Feed", new string('x', 20_000), "", "", "", "", "", 10));
+        firstRepository.UpsertArticle(new RssArticleWriteRecord("new", "subscription", "Feed", "New", "", "", "", "", "", 20));
         var walPath = databasePath + "-wal";
-        Assert.True(File.Exists(walPath) && new FileInfo(walPath).Length > 0);
+
+        using (var readerConnection = firstRepository.OpenConnection())
+        using (var readerTransaction = readerConnection.BeginTransaction(deferred: true))
+        using (var command = readerConnection.CreateCommand())
+        {
+            command.Transaction = readerTransaction;
+            command.CommandText = "SELECT title FROM rss_articles WHERE id = 'old';";
+            using var reader = command.ExecuteReader();
+            Assert.True(reader.Read());
+
+            firstRepository.TrimArticles(1);
+            Assert.Equal("new", Assert.Single(firstRepository.QueryArticlesPage(null, null, 0, 10)).Id);
+        }
 
         var restartedRepository = new RssSqliteRepository(databasePath);
         restartedRepository.Initialize();
 
+        Assert.Equal("new", Assert.Single(restartedRepository.QueryArticlesPage(null, null, 0, 10)).Id);
         Assert.True(!File.Exists(walPath) || new FileInfo(walPath).Length == 0);
     }
 
