@@ -13,5 +13,10 @@ namespace Task_Flyout.Services
 
         public Task<RemoteImageStream?> FetchAsync(string url, CancellationToken cancellationToken = default)
             => RssService.FetchRemoteImageSafelyAsync(url, cancellationToken);
+
+        public Task<RemoteImageStream?> FetchTrustedMailAsync(
+            string url,
+            CancellationToken cancellationToken = default)
+            => RssService.FetchTrustedMailImageSafelyAsync(url, cancellationToken);
     }
 }

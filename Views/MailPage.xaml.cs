@@ -2345,7 +2345,7 @@ namespace Task_Flyout.Views
                         return;
                     }
 
-                    var fetched = await RemoteImageProxyService.Instance.FetchAsync(uri!, cts.Token);
+                    var fetched = await RemoteImageProxyService.Instance.FetchTrustedMailAsync(uri!, cts.Token);
                     if (fetched != null)
                     {
                         args.Response = coreWebView.Environment.CreateWebResourceResponse(

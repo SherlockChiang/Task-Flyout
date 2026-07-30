@@ -1,3 +1,4 @@
+using System.Net;
 using System.Xml;
 using Task_Flyout.Services;
 
@@ -5,6 +6,25 @@ namespace Task_Flyout.Tests;
 
 public class RssServiceTests
 {
+    [Fact]
+    public void Trusted_mail_resolution_accepts_tun_fake_ip_without_weakening_rss()
+    {
+        var addresses = new[] { IPAddress.Parse("198.18.24.8") };
+
+        Assert.False(RssFetchPolicy.AreResolvedAddressesSafe(addresses));
+        Assert.True(RssFetchPolicy.AreResolvedAddressesSafeForTrustedMail(addresses));
+    }
+
+    [Theory]
+    [InlineData("10.0.0.1")]
+    [InlineData("127.0.0.1")]
+    [InlineData("169.254.1.1")]
+    public void Trusted_mail_resolution_still_blocks_private_addresses(string address)
+    {
+        Assert.False(RssFetchPolicy.AreResolvedAddressesSafeForTrustedMail(
+            new[] { IPAddress.Parse(address) }));
+    }
+
     [Fact]
     public void Safe_xml_reader_settings_disable_external_resolution()
     {

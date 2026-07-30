@@ -15,6 +15,20 @@ namespace Task_Flyout.Services
         public static IPAddress Normalize(IPAddress address)
             => address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address;
 
+        /// <summary>
+        /// True for the IPv4 benchmarking range commonly used by TUN/Fake-IP DNS proxies.
+        /// This remains non-public and is only accepted by the trusted-mail image fetch path
+        /// when a DNS name, never an IP-literal URL, resolves into the range.
+        /// </summary>
+        public static bool IsTunSyntheticAddress(IPAddress address)
+        {
+            address = Normalize(address);
+            if (address.AddressFamily != AddressFamily.InterNetwork) return false;
+
+            var bytes = address.GetAddressBytes();
+            return bytes[0] == 198 && (bytes[1] == 18 || bytes[1] == 19);
+        }
+
         /// <summary>True only for routable public addresses; everything special-use is false.</summary>
         public static bool IsPublicIpAddress(IPAddress address)
         {

@@ -58,6 +58,15 @@ namespace Task_Flyout.Services
             return normalized.Count > 0 && normalized.All(NetworkSafety.IsPublicIpAddress);
         }
 
+        public static bool AreResolvedAddressesSafeForTrustedMail(IEnumerable<IPAddress> addresses)
+        {
+            var normalized = addresses.Select(NetworkSafety.Normalize).ToList();
+            return normalized.Count > 0 &&
+                   normalized.All(address =>
+                       NetworkSafety.IsPublicIpAddress(address) ||
+                       NetworkSafety.IsTunSyntheticAddress(address));
+        }
+
         public static bool TryResolveHttpRedirect(Uri currentUri, Uri? location, out Uri redirectUri)
         {
             redirectUri = currentUri;

@@ -49,6 +49,18 @@ public class NetworkSafetyTests
     }
 
     [Theory]
+    [InlineData("198.18.0.1", true)]
+    [InlineData("198.19.255.254", true)]
+    [InlineData("::ffff:198.18.1.2", true)]
+    [InlineData("198.20.0.1", false)]
+    [InlineData("192.168.1.1", false)]
+    [InlineData("8.8.8.8", false)]
+    public void IsTunSyntheticAddress_recognizes_only_fake_ip_range(string ip, bool expected)
+    {
+        Assert.Equal(expected, NetworkSafety.IsTunSyntheticAddress(IPAddress.Parse(ip)));
+    }
+
+    [Theory]
     [InlineData("https://localhost/x")]
     [InlineData("https://app.localhost/x")]
     [InlineData("https://printer.local/x")]

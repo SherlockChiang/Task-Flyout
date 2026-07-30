@@ -168,6 +168,9 @@ namespace Task_Flyout.Services
         // This flows only while fetching a user-entered local source. Redirects always
         // clear it so a public feed cannot pivot into a private network address.
         private static readonly AsyncLocal<string?> CurrentLocalNetworkAuthority = new();
+        // Trusted mail images may resolve public host names into mihomo/Clash Fake-IP
+        // addresses. The stricter RSS path never enables this compatibility mode.
+        private static readonly AsyncLocal<bool> CurrentAllowTunSyntheticAddress = new();
         private static readonly object InstancesLock = new();
         private static readonly List<WeakReference<RssService>> Instances = new();
         private static readonly SemaphoreSlim GlobalDataClearGate = new(1, 1);
@@ -848,7 +851,9 @@ namespace Task_Flyout.Services
                 try
                 {
                     var addresses = await Dns.GetHostAddressesAsync(uri.Host);
-                    return RssFetchPolicy.AreResolvedAddressesSafe(addresses);
+                    return CurrentAllowTunSyntheticAddress.Value
+                        ? RssFetchPolicy.AreResolvedAddressesSafeForTrustedMail(addresses)
+                        : RssFetchPolicy.AreResolvedAddressesSafe(addresses);
                 }
                 catch
                 {
@@ -887,13 +892,19 @@ namespace Task_Flyout.Services
             else
             {
                 addresses = await Dns.GetHostAddressesAsync(host, cancellationToken);
-                if (!RssFetchPolicy.AreResolvedAddressesSafe(addresses))
+                var safe = CurrentAllowTunSyntheticAddress.Value
+                    ? RssFetchPolicy.AreResolvedAddressesSafeForTrustedMail(addresses)
+                    : RssFetchPolicy.AreResolvedAddressesSafe(addresses);
+                if (!safe)
                     return new List<IPAddress>();
             }
 
             return addresses
                 .Select(NetworkSafety.Normalize)
-                .Where(NetworkSafety.IsPublicIpAddress)
+                .Where(address =>
+                    NetworkSafety.IsPublicIpAddress(address) ||
+                    (CurrentAllowTunSyntheticAddress.Value &&
+                     NetworkSafety.IsTunSyntheticAddress(address)))
                 .Distinct()
                 .ToList();
         }
@@ -905,14 +916,28 @@ namespace Task_Flyout.Services
         private static readonly BoundedHostGatePool RemoteImageHostGates = new(64, MaxRemoteImageFetchesPerHost);
 
         /// <summary>
-        /// Downloads a remote RSS article image through the app's SSRF-guarded HTTP client
-        /// (each connection is DNS-pinned to a public IP), so the WebView never connects to the
-        /// host directly — closing the DNS-rebinding gap a host-string check can't. Returns null
-        /// (caller should block) on any failure, redirect to a non-public host, non-image
-        /// content type, or oversize payload.
+        /// Downloads a remote image through the app's SSRF-guarded HTTP client. RSS requires
+        /// public addresses; explicitly trusted mail may also use TUN/Fake-IP synthetic
+        /// addresses for DNS host names. IP-literal URLs, redirects to local networks,
+        /// non-image responses, and oversized payloads remain blocked.
         /// </summary>
-        internal static async Task<RemoteImageStream?> FetchRemoteImageSafelyAsync(string url, CancellationToken cancellationToken = default)
+        internal static Task<RemoteImageStream?> FetchRemoteImageSafelyAsync(
+            string url,
+            CancellationToken cancellationToken = default)
+            => FetchRemoteImageSafelyCoreAsync(url, allowTunSyntheticAddress: false, cancellationToken);
+
+        internal static Task<RemoteImageStream?> FetchTrustedMailImageSafelyAsync(
+            string url,
+            CancellationToken cancellationToken = default)
+            => FetchRemoteImageSafelyCoreAsync(url, allowTunSyntheticAddress: true, cancellationToken);
+
+        private static async Task<RemoteImageStream?> FetchRemoteImageSafelyCoreAsync(
+            string url,
+            bool allowTunSyntheticAddress,
+            CancellationToken cancellationToken)
         {
+            var priorAllowTunSyntheticAddress = CurrentAllowTunSyntheticAddress.Value;
+            CurrentAllowTunSyntheticAddress.Value = allowTunSyntheticAddress;
             try
             {
                 if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
@@ -974,6 +999,10 @@ namespace Task_Flyout.Services
             catch
             {
                 return null;
+            }
+            finally
+            {
+                CurrentAllowTunSyntheticAddress.Value = priorAllowTunSyntheticAddress;
             }
         }
 
