@@ -285,18 +285,8 @@
                 </Grid.ColumnDefinitions>
                 <Border Grid.Row="0" Grid.Column="0" BorderBrush="{ThemeResource TaskFlyoutDividerBrush}" BorderThickness="0,0,1,1"/>
                 <Canvas x:Name="WeekTimelineHeaderCanvas" Grid.Row="0" Grid.Column="1" Height="48"/>
-                <ScrollViewer x:Name="WeekTimelineScrollViewer" Grid.Row="1" Grid.ColumnSpan="2"
-                              VerticalScrollBarVisibility="Auto" VerticalScrollMode="Enabled"
-                              HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
-                    <Grid x:Name="WeekTimelineScrollContent">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="56"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Canvas x:Name="WeekTimeAxisCanvas" Grid.Column="0" Width="56"/>
-                        <Canvas x:Name="WeekTimelineCanvas" Grid.Column="1"/>
-                    </Grid>
-                </ScrollViewer>
+                <Canvas x:Name="WeekTimeAxisCanvas" Grid.Row="1" Grid.Column="0" Width="56"/>
+                <Canvas x:Name="WeekTimelineCanvas" Grid.Row="1" Grid.Column="1"/>
             </Grid>
 
             <GridView x:Name="YearGrid" Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"

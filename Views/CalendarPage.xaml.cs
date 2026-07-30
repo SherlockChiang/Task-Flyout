@@ -89,9 +89,8 @@ namespace Task_Flyout.Views
     public sealed partial class CalendarPage : Page
     {
         private const int MonthCellItemLimit = 3;
-        private const double WeekTimelineHourHeight = 58;
+        private const double WeekTimelineHeaderHeight = 48;
         private const double WeekTimelineTimeAxisWidth = 56;
-        private const double WeekTimelineMinimumDayWidth = 92;
 
         public ObservableCollection<DayCellViewModel> DayCells { get; set; } = new();
         public ObservableCollection<AgendaItem> SelectedDayItems { get; set; } = new();
@@ -343,14 +342,13 @@ namespace Task_Flyout.Views
             WeekTimeAxisCanvas.Children.Clear();
             WeekTimelineHeaderCanvas.Children.Clear();
 
-            double availableWidth = Math.Max(
-                WeekTimelineMinimumDayWidth * 7,
-                WeekTimelineView.ActualWidth - WeekTimelineTimeAxisWidth - 20);
-            double timelineHeight = WeekTimelineHourHeight * 24;
+            double timelineHeight = Math.Max(1, WeekTimelineView.ActualHeight - WeekTimelineHeaderHeight);
+            double hourHeight = timelineHeight / 24.0;
+            double availableWidth = Math.Max(1, WeekTimelineView.ActualWidth - WeekTimelineTimeAxisWidth);
             double dayWidth = availableWidth / 7;
 
-            WeekTimelineScrollContent.Height = timelineHeight;
             WeekTimeAxisCanvas.Height = timelineHeight;
+            WeekTimeAxisCanvas.Width = WeekTimelineTimeAxisWidth;
             WeekTimelineCanvas.Width = availableWidth;
             WeekTimelineCanvas.Height = timelineHeight;
             WeekTimelineHeaderCanvas.Width = availableWidth;
@@ -412,7 +410,7 @@ namespace Task_Flyout.Views
 
             for (int hour = 0; hour <= 24; hour++)
             {
-                double top = hour * WeekTimelineHourHeight;
+                double top = hour * hourHeight;
                 var line = new Border
                 {
                     Width = availableWidth,
@@ -423,12 +421,13 @@ namespace Task_Flyout.Views
                 Canvas.SetTop(line, top);
                 WeekTimelineCanvas.Children.Add(line);
 
-                if (hour < 24)
+                int labelStep = hourHeight >= 24 ? 1 : hourHeight >= 14 ? 2 : 3;
+                if (hour < 24 && hour % labelStep == 0)
                 {
                     var label = new TextBlock
                     {
                         Text = $"{hour:00}:00",
-                        FontSize = 11,
+                        FontSize = hourHeight >= 18 ? 11 : 10,
                         Foreground = secondaryBrush
                     };
                     Canvas.SetTop(label, Math.Max(0, top - 7));
@@ -448,14 +447,14 @@ namespace Task_Flyout.Views
                              .OrderBy(i => GetWeekTimelineStart(i, date))
                              .ThenBy(i => i.Title))
                 {
-                    AddWeekTimelineEvent(item, date, day, dayWidth);
+                    AddWeekTimelineEvent(item, date, day, dayWidth, hourHeight);
                 }
             }
         }
 
-        private void AddWeekTimelineEvent(AgendaItem item, DateTime date, int dayIndex, double dayWidth)
+        private void AddWeekTimelineEvent(AgendaItem item, DateTime date, int dayIndex, double dayWidth, double hourHeight)
         {
-            if (!TryGetWeekTimelineBounds(item, date, out var top, out var height))
+            if (!TryGetWeekTimelineBounds(item, date, hourHeight, out var top, out var height))
                 return;
 
             PopulateItemColor(item);
@@ -469,11 +468,12 @@ namespace Task_Flyout.Views
             var title = new TextBlock
             {
                 Text = item.Title,
-                FontSize = 12,
+                FontSize = height >= 24 ? 12 : 11,
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 Foreground = foreground,
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                TextWrapping = TextWrapping.NoWrap
+                TextWrapping = TextWrapping.NoWrap,
+                MaxLines = 1
             };
             var subtitle = new TextBlock
             {
@@ -481,14 +481,15 @@ namespace Task_Flyout.Views
                 FontSize = 11,
                 Foreground = foreground,
                 Opacity = 0.82,
-                TextTrimming = TextTrimming.CharacterEllipsis
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Visibility = height >= 34 ? Visibility.Visible : Visibility.Collapsed
             };
             var block = new Border
             {
-                Width = Math.Max(48, dayWidth - 8),
+                Width = Math.Max(16, dayWidth - 8),
                 Height = height,
                 CornerRadius = new CornerRadius(5),
-                Padding = new Thickness(6, 4, 6, 4),
+                Padding = height >= 30 ? new Thickness(6, 4, 6, 4) : new Thickness(5, 2, 5, 2),
                 Background = background,
                 Opacity = item.IsCompleted ? 0.55 : 0.94,
                 DataContext = item,
@@ -505,7 +506,7 @@ namespace Task_Flyout.Views
             WeekTimelineCanvas.Children.Add(block);
         }
 
-        private bool TryGetWeekTimelineBounds(AgendaItem item, DateTime date, out double top, out double height)
+        private bool TryGetWeekTimelineBounds(AgendaItem item, DateTime date, double hourHeight, out double top, out double height)
         {
             DateTime dayStart = date.Date;
             DateTime dayEnd = dayStart.AddDays(1);
@@ -515,8 +516,8 @@ namespace Task_Flyout.Views
 
             if (allDay || item.StartDateTime == null)
             {
-                top = 4;
-                height = 26;
+                top = 2;
+                height = Math.Max(18, hourHeight - 4);
                 return true;
             }
 
@@ -532,8 +533,8 @@ namespace Task_Flyout.Views
                 return false;
             }
 
-            top = clampedStart.TimeOfDay.TotalHours * WeekTimelineHourHeight + 2;
-            height = Math.Max(26, (clampedEnd - clampedStart).TotalHours * WeekTimelineHourHeight - 4);
+            top = clampedStart.TimeOfDay.TotalHours * hourHeight + 2;
+            height = Math.Max(18, (clampedEnd - clampedStart).TotalHours * hourHeight - 4);
             return true;
         }
 
