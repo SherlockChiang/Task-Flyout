@@ -148,7 +148,8 @@ public class LocalizationResourceTests
     {
         string root = FindRepositoryRoot();
         XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
-        var appResources = XDocument.Load(Path.Combine(root, "App.xaml"))
+        var appDocument = XDocument.Load(Path.Combine(root, "App.xaml"));
+        var appResources = appDocument
             .Descendants()
             .Select(element => (string?)element.Attribute(x + "Key"))
             .Where(key => !string.IsNullOrWhiteSpace(key))
@@ -168,6 +169,26 @@ public class LocalizationResourceTests
 
         foreach (string key in requiredDesignKeys)
             Assert.Contains(key, appResources);
+
+        var themeDictionaries = appDocument
+            .Descendants()
+            .Where(element => element.Name.LocalName == "ResourceDictionary.ThemeDictionaries")
+            .Elements()
+            .ToDictionary(
+                element => (string)element.Attribute(x + "Key")!,
+                element => element.Elements()
+                    .Select(resource => (string?)resource.Attribute(x + "Key"))
+                    .Where(key => !string.IsNullOrWhiteSpace(key))
+                    .Cast<string>()
+                    .ToHashSet(StringComparer.Ordinal),
+                StringComparer.Ordinal);
+
+        foreach (string theme in new[] { "Default", "Light", "HighContrast" })
+        {
+            Assert.True(themeDictionaries.TryGetValue(theme, out var themeResources));
+            foreach (string key in requiredDesignKeys.Where(key => key.EndsWith("Brush", StringComparison.Ordinal)))
+                Assert.Contains(key, themeResources!);
+        }
 
         string[] pageFiles =
         {
