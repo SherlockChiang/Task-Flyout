@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -411,26 +412,29 @@ namespace Task_Flyout.Views
             for (int hour = 0; hour <= 24; hour++)
             {
                 double top = hour * hourHeight;
+                bool isMajorHour = CalendarWeekLayoutPolicy.ShouldShowTimeLabel(hour);
                 var line = new Border
                 {
                     Width = availableWidth,
                     Height = 1,
                     Background = dividerBrush,
-                    Opacity = hour % 6 == 0 ? 0.75 : 0.35
+                    Opacity = isMajorHour ? 0.72 : 0.22
                 };
                 Canvas.SetTop(line, top);
                 WeekTimelineCanvas.Children.Add(line);
 
-                int labelStep = hourHeight >= 24 ? 1 : hourHeight >= 14 ? 2 : 3;
-                if (hour < 24 && hour % labelStep == 0)
+                if (isMajorHour)
                 {
                     var label = new TextBlock
                     {
                         Text = $"{hour:00}:00",
-                        FontSize = hourHeight >= 18 ? 11 : 10,
+                        FontSize = 10,
                         Foreground = secondaryBrush
                     };
-                    Canvas.SetTop(label, Math.Max(0, top - 7));
+                    double labelTop = hour == 24
+                        ? Math.Max(0, timelineHeight - 14)
+                        : Math.Max(0, top - 7);
+                    Canvas.SetTop(label, labelTop);
                     Canvas.SetLeft(label, 2);
                     WeekTimeAxisCanvas.Children.Add(label);
                 }
@@ -464,10 +468,20 @@ namespace Task_Flyout.Views
             var foreground = !string.IsNullOrWhiteSpace(item.ColorHex) && Services.ColorHelper.ShouldUseWhiteText(item.ColorHex)
                 ? new SolidColorBrush(Microsoft.UI.Colors.White)
                 : new SolidColorBrush(Microsoft.UI.Colors.Black);
+            bool allDay = IsAllDaySubtitle(item.Subtitle);
+            string allDayText = _loader.GetStringOrDefault("TextAllDay") ?? "All Day";
+            string timeText = CalendarWeekLayoutPolicy.FormatEventTime(
+                item.StartDateTime,
+                item.EndDateTime,
+                allDay,
+                allDayText);
+            bool useExpandedLayout = height >= 40;
 
             var title = new TextBlock
             {
-                Text = item.Title,
+                Text = useExpandedLayout
+                    ? item.Title
+                    : CalendarWeekLayoutPolicy.FormatCompactEventText(item.Title, timeText),
                 FontSize = height >= 24 ? 12 : 11,
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 Foreground = foreground,
@@ -477,12 +491,14 @@ namespace Task_Flyout.Views
             };
             var subtitle = new TextBlock
             {
-                Text = IsAllDaySubtitle(item.Subtitle) ? (_loader.GetStringOrDefault("TextAllDay") ?? "All Day") : item.Subtitle,
+                Text = timeText,
                 FontSize = 11,
                 Foreground = foreground,
                 Opacity = 0.82,
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                Visibility = height >= 34 ? Visibility.Visible : Visibility.Collapsed
+                Visibility = useExpandedLayout && !string.IsNullOrWhiteSpace(timeText)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed
             };
             var block = new Border
             {
@@ -499,6 +515,9 @@ namespace Task_Flyout.Views
                     Children = { title, subtitle }
                 }
             };
+            string accessibleText = CalendarWeekLayoutPolicy.FormatCompactEventText(item.Title, timeText);
+            AutomationProperties.SetName(block, accessibleText);
+            ToolTipService.SetToolTip(block, accessibleText);
             block.Tapped += WeekTimelineEvent_Tapped;
             Canvas.SetLeft(block, dayIndex * dayWidth + 4);
             Canvas.SetTop(block, top);
@@ -733,43 +752,61 @@ namespace Task_Flyout.Views
         private void LayoutRoot_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             var mode = ResponsiveLayoutPolicy.GetCalendarMode(e.NewSize.Width);
-            if (_layoutMode == mode) return;
-            _layoutMode = mode;
-            if (mode == ResponsiveLayoutMode.Wide)
+            if (_layoutMode != mode)
             {
-                _isAccountPaneCollapsed = false;
-                _isTimelinePaneCollapsed = false;
+                _layoutMode = mode;
+                if (mode == ResponsiveLayoutMode.Wide)
+                {
+                    _isAccountPaneCollapsed = false;
+                    _isTimelinePaneCollapsed = false;
+                }
+                else
+                    _isAccountPaneCollapsed = true;
+                if (mode == ResponsiveLayoutMode.Narrow)
+                    _isTimelinePaneCollapsed = true;
             }
-            else
-                _isAccountPaneCollapsed = true;
-            if (mode == ResponsiveLayoutMode.Narrow)
-                _isTimelinePaneCollapsed = true;
             ApplyResponsiveLayout();
         }
 
         private void ApplyResponsiveLayout()
         {
+            bool agendaOnly = ResponsiveLayoutPolicy.ShouldShowCalendarAgendaOnly(
+                LayoutRoot.ActualWidth,
+                LayoutRoot.ActualHeight);
             bool showAccounts = !_isAccountPaneCollapsed;
-            bool showCalendar = _layoutMode != ResponsiveLayoutMode.Narrow || !showAccounts;
-            bool showTimeline = !_isTimelinePaneCollapsed && _layoutMode != ResponsiveLayoutMode.Narrow;
+            bool showCalendar = !agendaOnly;
+            bool showTimeline = agendaOnly ? !showAccounts : !_isTimelinePaneCollapsed;
 
             AccountColumn.MinWidth = showAccounts && _layoutMode == ResponsiveLayoutMode.Wide ? 240 : 0;
             AccountColumn.Width = showAccounts
-                ? (_layoutMode == ResponsiveLayoutMode.Narrow ? new GridLength(1, GridUnitType.Star) : new GridLength(2, GridUnitType.Star))
+                ? (agendaOnly ? new GridLength(1, GridUnitType.Star) : new GridLength(2, GridUnitType.Star))
                 : new GridLength(0);
             CalendarColumn.MinWidth = 0;
             CalendarColumn.Width = showCalendar ? new GridLength(5, GridUnitType.Star) : new GridLength(0);
-            TimelineColumn.MinWidth = showTimeline ? 280 : 0;
-            TimelineColumn.Width = showTimeline ? new GridLength(3, GridUnitType.Star) : new GridLength(0);
+            TimelineColumn.MinWidth = showTimeline && !agendaOnly ? 280 : 0;
+            TimelineColumn.Width = showTimeline
+                ? new GridLength(agendaOnly ? 1 : 3, GridUnitType.Star)
+                : new GridLength(0);
             AccountPane.Visibility = showAccounts ? Visibility.Visible : Visibility.Collapsed;
             CalendarContent.Visibility = showCalendar ? Visibility.Visible : Visibility.Collapsed;
             TimelinePane.Visibility = showTimeline ? Visibility.Visible : Visibility.Collapsed;
-            CalendarContent.Padding = _layoutMode == ResponsiveLayoutMode.Narrow
-                ? new Thickness(12)
-                : new Thickness(28, 32, 28, 32);
+            double padding = ResponsiveLayoutPolicy.GetPagePadding(
+                LayoutRoot.ActualWidth,
+                LayoutRoot.ActualHeight);
+            CalendarContent.Padding = new Thickness(padding);
+            AccountPane.Margin = agendaOnly
+                ? new Thickness(padding)
+                : new Thickness(24, 28, 12, 28);
+            TimelinePane.Margin = agendaOnly
+                ? new Thickness(padding)
+                : new Thickness(12, 28, 24, 28);
             ToggleAccountPaneIcon.Glyph = showAccounts ? "\uE76B" : "\uE76C";
             ToggleTimelinePaneIcon.Glyph = showTimeline ? "\uE76C" : "\uE76B";
-            ToggleTimelinePaneButton.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow
+            ToggleTimelinePaneButton.Visibility = agendaOnly
+                ? Visibility.Collapsed : Visibility.Visible;
+            TimelineAccountsButton.Visibility = agendaOnly
+                ? Visibility.Visible : Visibility.Collapsed;
+            CollapseTimelinePaneButton.Visibility = agendaOnly
                 ? Visibility.Collapsed : Visibility.Visible;
             Grid.SetRow(CalendarStatusPanel, 1);
             Grid.SetColumn(CalendarStatusPanel, 0);

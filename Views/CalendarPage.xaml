@@ -369,14 +369,20 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Uid="CalendarPage_AllAgendas" x:Name="TxtSideBarDate" Text="全部日程" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis"/>
-                <Button x:Uid="CalendarPage_BtnCollapseTimeline" Grid.Column="1" VerticalAlignment="Center" Width="32" Height="32" Padding="0"
+                <Button x:Uid="CalendarPage_BtnToggleAccounts" x:Name="TimelineAccountsButton" Grid.Column="1"
+                        Visibility="Collapsed" VerticalAlignment="Center" Width="32" Height="32" Padding="0"
+                        Background="Transparent" BorderThickness="0" Click="ToggleAccountPane_Click">
+                    <FontIcon Glyph="&#xE716;" FontSize="13"/>
+                </Button>
+                <Button x:Uid="CalendarPage_BtnCollapseTimeline" x:Name="CollapseTimelinePaneButton" Grid.Column="2" VerticalAlignment="Center" Width="32" Height="32" Padding="0"
                          Background="Transparent" BorderThickness="0" Click="ToggleTimelinePane_Click">
                     <FontIcon Glyph="&#xE76C;" FontSize="12"/>
                 </Button>
-                <Button x:Uid="CalendarPage_BtnAdd" Grid.Column="2" VerticalAlignment="Center" Style="{StaticResource AccentButtonStyle}" Padding="12,4" Click="BtnAddNew_Click">
+                <Button x:Uid="CalendarPage_BtnAdd" Grid.Column="3" VerticalAlignment="Center" Style="{StaticResource AccentButtonStyle}" Padding="12,4" Click="BtnAddNew_Click">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <FontIcon Glyph="&#xE710;" FontSize="14"/>
                         <TextBlock x:Uid="CalendarPage_BtnAddText" Text="新建" FontSize="13"/>
