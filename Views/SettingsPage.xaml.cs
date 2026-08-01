@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Automation;
 using Windows.Storage;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Windows.AppLifecycle;
@@ -22,6 +23,8 @@ namespace Task_Flyout.Views
         private bool _isClearingWebViewCache;
         private bool _isClearingRssData;
         private bool _isClearingWeatherData;
+        private bool? _usesMasonryLayout;
+        private bool _isColorPickerDialogOpen;
 
         public SettingsPage()
         {
@@ -45,6 +48,70 @@ namespace Task_Flyout.Views
             {
                 return fallbackText;
             }
+        }
+
+        private void SettingsScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            double padding = ResponsiveLayoutPolicy.GetPagePadding(e.NewSize.Width, e.NewSize.Height);
+            double sectionSpacing = ResponsiveLayoutPolicy.GetPageSectionSpacing(
+                e.NewSize.Width,
+                e.NewSize.Height);
+            SettingsScrollViewer.Padding = new Thickness(padding);
+            SettingsContent.Spacing = sectionSpacing;
+            SettingsSingleColumn.Spacing = sectionSpacing;
+            SettingsMasonryGrid.ColumnSpacing = sectionSpacing;
+            SettingsLeftColumn.Spacing = sectionSpacing;
+            SettingsRightColumn.Spacing = sectionSpacing;
+            ApplySettingsCardLayout(
+                ResponsiveLayoutPolicy.ShouldUseSettingsMasonry(e.NewSize.Width));
+        }
+
+        private void ApplySettingsCardLayout(bool useMasonry)
+        {
+            if (_usesMasonryLayout == useMasonry)
+                return;
+
+            if (useMasonry)
+            {
+                SettingsMasonryGrid.Visibility = Visibility.Visible;
+
+                MoveSettingsSection(SettingsLeftColumn, AppearanceSettingsSection);
+                MoveSettingsSection(SettingsLeftColumn, MailSyncSettingsSection);
+                MoveSettingsSection(SettingsLeftColumn, WeatherDiagnosticsSettingsSection);
+                MoveSettingsSection(SettingsLeftColumn, AboutSettingsSection);
+
+                MoveSettingsSection(SettingsRightColumn, ColorPaletteSettingsSection);
+                MoveSettingsSection(SettingsRightColumn, ClockSettingsSection);
+                MoveSettingsSection(SettingsRightColumn, NotificationSettingsSection);
+                MoveSettingsSection(SettingsRightColumn, SystemSettingsSection);
+
+                SettingsSingleColumn.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                SettingsSingleColumn.Visibility = Visibility.Visible;
+
+                MoveSettingsSection(SettingsSingleColumn, AppearanceSettingsSection);
+                MoveSettingsSection(SettingsSingleColumn, ColorPaletteSettingsSection);
+                MoveSettingsSection(SettingsSingleColumn, ClockSettingsSection);
+                MoveSettingsSection(SettingsSingleColumn, NotificationSettingsSection);
+                MoveSettingsSection(SettingsSingleColumn, MailSyncSettingsSection);
+                MoveSettingsSection(SettingsSingleColumn, SystemSettingsSection);
+                MoveSettingsSection(SettingsSingleColumn, WeatherDiagnosticsSettingsSection);
+                MoveSettingsSection(SettingsSingleColumn, AboutSettingsSection);
+
+                SettingsMasonryGrid.Visibility = Visibility.Collapsed;
+            }
+
+            _usesMasonryLayout = useMasonry;
+        }
+
+        private void MoveSettingsSection(StackPanel target, UIElement section)
+        {
+            SettingsSingleColumn.Children.Remove(section);
+            SettingsLeftColumn.Children.Remove(section);
+            SettingsRightColumn.Children.Remove(section);
+            target.Children.Add(section);
         }
 
         private async void SettingsPage_Loaded(object sender, RoutedEventArgs e)
@@ -223,170 +290,281 @@ namespace Task_Flyout.Views
 
         private Grid CreateColorRow(string label, string currentHex, Action<string> onColorSelected)
         {
-            var grid = new Grid { Margin = new Thickness(0, 2, 0, 2) };
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Auto) });
+            var grid = new Grid
+            {
+                MinHeight = 40,
+                Margin = new Thickness(0, 2, 0, 2),
+                ColumnSpacing = 8
+            };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-            var dot = new Button
-            {
-                Width = 44,
-                Height = 44,
-                Padding = new Thickness(0),
-                Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
-                BorderThickness = new Thickness(0),
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 12, 0)
-            };
-            dot.Content = new Border
-            {
-                Width = 20,
-                Height = 20,
-                CornerRadius = new CornerRadius(10),
-                Background = new SolidColorBrush(ColorHelper.ParseHex(currentHex))
-            };
-            AutomationProperties.SetName(dot, $"{label} color, {currentHex}");
-            ToolTipService.SetToolTip(dot, $"{label}: {currentHex}");
-            dot.Click += (s, e) =>
-            {
-                ShowColorPickerFlyout(dot, currentHex, color =>
-                {
-                    if (dot.Content is Border colorDot)
-                        colorDot.Background = new SolidColorBrush(ColorHelper.ParseHex(color));
-                    currentHex = color;
-                    AutomationProperties.SetName(dot, $"{label} color, {color}");
-                    ToolTipService.SetToolTip(dot, $"{label}: {color}");
-                    onColorSelected(color);
-                });
-            };
-            Grid.SetColumn(dot, 0);
-            grid.Children.Add(dot);
 
             var text = new TextBlock
             {
                 Text = label,
                 FontSize = 13,
+                MaxWidth = 240,
                 VerticalAlignment = VerticalAlignment.Center,
-                Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Foreground = GetThemeBrush("TextFillColorSecondaryBrush", Microsoft.UI.Colors.Gray)
             };
-            Grid.SetColumn(text, 1);
+            Grid.SetColumn(text, 0);
             grid.Children.Add(text);
+
+            var colorDot = new Border
+            {
+                Width = 20,
+                Height = 20,
+                CornerRadius = new CornerRadius(10),
+                Background = new SolidColorBrush(ColorHelper.ParseHex(currentHex)),
+                BorderBrush = GetThemeBrush("TaskFlyoutSectionBorderBrush", Microsoft.UI.Colors.Gray),
+                BorderThickness = new Thickness(1)
+            };
+            var colorButton = new Button
+            {
+                Width = 36,
+                MinWidth = 36,
+                Height = 36,
+                Padding = new Thickness(8),
+                CornerRadius = new CornerRadius(18),
+                BorderThickness = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center,
+                Content = colorDot
+            };
+            AutomationProperties.SetName(colorButton, $"{label}, {currentHex}");
+            ToolTipService.SetToolTip(colorButton, $"{label}: {currentHex}");
+            colorButton.Click += (s, e) =>
+            {
+                ShowColorPickerDialog(colorButton, currentHex, color =>
+                {
+                    colorDot.Background = new SolidColorBrush(ColorHelper.ParseHex(color));
+                    currentHex = color;
+                    AutomationProperties.SetName(colorButton, $"{label}, {color}");
+                    ToolTipService.SetToolTip(colorButton, $"{label}: {color}");
+                    onColorSelected(color);
+                });
+            };
+            Grid.SetColumn(colorButton, 1);
+            grid.Children.Add(colorButton);
+            grid.SizeChanged += (_, args) =>
+            {
+                double availableLabelWidth = args.NewSize.Width - colorButton.Width - grid.ColumnSpacing;
+                text.MaxWidth = Math.Clamp(availableLabelWidth, 48, 280);
+            };
 
             return grid;
         }
 
-        // 👉 核心：融合了"预设莫奈色"与"自定义RGB拾色器"的高级面板
-        private void ShowColorPickerFlyout(FrameworkElement anchor, string currentColor, Action<string> onColorSelected)
+        private async void ShowColorPickerDialog(
+            FrameworkElement anchor,
+            string currentColor,
+            Action<string> onColorSelected)
         {
-            var flyout = new Flyout();
-            var panel = new StackPanel { Spacing = 12, Padding = new Thickness(8), MaxWidth = 340 };
+            var xamlRoot = anchor.XamlRoot;
+            if (_isColorPickerDialogOpen || xamlRoot == null)
+                return;
 
-            // 1. 预设颜色标题
-            var presetHeader = new TextBlock
+            _isColorPickerDialogOpen = true;
+            double availableWidth = xamlRoot.Size.Width;
+            double availableHeight = xamlRoot.Size.Height;
+            var metrics = ResponsiveLayoutPolicy.GetColorPickerPopupMetrics(
+                availableWidth,
+                availableHeight);
+            var panel = new StackPanel
+            {
+                MaxWidth = metrics.ContentWidth,
+                Padding = new Thickness(12),
+                Spacing = 14
+            };
+
+            var monetColors = ColorHelper.MonetPalette;
+            var parsedCurrentColor = ColorHelper.ParseHex(currentColor);
+            var previewSwatch = new Border
+            {
+                Width = 48,
+                Height = 48,
+                CornerRadius = new CornerRadius(8),
+                Background = new SolidColorBrush(parsedCurrentColor),
+                BorderBrush = GetThemeBrush("TaskFlyoutSectionBorderBrush", Microsoft.UI.Colors.Gray),
+                BorderThickness = new Thickness(1)
+            };
+            var previewHexText = new TextBlock
+            {
+                Text = currentColor.ToUpperInvariant(),
+                FontSize = 14,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            };
+            var previewCard = new Grid
+            {
+                ColumnSpacing = 12,
+                Padding = new Thickness(10),
+                Background = GetThemeBrush("TaskFlyoutSectionBackgroundBrush", Microsoft.UI.Colors.Transparent)
+            };
+            previewCard.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            previewCard.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            previewCard.Children.Add(previewSwatch);
+            var previewText = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 2 };
+            previewText.Children.Add(new TextBlock
+            {
+                Text = "HEX",
+                FontSize = 11,
+                Foreground = GetThemeBrush("TextFillColorSecondaryBrush", Microsoft.UI.Colors.Gray)
+            });
+            previewText.Children.Add(previewHexText);
+            Grid.SetColumn(previewText, 1);
+            previewCard.Children.Add(previewText);
+            panel.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                BorderBrush = GetThemeBrush("TaskFlyoutSectionBorderBrush", Microsoft.UI.Colors.Gray),
+                BorderThickness = new Thickness(1),
+                Child = previewCard
+            });
+
+            panel.Children.Add(new TextBlock
             {
                 Text = GetSafeString("TextPresetColors", "Preset Colors"),
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                FontSize = 14
-            };
-            panel.Children.Add(presetHeader);
+                FontSize = 13
+            });
 
-            // 2. 预设莫奈色网格
-            var presetGrid = new GridView
+            int paletteRows = (int)Math.Ceiling(monetColors.Length / (double)metrics.PaletteColumns);
+            var presetGrid = new Grid
             {
-                SelectionMode = ListViewSelectionMode.None,
-                IsItemClickEnabled = true,
-                Margin = new Thickness(-4, 0, -4, 0)
+                RowSpacing = 6,
+                ColumnSpacing = 6,
+                HorizontalAlignment = HorizontalAlignment.Left
             };
-            presetGrid.ItemsPanel = (ItemsPanelTemplate)Microsoft.UI.Xaml.Markup.XamlReader.Load(
-                "<ItemsPanelTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'>" +
-                "<ItemsWrapGrid MaximumRowsOrColumns='6' Orientation='Horizontal'/>" +
-                "</ItemsPanelTemplate>");
+            for (int column = 0; column < metrics.PaletteColumns; column++)
+                presetGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            for (int row = 0; row < paletteRows; row++)
+                presetGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            // 精选莫奈色系 Hex 代码
-            string[] monetColors = {
-                "#D5A5A1", "#B38B8D", "#C3D1C6", "#9CB4A3", "#758A7A", "#E6D4B8",
-                "#D2B88F", "#B49665", "#BBD0D9", "#92A6B9", "#6A7B92", "#B19FB6"
-            };
-
-            // 提前声明 ColorPicker，以便点击预设时能联动修改它
             var colorPicker = new ColorPicker
             {
-                Color = ColorHelper.ParseHex(currentColor),
+                Color = parsedCurrentColor,
                 IsAlphaEnabled = false,
                 IsColorChannelTextInputVisible = true,
                 IsHexInputVisible = true,
-                Margin = new Thickness(0, -8, 0, 0)
+                HorizontalAlignment = HorizontalAlignment.Stretch
             };
-
-            foreach (var hex in monetColors)
+            var swatchIndicators = new Dictionary<string, FontIcon>(StringComparer.OrdinalIgnoreCase);
+            for (int index = 0; index < monetColors.Length; index++)
             {
-                var swatch = new RadioButton
+                string hex = monetColors[index];
+                var swatchColor = ColorHelper.ParseHex(hex);
+                var indicator = new FontIcon
                 {
-                    Width = 44,
-                    Height = 44,
-                    Padding = new Thickness(0),
-                    GroupName = "PresetColor",
-                    Margin = new Thickness(4),
-                    IsChecked = string.Equals(hex, currentColor, StringComparison.OrdinalIgnoreCase)
+                    Glyph = "\uE73E",
+                    FontSize = 13,
+                    Foreground = new SolidColorBrush(ColorHelper.ShouldUseWhiteText(hex)
+                        ? Microsoft.UI.Colors.White
+                        : Microsoft.UI.Colors.Black),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Visibility = Visibility.Collapsed
                 };
-                swatch.Content = new Border
+                var swatch = new Button
                 {
-                    Width = 32,
-                    Height = 32,
-                    CornerRadius = new CornerRadius(16),
-                    Background = new SolidColorBrush(ColorHelper.ParseHex(hex)),
-                    BorderThickness = new Thickness(1),
-                    BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.LightGray)
+                    Width = 42,
+                    Height = 42,
+                    Padding = new Thickness(5),
+                    Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                    BorderThickness = new Thickness(0),
+                    CornerRadius = new CornerRadius(6),
+                    Content = new Grid
+                    {
+                        Children =
+                        {
+                            new Border
+                            {
+                                Width = 32,
+                                Height = 32,
+                                CornerRadius = new CornerRadius(6),
+                                Background = new SolidColorBrush(swatchColor),
+                                BorderThickness = new Thickness(1),
+                                BorderBrush = GetThemeBrush("TaskFlyoutSectionBorderBrush", Microsoft.UI.Colors.Gray)
+                            },
+                            indicator
+                        }
+                    }
                 };
-                AutomationProperties.SetName(swatch, $"Preset color {hex}");
+                AutomationProperties.SetName(swatch, $"{GetSafeString("TextPresetColors", "Preset Colors")}: {hex}");
                 ToolTipService.SetToolTip(swatch, hex);
-
-                // Keep the detailed picker in sync with a keyboard or pointer choice.
-                swatch.Checked += (s, args) =>
-                {
-                    colorPicker.Color = ColorHelper.ParseHex(hex);
-                };
-                presetGrid.Items.Add(swatch);
+                swatch.Click += (_, _) => colorPicker.Color = swatchColor;
+                swatchIndicators[hex] = indicator;
+                Grid.SetColumn(swatch, index % metrics.PaletteColumns);
+                Grid.SetRow(swatch, index / metrics.PaletteColumns);
+                presetGrid.Children.Add(swatch);
             }
             panel.Children.Add(presetGrid);
 
-            // 3. 自定义颜色标题
-            var customHeader = new TextBlock
+            void UpdateColorPreview(Windows.UI.Color color)
+            {
+                string selectedHex = $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+                previewSwatch.Background = new SolidColorBrush(color);
+                previewHexText.Text = selectedHex;
+                foreach (var pair in swatchIndicators)
+                    pair.Value.Visibility = string.Equals(pair.Key, selectedHex, StringComparison.OrdinalIgnoreCase)
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+            }
+
+            colorPicker.ColorChanged += (_, args) => UpdateColorPreview(args.NewColor);
+            UpdateColorPreview(parsedCurrentColor);
+            panel.Children.Add(new TextBlock
             {
                 Text = GetSafeString("TextCustomColor", "Custom Color (RGB/HEX)"),
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                FontSize = 14,
-                Margin = new Thickness(0, 8, 0, 0)
-            };
-            panel.Children.Add(customHeader);
-
-            // 4. 高级调色盘
+                FontSize = 13
+            });
             panel.Children.Add(colorPicker);
 
-            // 5. 底部按钮
-            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Margin = new Thickness(0, 8, 0, 0) };
-
-            var cancelBtn = new Button { Content = GetSafeString("CalendarDialog.CloseButtonText", "Cancel") };
-            cancelBtn.Click += (s, e) => flyout.Hide();
-
-            var applyBtn = new Button
+            var dialog = new ContentDialog
             {
-                Content = GetSafeString("TextConfirm", "Confirm"),
-                Style = (Style)Application.Current.Resources["AccentButtonStyle"]
+                XamlRoot = xamlRoot,
+                Title = GetSafeString("TextPickColor", "Pick a color"),
+                PrimaryButtonText = GetSafeString("TextConfirm", "Confirm"),
+                CloseButtonText = GetSafeString("CalendarDialog.CloseButtonText", "Cancel"),
+                DefaultButton = ContentDialogButton.Primary,
+                Content = new ScrollViewer
+                {
+                    MaxHeight = metrics.MaxContentHeight,
+                    HorizontalScrollMode = ScrollMode.Disabled,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    VerticalScrollMode = ScrollMode.Auto,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    Content = panel
+                }
             };
-            applyBtn.Click += (s, e) =>
+
+            try
             {
-                var c = colorPicker.Color;
-                string newHex = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
-                onColorSelected(newHex);
-                flyout.Hide();
-            };
+                if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+                {
+                    var color = colorPicker.Color;
+                    onColorSelected($"#{color.R:X2}{color.G:X2}{color.B:X2}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Color picker dialog failed: {ex.Message}");
+            }
+            finally
+            {
+                _isColorPickerDialogOpen = false;
+            }
+        }
 
-            btnPanel.Children.Add(cancelBtn);
-            btnPanel.Children.Add(applyBtn);
-            panel.Children.Add(btnPanel);
+        private static Brush GetThemeBrush(string resourceKey, Windows.UI.Color fallback)
+        {
+            if (Application.Current.Resources.TryGetValue(resourceKey, out var resource) &&
+                resource is Brush brush)
+                return brush;
 
-            flyout.Content = panel;
-            flyout.ShowAt(anchor);
+            return new SolidColorBrush(fallback);
         }
 
         private void BroadcastChange()
