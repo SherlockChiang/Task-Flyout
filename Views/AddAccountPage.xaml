@@ -4,9 +4,13 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Background="{ThemeResource TaskFlyoutPageBackgroundBrush}">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto" HorizontalContentAlignment="Stretch">
-    <Grid Padding="{StaticResource TaskFlyoutPagePadding}" HorizontalAlignment="Stretch">
-        <StackPanel Spacing="24">
+    <ScrollViewer x:Name="AddAccountScrollViewer"
+                  VerticalScrollBarVisibility="Auto"
+                  VerticalScrollMode="Auto"
+                  HorizontalContentAlignment="Stretch"
+                  SizeChanged="AddAccountScrollViewer_SizeChanged">
+    <Grid x:Name="AddAccountLayoutRoot" Padding="{StaticResource TaskFlyoutPagePadding}" HorizontalAlignment="Stretch">
+        <StackPanel x:Name="AddAccountContent" Spacing="24">
             <TextBlock x:Uid="AddAccount_Title" Text="添加账户" FontSize="28" FontWeight="SemiBold"/>
             <TextBlock x:Uid="AddAccount_Subtitle" Text="选择要连接的账户类型" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="14" TextWrapping="WrapWholeWords"/>
 

@@ -23,6 +23,29 @@ public class ResponsiveLayoutPolicyTests
         => Assert.Equal(expected, ResponsiveLayoutPolicy.GetTasksMode(width));
 
     [Theory]
+    [InlineData(double.NaN, false)]
+    [InlineData(899, false)]
+    [InlineData(900, true)]
+    [InlineData(1440, true)]
+    public void Settings_use_masonry_only_when_two_columns_remain_readable(
+        double width,
+        bool expected)
+        => Assert.Equal(expected, ResponsiveLayoutPolicy.ShouldUseSettingsMasonry(width));
+
+    [Theory]
+    [InlineData(819, 700, true)]
+    [InlineData(820, 559, true)]
+    [InlineData(820, 560, false)]
+    [InlineData(1200, 800, false)]
+    public void Calendar_uses_agenda_only_when_the_month_grid_would_be_cramped(
+        double width,
+        double height,
+        bool expected)
+        => Assert.Equal(
+            expected,
+            ResponsiveLayoutPolicy.ShouldShowCalendarAgendaOnly(width, height));
+
+    [Theory]
     [InlineData(679, ResponsiveLayoutMode.Narrow)]
     [InlineData(680, ResponsiveLayoutMode.Medium)]
     [InlineData(1119, ResponsiveLayoutMode.Medium)]
@@ -32,6 +55,14 @@ public class ResponsiveLayoutPolicyTests
         Assert.Equal(expected, ResponsiveLayoutPolicy.GetCalendarMode(width));
         Assert.Equal(expected, ResponsiveLayoutPolicy.GetMailMode(width));
     }
+
+    [Theory]
+    [InlineData(1119, false)]
+    [InlineData(1120, true)]
+    public void Mail_auto_selects_the_first_message_only_in_the_wide_layout(
+        double width,
+        bool expected)
+        => Assert.Equal(expected, ResponsiveLayoutPolicy.ShouldAutoSelectFirstMail(width));
 
     [Theory]
     [InlineData(700, 354)]
@@ -45,6 +76,33 @@ public class ResponsiveLayoutPolicyTests
     [InlineData(420, 56)]
     public void Selects_calendar_cell_minimum_for_short_viewports(double availableHeight, double expected)
         => Assert.Equal(expected, ResponsiveLayoutPolicy.GetCalendarCellMinimumHeight(availableHeight));
+
+    [Theory]
+    [InlineData(540, 900, 12)]
+    [InlineData(900, 540, 12)]
+    [InlineData(900, 700, 20)]
+    [InlineData(1200, 800, 28)]
+    public void Selects_page_padding_from_logical_viewport(
+        double width, double height, double expected)
+        => Assert.Equal(expected, ResponsiveLayoutPolicy.GetPagePadding(width, height));
+
+    [Theory]
+    [InlineData(320, 500, 280, 436, 4)]
+    [InlineData(400, 700, 352, 620, 4)]
+    [InlineData(800, 900, 420, 620, 6)]
+    public void Constrains_color_picker_to_small_logical_viewports(
+        double width,
+        double height,
+        double expectedWidth,
+        double expectedHeight,
+        int expectedColumns)
+    {
+        var metrics = ResponsiveLayoutPolicy.GetColorPickerPopupMetrics(width, height);
+
+        Assert.Equal(expectedWidth, metrics.ContentWidth);
+        Assert.Equal(expectedHeight, metrics.MaxContentHeight);
+        Assert.Equal(expectedColumns, metrics.PaletteColumns);
+    }
 
     [Theory]
     [InlineData(0, 0)]

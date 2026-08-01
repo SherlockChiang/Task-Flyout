@@ -563,7 +563,8 @@ namespace Task_Flyout.Views
         private void WeatherScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             bool narrow = e.NewSize.Width < 600;
-            WeatherScrollViewer.Padding = narrow ? new Thickness(12) : new Thickness(24);
+            double padding = ResponsiveLayoutPolicy.GetPagePadding(e.NewSize.Width, e.NewSize.Height);
+            WeatherScrollViewer.Padding = new Thickness(padding);
             Grid.SetRow(CitySearchBox, 0);
             Grid.SetColumn(CitySearchBox, 0);
             Grid.SetColumnSpan(CitySearchBox, narrow ? 3 : 1);

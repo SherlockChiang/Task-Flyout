@@ -881,9 +881,11 @@ namespace Task_Flyout
         private void UpdateGlobalSearchSize(double width, double height)
         {
             if (GlobalSearchPanel == null) return;
-            GlobalSearchPanel.Width = Math.Max(0, Math.Min(720, width - 32));
-            GlobalSearchPanel.MaxHeight = Math.Max(260, Math.Min(640, height - 96));
-            GlobalSearchPanel.Margin = new Thickness(16, height < 560 ? 24 : 72, 16, 16);
+            double padding = ResponsiveLayoutPolicy.GetPagePadding(width, height);
+            double topMargin = height < 560 ? padding : Math.Max(48, padding * 2.5);
+            GlobalSearchPanel.Width = Math.Max(0, Math.Min(720, width - padding * 2));
+            GlobalSearchPanel.MaxHeight = Math.Max(120, Math.Min(640, height - topMargin - padding));
+            GlobalSearchPanel.Margin = new Thickness(padding, topMargin, padding, padding);
         }
 
         private async void OpenMailMessageOnPage(Views.MailPage mailPage, string accountId, string folderId, string messageId)

@@ -43,6 +43,15 @@ namespace Task_Flyout.Views
                 app.TaskMutations.StateChanged -= TaskMutations_StateChanged;
         }
 
+        private void AddAccountScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            double padding = ResponsiveLayoutPolicy.GetPagePadding(e.NewSize.Width, e.NewSize.Height);
+            AddAccountLayoutRoot.Padding = new Thickness(padding);
+            AddAccountContent.Spacing = ResponsiveLayoutPolicy.GetPageSectionSpacing(
+                e.NewSize.Width,
+                e.NewSize.Height);
+        }
+
         private void SyncManager_ProviderHealthChanged(object? sender, EventArgs e)
             => DispatcherQueue.TryEnqueue(UpdateChecklist);
 

@@ -1296,6 +1296,10 @@ namespace Task_Flyout.Views
 
         private void RssContentGrid_SizeChanged(object sender, SizeChangedEventArgs e)
         {
+            double padding = ResponsiveLayoutPolicy.GetPagePadding(
+                LayoutRoot.ActualWidth,
+                LayoutRoot.ActualHeight);
+            LayoutRoot.Padding = new Thickness(padding);
             bool narrow = e.NewSize.Width < ResponsiveLayoutPolicy.RssTwoPaneMinimumWidth;
             double articlePaneWidth = narrow ? e.NewSize.Width : e.NewSize.Width - 292;
             bool compactArticleHeader = articlePaneWidth < 600;
@@ -1316,7 +1320,6 @@ namespace Task_Flyout.Views
 
         private void ApplyRssResponsiveLayout()
         {
-            LayoutRoot.Padding = _isNarrowLayout ? new Thickness(12) : new Thickness(28);
             if (!_isNarrowLayout)
             {
                 SubscriptionPane.Visibility = Visibility.Visible;

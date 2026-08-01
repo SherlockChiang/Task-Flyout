@@ -693,10 +693,12 @@ namespace Task_Flyout.Views
         private void LayoutRoot_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             var mode = ResponsiveLayoutPolicy.GetTasksMode(e.NewSize.Width);
-            if (_layoutMode == mode) return;
-            _layoutMode = mode;
-            if (mode != ResponsiveLayoutMode.Wide)
-                _isAccountPaneCollapsed = true;
+            if (_layoutMode != mode)
+            {
+                _layoutMode = mode;
+                if (mode != ResponsiveLayoutMode.Wide)
+                    _isAccountPaneCollapsed = true;
+            }
             ApplyResponsiveLayout();
         }
 
@@ -712,7 +714,10 @@ namespace Task_Flyout.Views
             TaskContentColumn.Width = showContent ? new GridLength(5, GridUnitType.Star) : new GridLength(0);
             AccountPane.Visibility = showAccounts ? Visibility.Visible : Visibility.Collapsed;
             TaskContent.Visibility = showContent ? Visibility.Visible : Visibility.Collapsed;
-            TaskContent.Padding = _layoutMode == ResponsiveLayoutMode.Narrow ? new Thickness(16) : new Thickness(32);
+            double padding = ResponsiveLayoutPolicy.GetPagePadding(
+                LayoutRoot.ActualWidth,
+                LayoutRoot.ActualHeight);
+            TaskContent.Padding = new Thickness(padding);
             AddTaskButtonText.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow ? Visibility.Collapsed : Visibility.Visible;
             ToggleAccountPaneIcon.Glyph = showAccounts ? "\uE76B" : "\uE76C";
         }
