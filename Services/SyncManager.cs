@@ -89,13 +89,27 @@ namespace Task_Flyout.Services
                             var existing = account.Calendars.FirstOrDefault(c => c.Id == rCal.Id);
                             if (existing == null)
                             {
-                                account.Calendars.Add(new SubscribedCalendarInfo { Id = rCal.Id, Name = rCal.Name, IsVisible = true });
+                                account.Calendars.Add(new SubscribedCalendarInfo
+                                {
+                                    Id = rCal.Id,
+                                    Name = rCal.Name,
+                                    ColorHex = rCal.ColorHex,
+                                    IsVisible = true
+                                });
                                 changed = true;
                             }
-                            else if (existing.Name != rCal.Name)
+                            else
                             {
-                                existing.Name = rCal.Name;
-                                changed = true;
+                                if (existing.Name != rCal.Name)
+                                {
+                                    existing.Name = rCal.Name;
+                                    changed = true;
+                                }
+                                if (string.IsNullOrWhiteSpace(existing.ColorHex) && !string.IsNullOrWhiteSpace(rCal.ColorHex))
+                                {
+                                    existing.ColorHex = rCal.ColorHex;
+                                    changed = true;
+                                }
                             }
                         }
 
