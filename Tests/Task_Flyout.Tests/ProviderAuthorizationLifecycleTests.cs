@@ -9,6 +9,7 @@ public class ProviderAuthorizationLifecycleTests
     [InlineData("Gmail", true)]
     [InlineData("Microsoft", true)]
     [InlineData("Outlook", true)]
+    [InlineData("iCloud", false)]
     [InlineData("IMAP", false)]
     public void Identifies_shared_provider_authorization(string provider, bool expected)
     {
@@ -20,6 +21,8 @@ public class ProviderAuthorizationLifecycleTests
     [InlineData("google", "Google")]
     [InlineData("Outlook", "Microsoft")]
     [InlineData("MICROSOFT", "Microsoft")]
+    [InlineData("apple", "iCloud")]
+    [InlineData("ICLOUD", "iCloud")]
     [InlineData("IMAP", "IMAP")]
     public void Normalizes_feature_names_to_provider_names(string featureName, string expected)
     {

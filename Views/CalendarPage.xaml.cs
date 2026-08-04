@@ -1212,6 +1212,15 @@ namespace Task_Flyout.Views
             EditRecurrenceComboBox.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
             if (!isEvent) EditRecurrenceComboBox.SelectedIndex = 0;
             EditStartTimePicker.Header = isEvent ? (_loader.GetStringOrDefault("TextStartTime") ?? "Start time") : (_loader.GetStringOrDefault("TextDueTime") ?? "Due time");
+
+            if (_itemBeingEdited == null && EditCmbProvider != null)
+            {
+                string? selectedProvider = (EditCmbProvider.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+                SetupEditProviderComboBox();
+                var previous = EditCmbProvider.Items.OfType<ComboBoxItem>()
+                    .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), selectedProvider, StringComparison.Ordinal));
+                if (previous != null) EditCmbProvider.SelectedItem = previous;
+            }
         }
 
         private void SetupEditProviderComboBox(string? forceSelectProvider = null)
@@ -1222,7 +1231,12 @@ namespace Task_Flyout.Views
             if (accountMgr != null)
             {
                 foreach (var acct in accountMgr.Accounts)
+                {
+                    var capabilities = SyncProviderCapabilityPolicy.ForProvider(acct.ProviderName);
+                    if (EditRadioTask?.IsChecked == true && !capabilities.SupportsTasks) continue;
+                    if (EditRadioEvent?.IsChecked == true && !capabilities.SupportsEvents) continue;
                     EditCmbProvider.Items.Add(new ComboBoxItem { Content = acct.ProviderName, Tag = acct.ProviderName });
+                }
             }
             if (forceSelectProvider != null && !EditCmbProvider.Items.OfType<ComboBoxItem>().Any(i => i.Tag.ToString() == forceSelectProvider))
                 EditCmbProvider.Items.Add(new ComboBoxItem { Content = forceSelectProvider, Tag = forceSelectProvider });
@@ -1252,12 +1266,14 @@ namespace Task_Flyout.Views
             _itemBeingEdited = null;
             EditDialog.Title = _loader.GetStringOrDefault("TextNewItem") ?? "New Event / Task";
             EditDialog.SecondaryButtonText = "";
-            SetupEditProviderComboBox();
             EditCmbProvider.IsEnabled = true;
             EditRadioEvent.IsEnabled = true;
-            EditRadioTask.IsEnabled = true;
-            EditRadioTask.IsChecked = isTask;
-            EditRadioEvent.IsChecked = !isTask;
+            bool hasTaskProvider = (App.Current as App)?.SyncManager.AccountManager.Accounts
+                .Any(account => SyncProviderCapabilityPolicy.ForProvider(account.ProviderName).SupportsTasks) == true;
+            EditRadioTask.IsEnabled = hasTaskProvider;
+            EditRadioTask.IsChecked = isTask && hasTaskProvider;
+            EditRadioEvent.IsChecked = !isTask || !hasTaskProvider;
+            SetupEditProviderComboBox();
             EditRadioType_Changed(null, null);
             EditRecurrenceComboBox.SelectedIndex = 0;
             EditRecurrenceComboBox.IsEnabled = true;

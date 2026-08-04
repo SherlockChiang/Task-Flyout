@@ -60,7 +60,9 @@ namespace Task_Flyout.Views
             if (mgr == null || AccountListRepeater == null) return;
 
             AccountListRepeater.ItemsSource = null;
-            AccountListRepeater.ItemsSource = mgr.Accounts;
+            AccountListRepeater.ItemsSource = mgr.Accounts
+                .Where(account => SyncProviderCapabilityPolicy.ForProvider(account.ProviderName).SupportsTasks)
+                .ToList();
         }
 
         public void ReloadFilters()
@@ -308,6 +310,7 @@ namespace Task_Flyout.Views
 
             var providerNames = _syncManager.Providers
                 .Where(provider => _syncManager.AccountManager.IsConnected(provider.ProviderName))
+                .Where(provider => SyncProviderCapabilityPolicy.ForProvider(provider.ProviderName).SupportsTasks)
                 .Select(provider => provider.ProviderName)
                 .ToList();
 

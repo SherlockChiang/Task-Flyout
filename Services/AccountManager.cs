@@ -203,7 +203,8 @@ namespace Task_Flyout.Services
                     }
                     colorIndex++;
                 }
-                if (string.IsNullOrEmpty(account.TaskColorHex))
+                if (SyncProviderCapabilityPolicy.ForProvider(account.ProviderName).SupportsTasks
+                    && string.IsNullOrEmpty(account.TaskColorHex))
                 {
                     account.TaskColorHex = ColorHelper.GetDefaultColorForIndex(colorIndex);
                     colorIndex++;

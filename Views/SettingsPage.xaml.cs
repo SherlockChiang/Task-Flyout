@@ -275,16 +275,19 @@ namespace Task_Flyout.Views
                     ColorPalettePanel.Children.Add(row);
                 }
 
-                var taskRow = CreateColorRow(
-                    GetSafeString("MainWindow_ToggleTasks/Text", "Tasks"),
-                    account.TaskColorHex,
-                    selectedColor =>
-                    {
-                        account.TaskColorHex = selectedColor;
-                        mgr.Save();
-                        BroadcastChange();
-                    });
-                ColorPalettePanel.Children.Add(taskRow);
+                if (SyncProviderCapabilityPolicy.ForProvider(account.ProviderName).SupportsTasks)
+                {
+                    var taskRow = CreateColorRow(
+                        GetSafeString("MainWindow_ToggleTasks/Text", "Tasks"),
+                        account.TaskColorHex,
+                        selectedColor =>
+                        {
+                            account.TaskColorHex = selectedColor;
+                            mgr.Save();
+                            BroadcastChange();
+                        });
+                    ColorPalettePanel.Children.Add(taskRow);
+                }
             }
         }
 

@@ -22,6 +22,7 @@ namespace Task_Flyout.Services
             {
                 "google" or "gmail" => "Google",
                 "microsoft" or "outlook" => "Microsoft",
+                "icloud" or "apple" => "iCloud",
                 _ => providerName?.Trim() ?? ""
             };
 
