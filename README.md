@@ -41,8 +41,13 @@ a browser.
 
 1. Download the latest `.zip` from the [Releases page](https://github.com/SherlockChiang/Task-Flyout/releases/latest).
 2. Extract the archive to a local folder.
-3. Right-click `install.bat` and choose **Run as administrator**.
-4. The script imports the trusted certificate and installs the app.
+3. Open Windows PowerShell in the extracted folder and run:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\Install.ps1
+   ```
+
+4. Approve the certificate trust prompt. The script then installs the signed app package.
 
 ### Google sign-in warning
 

@@ -38,8 +38,13 @@ Task Flyout 常驻 Windows 11 系统托盘，将日历、任务、邮件、RSS �
 
 1. 在 [Releases 页面](https://github.com/SherlockChiang/Task-Flyout/releases/latest) 下载最新的 `.zip` 压缩包。
 2. 将压缩包解压到本地文件夹。
-3. 右键点击 `install.bat`，选择 **以管理员身份运行**。
-4. 脚本会自动导入受信任证书并安装应用。
+3. 在解压目录中打开 Windows PowerShell，然后运行：
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\Install.ps1
+   ```
+
+4. 同意证书信任提示，脚本随后会安装已签名的应用包。
 
 ### Google 登录提示
 
