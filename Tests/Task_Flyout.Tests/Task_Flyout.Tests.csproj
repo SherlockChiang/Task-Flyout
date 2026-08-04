@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Ical.Net" Version="5.2.3" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
@@ -69,6 +70,7 @@
     <Compile Include="..\..\Services\ProviderAuthCleanup.cs" Link="Source\ProviderAuthCleanup.cs" />
     <Compile Include="..\..\Services\ProviderAuthorizationLifecycle.cs" Link="Source\ProviderAuthorizationLifecycle.cs" />
     <Compile Include="..\..\Services\ProviderAuthorizationScopePolicy.cs" Link="Source\ProviderAuthorizationScopePolicy.cs" />
+    <Compile Include="..\..\Services\AuthorizationInteractionRequiredException.cs" Link="Source\AuthorizationInteractionRequiredException.cs" />
     <Compile Include="..\..\Services\OnboardingPolicy.cs" Link="Source\OnboardingPolicy.cs" />
     <Compile Include="..\..\Services\CachePrunePolicy.cs" Link="Source\CachePrunePolicy.cs" />
     <Compile Include="..\..\Services\BoundedHostGatePool.cs" Link="Source\BoundedHostGatePool.cs" />
@@ -78,6 +80,10 @@
     <Compile Include="..\..\Services\SyncEventTimePolicy.cs" Link="Source\SyncEventTimePolicy.cs" />
     <Compile Include="..\..\Services\SyncProviderEnums.cs" Link="Source\SyncProviderEnums.cs" />
     <Compile Include="..\..\Services\SyncProviderCapabilityPolicy.cs" Link="Source\SyncProviderCapabilityPolicy.cs" />
+    <Compile Include="..\..\Services\ICloudCalDavPolicy.cs" Link="Source\ICloudCalDavPolicy.cs" />
+    <Compile Include="..\..\Services\ICloudCredentialEnvelope.cs" Link="Source\ICloudCredentialEnvelope.cs" />
+    <Compile Include="..\..\Services\ICloudCalDavClient.cs" Link="Source\ICloudCalDavClient.cs" />
+    <Compile Include="..\..\Services\ICloudIcsCodec.cs" Link="Source\ICloudIcsCodec.cs" />
     <Compile Include="..\..\Services\SyncItemMappingPolicy.cs" Link="Source\SyncItemMappingPolicy.cs" />
     <Compile Include="..\..\Services\SyncPaginationPolicy.cs" Link="Source\SyncPaginationPolicy.cs" />
     <Compile Include="..\..\Services\SyncRetryPolicy.cs" Link="Source\SyncRetryPolicy.cs" />

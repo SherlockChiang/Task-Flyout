@@ -16,6 +16,7 @@ namespace Task_Flyout
     [JsonSerializable(typeof(WeatherFavoritesStore))]
     [JsonSerializable(typeof(HashSet<string>))]
     [JsonSerializable(typeof(Dictionary<string, List<AgendaItem>>))]
+    [JsonSerializable(typeof(ICloudCredentialEnvelope))]
     [JsonSourceGenerationOptions(WriteIndented = true)]
     internal partial class AppJsonContext : JsonSerializerContext
     {

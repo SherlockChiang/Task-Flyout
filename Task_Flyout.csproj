@@ -65,6 +65,7 @@
         <PackageReference Include="Google.Apis.Gmail.v1" Version="1.74.0.4134" />
         <PackageReference Include="Google.Apis.Tasks.v1" Version="1.72.0.3958" />
         <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.1" />
+        <PackageReference Include="Ical.Net" Version="5.2.3" />
         <PackageReference Include="MailKit" Version="4.16.0" />
         <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
         <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
