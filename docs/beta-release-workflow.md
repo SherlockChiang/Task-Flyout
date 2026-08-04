@@ -1,6 +1,6 @@
 # Beta Release Workflow
 
-The `.github/workflows/beta-release.yml` workflow builds and publishes a prerelease beta package whenever `master` is pushed, or when the workflow is run manually from GitHub Actions.
+The `.github/workflows/beta-release.yml` workflow builds and publishes a prerelease beta package only when it is run manually from the `master` branch in GitHub Actions. Normal pushes run the `Quality` workflow but do not receive signing or publication authority.
 
 ## What It Does
 
@@ -9,9 +9,10 @@ The `.github/workflows/beta-release.yml` workflow builds and publishes a prerele
 3. Restores and runs Release-configuration unit tests as the publication gate, with no OAuth or signing secrets.
 4. Gives the MSIX a unique, upgradeable CI revision, materializes only the Google OAuth build input, and builds an unsigned x64 package.
 5. Uploads the unsigned package as a one-day internal workflow artifact.
-6. Enters the protected `beta-release` environment, materializes the signing certificate under the runner temporary directory, signs and verifies the MSIX, and removes the certificate.
-7. Generates update notes from every commit since the previous published GitHub release.
-8. Creates a GitHub prerelease containing a zip with the signed MSIX, public certificate, and `Install.ps1`.
+6. In a separate read-only job, downloads the same unsigned artifact, registers it as a loose package, and runs the packaged UI Automation smoke suite without an environment or signing secret.
+7. Only after smoke succeeds, enters the protected `beta-release` environment, materializes the signing certificate under the runner temporary directory, signs and verifies the MSIX, and removes the certificate.
+8. Generates update notes from every commit since the previous published GitHub release.
+9. Creates a GitHub prerelease containing a zip with the signed MSIX, public certificate, and `Install.ps1`.
 
 ## Required Secrets
 
@@ -20,7 +21,7 @@ Set this repository secret for the package job:
 - `TASK_FLYOUT_GOOGLE_CREDENTIALS_JSON`: the full contents of the local `credentials.json` file used by Google OAuth.
 - `TASK_FLYOUT_MICROSOFT_CLIENT_ID`: the Microsoft public-client application ID used to generate the ignored `Secrets.cs` build input.
 
-Create a GitHub Environment named `beta-release` and set these environment secrets. Do not require reviewers if every `master` push must publish automatically:
+Create a GitHub Environment named `beta-release`, restrict its deployment branch to `master`, require an appropriate reviewer, and set these environment secrets:
 
 - `TASK_FLYOUT_CERTIFICATE_BASE64`: base64-encoded `.pfx` signing certificate bytes.
 - `TASK_FLYOUT_CERTIFICATE_PASSWORD`: password for the `.pfx` signing certificate.
@@ -35,7 +36,9 @@ To create the certificate secret locally in PowerShell:
 
 The workflow reads the first three version fields from `Package.appxmanifest` and uses the GitHub run number as the fourth MSIX revision. For example, manifest base `1.3.1.0` at run 123 produces package `1.3.1.123` and tag `beta-v1.3.1.123-123.1`. Both GitHub assets and Windows package upgrades are therefore unique.
 
-Release notes list the complete commit range from the previous published release tag through the pushed SHA. Serialized workflow concurrency keeps signing and publication from racing. If rapid pushes replace an older pending run, its commits remain in the next release's aggregated range.
+Release notes list the complete commit range from the previous published release tag through the dispatched SHA. Serialized workflow concurrency keeps signing and publication from racing.
+
+The remote `master` branch should require pull requests and the `Quality / Unit, localization, and policy tests` status before merge. These repository and environment rules are remote GitHub settings and are not created by the workflow YAML itself.
 
 ## Local Sideload Packages
 
@@ -72,5 +75,6 @@ This writes the Git-ignored `Directory.Build.local.props` with the matching curr
 - Restore and tests never receive OAuth credentials, the signing certificate, or its password.
 - Application compilation receives the OAuth public-client configuration but never receives signing material.
 - Only the protected release job receives `contents: write` and signing secrets.
+- The packaged candidate must pass smoke before the protected release job can read signing secrets or run `gh release create`.
 - The one-day unsigned artifact is internal job transport only; public releases contain only the signed install bundle.
 - Stable releases should continue to use the normal release process if a separate signing, changelog, or store submission flow is needed.
