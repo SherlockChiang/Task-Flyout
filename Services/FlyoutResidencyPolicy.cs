@@ -1,3 +1,5 @@
+using System;
+
 namespace Task_Flyout.Services
 {
     internal static class FlyoutResidencyPolicy
@@ -18,6 +20,19 @@ namespace Task_Flyout.Services
             if (usageLimitBytes - currentUsageBytes < MinimumMemoryHeadroomBytes)
                 return false;
             return true;
+        }
+
+        public static bool ShouldQueueBackgroundRefresh(
+            bool refreshQueued,
+            TimeSpan elapsedSinceLastStart,
+            TimeSpan cooldown)
+        {
+            if (refreshQueued) return false;
+            if (elapsedSinceLastStart < TimeSpan.Zero)
+                elapsedSinceLastStart = TimeSpan.Zero;
+            if (cooldown < TimeSpan.Zero)
+                cooldown = TimeSpan.Zero;
+            return elapsedSinceLastStart >= cooldown;
         }
     }
 }

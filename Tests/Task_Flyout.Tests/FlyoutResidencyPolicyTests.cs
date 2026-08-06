@@ -39,4 +39,20 @@ public class FlyoutResidencyPolicyTests
             underMemoryPressure: false,
             usageMb * 1024 * 1024,
             limitMb * 1024 * 1024));
+
+    [Theory]
+    [InlineData(false, 60, true)]
+    [InlineData(false, 59, false)]
+    [InlineData(true, 60, false)]
+    [InlineData(false, -1, false)]
+    public void Background_refresh_respects_queue_state_and_cooldown(
+        bool queued,
+        int elapsedSeconds,
+        bool expected)
+        => Assert.Equal(
+            expected,
+            FlyoutResidencyPolicy.ShouldQueueBackgroundRefresh(
+                queued,
+                TimeSpan.FromSeconds(elapsedSeconds),
+                TimeSpan.FromMinutes(1)));
 }

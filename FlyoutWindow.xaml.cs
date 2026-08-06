@@ -120,8 +120,12 @@ namespace Task_Flyout
         private bool _suppressSelectedDateChanged;
         private long _isOpenChangedToken;
         private DateTimeOffset? _lastSyncSucceededAt;
+        private long _lastBackgroundRefreshStartedTimestamp;
+        private CancellationTokenSource? _backgroundRefreshCts;
         private CancellationTokenSource? _weatherRefreshCts;
         private long _weatherRefreshGeneration;
+
+        private static readonly TimeSpan BackgroundRefreshCooldown = TimeSpan.FromMinutes(1);
 
         private readonly record struct DotSpec(double Left, double Top, SolidColorBrush Fill);
 
@@ -234,7 +238,6 @@ namespace Task_Flyout
                 try { await SyncAllDataAsync(true, forceRefresh: true); }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Periodic sync tick failed: {ex.Message}"); }
             };
-            _syncTimer.Start();
         }
 
         public void UpdateSyncInterval(int minutes)
@@ -899,6 +902,7 @@ namespace Task_Flyout
             _desiredOpen = false;
             _clockTimer?.Stop();
             _syncTimer?.Stop();
+            CancelBackgroundRefresh();
             CancelWeatherRefresh();
             _lastHideTime = DateTime.Now;
             App.UpdateEfficiencyMode();
@@ -906,28 +910,88 @@ namespace Task_Flyout
 
         private void QueueBackgroundRefresh()
         {
-            if (_backgroundRefreshQueued) return;
-            _backgroundRefreshQueued = true;
+            TimeSpan elapsedSinceLastStart = _lastBackgroundRefreshStartedTimestamp == 0
+                ? TimeSpan.MaxValue
+                : System.Diagnostics.Stopwatch.GetElapsedTime(_lastBackgroundRefreshStartedTimestamp);
+            if (!FlyoutResidencyPolicy.ShouldQueueBackgroundRefresh(
+                    Volatile.Read(ref _backgroundRefreshQueued),
+                    elapsedSinceLastStart,
+                    BackgroundRefreshCooldown))
+                return;
 
-            _ = Task.Run(async () =>
+            var cts = new CancellationTokenSource();
+            Volatile.Write(ref _backgroundRefreshCts, cts);
+            Volatile.Write(ref _backgroundRefreshQueued, true);
+            _ = RunQueuedBackgroundRefreshAsync(cts);
+        }
+
+        private async Task RunQueuedBackgroundRefreshAsync(CancellationTokenSource cts)
+        {
+            try
             {
-                await Task.Delay(1200);
+                await Task.Delay(1200, cts.Token);
+                if (!IsBackgroundRefreshCurrent(cts))
+                {
+                    CompleteBackgroundRefresh(cts);
+                    return;
+                }
+
                 bool enqueued = DispatcherQueue.TryEnqueue(async () =>
                 {
                     try
                     {
-                        if (!IsOpen) return;
+                        if (!IsBackgroundRefreshCurrent(cts) ||
+                            !IsOpen)
+                            return;
+
+                        _lastBackgroundRefreshStartedTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
                         await SyncAllDataAsync(true);
+                        if (!IsBackgroundRefreshCurrent(cts))
+                            return;
+
                         await RefreshWeatherAsync();
+                    }
+                    catch (OperationCanceledException) when (cts.IsCancellationRequested) { }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Queued flyout refresh failed: {ex.Message}");
                     }
                     finally
                     {
-                        _backgroundRefreshQueued = false;
+                        CompleteBackgroundRefresh(cts);
                     }
                 });
                 if (!enqueued)
-                    _backgroundRefreshQueued = false;
-            });
+                    CompleteBackgroundRefresh(cts);
+            }
+            catch (OperationCanceledException) when (cts.IsCancellationRequested)
+            {
+                CompleteBackgroundRefresh(cts);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Queueing flyout refresh failed: {ex.Message}");
+                CompleteBackgroundRefresh(cts);
+            }
+        }
+
+        private void CancelBackgroundRefresh()
+        {
+            CancellationTokenSource? cts = Interlocked.Exchange(ref _backgroundRefreshCts, null);
+            Volatile.Write(ref _backgroundRefreshQueued, false);
+            try { cts?.Cancel(); } catch { }
+        }
+
+        private bool IsBackgroundRefreshCurrent(CancellationTokenSource cts)
+            => !cts.IsCancellationRequested &&
+               !Volatile.Read(ref _isShuttingDown) &&
+               ReferenceEquals(Volatile.Read(ref _backgroundRefreshCts), cts);
+
+        private void CompleteBackgroundRefresh(CancellationTokenSource cts)
+        {
+            if (ReferenceEquals(Interlocked.CompareExchange(ref _backgroundRefreshCts, null, cts), cts))
+                Volatile.Write(ref _backgroundRefreshQueued, false);
+            cts.Dispose();
         }
 
         private void AdjustWindowHeight()
@@ -1430,6 +1494,7 @@ namespace Task_Flyout
             _syncTimer?.Stop();
             _clockTimer?.Stop();
             _dotRefreshTimer?.Stop();
+            CancelBackgroundRefresh();
             CancelWeatherRefresh();
             if (_activeScrollViewer != null)
             {
