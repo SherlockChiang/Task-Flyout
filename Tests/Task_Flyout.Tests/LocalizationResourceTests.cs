@@ -79,6 +79,33 @@ public class LocalizationResourceTests
     }
 
     [Fact]
+    public void Visible_chinese_xaml_fallbacks_are_resource_backed()
+    {
+        string root = FindRepositoryRoot();
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var visibleAttributes = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Text", "Content", "Header", "PlaceholderText", "OnContent", "OffContent",
+            "Title", "PrimaryButtonText", "SecondaryButtonText", "CloseButtonText"
+        };
+        var chineseText = new Regex("[\\u4e00-\\u9fff]", RegexOptions.CultureInvariant);
+        var xamlFiles = Directory.EnumerateFiles(root, "*.xaml", SearchOption.TopDirectoryOnly)
+            .Concat(Directory.EnumerateFiles(Path.Combine(root, "Views"), "*.xaml", SearchOption.TopDirectoryOnly));
+
+        var violations = xamlFiles
+            .SelectMany(path => XDocument.Load(path).Descendants()
+                .Where(element => string.IsNullOrWhiteSpace((string?)element.Attribute(x + "Uid")))
+                .SelectMany(element => element.Attributes()
+                    .Where(attribute => visibleAttributes.Contains(attribute.Name.LocalName)
+                        && chineseText.IsMatch(attribute.Value))
+                    .Select(attribute => $"{Path.GetRelativePath(root, path)}: {element.Name.LocalName}.{attribute.Name.LocalName}")))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Empty(violations);
+    }
+
+    [Fact]
     public void Packaged_smoke_surfaces_have_stable_automation_ids()
     {
         string root = FindRepositoryRoot();

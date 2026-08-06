@@ -172,7 +172,7 @@
                         Click="ToggleAccountPane_Click">
                     <FontIcon x:Name="ToggleAccountPaneIcon" Glyph="&#xE76B;" FontSize="12"/>
                 </Button>
-                <Button x:Name="BtnMonthYear" Content="2026年 3月" FontSize="28" FontWeight="Bold" Background="Transparent" BorderThickness="0"
+                <Button x:Name="BtnMonthYear" Content="" FontSize="28" FontWeight="Bold" Background="Transparent" BorderThickness="0"
                         Padding="8,4" Margin="-8,0,0,0" Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                         Click="BtnMonthYear_Click"/>
 
