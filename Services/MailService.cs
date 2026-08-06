@@ -3715,14 +3715,17 @@ namespace Task_Flyout.Services
             return name.StartsWith("CATEGORY_", StringComparison.OrdinalIgnoreCase) ||
                    name.StartsWith("[Imap]/", StringComparison.OrdinalIgnoreCase) ||
                    name.Contains("/", StringComparison.OrdinalIgnoreCase) ||
-                   name.Contains("同步问题", StringComparison.OrdinalIgnoreCase);
+                   name.Contains("同步问题", StringComparison.OrdinalIgnoreCase) ||
+                   name.Contains("同步問題", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsNoisyImapFolder(string id, string displayName)
         {
             return string.IsNullOrWhiteSpace(id) ||
                    id.Contains("同步问题", StringComparison.OrdinalIgnoreCase) ||
-                   displayName.Contains("同步问题", StringComparison.OrdinalIgnoreCase);
+                   displayName.Contains("同步问题", StringComparison.OrdinalIgnoreCase) ||
+                   id.Contains("同步問題", StringComparison.OrdinalIgnoreCase) ||
+                   displayName.Contains("同步問題", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string NormalizeFolderKey(string id, string displayName)
@@ -3854,7 +3857,8 @@ namespace Task_Flyout.Services
         private static bool IsInboxName(string value)
             => string.Equals(value, "INBOX", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(value, "Inbox", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(value, "收件箱", StringComparison.OrdinalIgnoreCase);
+               string.Equals(value, "收件箱", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, "收件匣", StringComparison.OrdinalIgnoreCase);
 
         private static string GetImapPassword(string accountId)
         {

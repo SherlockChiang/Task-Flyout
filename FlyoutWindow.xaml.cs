@@ -1549,10 +1549,10 @@ namespace Task_Flyout
             if (e.ClickedItem is AgendaItem item)
             {
                 string noAgenda = _loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events";
-                if (item.Title != null && (item.Title.Contains(noAgenda) || item.Title.Contains("No upcoming events") || item.Title.Contains("没有安排") || item.Title.Contains("近期没有安排"))) return;
+                if (item.Title != null && (item.Title.Contains(noAgenda) || item.Title.Contains("No upcoming events") || item.Title.Contains("没有安排") || item.Title.Contains("近期没有安排") || item.Title.Contains("沒有安排") || item.Title.Contains("近期沒有安排"))) return;
 
                 string welcomeTitle = _loader.GetStringOrDefault("TextWelcomeTitle") ?? "Welcome to Task Flyout";
-                if (item.Title == welcomeTitle || item.Title == "未连接账户" || item.Title == "Welcome to Task Flyout" || item.Title == "欢迎使用 Task Flyout")
+                if (item.Title == welcomeTitle || item.Title == "未连接账户" || item.Title == "未連接帳戶" || item.Title == "Welcome to Task Flyout" || item.Title == "欢迎使用 Task Flyout" || item.Title == "歡迎使用 Task Flyout")
                 {
                     HideFlyout(autoHide: false);
                     App.OpenMainWindowInternal(win => win.NavigateToAddAccount());
