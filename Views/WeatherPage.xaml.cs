@@ -132,8 +132,6 @@ namespace Task_Flyout.Views
 
             // Build detail chips
             CurrentDetailsPanel.Children.Clear();
-            string lang = GetCurrentLang();
-
             void AddChip(string glyph, string text)
             {
                 if (string.IsNullOrEmpty(text)) return;
@@ -354,9 +352,6 @@ namespace Task_Flyout.Views
             }
         }
 
-        private static string GetCurrentLang()
-            => LocalizationHelper.SupportedLanguageCode;
-
         #endregion
 
         #region Source Selection
@@ -488,8 +483,6 @@ namespace Task_Flyout.Views
         private void RefreshIconSourceComboBox()
         {
             if (IconFontComboBox == null) return;
-            string lang = GetCurrentLang();
-
             // Migrate the old "Fluent Icons" classical preset which never rendered (no matching glyphs).
             if (_weatherService != null && _weatherService.IconFontFamily == "Segoe Fluent Icons, Segoe MDL2 Assets")
                 _weatherService.IconFontFamily = "Segoe UI Symbol";

@@ -1929,4 +1929,42 @@ Fallback: {6}</value></data>
   <data name="CalendarPage_YearNoItems.Text" xml:space="preserve"><value>No events</value></data>
   <data name="CalendarPage_YearItemCount" xml:space="preserve"><value>{0} items</value></data>
   <data name="TextLastSuccessFormat" xml:space="preserve"><value>Last success: {0:g}</value></data>
+  <data name="WeatherAlert_NowFormat" xml:space="preserve"><value>{0} now</value></data>
+  <data name="WeatherAlert_InHoursFormat" xml:space="preserve"><value>{0} in {1}h</value></data>
+  <data name="WeatherField_PollenValueFormat" xml:space="preserve"><value>Pollen {0}</value></data>
+  <data name="WeatherCondition_ClearSky" xml:space="preserve"><value>Clear sky</value></data>
+  <data name="WeatherCondition_MainlyClear" xml:space="preserve"><value>Mainly clear</value></data>
+  <data name="WeatherCondition_PartlyCloudy" xml:space="preserve"><value>Partly cloudy</value></data>
+  <data name="WeatherCondition_Overcast" xml:space="preserve"><value>Overcast</value></data>
+  <data name="WeatherCondition_Fog" xml:space="preserve"><value>Fog</value></data>
+  <data name="WeatherCondition_RimeFog" xml:space="preserve"><value>Rime fog</value></data>
+  <data name="WeatherCondition_LightDrizzle" xml:space="preserve"><value>Light drizzle</value></data>
+  <data name="WeatherCondition_ModerateDrizzle" xml:space="preserve"><value>Moderate drizzle</value></data>
+  <data name="WeatherCondition_DenseDrizzle" xml:space="preserve"><value>Dense drizzle</value></data>
+  <data name="WeatherCondition_FreezingDrizzle" xml:space="preserve"><value>Freezing drizzle</value></data>
+  <data name="WeatherCondition_SlightRain" xml:space="preserve"><value>Slight rain</value></data>
+  <data name="WeatherCondition_ModerateRain" xml:space="preserve"><value>Moderate rain</value></data>
+  <data name="WeatherCondition_HeavyRain" xml:space="preserve"><value>Heavy rain</value></data>
+  <data name="WeatherCondition_FreezingRain" xml:space="preserve"><value>Freezing rain</value></data>
+  <data name="WeatherCondition_SlightSnow" xml:space="preserve"><value>Slight snow</value></data>
+  <data name="WeatherCondition_ModerateSnow" xml:space="preserve"><value>Moderate snow</value></data>
+  <data name="WeatherCondition_HeavySnow" xml:space="preserve"><value>Heavy snow</value></data>
+  <data name="WeatherCondition_SnowGrains" xml:space="preserve"><value>Snow grains</value></data>
+  <data name="WeatherCondition_SlightRainShowers" xml:space="preserve"><value>Slight rain showers</value></data>
+  <data name="WeatherCondition_ModerateRainShowers" xml:space="preserve"><value>Moderate rain showers</value></data>
+  <data name="WeatherCondition_ViolentRainShowers" xml:space="preserve"><value>Violent rain showers</value></data>
+  <data name="WeatherCondition_SlightSnowShowers" xml:space="preserve"><value>Slight snow showers</value></data>
+  <data name="WeatherCondition_HeavySnowShowers" xml:space="preserve"><value>Heavy snow showers</value></data>
+  <data name="WeatherCondition_Thunderstorm" xml:space="preserve"><value>Thunderstorm</value></data>
+  <data name="WeatherCondition_ThunderstormWithHail" xml:space="preserve"><value>Thunderstorm with hail</value></data>
+  <data name="WeatherCondition_Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="WeatherWind_N" xml:space="preserve"><value>N</value></data>
+  <data name="WeatherWind_NE" xml:space="preserve"><value>NE</value></data>
+  <data name="WeatherWind_E" xml:space="preserve"><value>E</value></data>
+  <data name="WeatherWind_SE" xml:space="preserve"><value>SE</value></data>
+  <data name="WeatherWind_S" xml:space="preserve"><value>S</value></data>
+  <data name="WeatherWind_SW" xml:space="preserve"><value>SW</value></data>
+  <data name="WeatherWind_W" xml:space="preserve"><value>W</value></data>
+  <data name="WeatherWind_NW" xml:space="preserve"><value>NW</value></data>
+  <data name="TextRainHour" xml:space="preserve"><value>{0}h</value></data>
 </root>

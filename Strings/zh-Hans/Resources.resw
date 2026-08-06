@@ -1929,4 +1929,42 @@ DPI：{3}
   <data name="CalendarPage_YearNoItems.Text" xml:space="preserve"><value>无日程</value></data>
   <data name="CalendarPage_YearItemCount" xml:space="preserve"><value>{0} 项</value></data>
   <data name="TextLastSuccessFormat" xml:space="preserve"><value>上次成功：{0:g}</value></data>
+  <data name="WeatherAlert_NowFormat" xml:space="preserve"><value>即将{0}</value></data>
+  <data name="WeatherAlert_InHoursFormat" xml:space="preserve"><value>{1}小时后{0}</value></data>
+  <data name="WeatherField_PollenValueFormat" xml:space="preserve"><value>花粉 {0}</value></data>
+  <data name="WeatherCondition_ClearSky" xml:space="preserve"><value>晴</value></data>
+  <data name="WeatherCondition_MainlyClear" xml:space="preserve"><value>大部晴朗</value></data>
+  <data name="WeatherCondition_PartlyCloudy" xml:space="preserve"><value>多云</value></data>
+  <data name="WeatherCondition_Overcast" xml:space="preserve"><value>阴</value></data>
+  <data name="WeatherCondition_Fog" xml:space="preserve"><value>雾</value></data>
+  <data name="WeatherCondition_RimeFog" xml:space="preserve"><value>冻雾</value></data>
+  <data name="WeatherCondition_LightDrizzle" xml:space="preserve"><value>小毛毛雨</value></data>
+  <data name="WeatherCondition_ModerateDrizzle" xml:space="preserve"><value>毛毛雨</value></data>
+  <data name="WeatherCondition_DenseDrizzle" xml:space="preserve"><value>大毛毛雨</value></data>
+  <data name="WeatherCondition_FreezingDrizzle" xml:space="preserve"><value>冻毛毛雨</value></data>
+  <data name="WeatherCondition_SlightRain" xml:space="preserve"><value>小雨</value></data>
+  <data name="WeatherCondition_ModerateRain" xml:space="preserve"><value>中雨</value></data>
+  <data name="WeatherCondition_HeavyRain" xml:space="preserve"><value>大雨</value></data>
+  <data name="WeatherCondition_FreezingRain" xml:space="preserve"><value>冻雨</value></data>
+  <data name="WeatherCondition_SlightSnow" xml:space="preserve"><value>小雪</value></data>
+  <data name="WeatherCondition_ModerateSnow" xml:space="preserve"><value>中雪</value></data>
+  <data name="WeatherCondition_HeavySnow" xml:space="preserve"><value>大雪</value></data>
+  <data name="WeatherCondition_SnowGrains" xml:space="preserve"><value>雪粒</value></data>
+  <data name="WeatherCondition_SlightRainShowers" xml:space="preserve"><value>小阵雨</value></data>
+  <data name="WeatherCondition_ModerateRainShowers" xml:space="preserve"><value>中阵雨</value></data>
+  <data name="WeatherCondition_ViolentRainShowers" xml:space="preserve"><value>大阵雨</value></data>
+  <data name="WeatherCondition_SlightSnowShowers" xml:space="preserve"><value>小阵雪</value></data>
+  <data name="WeatherCondition_HeavySnowShowers" xml:space="preserve"><value>大阵雪</value></data>
+  <data name="WeatherCondition_Thunderstorm" xml:space="preserve"><value>雷阵雨</value></data>
+  <data name="WeatherCondition_ThunderstormWithHail" xml:space="preserve"><value>雷阵雨伴冰雹</value></data>
+  <data name="WeatherCondition_Unknown" xml:space="preserve"><value>未知</value></data>
+  <data name="WeatherWind_N" xml:space="preserve"><value>北</value></data>
+  <data name="WeatherWind_NE" xml:space="preserve"><value>东北</value></data>
+  <data name="WeatherWind_E" xml:space="preserve"><value>东</value></data>
+  <data name="WeatherWind_SE" xml:space="preserve"><value>东南</value></data>
+  <data name="WeatherWind_S" xml:space="preserve"><value>南</value></data>
+  <data name="WeatherWind_SW" xml:space="preserve"><value>西南</value></data>
+  <data name="WeatherWind_W" xml:space="preserve"><value>西</value></data>
+  <data name="WeatherWind_NW" xml:space="preserve"><value>西北</value></data>
+  <data name="TextRainHour" xml:space="preserve"><value>{0}小时</value></data>
 </root>

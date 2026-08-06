@@ -1422,7 +1422,6 @@ namespace Task_Flyout
                 return;
             }
 
-            string lang = GetWeatherLang();
 
             void AddChip(string glyph, string text)
             {
@@ -1461,7 +1460,9 @@ namespace Task_Flyout
             if (fields.Contains("airquality") && !string.IsNullOrEmpty(info.AirQuality))
                 AddChip("\uE9CA", $"AQI {info.AirQuality}");
             if (fields.Contains("pollen") && !string.IsNullOrEmpty(info.Pollen))
-                AddChip("\uE710", lang == "en" ? $"Pollen {info.Pollen}" : $"\u82B1\u7C89 {info.Pollen}");
+                AddChip("\uE710", string.Format(
+                    _loader.GetStringOrDefault("WeatherField_PollenValueFormat") ?? "Pollen {0}",
+                    info.Pollen));
             if (fields.Contains("sun") && !string.IsNullOrEmpty(info.Sunrise))
                 AddChip("\uE706", $"{info.Sunrise} / {info.Sunset}");
             if (fields.Contains("moon") && !string.IsNullOrEmpty(info.MoonPhase))
@@ -1475,9 +1476,6 @@ namespace Task_Flyout
 
             WeatherDetailStrip.Visibility = WeatherDetailStrip.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
-
-        private static string GetWeatherLang()
-            => LocalizationHelper.SupportedLanguageCode;
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
