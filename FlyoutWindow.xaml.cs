@@ -79,6 +79,7 @@ namespace Task_Flyout
         private DispatcherTimer? _clockTimer;
         private SyncManager _syncManager = null!;
         private ResourceLoader _loader;
+        private ElementTheme? _appliedTheme;
 
         private DateTime _lastHideTime = DateTime.MinValue;
         private bool _isPinned = false;
@@ -1504,6 +1505,9 @@ namespace Task_Flyout
             var effectiveTheme = theme == ElementTheme.Default
                 ? Application.Current.RequestedTheme == ApplicationTheme.Dark ? ElementTheme.Dark : ElementTheme.Light
                 : theme;
+            if (_appliedTheme == effectiveTheme) return;
+
+            _appliedTheme = effectiveTheme;
             RootGrid.RequestedTheme = effectiveTheme;
             FlyoutIsland.RequestedTheme = effectiveTheme;
         }
@@ -1517,7 +1521,10 @@ namespace Task_Flyout
         }
 
         private void FlyoutIsland_ActualThemeChanged(FrameworkElement sender, object args)
-            => ApplyConfiguredTheme(App.GetConfiguredTheme());
+        {
+            _appliedTheme = null;
+            ApplyConfiguredTheme(App.GetConfiguredTheme());
+        }
 
         public void Shutdown()
         {
