@@ -144,7 +144,6 @@ namespace Task_Flyout.Views
             UpdateWeatherBarDiagnostics();
             await UpdateWebViewCacheStatusAsync();
 
-            // 👉 这里已经支持多语言了！只需在英文 resw 中添加键名 TextMinutes，值为 Minutes 即可。
             string minuteStr = GetSafeString("TextMinutes", "minutes");
 
             NotifyTimeComboBox.Items.Clear();
