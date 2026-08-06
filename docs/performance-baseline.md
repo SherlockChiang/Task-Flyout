@@ -14,6 +14,8 @@ Use this checklist before and after performance-sensitive changes. Record result
 
 Performance diagnostics are off by default. Enable them with the local setting `PerformanceDiagnosticsEnabled=true` or set `TASKFLYOUT_PERFORMANCE_DIAGNOSTICS=1` before starting the process. Restart the app after changing either option.
 
+Flyout preloading is off by default and can be enabled under **Settings > System & General**. The preload runs after startup only when the app is below the memory-usage ceiling and has sufficient headroom; memory pressure skips it.
+
 Each process gets a random `run_id`. Records are appended in the background to `%LOCALAPPDATA%\TaskFlyout\Logs\performance-diagnostics.csv` (or the corresponding packaged local app-data location). The log rotates to one `.1` backup at 2 MB. Exit performs a best-effort two-second flush.
 
 The long-form CSV schema is `run_id,sequence,timestamp,scenario,metric,start,end,duration,outcome,source`. These fields contain fixed diagnostic identifiers and timings only. Do not add account names, message/feed/calendar content, URLs, locations, identifiers, or arbitrary content fields.

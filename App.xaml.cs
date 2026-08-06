@@ -225,8 +225,8 @@ namespace Task_Flyout
 
         private void QueueFlyoutPrewarmIfEnabled()
         {
-            bool enabled = ApplicationData.Current.LocalSettings.Values["FlyoutPrewarmEnabled"] as bool? ?? false;
-            if (!enabled) return;
+            bool? configured = ApplicationData.Current.LocalSettings.Values["FlyoutPrewarmEnabled"] as bool?;
+            if (!CanPrewarmFlyout(configured)) return;
 
             MainDispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, async () =>
             {
@@ -234,12 +234,31 @@ namespace Task_Flyout
                 {
                     await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(8));
                     if (MyFlyoutWindow != null) return;
+                    if (!CanPrewarmFlyout(configured)) return;
 
                     await EnsureAccountsHydratedAsync();
-                    EnsureFlyoutWindow();
+                    await SyncManager.WarmCacheAsync();
+                    if (!CanPrewarmFlyout(configured)) return;
+                    EnsureFlyoutWindow().Prewarm();
                 }
                 catch { }
             });
+        }
+
+        private static bool CanPrewarmFlyout(bool? configured)
+        {
+            try
+            {
+                return FlyoutResidencyPolicy.ShouldPrewarm(
+                    configured,
+                    Windows.System.MemoryManager.AppMemoryUsageLevel >= Windows.System.AppMemoryUsageLevel.Medium,
+                    checked((long)Windows.System.MemoryManager.AppMemoryUsage),
+                    checked((long)Windows.System.MemoryManager.AppMemoryUsageLimit));
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void QueueBackgroundRefreshStart()

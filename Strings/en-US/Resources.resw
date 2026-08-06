@@ -405,6 +405,9 @@
   <data name="SettingsPage_EfficiencyMode.Header" xml:space="preserve">
     <value>Use efficiency mode while collapsed to the tray (saves power)</value>
   </data>
+  <data name="SettingsPage_FlyoutPrewarm.Header" xml:space="preserve">
+    <value>Preload the tray flyout after startup (faster first open, uses more memory)</value>
+  </data>
   <data name="CloseToExit_Title" xml:space="preserve">
     <value>Exit Task Flyout?</value>
   </data>

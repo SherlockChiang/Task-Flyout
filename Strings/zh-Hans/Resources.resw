@@ -405,6 +405,9 @@
   <data name="SettingsPage_EfficiencyMode.Header" xml:space="preserve">
     <value>收起到托盘时启用效能模式 (省电)</value>
   </data>
+  <data name="SettingsPage_FlyoutPrewarm.Header" xml:space="preserve">
+    <value>启动后预加载托盘浮窗（首次打开更快，但会占用更多内存）</value>
+  </data>
   <data name="CloseToExit_Title" xml:space="preserve">
     <value>退出 Task Flyout?</value>
   </data>

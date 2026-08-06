@@ -282,6 +282,15 @@ namespace Task_Flyout
             }
         }
 
+        public void Prewarm()
+        {
+            if (_isShuttingDown) return;
+            LoadCacheForDate(DateTime.Today);
+            _selectedDay = DateTime.Today;
+            ShowDataForDate(_selectedDay);
+            UpdateClock();
+        }
+
         private static IEnumerable<string> GetVisibleCacheDateKeys(DateTime anchorDate)
         {
             var firstOfMonth = new DateTime(anchorDate.Year, anchorDate.Month, 1);

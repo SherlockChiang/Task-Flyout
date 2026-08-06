@@ -126,6 +126,7 @@ namespace Task_Flyout.Views
 
             BackgroundToggle.IsOn = settings.Values["RunInBackground"] as bool? ?? true;
             EfficiencyModeToggle.IsOn = settings.Values["EfficiencyModeEnabled"] as bool? ?? true;
+            FlyoutPrewarmToggle.IsOn = settings.Values["FlyoutPrewarmEnabled"] as bool? ?? false;
             NotifyToggle.IsOn = settings.Values["NotifyEnabled"] as bool? ?? true;
             HideNotificationContentToggle.IsOn = settings.Values["HideNotificationContent"] as bool? ?? true;
             MailPollingToggle.IsOn = settings.Values["MailPollingEnabled"] as bool? ?? true;
@@ -870,6 +871,12 @@ namespace Task_Flyout.Views
             if (_isInitializing) return;
             ApplicationData.Current.LocalSettings.Values["EfficiencyModeEnabled"] = EfficiencyModeToggle.IsOn;
             App.UpdateEfficiencyMode();
+        }
+
+        private void FlyoutPrewarmToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            ApplicationData.Current.LocalSettings.Values["FlyoutPrewarmEnabled"] = FlyoutPrewarmToggle.IsOn;
         }
 
         private void ShowSecondsToggle_Toggled(object sender, RoutedEventArgs e)
