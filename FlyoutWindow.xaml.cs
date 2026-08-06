@@ -91,6 +91,7 @@ namespace Task_Flyout
         private readonly Dictionary<CalendarViewDayItem, List<Color>> _semanticDotColors = new();
         private long _dayItemGeneration;
         private long _agendaCacheVersion;
+        private DateTime _localCacheAnchorMonth = DateTime.MinValue;
         private long _filterVersion;
         private DateTime _displayedMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
         private CalendarDotRenderKey? _lastDotRenderKey;
@@ -261,13 +262,23 @@ namespace Task_Flyout
             {
                 if (_syncManager != null)
                 {
-                    var snapshot = _syncManager.GetVersionedDayItemsSnapshot(GetVisibleCacheDateKeys(anchorDate));
+                    var anchorMonth = new DateTime(anchorDate.Year, anchorDate.Month, 1);
+                    long knownVersion = CalendarMonthRangePolicy.GetReusableSnapshotVersion(
+                        _localCacheAnchorMonth,
+                        anchorDate,
+                        _agendaCacheVersion);
+                    var snapshot = _syncManager.GetVersionedDayItemsSnapshotIfChanged(
+                        knownVersion,
+                        GetVisibleCacheDateKeys(anchorDate));
+                    if (snapshot == null) return;
+
                     _localCache = new AppCache
                     {
                         DayItems = snapshot.DayItems,
                         MarkedDates = snapshot.DayItems.Keys.ToHashSet(StringComparer.Ordinal)
                     };
                     _agendaCacheVersion = snapshot.Version;
+                    _localCacheAnchorMonth = anchorMonth;
                     MarkedDates = new HashSet<string>(_localCache.MarkedDates);
                     EventCounts.Clear();
                     foreach (var kvp in _localCache.DayItems)
@@ -281,6 +292,7 @@ namespace Task_Flyout
             {
                 _localCache = new();
                 _agendaCacheVersion = -1;
+                _localCacheAnchorMonth = DateTime.MinValue;
                 _lastDotRenderKey = null;
             }
         }

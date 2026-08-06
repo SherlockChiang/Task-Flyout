@@ -29,6 +29,19 @@ namespace Task_Flyout.Services
 
     internal static class CalendarMonthRangePolicy
     {
+        public static long GetReusableSnapshotVersion(
+            DateTime cachedAnchorMonth,
+            DateTime requestedDate,
+            long cachedVersion)
+        {
+            if (cachedAnchorMonth == DateTime.MinValue) return -1;
+
+            return cachedAnchorMonth.Year == requestedDate.Year
+                   && cachedAnchorMonth.Month == requestedDate.Month
+                ? cachedVersion
+                : -1;
+        }
+
         public static CalendarMonthRange GetWeekRange(DateTime displayedDate, DayOfWeek firstDayOfWeek)
         {
             var start = LocalizationHelper.GetWeekStart(displayedDate.Date, firstDayOfWeek);

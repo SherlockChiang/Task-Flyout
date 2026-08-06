@@ -5,6 +5,35 @@ namespace Task_Flyout.Tests;
 public class CalendarMonthRangePolicyTests
 {
     [Theory]
+    [InlineData("2026-08-01", "2026-08-31", 42, 42)]
+    [InlineData("2026-08-01", "2026-09-01", 42, -1)]
+    [InlineData("2026-08-01", "2027-08-01", 42, -1)]
+    public void GetReusableSnapshotVersion_OnlyReusesWithinCachedMonth(
+        string cachedAnchorMonth,
+        string requestedDate,
+        long cachedVersion,
+        long expectedVersion)
+    {
+        var result = CalendarMonthRangePolicy.GetReusableSnapshotVersion(
+            DateTime.Parse(cachedAnchorMonth),
+            DateTime.Parse(requestedDate),
+            cachedVersion);
+
+        Assert.Equal(expectedVersion, result);
+    }
+
+    [Fact]
+    public void GetReusableSnapshotVersion_RejectsUninitializedAnchor()
+    {
+        var result = CalendarMonthRangePolicy.GetReusableSnapshotVersion(
+            DateTime.MinValue,
+            new DateTime(2026, 8, 1),
+            42);
+
+        Assert.Equal(-1, result);
+    }
+
+    [Theory]
     [InlineData(2026, 2, DayOfWeek.Sunday, "2026-02-01", "2026-03-01")]
     [InlineData(2026, 2, DayOfWeek.Monday, "2026-01-26", "2026-03-02")]
     [InlineData(2026, 8, DayOfWeek.Sunday, "2026-07-26", "2026-09-06")]

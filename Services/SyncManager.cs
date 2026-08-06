@@ -151,21 +151,36 @@ namespace Task_Flyout.Services
         public VersionedDayItemsSnapshot GetVersionedDayItemsSnapshot(IEnumerable<string> dateKeys)
         {
             EnsureCacheLoaded();
-            var keys = dateKeys
-                .Where(key => !string.IsNullOrWhiteSpace(key))
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-
             var published = Volatile.Read(ref _publishedCache);
-            var cache = published.Cache;
-            var result = new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal);
-            foreach (var key in keys)
-            {
-                if (cache.DayItems.TryGetValue(key, out var items))
-                    result[key] = items.Select(CloneAgendaItem).ToList();
-            }
+            return CreateDayItemsSnapshotIfChanged(
+                published,
+                long.MinValue,
+                dateKeys)!;
+        }
 
-            return new VersionedDayItemsSnapshot(published.Version, result);
+        public VersionedDayItemsSnapshot? GetVersionedDayItemsSnapshotIfChanged(
+            long knownVersion,
+            IEnumerable<string> dateKeys)
+        {
+            EnsureCacheLoaded();
+            var published = Volatile.Read(ref _publishedCache);
+            return CreateDayItemsSnapshotIfChanged(published, knownVersion, dateKeys);
+        }
+
+        private static VersionedDayItemsSnapshot? CreateDayItemsSnapshotIfChanged(
+            PublishedCacheSnapshot published,
+            long knownVersion,
+            IEnumerable<string> dateKeys)
+        {
+            var slice = VersionedBucketSlicePolicy.CreateIfChanged(
+                knownVersion,
+                published.Version,
+                published.Cache.DayItems,
+                dateKeys,
+                CloneAgendaItem);
+            return slice == null
+                ? null
+                : new VersionedDayItemsSnapshot(slice.Version, slice.Buckets);
         }
 
         public AppCache GetRangeCacheSnapshot(DateTime min, DateTime max, bool tasksOnly = false)
