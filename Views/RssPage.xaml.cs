@@ -1025,7 +1025,12 @@ namespace Task_Flyout.Views
         {
             if (ArticleListSubtitle == null) return;
 
-            ArticleListSubtitle.Text = StatusMessageFormatter.Format(message, _lastArticleLoadSucceededAt, isError);
+            ArticleListSubtitle.Text = StatusMessageFormatter.Format(
+                message,
+                _lastArticleLoadSucceededAt,
+                isError,
+                _loader.GetStringOrDefault("TextLastSuccessFormat") ?? "Last success: {0:g}",
+                LocalizationHelper.AppCulture);
             var peer = FrameworkElementAutomationPeer.FromElement(ArticleListSubtitle) ??
                        FrameworkElementAutomationPeer.CreatePeerForElement(ArticleListSubtitle);
             peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);

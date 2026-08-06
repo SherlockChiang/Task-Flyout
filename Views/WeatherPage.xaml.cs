@@ -1169,7 +1169,12 @@ namespace Task_Flyout.Views
         private void SetWeatherStatus(string message, bool isError = false)
         {
             if (WeatherStatusText == null) return;
-            WeatherStatusText.Text = StatusMessageFormatter.Format(message, _lastWeatherLoadSucceededAt, isError);
+            WeatherStatusText.Text = StatusMessageFormatter.Format(
+                message,
+                _lastWeatherLoadSucceededAt,
+                isError,
+                _loader.GetStringOrDefault("TextLastSuccessFormat") ?? "Last success: {0:g}",
+                LocalizationHelper.AppCulture);
         }
 
         #endregion

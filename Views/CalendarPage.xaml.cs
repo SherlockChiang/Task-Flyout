@@ -308,7 +308,12 @@ namespace Task_Flyout.Views
             {
                 if (token.IsCancellationRequested) return;
                 System.Diagnostics.Debug.WriteLine($"Sync error: {ex.Message}");
-                SetCalendarStatus(StatusMessageFormatter.Format(_loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed", _lastCalendarSyncSucceededAt, includeLastSuccess: true), isError: true);
+                SetCalendarStatus(StatusMessageFormatter.Format(
+                    _loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed",
+                    _lastCalendarSyncSucceededAt,
+                    includeLastSuccess: true,
+                    _loader.GetStringOrDefault("TextLastSuccessFormat") ?? "Last success: {0:g}",
+                    LocalizationHelper.AppCulture), isError: true);
             }
             finally
             {
@@ -1195,7 +1200,12 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Force sync error: {ex.Message}");
-                SetCalendarStatus(StatusMessageFormatter.Format(_loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed", _lastCalendarSyncSucceededAt, includeLastSuccess: true), isError: true);
+                SetCalendarStatus(StatusMessageFormatter.Format(
+                    _loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed",
+                    _lastCalendarSyncSucceededAt,
+                    includeLastSuccess: true,
+                    _loader.GetStringOrDefault("TextLastSuccessFormat") ?? "Last success: {0:g}",
+                    LocalizationHelper.AppCulture), isError: true);
             }
             finally
             {

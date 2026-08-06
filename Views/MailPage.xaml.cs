@@ -1513,7 +1513,12 @@ namespace Task_Flyout.Views
         private void SetMessageListStatus(string message, bool isError = false)
         {
             if (MessageListSubtitle == null) return;
-            MessageListSubtitle.Text = StatusMessageFormatter.Format(message, _lastMessageLoadSucceededAt, isError);
+            MessageListSubtitle.Text = StatusMessageFormatter.Format(
+                message,
+                _lastMessageLoadSucceededAt,
+                isError,
+                _loader.GetStringOrDefault("TextLastSuccessFormat") ?? "Last success: {0:g}",
+                LocalizationHelper.AppCulture);
             RaiseLiveRegionChanged(MessageListSubtitle);
         }
 

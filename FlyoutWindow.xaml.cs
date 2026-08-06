@@ -803,7 +803,12 @@ namespace Task_Flyout
                     AgendaItems.Add(new AgendaItem
                     {
                         Title = _loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed",
-                        Subtitle = StatusMessageFormatter.Format(ex.Message, _lastSyncSucceededAt, includeLastSuccess: true),
+                        Subtitle = StatusMessageFormatter.Format(
+                            ex.Message,
+                            _lastSyncSucceededAt,
+                            includeLastSuccess: true,
+                            _loader.GetStringOrDefault("TextLastSuccessFormat") ?? "Last success: {0:g}",
+                            LocalizationHelper.AppCulture),
                         IsEvent = false,
                         IsTask = false
                     });
