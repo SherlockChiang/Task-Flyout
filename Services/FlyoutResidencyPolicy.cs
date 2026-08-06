@@ -34,5 +34,8 @@ namespace Task_Flyout.Services
                 cooldown = TimeSpan.Zero;
             return elapsedSinceLastStart >= cooldown;
         }
+
+        public static bool ShouldTrimMemoryCaches(bool isVisibleOrOpening)
+            => !isVisibleOrOpening;
     }
 }

@@ -55,4 +55,14 @@ public class FlyoutResidencyPolicyTests
                 queued,
                 TimeSpan.FromSeconds(elapsedSeconds),
                 TimeSpan.FromMinutes(1)));
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void Memory_cache_trim_only_runs_while_hidden(
+        bool isVisibleOrOpening,
+        bool expected)
+        => Assert.Equal(
+            expected,
+            FlyoutResidencyPolicy.ShouldTrimMemoryCaches(isVisibleOrOpening));
 }

@@ -365,6 +365,8 @@ namespace Task_Flyout
                 {
                     MailService.TrimVolatileMessageBodies();
                 }
+
+                MyFlyoutWindow?.TrimMemoryCaches();
             });
         }
 

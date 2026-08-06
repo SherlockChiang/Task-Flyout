@@ -1496,6 +1496,14 @@ namespace Task_Flyout
             FlyoutIsland.RequestedTheme = effectiveTheme;
         }
 
+        public void TrimMemoryCaches()
+        {
+            if (!FlyoutResidencyPolicy.ShouldTrimMemoryCaches(IsVisibleOrOpening)) return;
+            _flyoutWeatherIconCache.Clear();
+            _dotBrushCache.Clear();
+            _lastDotRenderKey = null;
+        }
+
         private void FlyoutIsland_ActualThemeChanged(FrameworkElement sender, object args)
             => ApplyConfiguredTheme(App.GetConfiguredTheme());
 
