@@ -1928,6 +1928,9 @@ DPI：{3}
   <data name="CalendarPage_ViewYear.Content" xml:space="preserve"><value>年</value></data>
   <data name="CalendarPage_YearNoItems.Text" xml:space="preserve"><value>无日程</value></data>
   <data name="CalendarPage_YearItemCount" xml:space="preserve"><value>{0} 项</value></data>
+  <data name="Lang_ChineseSimplified.Content" xml:space="preserve"><value>简体中文</value></data>
+  <data name="Lang_ChineseTraditional.Content" xml:space="preserve"><value>繁體中文</value></data>
+  <data name="Lang_English.Content" xml:space="preserve"><value>English</value></data>
   <data name="TextLastSuccessFormat" xml:space="preserve"><value>上次成功：{0:g}</value></data>
   <data name="WeatherAlert_NowFormat" xml:space="preserve"><value>即将{0}</value></data>
   <data name="WeatherAlert_InHoursFormat" xml:space="preserve"><value>{1}小时后{0}</value></data>

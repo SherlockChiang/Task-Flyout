@@ -1,0 +1,1973 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Microsoft ResX Schema
+
+    Version 2.0
+
+    The primary goals of this format is to allow a simple XML format
+    that is mostly human readable. The generation and parsing of the
+    various data types are done through the TypeConverter classes
+    associated with the data types.
+
+    Example:
+
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+
+    There are any number of "resheader" rows that contain simple
+    name/value pairs.
+
+    Each data row contains a name, and value. The row also contains a
+    type or mimetype. Type corresponds to a .NET class that support
+    text/value conversion through the TypeConverter architecture.
+    Classes that don't support this are serialized and stored with the
+    mimetype set.
+
+    The mimetype is used for serialized objects, and tells the
+    ResXResourceReader how to depersist the object. This is currently not
+    extensible. For a given mimetype the value must be set accordingly:
+
+    Note - application/x-microsoft.net.object.binary.base64 is the format
+    that the ResXResourceWriter will generate, however the reader can
+    read any of the formats listed below.
+
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="SettingsPage_Title.Text" xml:space="preserve">
+    <value>設定</value>
+  </data>
+  <data name="SettingsPage_Appearance.Text" xml:space="preserve">
+    <value>外觀與語言</value>
+  </data>
+  <data name="SettingsPage_ThemeMode.Header" xml:space="preserve">
+    <value>應用主題</value>
+  </data>
+  <data name="Theme_System.Content" xml:space="preserve">
+    <value>跟隨系統</value>
+  </data>
+  <data name="Theme_Light.Content" xml:space="preserve">
+    <value>淺色</value>
+  </data>
+  <data name="Theme_Dark.Content" xml:space="preserve">
+    <value>深色</value>
+  </data>
+  <data name="SettingsPage_Language.Header" xml:space="preserve">
+    <value>介面語言 (重啟生效)</value>
+  </data>
+  <data name="Lang_System.Content" xml:space="preserve">
+    <value>跟隨系統</value>
+  </data>
+  <data name="RestartRequired_Title" xml:space="preserve">
+    <value>需要重啟</value>
+  </data>
+  <data name="RestartRequired_Content" xml:space="preserve">
+    <value>更改介面語言後，需要重新啟動應用才能完全生效。</value>
+  </data>
+  <data name="RestartRequired_Close" xml:space="preserve">
+    <value>我知道了</value>
+  </data>
+  <data name="CalendarPage_BtnToday.Content" xml:space="preserve">
+    <value>今天</value>
+  </data>
+  <data name="CalendarPage_Sun.Text" xml:space="preserve">
+    <value>週日</value>
+  </data>
+  <data name="CalendarPage_Mon.Text" xml:space="preserve">
+    <value>週一</value>
+  </data>
+  <data name="CalendarPage_Tue.Text" xml:space="preserve">
+    <value>週二</value>
+  </data>
+  <data name="CalendarPage_Wed.Text" xml:space="preserve">
+    <value>週三</value>
+  </data>
+  <data name="CalendarPage_Thu.Text" xml:space="preserve">
+    <value>週四</value>
+  </data>
+  <data name="CalendarPage_Fri.Text" xml:space="preserve">
+    <value>週五</value>
+  </data>
+  <data name="CalendarPage_Sat.Text" xml:space="preserve">
+    <value>週六</value>
+  </data>
+  <data name="CalendarPage_AllAgendas.Text" xml:space="preserve">
+    <value>全部行程</value>
+  </data>
+  <data name="CalendarDialog.Title" xml:space="preserve">
+    <value>編輯行程 / 任務</value>
+  </data>
+  <data name="CalendarDialog.PrimaryButtonText" xml:space="preserve">
+    <value>儲存</value>
+  </data>
+  <data name="CalendarDialog.SecondaryButtonText" xml:space="preserve">
+    <value>刪除</value>
+  </data>
+  <data name="CalendarDialog.CloseButtonText" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="CalendarDialog_TitleInput.Header" xml:space="preserve">
+    <value>名稱</value>
+  </data>
+  <data name="CalendarDialog_TitleInput.PlaceholderText" xml:space="preserve">
+    <value>行程/任務名稱</value>
+  </data>
+  <data name="CalendarDialog_LocationInput.Header" xml:space="preserve">
+    <value>地點 (選填)</value>
+  </data>
+  <data name="CalendarDialog_LocationInput.PlaceholderText" xml:space="preserve">
+    <value>新增位置資訊</value>
+  </data>
+  <data name="CalendarDialog_DescInput.Header" xml:space="preserve">
+    <value>詳情備註 (選填)</value>
+  </data>
+  <data name="CalendarDialog_DescInput.PlaceholderText" xml:space="preserve">
+    <value>記錄詳細內容...</value>
+  </data>
+  <data name="CalendarDialog_DateInput.Header" xml:space="preserve">
+    <value>日期</value>
+  </data>
+  <data name="CalendarDialog_AllDayInput.Content" xml:space="preserve">
+    <value>全天事件</value>
+  </data>
+  <data name="CalendarDialog_StartTimeInput.Header" xml:space="preserve">
+    <value>開始時間</value>
+  </data>
+  <data name="CalendarDialog_EndTimeInput.Header" xml:space="preserve">
+    <value>結束時間</value>
+  </data>
+  <data name="TextAllDay" xml:space="preserve">
+    <value>全天</value>
+  </data>
+  <data name="TextNoAgendaTitle" xml:space="preserve">
+    <value>近期沒有安排</value>
+  </data>
+  <data name="TextNoAgendaSub" xml:space="preserve">
+    <value>休息一下吧</value>
+  </data>
+  <data name="TextOnwards" xml:space="preserve">
+    <value>起</value>
+  </data>
+  <data name="TextTask" xml:space="preserve">
+    <value>任務</value>
+  </data>
+  <data name="TextSyncing" xml:space="preserve">
+    <value>同步中...</value>
+  </data>
+  <data name="TextSyncFailed" xml:space="preserve">
+    <value>同步失敗</value>
+  </data>
+  <data name="TextAddFailed" xml:space="preserve">
+    <value>❌ 任務新增失敗</value>
+  </data>
+  <data name="TextUpcoming" xml:space="preserve">
+    <value>即將到來</value>
+  </data>
+  <data name="TextUpcomingMonth" xml:space="preserve">
+    <value>未來一個月</value>
+  </data>
+  <data name="TextTomorrow" xml:space="preserve">
+    <value>明天</value>
+  </data>
+  <data name="TextDayAfterTomorrow" xml:space="preserve">
+    <value>後天</value>
+  </data>
+  <data name="TextFullSyncTitle" xml:space="preserve">
+    <value>全量同步中...</value>
+  </data>
+  <data name="TextFullSyncSub" xml:space="preserve">
+    <value>正在取得您的全部行程與任務</value>
+  </data>
+  <data name="MainWindow_NavCalendar.Content" xml:space="preserve">
+    <value>行事曆</value>
+  </data>
+  <data name="MainWindow_GoogleAccount.Text" xml:space="preserve">
+    <value>Google 帳戶</value>
+  </data>
+  <data name="MainWindow_BtnConnectGoogle.Content" xml:space="preserve">
+    <value>連結與授權</value>
+  </data>
+  <data name="MainWindow_TglGoogleEvents.Header" xml:space="preserve">
+    <value>顯示行程</value>
+  </data>
+  <data name="MainWindow_TglGoogleTasks.Header" xml:space="preserve">
+    <value>顯示任務</value>
+  </data>
+  <data name="MainWindow_MSAccount.Text" xml:space="preserve">
+    <value>Microsoft 帳戶</value>
+  </data>
+  <data name="MainWindow_BtnConnectMS.Content" xml:space="preserve">
+    <value>連結與授權</value>
+  </data>
+  <data name="MainWindow_TglMSEvents.Header" xml:space="preserve">
+    <value>顯示行程</value>
+  </data>
+  <data name="MainWindow_TglMSTasks.Header" xml:space="preserve">
+    <value>顯示任務</value>
+  </data>
+  <data name="MainWindow_BtnForceSync.Content" xml:space="preserve">
+    <value>強制立即同步</value>
+  </data>
+  <data name="TextAuthorizing" xml:space="preserve">
+    <value>授權中...</value>
+  </data>
+  <data name="TextAuthFailed" xml:space="preserve">
+    <value>授權失敗</value>
+  </data>
+  <data name="Flyout_BtnGoToToday.ToolTipService.ToolTip" xml:space="preserve">
+    <value>回到今天</value>
+  </data>
+  <data name="Flyout_BtnSettings.ToolTipService.ToolTip" xml:space="preserve">
+    <value>設定</value>
+  </data>
+  <data name="Flyout_BtnRefresh.ToolTipService.ToolTip" xml:space="preserve">
+    <value>強制同步云端</value>
+  </data>
+  <data name="Flyout_TextAdd.Text" xml:space="preserve">
+    <value>新增</value>
+  </data>
+  <data name="Flyout_BtnAdd.AutomationProperties.Name" xml:space="preserve">
+    <value>新增項目</value>
+  </data>
+  <data name="Flyout_BtnAdd.ToolTipService.ToolTip" xml:space="preserve">
+    <value>新增項目</value>
+  </data>
+  <data name="Flyout_TextNew.Text" xml:space="preserve">
+    <value>新增</value>
+  </data>
+  <data name="Flyout_RadioEvent.Content" xml:space="preserve">
+    <value>行程</value>
+  </data>
+  <data name="Flyout_RadioTask.Content" xml:space="preserve">
+    <value>任務</value>
+  </data>
+  <data name="Flyout_TxtNewTitle.PlaceholderText" xml:space="preserve">
+    <value>輸入標題內容...</value>
+  </data>
+  <data name="Flyout_TxtLocation.PlaceholderText" xml:space="preserve">
+    <value>新增地點（選填）</value>
+  </data>
+  <data name="Flyout_ChkAllDay.Content" xml:space="preserve">
+    <value>全天</value>
+  </data>
+  <data name="Flyout_TimePickerStart.Header" xml:space="preserve">
+    <value>開始時間</value>
+  </data>
+  <data name="Flyout_TxtTimeSeparator.Text" xml:space="preserve">
+    <value>至</value>
+  </data>
+  <data name="Flyout_TimePickerEnd.Header" xml:space="preserve">
+    <value>結束時間</value>
+  </data>
+  <data name="Flyout_BtnCancel.Content" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="Flyout_BtnSave.Content" xml:space="preserve">
+    <value>儲存</value>
+  </data>
+  <data name="TrayMenu_ShowMain.Text" xml:space="preserve">
+    <value>顯示主頁面</value>
+  </data>
+  <data name="TrayMenu_Exit.Text" xml:space="preserve">
+    <value>退出</value>
+  </data>
+  <data name="TextWelcomeTitle" xml:space="preserve">
+    <value>歡迎使用 Task Flyout</value>
+  </data>
+  <data name="TextWelcomeSub" xml:space="preserve">
+    <value>點擊設定按鈕連結帳號</value>
+  </data>
+  <data name="TextStartTime" xml:space="preserve">
+    <value>開始時間</value>
+  </data>
+  <data name="TextDueTime" xml:space="preserve">
+    <value>截止時間</value>
+  </data>
+  <data name="TextCredNotFound" xml:space="preserve">
+    <value>找不到 credentials.json 檔案，請檢查設定！</value>
+  </data>
+  <data name="TextNewItem" xml:space="preserve">
+    <value>新增行程 / 任務</value>
+  </data>
+  <data name="CalendarDialog_Provider.Header" xml:space="preserve">
+    <value>所屬帳戶</value>
+  </data>
+  <data name="CalendarDialog_RadioEvent.Content" xml:space="preserve">
+    <value>行程</value>
+  </data>
+  <data name="CalendarDialog_RadioTask.Content" xml:space="preserve">
+    <value>任務</value>
+  </data>
+  <data name="Flyout_CmbProvider.Header" xml:space="preserve">
+    <value>所屬帳戶</value>
+  </data>
+  <data name="TextToday" xml:space="preserve">
+    <value>今天</value>
+  </data>
+  <data name="TextDaysLater" xml:space="preserve">
+    <value>{0}天後</value>
+  </data>
+  <data name="TextDaysAgo" xml:space="preserve">
+    <value>{0}天前</value>
+  </data>
+  <data name="SettingsPage_System.Text" xml:space="preserve">
+    <value>系統與常規</value>
+  </data>
+  <data name="SettingsPage_Startup.Header" xml:space="preserve">
+    <value>開機時自動啟動</value>
+  </data>
+  <data name="SettingsPage_Background.Header" xml:space="preserve">
+    <value>關閉主視窗時保持背景運行 (推薦)</value>
+  </data>
+  <data name="SettingsPage_EfficiencyMode.Header" xml:space="preserve">
+    <value>收起到系統匣時啟用效能模式 (省電)</value>
+  </data>
+  <data name="SettingsPage_FlyoutPrewarm.Header" xml:space="preserve">
+    <value>啟動後預載入系統匣浮動視窗（首次開啟更快，但會占用更多內存）</value>
+  </data>
+  <data name="CloseToExit_Title" xml:space="preserve">
+    <value>退出 Task Flyout?</value>
+  </data>
+  <data name="CloseToExit_Content" xml:space="preserve">
+    <value>關閉視窗將退出 Task Flyout。你可以在設定中改為背景運行。</value>
+  </data>
+  <data name="CloseToExit_Exit" xml:space="preserve">
+    <value>退出</value>
+  </data>
+  <data name="CloseToExit_Background" xml:space="preserve">
+    <value>背景運行</value>
+  </data>
+  <data name="RestartRequired_Primary" xml:space="preserve">
+    <value>立即重啟</value>
+  </data>
+  <data name="MainWindow_BtnAddAccount.Text" xml:space="preserve">
+    <value>新增帳戶</value>
+  </data>
+  <data name="AddAccount_Title.Text" xml:space="preserve">
+    <value>帳戶與健康狀態</value>
+  </data>
+  <data name="AddAccount_Subtitle.Text" xml:space="preserve">
+    <value>查看連結狀態、快取資料、待處理更改與帳戶設定</value>
+  </data>
+  <data name="AddAccount_GoogleDesc.Text" xml:space="preserve">
+    <value>Google 行事曆與任務</value>
+  </data>
+  <data name="AddAccount_MSDesc.Text" xml:space="preserve">
+    <value>Outlook 行事曆與 To Do</value>
+  </data>
+  <data name="AddAccount_ICloudTitle.Text" xml:space="preserve">
+    <value>iCloud</value>
+  </data>
+  <data name="AddAccount_ICloudDesc.Text" xml:space="preserve">
+    <value>iCloud 行事曆</value>
+  </data>
+  <data name="AddAccount_AlreadyConnected" xml:space="preserve">
+    <value>已連結</value>
+  </data>
+  <data name="AddAccount_Reconnect" xml:space="preserve">
+    <value>重新連結全部功能</value>
+  </data>
+  <data name="AddAccount_ReconnectICloud" xml:space="preserve">
+    <value>重新連結 iCloud 行事曆</value>
+  </data>
+  <data name="AddAccount_ChecklistTitle.Text" xml:space="preserve">
+    <value>帳戶健康與離線狀態</value>
+  </data>
+  <data name="AddAccount_RetrySync.Content" xml:space="preserve">
+    <value>重試同步</value>
+  </data>
+  <data name="AddAccount_OpenMailSetup.Text" xml:space="preserve">
+    <value>開啟郵件設定</value>
+  </data>
+  <data name="AddAccount_OpenWeatherSetup.Text" xml:space="preserve">
+    <value>開啟天氣設定</value>
+  </data>
+  <data name="AddAccount_Skip.Content" xml:space="preserve">
+    <value>暫時跳過</value>
+  </data>
+  <data name="AddAccount_Finish.Content" xml:space="preserve">
+    <value>完成設定</value>
+  </data>
+  <data name="AddAccount_Ready" xml:space="preserve">
+    <value>已就緒</value>
+  </data>
+  <data name="AddAccount_HealthReady" xml:space="preserve">
+    <value>已連結</value>
+  </data>
+  <data name="AddAccount_HealthSyncing" xml:space="preserve">
+    <value>正在同步</value>
+  </data>
+  <data name="AddAccount_HealthCached" xml:space="preserve">
+    <value>目前離線或服務不可用；已有快取資料</value>
+  </data>
+  <data name="AddAccount_HealthReconnect" xml:space="preserve">
+    <value>需要重新連結</value>
+  </data>
+  <data name="AddAccount_HealthFailed" xml:space="preserve">
+    <value>同步失敗</value>
+  </data>
+  <data name="AddAccount_LastSuccess" xml:space="preserve">
+    <value>上次成功：{0}</value>
+  </data>
+  <data name="AddAccount_CacheAvailable" xml:space="preserve">
+    <value>已有快取資料</value>
+  </data>
+  <data name="AddAccount_PendingChanges" xml:space="preserve">
+    <value>待處理更改：任務 {0}，失敗任務 {1}，郵件 {2}</value>
+  </data>
+  <data name="AddAccount_MailSetupIncomplete" xml:space="preserve">
+    <value>設定未完成</value>
+  </data>
+  <data name="AddAccount_MailHealth" xml:space="preserve">
+    <value>郵件 {0}：{1}；待處理更改 {2}</value>
+  </data>
+  <data name="AddAccount_ConnectGoogle" xml:space="preserve">
+    <value>連結 Google 以使用行事曆、任務和 Gmail。</value>
+  </data>
+  <data name="AddAccount_ConnectMicrosoft" xml:space="preserve">
+    <value>連結 Microsoft 以使用 Outlook 行事曆和 To Do。</value>
+  </data>
+  <data name="AddAccount_ConnectICloud" xml:space="preserve">
+    <value>使用 App 專用密碼連結 iCloud 行事曆。</value>
+  </data>
+  <data name="AddAccount_ICloudDialogTitle" xml:space="preserve"><value>連結 iCloud 行事曆</value></data>
+  <data name="AddAccount_ICloudAccountHeader" xml:space="preserve"><value>Apple 帳戶信箱</value></data>
+  <data name="AddAccount_ICloudAccountPlaceholder" xml:space="preserve"><value>name@example.com</value></data>
+  <data name="AddAccount_ICloudPasswordHeader" xml:space="preserve"><value>App 專用密碼</value></data>
+  <data name="AddAccount_ICloudPasswordHelp" xml:space="preserve"><value>管理 App 專用密碼</value></data>
+  <data name="AddAccount_ICloudExplanation" xml:space="preserve"><value>請輸入 Apple 帳戶信箱和 App 專用密碼。Task Flyout 不接受也不會儲存你的 Apple 帳戶主密碼。</value></data>
+  <data name="AddAccount_ICloudValidation" xml:space="preserve"><value>請輸入有效的 Apple 帳戶信箱和 App 專用密碼。</value></data>
+  <data name="TextConnect" xml:space="preserve"><value>連結</value></data>
+  <data name="AddAccount_ConnectMail" xml:space="preserve">
+    <value>從郵件頁面新增 Gmail、Outlook 或 IMAP。</value>
+  </data>
+  <data name="AddAccount_ConnectWeather" xml:space="preserve">
+    <value>從天氣頁面啟用天氣並選擇城市。</value>
+  </data>
+  <data name="TextRemoveAccountTitle" xml:space="preserve">
+    <value>移除帳戶</value>
+  </data>
+  <data name="TextRemoveAccountContent" xml:space="preserve">
+    <value>確定要移除 {0} 帳戶嗎？</value>
+  </data>
+  <data name="TextConfirm" xml:space="preserve">
+    <value>確定</value>
+  </data>
+  <data name="TextShowEvents" xml:space="preserve">
+    <value>顯示行程</value>
+  </data>
+  <data name="TextShowTasks" xml:space="preserve">
+    <value>顯示任務</value>
+  </data>
+  <data name="MainWindow_ToggleTasks.Text" xml:space="preserve">
+    <value>任務</value>
+  </data>
+  <data name="TextPickColor" xml:space="preserve">
+    <value>選擇色彩</value>
+  </data>
+  <data name="TextNotificationReminder" xml:space="preserve">
+    <value>行程提醒</value>
+  </data>
+  <data name="TextMinutesLater" xml:space="preserve">
+    <value>{0} 分鐘後開始</value>
+  </data>
+  <data name="TextOneMinuteLater" xml:space="preserve">
+    <value>1 分鐘後開始</value>
+  </data>
+  <data name="TextNoAccount" xml:space="preserve">
+    <value>尚未連結任何帳戶</value>
+  </data>
+  <data name="SettingsPage_ColorPalette.Text" xml:space="preserve">
+    <value>莫奈調色盤</value>
+  </data>
+  <data name="SettingsPage_ColorPaletteDesc.Text" xml:space="preserve">
+    <value>為每個行事曆和任務列表指定代表色，色彩將同步應用到側欄與行事曆視圖。</value>
+  </data>
+  <data name="SettingsPage_Notification.Text" xml:space="preserve">
+    <value>通知提醒</value>
+  </data>
+  <data name="SettingsPage_NotifyToggle.Header" xml:space="preserve">
+    <value>行程開始前彈出通知</value>
+  </data>
+  <data name="SettingsPage_NotifyTime.Header" xml:space="preserve">
+    <value>提前提醒時間</value>
+  </data>
+  <data name="SettingsPage_SyncInterval.Header" xml:space="preserve">
+    <value>自動同步間隔</value>
+  </data>
+  <data name="TextMinutes" xml:space="preserve">
+    <value>分鐘</value>
+  </data>
+  <data name="TextPresetColors" xml:space="preserve">
+    <value>色彩預設</value>
+  </data>
+  <data name="TextCustomColor" xml:space="preserve">
+    <value>自訂色彩</value>
+  </data>
+  <data name="SettingsPage_Weather.Text" xml:space="preserve">
+    <value>今日天氣</value>
+  </data>
+  <data name="SettingsPage_WeatherToggle.Header" xml:space="preserve">
+    <value>在浮動視窗顯示天氣</value>
+  </data>
+  <data name="SettingsPage_WeatherCity.Header" xml:space="preserve">
+    <value>城市名稱</value>
+  </data>
+  <data name="SettingsPage_WeatherCity.PlaceholderText" xml:space="preserve">
+    <value>例如：北京</value>
+  </data>
+  <data name="SettingsPage_Clock.Text" xml:space="preserve">
+    <value>時鐘顯示</value>
+  </data>
+  <data name="SettingsPage_ShowSeconds.Header" xml:space="preserve">
+    <value>在浮動視窗時鐘中顯示秒</value>
+  </data>
+  <data name="Flyout_BtnPin.ToolTipService.ToolTip" xml:space="preserve">
+    <value>置頂視窗</value>
+  </data>
+  <data name="Flyout_BtnWeather.ToolTipService.ToolTip" xml:space="preserve">
+    <value>查看天氣詳情</value>
+  </data>
+  <data name="WeatherPage_Title.Text" xml:space="preserve">
+    <value>天氣設定與概覽</value>
+  </data>
+  <data name="WeatherPage_Toggle.Header" xml:space="preserve">
+    <value>在系統浮動視窗中顯示今日天氣</value>
+  </data>
+  <data name="WeatherPage_CityHeader.Text" xml:space="preserve">
+    <value>搜尋城市 (支援中英拼音)</value>
+  </data>
+  <data name="WeatherPage_24Hour.Text" xml:space="preserve">
+    <value>24 小時預報</value>
+  </data>
+  <data name="MainWindow_NavWeather.Content" xml:space="preserve">
+    <value>天氣</value>
+  </data>
+  <data name="WeatherPage_CitySearchBox.PlaceholderText" xml:space="preserve">
+    <value>輸入城市名後等待幾秒...</value>
+  </data>
+  <data name="WeatherPage_BtnRefresh.Content" xml:space="preserve">
+    <value>重新整理</value>
+  </data>
+  <data name="WeatherPage_BtnUseLocation.Text" xml:space="preserve">
+    <value>目前位置</value>
+  </data>
+  <data name="WeatherPage_AutoFollowLocation.Header" xml:space="preserve">
+    <value>自動跟隨定位</value>
+  </data>
+  <data name="WeatherCurrentLocation" xml:space="preserve">
+    <value>目前位置</value>
+  </data>
+  <data name="WeatherLocationDenied" xml:space="preserve">
+    <value>定位已關閉。請在 Windows 設定 › 隱私和安全性 › 定位 中開啟。</value>
+  </data>
+  <data name="WeatherLocationFailed" xml:space="preserve">
+    <value>無法取得目前位置，請重試。</value>
+  </data>
+  <data name="WeatherPage_IconFontHeader.Header" xml:space="preserve">
+    <value>圖示風格</value>
+  </data>
+  <data name="WeatherPage_FontEmoji.Content" xml:space="preserve">
+    <value>Windows 11 風格</value>
+  </data>
+  <data name="WeatherPage_FontSymbol.Content" xml:space="preserve">
+    <value>經典</value>
+  </data>
+  <data name="WeatherPage_FontCustom.Content" xml:space="preserve">
+    <value>自訂字體</value>
+  </data>
+  <data name="WeatherPage_CustomFontBox.Header" xml:space="preserve">
+    <value>自訂字體名稱</value>
+  </data>
+  <data name="WeatherPage_CustomFontBox.PlaceholderText" xml:space="preserve">
+    <value>Noto Color Emoji</value>
+  </data>
+  <data name="WeatherPage_IconPackHeader.Text" xml:space="preserve">
+    <value>圖示包</value>
+  </data>
+  <data name="WeatherPage_IconPackDesc.Text" xml:space="preserve">
+    <value>匯入 Breezy 風格圖示包（GitHub 源碼 ZIP）。壓縮包需包含 drawable_filter.xml 以及 drawable/ 資料夾中的 PNG。預設使用 Windows 11 表情符號。</value>
+  </data>
+  <data name="WeatherPage_BtnImportIconPack.Content" xml:space="preserve">
+    <value>匯入 .zip…</value>
+  </data>
+  <data name="WeatherPage_BtnDeleteIconPack.Content" xml:space="preserve">
+    <value>刪除目前圖示包</value>
+  </data>
+  <data name="WeatherPage_SourceHeader.Header" xml:space="preserve">
+    <value>天氣資料源</value>
+  </data>
+  <data name="WeatherPage_SourceHintOM" xml:space="preserve">
+    <value>Open-Meteo：免費、無需 API 密鑰、支援空氣品質與花粉資料、真正逐時預報</value>
+  </data>
+  <data name="WeatherPage_SourceHintWttr" xml:space="preserve">
+    <value>wttr.in：免費、無需 API 密鑰、僅提供基礎天氣資料、每 3 小時插值預報</value>
+  </data>
+  <data name="WeatherPage_FlyoutFields" xml:space="preserve">
+    <value>浮動視窗顯示欄位</value>
+  </data>
+  <data name="WeatherPage_FlyoutFieldsDesc" xml:space="preserve">
+    <value>勾選希望在系統浮動視窗中顯示的天氣資訊</value>
+  </data>
+  <data name="TextNewMail" xml:space="preserve">
+    <value>新郵件</value>
+  </data>
+  <data name="MailCopyCode" xml:space="preserve">
+    <value>復制驗證碼</value>
+  </data>
+  <data name="MailCodeCopied" xml:space="preserve">
+    <value>驗證碼已復制</value>
+  </data>
+  <data name="TextSetupIncomplete" xml:space="preserve">
+    <value>待設定</value>
+  </data>
+  <data name="TextFolderPlaceholder" xml:space="preserve">
+    <value>完成設定後顯示資料夾</value>
+  </data>
+  <data name="TextMailReadError" xml:space="preserve">
+    <value>無法讀取此郵件</value>
+  </data>
+  <data name="TextMailFetchError" xml:space="preserve">
+    <value>IMAP 伺服器返回了無效的 FETCH 響應。</value>
+  </data>
+  <data name="TextMailBodyError" xml:space="preserve">
+    <value>無法載入此郵件的內文內容。</value>
+  </data>
+  <data name="TextYesterday" xml:space="preserve">
+    <value>昨天</value>
+  </data>
+  <data name="TextInbox" xml:space="preserve">
+    <value>收件匣</value>
+  </data>
+  <data name="TextSyncIssue" xml:space="preserve">
+    <value>同步問題</value>
+  </data>
+  <data name="TextUnknownSource" xml:space="preserve">
+    <value>未知來源</value>
+  </data>
+  <data name="TextEventReminder" xml:space="preserve">
+    <value>行程提醒</value>
+  </data>
+  <data name="TextMinutesBefore" xml:space="preserve">
+    <value>{0} 分鐘後</value>
+  </data>
+  <data name="TextOneMinuteBefore" xml:space="preserve">
+    <value>1 分鐘後</value>
+  </data>
+  <data name="TextStartsAt" xml:space="preserve">
+    <value>開始 · {0}</value>
+  </data>
+  <data name="TextNewFolder" xml:space="preserve">
+    <value>新資料夾</value>
+  </data>
+  <data name="TextUntitled" xml:space="preserve">
+    <value>(無標題)</value>
+  </data>
+  <data name="TextFolder" xml:space="preserve">
+    <value>資料夾</value>
+  </data>
+  <data name="TextDeleteRecurringTitle" xml:space="preserve">
+    <value>刪除重複行程</value>
+  </data>
+  <data name="TextDeleteRecurringPrompt" xml:space="preserve">
+    <value>請選擇要刪除的范圍。</value>
+  </data>
+  <data name="TextDeleteThisEvent" xml:space="preserve">
+    <value>僅刪除此事件</value>
+  </data>
+  <data name="TextDeleteThisAndFollowing" xml:space="preserve">
+    <value>刪除此事件和之後事件</value>
+  </data>
+  <data name="TextDeleteAllRecurring" xml:space="preserve">
+    <value>刪除所有重複事件</value>
+  </data>
+  <data name="TextSelectFolder" xml:space="preserve">
+    <value>請選擇左側資料夾</value>
+  </data>
+  <data name="TextAddMailAccountFirst" xml:space="preserve">
+    <value>先新增一個信箱帳戶</value>
+  </data>
+  <data name="TextNMailItems" xml:space="preserve">
+    <value>{0} 封郵件</value>
+  </data>
+  <data name="TextMailNotFound" xml:space="preserve">
+    <value>沒有在本機快取或目前資料夾中找到這封通知郵件。</value>
+  </data>
+  <data name="TextLoading" xml:space="preserve">
+    <value>正在載入</value>
+  </data>
+  <data name="TextLoadFoldersFailed" xml:space="preserve">
+    <value>載入資料夾失敗，請稍後重試。</value>
+  </data>
+  <data name="TextLoadMailFailed" xml:space="preserve">
+    <value>載入郵件失敗，請稍後重試。</value>
+  </data>
+  <data name="TextDeleteMailAccount" xml:space="preserve">
+    <value>刪除信箱帳戶</value>
+  </data>
+  <data name="TextDeleteMailAccountContent" xml:space="preserve">
+    <value>要從 Task Flyout 刪除 {0} - {1} 嗎？這不會刪除信箱伺服器上的郵件。郵件與 RSS 閱讀器共享嵌入式瀏覽器設定，因此兩者的網站資料、歷史記錄和磁碟快取也會一並清除。</value>
+  </data>
+  <data name="TextCompose" xml:space="preserve">
+    <value>寫郵件</value>
+  </data>
+  <data name="TextReply" xml:space="preserve">
+    <value>回覆郵件</value>
+  </data>
+  <data name="TextOpeningMSAuth" xml:space="preserve">
+    <value>正在開啟 Microsoft 授權...</value>
+  </data>
+  <data name="TextAccountAdded" xml:space="preserve">
+    <value>已新增 {0}</value>
+  </data>
+  <data name="TextAddOutlookFailed" xml:space="preserve">
+    <value>新增 Outlook 帳戶失敗，請檢查授權或網路連結。</value>
+  </data>
+  <data name="TextOpeningGoogleAuth" xml:space="preserve">
+    <value>正在開啟 Google 授權...</value>
+  </data>
+  <data name="TextAddGmailFailed" xml:space="preserve">
+    <value>新增 Gmail 帳戶失敗，請檢查授權或網路連結。</value>
+  </data>
+  <data name="TextImapSetupHint" xml:space="preserve">
+    <value>請輸入 IMAP 伺服器資訊。Gmail/Outlook 建議優先使用 OAuth。</value>
+  </data>
+  <data name="TextEnterEmail" xml:space="preserve">
+    <value>請輸入信箱位址。</value>
+  </data>
+  <data name="TextEnterImapServer" xml:space="preserve">
+    <value>請輸入 IMAP 伺服器。</value>
+  </data>
+  <data name="TextEnterPassword" xml:space="preserve">
+    <value>請輸入密碼或應用專用密碼。</value>
+  </data>
+  <data name="TextEnterSmtpServer" xml:space="preserve">
+    <value>請輸入 SMTP 伺服器，IMAP 帳戶需要它來傳送郵件。</value>
+  </data>
+  <data name="TextConnectingImap" xml:space="preserve">
+    <value>正在連結 IMAP 伺服器...</value>
+  </data>
+  <data name="TextImapConnectFailed" xml:space="preserve">
+    <value>連結 IMAP 伺服器失敗，請檢查伺服器設定和憑據。</value>
+  </data>
+  <data name="TextReadSyncFailed" xml:space="preserve">
+    <value>已讀狀態同步失敗。</value>
+  </data>
+  <data name="TextNoBody" xml:space="preserve">
+    <value>沒有可用內文。</value>
+  </data>
+  <data name="TextTrustSource" xml:space="preserve">
+    <value>信任此來源</value>
+  </data>
+  <data name="TextUntrustSource" xml:space="preserve">
+    <value>取消信任來源</value>
+  </data>
+  <data name="TextTrusted" xml:space="preserve">
+    <value>已信任：{0}</value>
+  </data>
+  <data name="TextTrustTooltip" xml:space="preserve">
+    <value>信任後將允許載入此來源的遠端郵件內容：{0}</value>
+  </data>
+  <data name="TextTrustSender" xml:space="preserve">
+    <value>信任此寄件者</value>
+  </data>
+  <data name="TextTrustDomain" xml:space="preserve">
+    <value>信任所有 @{0}</value>
+  </data>
+  <data name="TextUntrustDomain" xml:space="preserve">
+    <value>取消信任 @{0}</value>
+  </data>
+  <data name="TextDomainTrusted" xml:space="preserve">
+    <value>域名已信任：@{0}</value>
+  </data>
+  <data name="TextLoadRemoteImages" xml:space="preserve">
+    <value>載入遠端圖片</value>
+  </data>
+  <data name="TextSelectSender" xml:space="preserve">
+    <value>請選擇寄件者。</value>
+  </data>
+  <data name="TextSenderNotFound" xml:space="preserve">
+    <value>找不到寄件者帳戶。</value>
+  </data>
+  <data name="TextEnterRecipient" xml:space="preserve">
+    <value>請輸入收件人。</value>
+  </data>
+  <data name="TextSending" xml:space="preserve">
+    <value>正在傳送...</value>
+  </data>
+  <data name="TextMailSent" xml:space="preserve">
+    <value>郵件已傳送。</value>
+  </data>
+  <data name="TextSendFailed" xml:space="preserve">
+    <value>傳送郵件失敗，請檢查網路連結和帳戶設定。</value>
+  </data>
+  <data name="TextRemoveAccountFailedTitle" xml:space="preserve">
+    <value>未移除帳戶</value>
+  </data>
+  <data name="TextRemoveAccountFailedContent" xml:space="preserve">
+    <value>無法完整清除授權資料。帳戶已保留，您可以重試。</value>
+  </data>
+  <data name="TextSendStatusUnknown" xml:space="preserve">
+    <value>傳送操作已超時。再次嘗試前，請先檢查“已傳送”資料夾。</value>
+  </data>
+  <data name="TextReadSyncQueued" xml:space="preserve">
+    <value>已讀狀態將在帳戶恢復可用後自動同步。</value>
+  </data>
+  <data name="MailPage_SelectFolderPrompt.AutomationProperties.Name" xml:space="preserve">
+    <value>郵件列表狀態</value>
+  </data>
+  <data name="MailPage_ComposeStatus.AutomationProperties.Name" xml:space="preserve">
+    <value>郵件傳送狀態</value>
+  </data>
+  <data name="RssPage_ArticleStatus.AutomationProperties.Name" xml:space="preserve">
+    <value>RSS 文章狀態</value>
+  </data>
+  <data name="TextClearRssDataTitle" xml:space="preserve">
+    <value>清除 RSS 本機資料？</value>
+  </data>
+  <data name="TextClearRssDataContent" xml:space="preserve">
+    <value>這將刪除此裝置上快取的 RSS 訂閱、文章和圖片。郵件與 RSS 閱讀器共享嵌入式瀏覽器設定，因此兩者的網站資料、歷史記錄和磁碟快取也會一並清除。此操作不會取消來源網站上的訂閱，也不會刪除系統備份。</value>
+  </data>
+  <data name="TextRssDataCleared" xml:space="preserve">
+    <value>RSS 本機資料已清除。</value>
+  </data>
+  <data name="TextOriginalMail" xml:space="preserve">
+    <value>---- 原始郵件 ----</value>
+  </data>
+  <data name="TextOriginalSender" xml:space="preserve">
+    <value>寄件者</value>
+  </data>
+  <data name="TextOriginalTime" xml:space="preserve">
+    <value>時間</value>
+  </data>
+  <data name="TextOriginalSubject" xml:space="preserve">
+    <value>主題</value>
+  </data>
+  <data name="TextRssInitFailed" xml:space="preserve">
+    <value>RSS 初始化失敗：{0}</value>
+  </data>
+  <data name="TextAllArticles" xml:space="preserve">
+    <value>全部文章</value>
+  </data>
+  <data name="TextUncategorized" xml:space="preserve">
+    <value>未分類</value>
+  </data>
+  <data name="TextNSubscriptions" xml:space="preserve">
+    <value>{0} 個訂閱，{1} 個資料夾</value>
+  </data>
+  <data name="TextNoCachedArticles" xml:space="preserve">
+    <value>暫無快取文章，點擊重新整理取得</value>
+  </data>
+  <data name="TextNArticlesScroll" xml:space="preserve">
+    <value>{0} 篇文章，向下滾動載入更多</value>
+  </data>
+  <data name="TextNArticles" xml:space="preserve">
+    <value>{0} 篇文章</value>
+  </data>
+  <data name="TextCacheLoadFailed" xml:space="preserve">
+    <value>快取讀取失敗：{0}</value>
+  </data>
+  <data name="TextNoArticles" xml:space="preserve">
+    <value>暫無文章</value>
+  </data>
+  <data name="TextNArticlesClickLoad" xml:space="preserve">
+    <value>{0} 篇文章，點擊載入更多</value>
+  </data>
+  <data name="TextLoadFailed" xml:space="preserve">
+    <value>載入失敗：{0}</value>
+  </data>
+  <data name="TextAllSubscriptions" xml:space="preserve">
+    <value>全部訂閱文章</value>
+  </data>
+  <data name="TextCurrentFolderArticles" xml:space="preserve">
+    <value>目前資料夾下的 RSS 文章</value>
+  </data>
+  <data name="TextUncategorizedArticles" xml:space="preserve">
+    <value>未分類訂閱文章</value>
+  </data>
+  <data name="TextRssAddress" xml:space="preserve">
+    <value>RSS 位址</value>
+  </data>
+  <data name="TextAddRssSubscription" xml:space="preserve">
+    <value>新增 RSS 訂閱</value>
+  </data>
+  <data name="TextAddFailed2" xml:space="preserve">
+    <value>新增失敗：{0}</value>
+  </data>
+  <data name="TextDeleteSubscription" xml:space="preserve">
+    <value>刪除訂閱</value>
+  </data>
+  <data name="TextDeleteSubscriptionContent" xml:space="preserve">
+    <value>確定要刪除"{0}"嗎？本機快取文章也會一起刪除。</value>
+  </data>
+  <data name="TextFolderName" xml:space="preserve">
+    <value>資料夾名稱</value>
+  </data>
+  <data name="TextRenameFolder" xml:space="preserve">
+    <value>重命名資料夾</value>
+  </data>
+  <data name="TextSubscriptionName" xml:space="preserve">
+    <value>訂閱名稱</value>
+  </data>
+  <data name="TextRenameSubscription" xml:space="preserve">
+    <value>重命名訂閱</value>
+  </data>
+  <data name="TextFolderNamePlaceholder" xml:space="preserve">
+    <value>例如：科技、新聞、博客</value>
+  </data>
+  <data name="TextAddRssFolder" xml:space="preserve">
+    <value>新增 RSS 資料夾</value>
+  </data>
+  <data name="TextDeleteFolder" xml:space="preserve">
+    <value>刪除資料夾</value>
+  </data>
+  <data name="TextDeleteFolderContent" xml:space="preserve">
+    <value>確定要刪除"{0}"嗎？訂閱不會刪除，會移動到未分類。</value>
+  </data>
+  <data name="TextSetFolder" xml:space="preserve">
+    <value>設定"{0}"的資料夾</value>
+  </data>
+  <data name="TextArticleRenderFailed" xml:space="preserve">
+    <value>文章渲染失敗：{0}</value>
+  </data>
+  <data name="TextPendingTasks" xml:space="preserve">
+    <value>待完成 ({0})</value>
+  </data>
+  <data name="TextCompletedTasks" xml:space="preserve">
+    <value>已完成 ({0})</value>
+  </data>
+  <data name="TextAllDone" xml:space="preserve">
+    <value>已經沒有未完成任務，{0} 個已完成</value>
+  </data>
+  <data name="TextTaskSummary" xml:space="preserve">
+    <value>{0} 個待完成，{1} 個已完成</value>
+  </data>
+  <data name="TextNoAccountAvailable" xml:space="preserve">
+    <value>沒有可用帳戶</value>
+  </data>
+  <data name="TextAddAccountForTasks" xml:space="preserve">
+    <value>請先新增並登入一個支援任務的帳戶。</value>
+  </data>
+  <data name="TextTitle" xml:space="preserve">
+    <value>標題</value>
+  </data>
+  <data name="TextTaskName" xml:space="preserve">
+    <value>任務名稱</value>
+  </data>
+  <data name="TextAccount" xml:space="preserve">
+    <value>帳戶</value>
+  </data>
+  <data name="TextDate" xml:space="preserve">
+    <value>日期</value>
+  </data>
+  <data name="TextTime" xml:space="preserve">
+    <value>時間</value>
+  </data>
+  <data name="TextAddTask" xml:space="preserve">
+    <value>新增任務</value>
+  </data>
+  <data name="TextEnterTaskName" xml:space="preserve">
+    <value>請輸入任務名稱</value>
+  </data>
+  <data name="TextDeleteTask" xml:space="preserve">
+    <value>刪除任務</value>
+  </data>
+  <data name="TextDeleteTaskContent" xml:space="preserve">
+    <value>確定要刪除"{0}"嗎？</value>
+  </data>
+  <data name="TextRemoveAccount" xml:space="preserve">
+    <value>移除帳戶</value>
+  </data>
+  <data name="TextRemoveAccountConfirm" xml:space="preserve">
+    <value>確定要移除 {0} 帳戶嗎？</value>
+  </data>
+  <data name="TextTodoTasks" xml:space="preserve">
+    <value>待辦任務</value>
+  </data>
+  <data name="TextCustomColorRGB" xml:space="preserve">
+    <value>自訂色彩 (RGB/HEX)</value>
+  </data>
+  <data name="TextRestartContent" xml:space="preserve">
+    <value>更改語言需要重啟應用才能生效。</value>
+  </data>
+  <data name="TextLater" xml:space="preserve">
+    <value>稍後</value>
+  </data>
+  <data name="TextNoSubscriptionsHint" xml:space="preserve">
+    <value>還沒有訂閱。新增 RSS 位址後開始閱讀。</value>
+  </data>
+  <data name="TextAdd" xml:space="preserve">
+    <value>新增</value>
+  </data>
+  <data name="TextYearFormat" xml:space="preserve">
+    <value>{0}年</value>
+  </data>
+  <data name="AddAccount_GoogleTitle.Text" xml:space="preserve">
+    <value>Google</value>
+  </data>
+  <data name="AddAccount_MSTitle.Text" xml:space="preserve">
+    <value>Microsoft</value>
+  </data>
+  <data name="CalendarPage_AccountHeader.Text" xml:space="preserve">
+    <value>行程帳戶</value>
+  </data>
+  <data name="CalendarPage_TodoHeader.Text" xml:space="preserve">
+    <value>待辦任務</value>
+  </data>
+  <data name="CalendarPage_AddAccount.Text" xml:space="preserve">
+    <value>新增帳戶</value>
+  </data>
+  <data name="CalendarPage_NoAccountTitle.Text" xml:space="preserve">
+    <value>尚未連結行程帳戶</value>
+  </data>
+  <data name="CalendarPage_NoAccountSub.Text" xml:space="preserve">
+    <value>連結 Google 或 Microsoft 帳戶後，這裡將顯示您的行程與待辦。</value>
+  </data>
+  <data name="TasksPage_AccountHeader.Text" xml:space="preserve">
+    <value>任務帳戶</value>
+  </data>
+  <data name="TasksPage_TodoHeader.Text" xml:space="preserve">
+    <value>待辦任務</value>
+  </data>
+  <data name="TasksPage_AddAccount.Text" xml:space="preserve">
+    <value>新增帳戶</value>
+  </data>
+  <data name="TasksPage_Title.Text" xml:space="preserve">
+    <value>任務</value>
+  </data>
+  <data name="TasksPage_Loading.Text" xml:space="preserve">
+    <value>正在載入任務</value>
+  </data>
+  <data name="TasksPage_AddTask.Text" xml:space="preserve">
+    <value>新增任務</value>
+  </data>
+  <data name="TasksPage_PendingHeader.Text" xml:space="preserve">
+    <value>待完成</value>
+  </data>
+  <data name="TasksPage_CompletedHeader.Text" xml:space="preserve">
+    <value>已完成</value>
+  </data>
+  <data name="TasksPage_NoPending.Text" xml:space="preserve">
+    <value>已經沒有未完成任務</value>
+  </data>
+  <data name="MailPage_Title.Text" xml:space="preserve">
+    <value>郵件</value>
+  </data>
+  <data name="MailPage_Subtitle.Text" xml:space="preserve">
+    <value>帳戶、資料夾與收件匣</value>
+  </data>
+  <data name="MailPage_Compose.Text" xml:space="preserve">
+    <value>寫郵件</value>
+  </data>
+  <data name="MailPage_Refresh.Text" xml:space="preserve">
+    <value>重新整理</value>
+  </data>
+  <data name="MailPage_DeleteAccount.Text" xml:space="preserve">
+    <value>刪除目前信箱</value>
+  </data>
+  <data name="MailPage_AddAccount.Text" xml:space="preserve">
+    <value>新增新信箱</value>
+  </data>
+  <data name="MailPage_SenderLabel.Text" xml:space="preserve">
+    <value>寄件者</value>
+  </data>
+  <data name="MailPage_DateLabel.Text" xml:space="preserve">
+    <value>時間</value>
+  </data>
+  <data name="RssPage_Title.Text" xml:space="preserve">
+    <value>RSS</value>
+  </data>
+  <data name="RssPage_FeedLabel.Text" xml:space="preserve">
+    <value>訂閱</value>
+  </data>
+  <data name="RssPage_Rename.Text" xml:space="preserve">
+    <value>重命名</value>
+  </data>
+  <data name="RssPage_Delete.Text" xml:space="preserve">
+    <value>刪除</value>
+  </data>
+  <data name="RssPage_AddFeed.Text" xml:space="preserve">
+    <value>新增訂閱</value>
+  </data>
+  <data name="RssPage_Browser.Text" xml:space="preserve">
+    <value>瀏覽器</value>
+  </data>
+  <data name="SettingsPage_MailSync.Text" xml:space="preserve">
+    <value>郵件同步</value>
+  </data>
+  <data name="SettingsPage_About.Text" xml:space="preserve">
+    <value>關於</value>
+  </data>
+  <data name="SettingsPage_WeatherBarDiagnostics.Text" xml:space="preserve">
+    <value>天氣欄診斷</value>
+  </data>
+  <data name="SettingsPage_WeatherBarDiagnosticsDesc.Text" xml:space="preserve">
+    <value>只讀的附加與版面配置狀態，不收集視窗標題或個人資料。</value>
+  </data>
+  <data name="SettingsPage_ReattachTaskbar.Content" xml:space="preserve">
+    <value>重新附加任務欄</value>
+  </data>
+  <data name="SettingsPage_Desc.Text" xml:space="preserve">
+    <value>行程、任務、天氣、郵件與 RSS 的系統匣浮動視窗效率工具。</value>
+  </data>
+  <data name="WeatherPage_BarTitle.Header" xml:space="preserve">
+    <value>任務欄天氣欄</value>
+  </data>
+  <data name="SettingsPage_MailPolling.Header" xml:space="preserve">
+    <value>定時抓取新郵件並顯示 Windows 通知</value>
+  </data>
+  <data name="SettingsPage_MailInterval.Header" xml:space="preserve">
+    <value>新郵件檢查間隔</value>
+  </data>
+  <data name="SettingsPage_BlockRemoteImages.Header" xml:space="preserve">
+    <value>預設阻止未信任寄件者的遠端圖片（防追蹤像素）</value>
+  </data>
+  <data name="SettingsPage_InsecureWebview.Header" xml:space="preserve">
+    <value>允許郵件載入 HTTP 圖片資源</value>
+  </data>
+  <data name="SettingsPage_RssRemote.Header" xml:space="preserve">
+    <value>允許 RSS 文章載入遠端圖片資源</value>
+  </data>
+  <data name="SettingsPage_ClearCache.Content" xml:space="preserve">
+    <value>清理 WebView2 快取</value>
+  </data>
+  <data name="SettingsPage_CacheWarning.Title" xml:space="preserve">
+    <value>WebView2 快取接近上限</value>
+  </data>
+  <data name="SettingsPage_CacheWarning.Message" xml:space="preserve">
+    <value>建議立即清理，以避免下次啟動時自動清理增加 I/O 開銷。</value>
+  </data>
+  <data name="MainWindow_NavTasks.Content" xml:space="preserve">
+    <value>任務</value>
+  </data>
+  <data name="MainWindow_NavMail.Content" xml:space="preserve">
+    <value>郵件</value>
+  </data>
+  <data name="MainWindow_NavRss.Content" xml:space="preserve">
+    <value>RSS</value>
+  </data>
+  <data name="TextVersion" xml:space="preserve">
+    <value>版本</value>
+  </data>
+  <data name="TextVersionUnknown" xml:space="preserve">
+    <value>未知版本</value>
+  </data>
+  <data name="TextRainStopSoon" xml:space="preserve">
+    <value>正在下雨，很快會停</value>
+  </data>
+  <data name="TextRainStopInAbout" xml:space="preserve">
+    <value>正在下雨，約{0}後停</value>
+  </data>
+  <data name="TextRainContinues" xml:space="preserve">
+    <value>未來{0}h雨還會持續</value>
+  </data>
+  <data name="TextRainMinute" xml:space="preserve">
+    <value>{0}分鐘</value>
+  </data>
+  <data name="TextWeatherDateFormat" xml:space="preserve">
+    <value>M月d日</value>
+  </data>
+  <data name="CalendarDialog_RecurrenceCombo.Header" xml:space="preserve">
+    <value>重複</value>
+  </data>
+  <data name="CalendarDialog_RecurrenceNone.Content" xml:space="preserve">
+    <value>不重複</value>
+  </data>
+  <data name="CalendarDialog_RecurrenceDaily.Content" xml:space="preserve">
+    <value>每天</value>
+  </data>
+  <data name="CalendarDialog_RecurrenceWeekly.Content" xml:space="preserve">
+    <value>每週</value>
+  </data>
+  <data name="CalendarDialog_RecurrenceMonthly.Content" xml:space="preserve">
+    <value>每月</value>
+  </data>
+  <data name="CalendarDialog_RecurrenceYearly.Content" xml:space="preserve">
+    <value>每年</value>
+  </data>
+  <data name="CalendarPage_BtnCollapseAccounts.ToolTipService.ToolTip" xml:space="preserve">
+    <value>折疊帳戶</value>
+  </data>
+  <data name="CalendarPage_BtnRemoveAccount.ToolTipService.ToolTip" xml:space="preserve">
+    <value>移除帳戶</value>
+  </data>
+  <data name="CalendarPage_BtnToggleAccounts.ToolTipService.ToolTip" xml:space="preserve">
+    <value>顯示/隱藏帳戶</value>
+  </data>
+  <data name="CalendarPage_BtnToggleTimeline.ToolTipService.ToolTip" xml:space="preserve">
+    <value>顯示/隱藏行程</value>
+  </data>
+  <data name="CalendarPage_BtnCollapseTimeline.ToolTipService.ToolTip" xml:space="preserve">
+    <value>折疊行程</value>
+  </data>
+  <data name="CalendarPage_BtnAddText.Text" xml:space="preserve">
+    <value>新增</value>
+  </data>
+  <data name="MailPage_UnreadOnlyToggle.Header" xml:space="preserve">
+    <value>僅未讀</value>
+  </data>
+  <data name="MailPage_InboxHeader.Text" xml:space="preserve">
+    <value>收件匣</value>
+  </data>
+  <data name="MailPage_LoadMore.Text" xml:space="preserve">
+    <value>載入更多郵件</value>
+  </data>
+  <data name="MailPage_RemoteImagesBlocked.Text" xml:space="preserve">
+    <value>已阻止遠端圖片以保護隱私。</value>
+  </data>
+  <data name="MailPage_BtnShowImages.Text" xml:space="preserve">
+    <value>顯示圖片</value>
+  </data>
+  <data name="MailPage_SelectFolderPrompt.Text" xml:space="preserve">
+    <value>請選擇左側資料夾</value>
+  </data>
+  <data name="MailPage_SelectMailPrompt.Text" xml:space="preserve">
+    <value>選擇一封郵件查看預覽</value>
+  </data>
+  <data name="MailPage_ToHeader.Text" xml:space="preserve">
+    <value>收件人</value>
+  </data>
+  <data name="MailPage_BtnTrustSender.Text" xml:space="preserve">
+    <value>信任此來源</value>
+  </data>
+  <data name="MailPage_BtnReply.Text" xml:space="preserve">
+    <value>回覆</value>
+  </data>
+  <data name="MailPage_BtnOpenInBrowser.Text" xml:space="preserve">
+    <value>在瀏覽器中開啟</value>
+  </data>
+  <data name="MailPage_AddAccountTitle.Text" xml:space="preserve">
+    <value>新增信箱帳戶</value>
+  </data>
+  <data name="MailPage_AddAccountSubtitle.Text" xml:space="preserve">
+    <value>選擇信箱類型。Outlook 和 Gmail 使用 OAuth；IMAP 需要填寫伺服器設定。</value>
+  </data>
+  <data name="MailPage_BtnMSAccount.Text" xml:space="preserve">
+    <value>Microsoft 帳戶</value>
+  </data>
+  <data name="MailPage_BtnCustomAccount.Text" xml:space="preserve">
+    <value>自訂信箱</value>
+  </data>
+  <data name="MailPage_ImapDisplayName.Header" xml:space="preserve">
+    <value>顯示名稱</value>
+  </data>
+  <data name="MailPage_ImapAddress.Header" xml:space="preserve">
+    <value>信箱位址</value>
+  </data>
+  <data name="MailPage_ImapUserName.Header" xml:space="preserve">
+    <value>使用者名</value>
+  </data>
+  <data name="MailPage_ImapPassword.Header" xml:space="preserve">
+    <value>密碼或應用專用密碼</value>
+  </data>
+  <data name="MailPage_ImapHost.Header" xml:space="preserve">
+    <value>IMAP 伺服器</value>
+  </data>
+  <data name="MailPage_ImapPort.Header" xml:space="preserve">
+    <value>端口</value>
+  </data>
+  <data name="MailPage_ImapSsl.Header" xml:space="preserve">
+    <value>使用 SSL/TLS</value>
+  </data>
+  <data name="MailPage_SmtpHost.Header" xml:space="preserve">
+    <value>SMTP 伺服器</value>
+  </data>
+  <data name="MailPage_SmtpPort.Header" xml:space="preserve">
+    <value>端口</value>
+  </data>
+  <data name="MailPage_SmtpUserName.Header" xml:space="preserve">
+    <value>SMTP 使用者名</value>
+  </data>
+  <data name="MailPage_SmtpSsl.Header" xml:space="preserve">
+    <value>SMTP 使用 SSL/TLS</value>
+  </data>
+  <data name="MailPage_BtnCancel.Content" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="MailPage_BtnSaveImapText.Text" xml:space="preserve">
+    <value>連結並儲存 IMAP 帳戶</value>
+  </data>
+  <data name="MailPage_ComposeTitle.Text" xml:space="preserve">
+    <value>寫郵件</value>
+  </data>
+  <data name="MailPage_BtnCancelCompose.Content" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="MailPage_TextSend.Text" xml:space="preserve">
+    <value>傳送</value>
+  </data>
+  <data name="MailPage_ComposeFrom.Header" xml:space="preserve">
+    <value>寄件者</value>
+  </data>
+  <data name="MailPage_ComposeTo.Header" xml:space="preserve">
+    <value>收件人</value>
+  </data>
+  <data name="MailPage_ComposeSubject.Header" xml:space="preserve">
+    <value>標題</value>
+  </data>
+  <data name="MailPage_ComposeBody.Header" xml:space="preserve">
+    <value>內容</value>
+  </data>
+  <data name="WeatherPage_WeatherBarDesc" xml:space="preserve">
+    <value>在任務欄上顯示浮動天氣條（替代 Win11 小組件天氣）</value>
+  </data>
+  <data name="WeatherPage_DailyForecastTitle" xml:space="preserve">
+    <value>未來 7 天預報</value>
+  </data>
+  <data name="WeatherPage_BarFieldsHeader" xml:space="preserve">
+    <value>任務欄天氣條內容</value>
+  </data>
+  <data name="WeatherPage_BarFieldsDesc" xml:space="preserve">
+    <value>選擇任務欄天氣條上顯示的欄位</value>
+  </data>
+  <data name="WeatherPage_AlertsHeader" xml:space="preserve">
+    <value>極端天氣預警</value>
+  </data>
+  <data name="WeatherPage_AlertsDesc" xml:space="preserve">
+    <value>檢測到極端天氣時在天氣條上顯示預警</value>
+  </data>
+  <data name="WeatherPage_AlertsToggleHeader" xml:space="preserve">
+    <value>啟用預警</value>
+  </data>
+  <data name="WeatherPage_AlertHoursLabel" xml:space="preserve">
+    <value>預警提前量（小時）：</value>
+  </data>
+  <data name="WeatherPage_FeelsLike" xml:space="preserve">
+    <value>體感</value>
+  </data>
+  <data name="WeatherPage_Humidity" xml:space="preserve">
+    <value>濕度</value>
+  </data>
+  <data name="WeatherPage_Wind" xml:space="preserve">
+    <value>風速</value>
+  </data>
+  <data name="WeatherPage_PrecipProb" xml:space="preserve">
+    <value>降水概率</value>
+  </data>
+  <data name="WeatherPage_Precipitation" xml:space="preserve">
+    <value>降水量</value>
+  </data>
+  <data name="WeatherPage_UVIndex" xml:space="preserve">
+    <value>UV 指數</value>
+  </data>
+  <data name="WeatherPage_Visibility" xml:space="preserve">
+    <value>能見度</value>
+  </data>
+  <data name="WeatherPage_Pressure" xml:space="preserve">
+    <value>氣壓</value>
+  </data>
+  <data name="WeatherPage_AQI" xml:space="preserve">
+    <value>空氣品質</value>
+  </data>
+  <data name="WeatherPage_GrassPollen" xml:space="preserve">
+    <value>草類花粉</value>
+  </data>
+  <data name="WeatherPage_BirchPollen" xml:space="preserve">
+    <value>樺樹花粉</value>
+  </data>
+  <data name="WeatherPage_RagweedPollen" xml:space="preserve">
+    <value>豚草花粉</value>
+  </data>
+  <data name="WeatherPage_AQIGood" xml:space="preserve">
+    <value>優</value>
+  </data>
+  <data name="WeatherPage_AQIModerate" xml:space="preserve">
+    <value>良</value>
+  </data>
+  <data name="WeatherPage_AQIUnhealthySensitive" xml:space="preserve">
+    <value>輕度污染</value>
+  </data>
+  <data name="WeatherPage_AQIUnhealthy" xml:space="preserve">
+    <value>中度污染</value>
+  </data>
+  <data name="WeatherPage_AQIHazardous" xml:space="preserve">
+    <value>重度污染</value>
+  </data>
+  <data name="WeatherPage_IconFontEmoji" xml:space="preserve">
+    <value>Windows 11 風格（表情符號）</value>
+  </data>
+  <data name="WeatherPage_IconFontSymbol" xml:space="preserve">
+    <value>經典風格（Segoe UI Symbol）</value>
+  </data>
+  <data name="WeatherPage_IconFontCustom" xml:space="preserve">
+    <value>自訂字體…</value>
+  </data>
+  <data name="WeatherPage_IconPackImporting" xml:space="preserve">
+    <value>正在匯入…</value>
+  </data>
+  <data name="WeatherPage_IconPackFailed" xml:space="preserve">
+    <value>失敗：ZIP 中未找到 drawable_filter.xml</value>
+  </data>
+  <data name="WeatherPage_IconPackImported" xml:space="preserve">
+    <value>匯入完成：{0}</value>
+  </data>
+  <data name="WeatherField_Icon" xml:space="preserve">
+    <value>圖示</value>
+  </data>
+  <data name="WeatherField_Temperature" xml:space="preserve">
+    <value>溫度</value>
+  </data>
+  <data name="WeatherField_Description" xml:space="preserve">
+    <value>天氣描述</value>
+  </data>
+  <data name="WeatherField_Location" xml:space="preserve">
+    <value>地點</value>
+  </data>
+  <data name="WeatherField_FeelsLike" xml:space="preserve">
+    <value>體感溫度</value>
+  </data>
+  <data name="WeatherField_Humidity" xml:space="preserve">
+    <value>濕度</value>
+  </data>
+  <data name="WeatherField_Wind" xml:space="preserve">
+    <value>風速</value>
+  </data>
+  <data name="WeatherField_Precipitation" xml:space="preserve">
+    <value>降水概率</value>
+  </data>
+  <data name="WeatherField_UVIndex" xml:space="preserve">
+    <value>UV 指數</value>
+  </data>
+  <data name="WeatherField_Visibility" xml:space="preserve">
+    <value>能見度</value>
+  </data>
+  <data name="WeatherField_Pressure" xml:space="preserve">
+    <value>氣壓</value>
+  </data>
+  <data name="WeatherField_AirQuality" xml:space="preserve">
+    <value>空氣品質</value>
+  </data>
+  <data name="WeatherField_Pollen" xml:space="preserve">
+    <value>花粉過敏</value>
+  </data>
+  <data name="WeatherField_Sun" xml:space="preserve">
+    <value>日出日落</value>
+  </data>
+  <data name="WeatherField_Moon" xml:space="preserve">
+    <value>月相</value>
+  </data>
+  <data name="WeatherAlert_Thunderstorm" xml:space="preserve">
+    <value>雷陣雨</value>
+  </data>
+  <data name="WeatherAlert_FreezingRain" xml:space="preserve">
+    <value>凍雨</value>
+  </data>
+  <data name="WeatherAlert_HeavyRain" xml:space="preserve">
+    <value>大雨</value>
+  </data>
+  <data name="WeatherAlert_Rain" xml:space="preserve">
+    <value>降雨</value>
+  </data>
+  <data name="WeatherAlert_HeavySnow" xml:space="preserve">
+    <value>大雪</value>
+  </data>
+  <data name="WeatherAlert_Snow" xml:space="preserve">
+    <value>降雪</value>
+  </data>
+  <data name="WeatherAlert_Fog" xml:space="preserve">
+    <value>起霧</value>
+  </data>
+  <data name="WeatherAlert_HighWind" xml:space="preserve">
+    <value>大風</value>
+  </data>
+  <data name="WeatherAlert_ExtremeHeat" xml:space="preserve">
+    <value>高溫</value>
+  </data>
+  <data name="WeatherAlert_ExtremeCold" xml:space="preserve">
+    <value>嚴寒</value>
+  </data>
+  <data name="WeatherPage_RemoveLocation" xml:space="preserve"><value>移除</value></data>
+  <data name="WeatherPage_RemoveLocationTitle" xml:space="preserve"><value>移除已儲存地點？</value></data>
+  <data name="WeatherPage_RemoveLocationConfirm" xml:space="preserve"><value>這也會移除此裝置上儲存的該地點天氣快取。</value></data>
+  <data name="WeatherPage_LocationCount" xml:space="preserve"><value>已儲存 {0}/{1} 個地點</value></data>
+  <data name="WeatherBar_ManageLocations" xml:space="preserve"><value>管理地點</value></data>
+  <data name="WeatherAlertDetail_Type" xml:space="preserve"><value>類型</value></data>
+  <data name="WeatherAlertDetail_Start" xml:space="preserve"><value>開始</value></data>
+  <data name="WeatherAlertDetail_End" xml:space="preserve"><value>結束</value></data>
+  <data name="WeatherAlertDetail_Precipitation" xml:space="preserve"><value>降水概率</value></data>
+  <data name="WeatherAlertDetail_Wind" xml:space="preserve"><value>風速</value></data>
+  <data name="WeatherAlertDetail_Temperature" xml:space="preserve"><value>溫度</value></data>
+  <data name="WeatherAlertDetail_Threshold" xml:space="preserve"><value>檢測閾值</value></data>
+  <data name="WeatherAlertDetail_Location" xml:space="preserve"><value>地點</value></data>
+  <data name="WeatherAlertDetail_Disclaimer" xml:space="preserve"><value>僅根據天氣預報推導，並非官方天氣預警。</value></data>
+  <data name="WeatherAlertDetail_OpenWeather" xml:space="preserve"><value>開啟天氣</value></data>
+  <data name="WeatherAlertDetail_Threshold_HeavyRain" xml:space="preserve"><value>降水概率 &gt;= 50%</value></data>
+  <data name="WeatherAlertDetail_Threshold_Rain" xml:space="preserve"><value>降水概率 &gt;= 50%</value></data>
+  <data name="WeatherAlertDetail_Threshold_HighWind" xml:space="preserve"><value>風速 &gt;= 40 km/h</value></data>
+  <data name="WeatherAlertDetail_Threshold_ExtremeHeat" xml:space="preserve"><value>溫度 &gt;= 35 C</value></data>
+  <data name="WeatherAlertDetail_Threshold_ExtremeCold" xml:space="preserve"><value>溫度 &lt;= -10 C</value></data>
+  <data name="WeatherAlertDetail_Threshold_Thunderstorm" xml:space="preserve"><value>預報天氣狀況代碼</value></data>
+  <data name="WeatherAlertDetail_Threshold_FreezingRain" xml:space="preserve"><value>預報天氣狀況代碼</value></data>
+  <data name="WeatherAlertDetail_Threshold_HeavySnow" xml:space="preserve"><value>預報天氣狀況代碼</value></data>
+  <data name="WeatherAlertDetail_Threshold_Snow" xml:space="preserve"><value>預報天氣狀況代碼</value></data>
+  <data name="WeatherAlertDetail_Threshold_Fog" xml:space="preserve"><value>預報天氣狀況代碼</value></data>
+  <data name="RssPage_AllSubscriptions.Text" xml:space="preserve">
+    <value>全部訂閱文章</value>
+  </data>
+  <data name="RssPage_ShowSubscriptions.Content" xml:space="preserve">
+    <value>訂閱源</value>
+  </data>
+  <data name="RssPage_ShowSubscriptions.AutomationProperties.Name" xml:space="preserve">
+    <value>顯示訂閱源</value>
+  </data>
+  <data name="RssPage_AllArticles.Text" xml:space="preserve">
+    <value>全部文章</value>
+  </data>
+  <data name="RssPage_BtnAddFolder.ToolTipService.ToolTip" xml:space="preserve">
+    <value>新增資料夾</value>
+  </data>
+  <data name="RssPage_BtnBackToList.ToolTipService.ToolTip" xml:space="preserve">
+    <value>返回列表</value>
+  </data>
+  <data name="SettingsPage_AutoMarkMailAsRead.Header" xml:space="preserve">
+    <value>開啟郵件時自動標記為已讀</value>
+  </data>
+  <data name="SettingsPage_AutoMarkMailAsReadDesc.Text" xml:space="preserve">
+    <value>此設定僅控制開啟單封郵件時的自動標記；手動的已讀、未讀和旗標指令仍會寫入信箱。</value>
+  </data>
+  <data name="SettingsPage_BackgroundDesc.Text" xml:space="preserve">
+    <value>開啟後關閉主視窗仍會保留系統匣、同步、提醒和郵件輪詢；關閉後會退出應用。</value>
+  </data>
+  <data name="MailPage_ComposeConsentHint.Text" xml:space="preserve">
+    <value>Gmail 可能請求傳送權限；Outlook 可能請求郵件讀寫和傳送權限，以建立可追蹤草稿並避免重複傳送。</value>
+  </data>
+  <data name="MailPage_SendComposeButton.AutomationProperties.Name" xml:space="preserve">
+    <value>傳送郵件</value>
+  </data>
+  <data name="MailPage_SendComposeButton.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Gmail 可能請求傳送權限；Outlook 可能請求郵件讀寫和傳送權限，以建立可追蹤草稿並避免重複傳送。</value>
+  </data>
+  <data name="MailPage_SendComposeButton.ToolTipService.ToolTip" xml:space="preserve">
+    <value>傳送郵件</value>
+  </data>
+  <data name="WeatherPage_LocationPrivacyDesc.Text" xml:space="preserve">
+    <value>使用目前位置或自動跟隨定位會調用 Windows 位置權限；座標僅儲存在本機，並只用於向所選天氣來源請求天氣。</value>
+  </data>
+  <data name="WeatherLocationUpdated" xml:space="preserve">
+    <value>位置已更新：{0}</value>
+  </data>
+  <data name="SettingsPage_NotifyDesc.Text" xml:space="preserve">
+    <value>行程提醒只影響行事曆/任務開始前的提醒通知；天氣警報在天氣頁單獨設定。</value>
+  </data>
+  <data name="SettingsPage_MailPollingDesc.Text" xml:space="preserve">
+    <value>新郵件通知只影響郵件輪詢；不會改變行程提醒或天氣警報設定。</value>
+  </data>
+  <data name="AddAccount_ChecklistFormat" xml:space="preserve"><value>Google：{0}
+Microsoft：{1}
+iCloud：{2}
+郵件：{3}
+天氣：{4}</value></data>
+  <data name="TextRssRefreshBlockedPrivateNetwork" xml:space="preserve"><value>重新整理被安全策略攔截：RSS 位址或重定向解析到了非公網 IP。必須為此訂閱的指定主機、端口和協議單獨批準本機網路訪問。</value></data>
+  <data name="TextAllowLocalNetworkRss" xml:space="preserve"><value>允許此訂閱訪問其指定的本機網路主機和端口</value></data>
+  <data name="TextLocalNetworkRssWarning" xml:space="preserve"><value>僅對家庭或工作網路中可信的 RSS 源啟用。重定向到其他本機主機或端口仍會被阻止。</value></data>
+  <data name="TextLocalNetworkRssTitle" xml:space="preserve"><value>允許 RSS 訪問本機網路？</value></data>
+  <data name="TextLocalNetworkRssConfirm" xml:space="preserve"><value>僅允許此訂閱連結到 {0}？重定向到其他本機主機、端口或協議仍會被阻止。</value></data>
+  <data name="TextRssRefreshFailed" xml:space="preserve"><value>重新整理失敗：{0}</value></data>
+  <data name="TextRssRemoteImagesProxied" xml:space="preserve"><value>遠端圖片由 Task Flyout 安全代理載入；解析到私有網路的資源會被阻止。</value></data>
+  <data name="TextRssRemoteImagesBlockedPrivacy" xml:space="preserve"><value>遠端圖片已按隱私設定阻止。可在設定中啟用 RSS 遠端資源，通過安全代理載入。</value></data>
+  <data name="Flyout_BtnGoToToday.AutomationProperties.Name" xml:space="preserve"><value>回到今天</value></data>
+  <data name="Flyout_BtnWeather.AutomationProperties.Name" xml:space="preserve"><value>查看天氣詳情</value></data>
+  <data name="Flyout_BtnSettings.AutomationProperties.Name" xml:space="preserve"><value>開啟設定</value></data>
+  <data name="Flyout_BtnRefresh.AutomationProperties.Name" xml:space="preserve"><value>立即同步</value></data>
+  <data name="Flyout_BtnPin.AutomationProperties.Name" xml:space="preserve"><value>置頂視窗</value></data>
+  <data name="CalendarPage_BtnCollapseAccounts.AutomationProperties.Name" xml:space="preserve"><value>折疊帳戶</value></data>
+  <data name="CalendarPage_BtnRemoveAccount.AutomationProperties.Name" xml:space="preserve"><value>移除帳戶</value></data>
+  <data name="CalendarPage_TaskVisibilityToggle.AutomationProperties.Name" xml:space="preserve"><value>顯示或隱藏待辦任務</value></data>
+  <data name="CalendarPage_BtnToggleAccounts.AutomationProperties.Name" xml:space="preserve"><value>顯示或隱藏帳戶</value></data>
+  <data name="CalendarPage_BtnToggleTimeline.AutomationProperties.Name" xml:space="preserve"><value>顯示或隱藏行程</value></data>
+  <data name="CalendarPage_BtnCollapseTimeline.AutomationProperties.Name" xml:space="preserve"><value>折疊行程</value></data>
+  <data name="TasksPage_BtnCollapseAccounts.AutomationProperties.Name" xml:space="preserve"><value>折疊帳戶</value></data>
+  <data name="TasksPage_BtnCollapseAccounts.ToolTipService.ToolTip" xml:space="preserve"><value>折疊帳戶</value></data>
+  <data name="TasksPage_BtnRemoveAccount.AutomationProperties.Name" xml:space="preserve"><value>移除帳戶</value></data>
+  <data name="TasksPage_BtnRemoveAccount.ToolTipService.ToolTip" xml:space="preserve"><value>移除帳戶</value></data>
+  <data name="TasksPage_TaskVisibilityToggle.AutomationProperties.Name" xml:space="preserve"><value>顯示或隱藏待辦任務</value></data>
+  <data name="TasksPage_BtnExpandAccounts.AutomationProperties.Name" xml:space="preserve"><value>展開帳戶</value></data>
+  <data name="TasksPage_BtnExpandAccounts.ToolTipService.ToolTip" xml:space="preserve"><value>展開帳戶</value></data>
+  <data name="TasksPage_BtnDeleteTask.AutomationProperties.Name" xml:space="preserve"><value>刪除任務</value></data>
+  <data name="TasksPage_BtnDeleteTask.ToolTipService.ToolTip" xml:space="preserve"><value>刪除任務</value></data>
+  <data name="RssPage_BtnAddFolder.AutomationProperties.Name" xml:space="preserve"><value>新增資料夾</value></data>
+  <data name="RssPage_AddSubscriptionButton.AutomationProperties.Name" xml:space="preserve"><value>新增訂閱</value></data>
+  <data name="RssPage_AddSubscriptionButton.ToolTipService.ToolTip" xml:space="preserve"><value>新增訂閱</value></data>
+  <data name="RssPage_RefreshButton.AutomationProperties.Name" xml:space="preserve"><value>重新整理 RSS 文章</value></data>
+  <data name="RssPage_RefreshButton.ToolTipService.ToolTip" xml:space="preserve"><value>重新整理 RSS 文章</value></data>
+  <data name="RssPage_BtnBackToList.AutomationProperties.Name" xml:space="preserve"><value>返回列表</value></data>
+  <data name="RssPage_OpenArticleInBrowserButton.AutomationProperties.Name" xml:space="preserve"><value>在瀏覽器中開啟文章</value></data>
+  <data name="RssPage_OpenArticleInBrowserButton.ToolTipService.ToolTip" xml:space="preserve"><value>在瀏覽器中開啟文章</value></data>
+  <data name="MailPage_ComposeButton.AutomationProperties.Name" xml:space="preserve"><value>寫郵件</value></data>
+  <data name="MailPage_ComposeButton.ToolTipService.ToolTip" xml:space="preserve"><value>寫郵件</value></data>
+  <data name="MailPage_RefreshButton.AutomationProperties.Name" xml:space="preserve"><value>重新整理郵件</value></data>
+  <data name="MailPage_RefreshButton.ToolTipService.ToolTip" xml:space="preserve"><value>重新整理郵件</value></data>
+  <data name="MailPage_RemoveMailButton.AutomationProperties.Name" xml:space="preserve"><value>刪除目前信箱</value></data>
+  <data name="MailPage_RemoveMailButton.ToolTipService.ToolTip" xml:space="preserve"><value>刪除目前信箱</value></data>
+  <data name="MailPage_AddMailButton.AutomationProperties.Name" xml:space="preserve"><value>新增新信箱</value></data>
+  <data name="MailPage_AddMailButton.ToolTipService.ToolTip" xml:space="preserve"><value>新增新信箱</value></data>
+  <data name="MailPage_LoadMoreButton.AutomationProperties.Name" xml:space="preserve"><value>載入更多郵件</value></data>
+  <data name="MailPage_LoadMoreButton.ToolTipService.ToolTip" xml:space="preserve"><value>載入更多郵件</value></data>
+  <data name="MailPage_ShowRemoteImagesButton.AutomationProperties.Name" xml:space="preserve"><value>顯示遠端圖片</value></data>
+  <data name="MailPage_ShowRemoteImagesButton.ToolTipService.ToolTip" xml:space="preserve"><value>顯示遠端圖片</value></data>
+  <data name="MailPage_TrustSenderButton.AutomationProperties.Name" xml:space="preserve"><value>信任此來源</value></data>
+  <data name="MailPage_TrustSenderButton.ToolTipService.ToolTip" xml:space="preserve"><value>信任此來源</value></data>
+  <data name="MailPage_ReplyButton.AutomationProperties.Name" xml:space="preserve"><value>回覆郵件</value></data>
+  <data name="MailPage_ReplyButton.ToolTipService.ToolTip" xml:space="preserve"><value>回覆郵件</value></data>
+  <data name="MailPage_OpenInBrowserButton.AutomationProperties.Name" xml:space="preserve"><value>在瀏覽器中開啟郵件</value></data>
+  <data name="MailPage_OpenInBrowserButton.ToolTipService.ToolTip" xml:space="preserve"><value>在瀏覽器中開啟郵件</value></data>
+  <data name="MailPage_AddOutlookButton.AutomationProperties.Name" xml:space="preserve"><value>新增 Outlook 信箱</value></data>
+  <data name="MailPage_AddOutlookButton.ToolTipService.ToolTip" xml:space="preserve"><value>新增 Outlook 信箱</value></data>
+  <data name="MailPage_AddGmailButton.AutomationProperties.Name" xml:space="preserve"><value>新增 Gmail 信箱</value></data>
+  <data name="MailPage_AddGmailButton.ToolTipService.ToolTip" xml:space="preserve"><value>新增 Gmail 信箱</value></data>
+  <data name="MailPage_AddImapButton.AutomationProperties.Name" xml:space="preserve"><value>新增 IMAP 信箱</value></data>
+  <data name="MailPage_AddImapButton.ToolTipService.ToolTip" xml:space="preserve"><value>新增 IMAP 信箱</value></data>
+  <data name="MailPage_BtnCancel.AutomationProperties.Name" xml:space="preserve"><value>取消 IMAP 設定</value></data>
+  <data name="MailPage_BtnCancel.ToolTipService.ToolTip" xml:space="preserve"><value>取消 IMAP 設定</value></data>
+  <data name="MailPage_BtnSaveImap.AutomationProperties.Name" xml:space="preserve"><value>連結並儲存 IMAP 帳戶</value></data>
+  <data name="MailPage_BtnSaveImap.ToolTipService.ToolTip" xml:space="preserve"><value>連結並儲存 IMAP 帳戶</value></data>
+  <data name="MailPage_BtnCancelCompose.AutomationProperties.Name" xml:space="preserve"><value>取消寫郵件</value></data>
+  <data name="MailPage_BtnCancelCompose.ToolTipService.ToolTip" xml:space="preserve"><value>取消寫郵件</value></data>
+  <data name="WeatherPage_UseCurrentLocationButton.AutomationProperties.Name" xml:space="preserve"><value>使用目前位置</value></data>
+  <data name="WeatherPage_UseCurrentLocationButton.ToolTipService.ToolTip" xml:space="preserve"><value>使用目前位置</value></data>
+  <data name="WeatherPage_BtnRefresh.AutomationProperties.Name" xml:space="preserve"><value>重新整理天氣</value></data>
+  <data name="WeatherPage_BtnRefresh.ToolTipService.ToolTip" xml:space="preserve"><value>重新整理天氣</value></data>
+  <data name="WeatherPage_BtnImportIconPack.AutomationProperties.Name" xml:space="preserve"><value>匯入天氣圖示包</value></data>
+  <data name="WeatherPage_BtnImportIconPack.ToolTipService.ToolTip" xml:space="preserve"><value>匯入天氣圖示包</value></data>
+  <data name="WeatherPage_BtnDeleteIconPack.AutomationProperties.Name" xml:space="preserve"><value>刪除目前天氣圖示包</value></data>
+  <data name="WeatherPage_BtnDeleteIconPack.ToolTipService.ToolTip" xml:space="preserve"><value>刪除目前天氣圖示包</value></data>
+  <data name="SettingsPage_ClearCache.AutomationProperties.Name" xml:space="preserve"><value>清理 WebView2 快取</value></data>
+  <data name="SettingsPage_ClearCache.ToolTipService.ToolTip" xml:space="preserve"><value>清理 WebView2 快取</value></data>
+  <data name="SettingsPage_ClearRssData.Content" xml:space="preserve"><value>清除 RSS 本機資料</value></data>
+  <data name="SettingsPage_ClearRssData.AutomationProperties.Name" xml:space="preserve"><value>清除 RSS 本機資料</value></data>
+  <data name="SettingsPage_ClearRssData.ToolTipService.ToolTip" xml:space="preserve"><value>清除 RSS 本機資料</value></data>
+  <data name="WeatherBar_OpenButton.AutomationProperties.Name" xml:space="preserve"><value>開啟 Task Flyout 天氣</value></data>
+  <data name="WeatherBar_OpenButton.ToolTipService.ToolTip" xml:space="preserve"><value>開啟天氣</value></data>
+  <data name="TextAllowInsecureHttpRss" xml:space="preserve"><value>允許此訂閱使用未加密的 HTTP</value></data>
+  <data name="TextInsecureHttpRssWarning" xml:space="preserve"><value>HTTP 訂閱內容可能被網路中的其他裝置讀取或篡改，建議使用 HTTPS。</value></data>
+  <data name="TextInsecureHttpRssTitle" xml:space="preserve"><value>允許不安全的 RSS 連結？</value></data>
+  <data name="TextInsecureHttpRssConfirm" xml:space="preserve"><value>{0} 使用未加密的 HTTP，網路中的其他裝置可能讀取或篡改其內容。是否僅對此訂閱允許？</value></data>
+  <data name="TextAllow" xml:space="preserve"><value>允許</value></data>
+  <data name="SettingsPage_ClearWeatherData.Content" xml:space="preserve"><value>清除天氣和位置資料</value></data>
+  <data name="SettingsPage_ClearWeatherData.AutomationProperties.Name" xml:space="preserve"><value>清除天氣和位置資料</value></data>
+  <data name="SettingsPage_ClearWeatherData.ToolTipService.ToolTip" xml:space="preserve"><value>清除已儲存的天氣、城市和精確座標</value></data>
+  <data name="TextClearWeatherDataTitle" xml:space="preserve"><value>清除天氣和位置資料？</value></data>
+  <data name="TextClearWeatherDataContent" xml:space="preserve"><value>此操作會停止位置追蹤，並從本裝置刪除已儲存的城市、精確座標和天氣快取。</value></data>
+  <data name="TextWeatherDataCleared" xml:space="preserve"><value>已清除天氣和位置資料。</value></data>
+  <data name="TextTaskMutationQueued" xml:space="preserve"><value>任務更改已排隊...</value></data>
+  <data name="TextTaskMutationPending" xml:space="preserve"><value>正在儲存任務更改...</value></data>
+  <data name="TextTaskMutationFailed" xml:space="preserve"><value>任務更改失敗，可以重試。</value></data>
+  <data name="TextTaskMutationSucceeded" xml:space="preserve"><value>任務更改已儲存。</value></data>
+  <data name="TaskMutation_Retry.Content" xml:space="preserve"><value>重試</value></data>
+  <data name="TaskMutation_Retry.AutomationProperties.Name" xml:space="preserve"><value>重試失敗的任務更改</value></data>
+  <data name="TextProviderRemovalContent" xml:space="preserve"><value>僅從行事曆和任務中移除 {0}，還是從行事曆、任務和郵件中完全斷開？僅移除此功能會保留共享的服務提供者授權。</value></data>
+  <data name="TextMailProviderRemovalContent" xml:space="preserve"><value>僅從郵件中移除 {0} - {1}，還是從郵件、行事曆和任務中完全斷開此服務提供者？僅移除郵件會保留共享授權。兩種方式都會清除嵌入式瀏覽器資料。</value></data>
+  <data name="TextRemoveAgendaOnly" xml:space="preserve"><value>僅在此處移除</value></data>
+  <data name="TextRemoveMailOnly" xml:space="preserve"><value>僅在此處移除</value></data>
+  <data name="TextDisconnectProvider" xml:space="preserve"><value>完全斷開</value></data>
+  <data name="TextDisconnectProviderFailed" xml:space="preserve"><value>帳戶更改未完成，部分本機資料可能仍然保留，請重試。</value></data>
+  <data name="MailPage_AccountsButton.AutomationProperties.Name" xml:space="preserve"><value>顯示郵件帳戶和資料夾</value></data>
+  <data name="MailPage_AccountsButton.ToolTipService.ToolTip" xml:space="preserve"><value>郵件帳戶和資料夾</value></data>
+  <data name="MailPage_BackButton.AutomationProperties.Name" xml:space="preserve"><value>返回上一個郵件面板</value></data>
+  <data name="MailPage_BackButton.ToolTipService.ToolTip" xml:space="preserve"><value>返回</value></data>
+  <data name="RssPage_OpmlButton.AutomationProperties.Name" xml:space="preserve"><value>匯入或匯出訂閱</value></data>
+  <data name="RssPage_ImportOpml.Text" xml:space="preserve"><value>匯入 OPML...</value></data>
+  <data name="RssPage_ExportOpml.Text" xml:space="preserve"><value>匯出 OPML...</value></data>
+  <data name="TextOpmlTooLarge" xml:space="preserve"><value>OPML 檔案大於 5 MB。</value></data>
+  <data name="TextOpmlAllowHttp" xml:space="preserve"><value>允許匯入未加密的 HTTP 訂閱</value></data>
+  <data name="TextOpmlPreview" xml:space="preserve"><value>新增訂閱：{0}&#xA;跳過重複項：{1}&#xA;映射資料夾：{2}&#xA;未加密 HTTP 訂閱：{3}</value></data>
+  <data name="TextOpmlImportTitle" xml:space="preserve"><value>匯入 OPML 訂閱</value></data>
+  <data name="TextImport" xml:space="preserve"><value>匯入</value></data>
+  <data name="TextOpmlImportResult" xml:space="preserve"><value>已匯入 {0} 個訂閱；跳過 {1} 個；失敗 {2} 個。重新整理以下載文章。</value></data>
+  <data name="TextOpmlImportFailed" xml:space="preserve"><value>OPML 匯入失敗：{0}</value></data>
+  <data name="TextOpmlFileType" xml:space="preserve"><value>OPML 訂閱列表</value></data>
+  <data name="TextOpmlExportResult" xml:space="preserve"><value>已將 {0} 個訂閱匯出到 {1}。</value></data>
+  <data name="TextOpmlExportFailed" xml:space="preserve"><value>OPML 匯出失敗：{0}</value></data>
+  <data name="RssPage_FilterAll.Content" xml:space="preserve"><value>全部</value></data>
+  <data name="RssPage_FilterUnread.Content" xml:space="preserve"><value>未讀</value></data>
+  <data name="RssPage_FilterStarred.Content" xml:space="preserve"><value>收藏</value></data>
+  <data name="RssPage_ArticleFilter.AutomationProperties.Name" xml:space="preserve"><value>文章篩選</value></data>
+  <data name="RssPage_ToggleStar.AutomationProperties.Name" xml:space="preserve"><value>切換收藏狀態</value></data>
+  <data name="RssPage_ToggleRead.AutomationProperties.Name" xml:space="preserve"><value>切換已讀狀態</value></data>
+  <data name="TasksPage_Search.PlaceholderText" xml:space="preserve"><value>搜尋快取任務</value></data>
+  <data name="TasksPage_Search.AutomationProperties.Name" xml:space="preserve"><value>搜尋快取任務</value></data>
+  <data name="MailPage_Search.PlaceholderText" xml:space="preserve"><value>搜尋已載入郵件</value></data>
+  <data name="MailPage_Search.AutomationProperties.Name" xml:space="preserve"><value>搜尋已載入郵件</value></data>
+  <data name="RssPage_Search.PlaceholderText" xml:space="preserve"><value>搜尋快取文章</value></data>
+  <data name="RssPage_Search.AutomationProperties.Name" xml:space="preserve"><value>搜尋快取文章</value></data>
+  <data name="TextSearchMatches" xml:space="preserve"><value>已載入 {1} 項，匹配 {0} 項</value></data>
+  <data name="TextSearchMatchesSimple" xml:space="preserve"><value>匹配 {0} 個任務</value></data>
+  <data name="TrayMenu_Status.Text" xml:space="preserve"><value>Task Flyout · 就緒</value></data>
+  <data name="TrayMenu_NewItem.Text" xml:space="preserve"><value>新增項目</value></data>
+  <data name="TrayMenu_SyncNow.Text" xml:space="preserve"><value>立即同步</value></data>
+  <data name="TrayMenu_Compose.Text" xml:space="preserve"><value>撰寫郵件</value></data>
+  <data name="TrayMenu_Weather.Text" xml:space="preserve"><value>天氣</value></data>
+  <data name="TrayStatus_Ready" xml:space="preserve"><value>就緒</value></data>
+  <data name="TrayStatus_Syncing" xml:space="preserve"><value>正在同步...</value></data>
+  <data name="TrayStatus_Finished" xml:space="preserve"><value>同步完成</value></data>
+  <data name="TrayStatus_NeedsAttention" xml:space="preserve"><value>需要處理</value></data>
+  <data name="TrayStatus_NewMail" xml:space="preserve"><value>有新郵件</value></data>
+  <data name="TextRecoverDraftTitle" xml:space="preserve"><value>恢復未傳送的草稿？</value></data>
+  <data name="TextRecoverDraftContent" xml:space="preserve"><value>存在一份儲存于 {0} 的受保護草稿。</value></data>
+  <data name="TextRestore" xml:space="preserve"><value>恢復</value></data>
+  <data name="TextNotNow" xml:space="preserve"><value>暫不處理</value></data>
+  <data name="TextDiscardDraftTitle" xml:space="preserve"><value>丟棄草稿？</value></data>
+  <data name="TextDiscardDraftContent" xml:space="preserve"><value>未傳送的郵件將被安全刪除。</value></data>
+  <data name="TextDiscard" xml:space="preserve"><value>丟棄</value></data>
+  <data name="TextContinueEditing" xml:space="preserve"><value>繼續編輯</value></data>
+  <data name="TextDiscardDraftFailed" xml:space="preserve"><value>無法刪除受保護草稿，請重試。</value></data>
+  <data name="TextMailSentDraftCleanupFailed" xml:space="preserve"><value>郵件已傳送，但無法刪除受保護的恢復副本。再次撰寫前請先丟棄該副本。</value></data>
+  <data name="MailPage_AddAttachments.Content" xml:space="preserve"><value>新增附件</value></data>
+  <data name="MailPage_RemoveAttachment.AutomationProperties.Name" xml:space="preserve"><value>移除附件</value></data>
+  <data name="TextAttachmentCountLimit" xml:space="preserve"><value>最多可新增 10 個附件。</value></data>
+  <data name="TextAttachmentFileLimit" xml:space="preserve"><value>每個附件必須大於 0 字節且不超過 3 MB。</value></data>
+  <data name="TextAttachmentTotalLimit" xml:space="preserve"><value>附件總大小不能超過 10 MB。</value></data>
+  <data name="TextAttachmentAddFailed" xml:space="preserve"><value>無法新增附件：{0}</value></data>
+  <data name="TextAttachmentSummary" xml:space="preserve"><value>{0} 個檔案 · 已使用 {1}/10 MB</value></data>
+  <data name="TextPreparingAttachments" xml:space="preserve"><value>正在準備附件...</value></data>
+  <data name="TextUploadingAttachments" xml:space="preserve"><value>正在上傳附件...</value></data>
+  <data name="TextConfirmingSend" xml:space="preserve"><value>正在確認傳送狀態...</value></data>
+  <data name="Notification_Snooze" xml:space="preserve"><value>推遲 10 分鐘</value></data>
+  <data name="Notification_Complete" xml:space="preserve"><value>完成</value></data>
+  <data name="TextTaskReminder" xml:space="preserve"><value>任務提醒</value></data>
+  <data name="TextTaskDueOneMinute" xml:space="preserve"><value>任務將在 1 分鐘後到期</value></data>
+  <data name="TextTaskDueMinutes" xml:space="preserve"><value>任務將在 {0} 分鐘後到期</value></data>
+  <data name="TasksPage_BtnEditTask.AutomationProperties.Name" xml:space="preserve"><value>編輯任務</value></data>
+  <data name="TasksPage_BtnEditTask.ToolTipService.ToolTip" xml:space="preserve"><value>編輯任務</value></data>
+  <data name="TextEditTask" xml:space="preserve"><value>編輯任務</value></data>
+  <data name="TextCompleted" xml:space="preserve"><value>已完成</value></data>
+  <data name="TextTaskAccountList" xml:space="preserve"><value>帳號：{0} · 列表：{1}</value></data>
+  <data name="TextDefaultList" xml:space="preserve"><value>預設</value></data>
+  <data name="TextTaskUnsupportedFields" xml:space="preserve"><value>目前連結的服務不支援任務到期時間、重複規則或在帳號/列表間移動，這些欄位不會被更改。</value></data>
+  <data name="TextTitleRequired" xml:space="preserve"><value>標題不能為空。</value></data>
+  <data name="TextSaveFailed" xml:space="preserve"><value>無法儲存，請重試。</value></data>
+  <data name="GlobalSearch_SearchBox.PlaceholderText" xml:space="preserve"><value>搜尋本機資料或運行指令</value></data>
+  <data name="GlobalSearch_Close.ToolTipService.ToolTip" xml:space="preserve"><value>關閉</value></data>
+  <data name="GlobalSearch_Hint.Text" xml:space="preserve"><value>僅搜尋本機快取 · Enter 開啟 · Esc 關閉</value></data>
+  <data name="GlobalSearch_GroupCommands" xml:space="preserve"><value>指令</value></data>
+  <data name="GlobalSearch_GroupTasks" xml:space="preserve"><value>任務</value></data>
+  <data name="GlobalSearch_GroupCalendar" xml:space="preserve"><value>行事曆</value></data>
+  <data name="GlobalSearch_GroupMail" xml:space="preserve"><value>郵件</value></data>
+  <data name="GlobalSearch_GroupRss" xml:space="preserve"><value>RSS</value></data>
+  <data name="GlobalSearch_Untitled" xml:space="preserve"><value>無標題</value></data>
+  <data name="GlobalSearch_CachedMailContext" xml:space="preserve"><value>已從本機郵件快取開啟</value></data>
+  <data name="GlobalSearch_CommandNewTask" xml:space="preserve"><value>新增任務</value></data>
+  <data name="GlobalSearch_CommandNewEvent" xml:space="preserve"><value>新增行程</value></data>
+  <data name="GlobalSearch_CommandComposeMail" xml:space="preserve"><value>撰寫郵件</value></data>
+  <data name="GlobalSearch_CommandSyncCalendar" xml:space="preserve"><value>同步行事曆</value></data>
+  <data name="GlobalSearch_CommandSyncTasks" xml:space="preserve"><value>同步任務</value></data>
+  <data name="GlobalSearch_CommandOpenCalendar" xml:space="preserve"><value>開啟行事曆</value></data>
+  <data name="GlobalSearch_CommandOpenTasks" xml:space="preserve"><value>開啟任務</value></data>
+  <data name="GlobalSearch_CommandOpenMail" xml:space="preserve"><value>開啟郵件</value></data>
+  <data name="GlobalSearch_CommandOpenRss" xml:space="preserve"><value>開啟 RSS</value></data>
+  <data name="GlobalSearch_CommandOpenSettings" xml:space="preserve"><value>開啟設定</value></data>
+  <data name="GlobalSearch_CommandOpenAccounts" xml:space="preserve"><value>開啟帳戶</value></data>
+  <data name="GlobalSearch_CommandCacheSettings" xml:space="preserve"><value>管理快取設定</value></data>
+  <data name="GlobalSearch_Overlay.AutomationProperties.Name" xml:space="preserve"><value>全局搜尋與指令面板</value></data>
+  <data name="GlobalSearch_Close.AutomationProperties.Name" xml:space="preserve"><value>關閉全局搜尋</value></data>
+  <data name="GlobalSearch_CommandOpenWeather" xml:space="preserve"><value>開啟天氣</value></data>
+  <data name="GlobalSearch_CommandToggleWeatherBar" xml:space="preserve"><value>切換天氣欄</value></data>
+  <data name="MailPage_MarkRead.Label" xml:space="preserve"><value>標為已讀</value></data>
+  <data name="MailPage_MarkUnread.Label" xml:space="preserve"><value>標為未讀</value></data>
+  <data name="MailPage_Flag.Label" xml:space="preserve"><value>新增旗標</value></data>
+  <data name="MailPage_Unflag.Label" xml:space="preserve"><value>移除旗標</value></data>
+  <data name="MailPage_Undo.Content" xml:space="preserve"><value>撤銷</value></data>
+  <data name="TextMailMutationComplete" xml:space="preserve"><value>已更新 {0} 封郵件。</value></data>
+  <data name="TextMailMutationFailed" xml:space="preserve"><value>部分郵件無法更新。</value></data>
+  <data name="MailPage_Archive.Label" xml:space="preserve"><value>存檔</value></data>
+  <data name="MailPage_Move.Label" xml:space="preserve"><value>移動</value></data>
+  <data name="MailPage_Delete.Label" xml:space="preserve"><value>刪除</value></data>
+  <data name="TextMailMoveTitle" xml:space="preserve"><value>移動郵件</value></data>
+  <data name="TextMailMoveDestination" xml:space="preserve"><value>目標資料夾</value></data>
+  <data name="TextMailMoveNoDestinations" xml:space="preserve"><value>沒有可用的目標資料夾。</value></data>
+  <data name="TextMailMoveDestinationsFailed" xml:space="preserve"><value>無法載入目標資料夾。</value></data>
+  <data name="TextMailMoveComplete" xml:space="preserve"><value>郵件已移動。</value></data>
+  <data name="TextMailMoveFailed" xml:space="preserve"><value>無法移動郵件。</value></data>
+  <data name="TextMailMoveOutcomeUnknown" xml:space="preserve"><value>移動結果未知。已重新整理資料夾，且未重試操作。</value></data>
+  <data name="TextMailMoveUndone" xml:space="preserve"><value>已撤銷移動。</value></data>
+  <data name="TextMailMoveUndoFailed" xml:space="preserve"><value>無法撤銷移動。</value></data>
+  <data name="TextMailMoveUndoOutcomeUnknown" xml:space="preserve"><value>撤銷結果未知。已重新整理資料夾，且未重試操作。</value></data>
+  <data name="MailPage_MoveToFolder.Label" xml:space="preserve"><value>移動到資料夾</value></data>
+  <data name="MailPage_MoveToDeletedItems.Label" xml:space="preserve"><value>移動到“已刪除郵件”</value></data>
+  <data name="MailPage_MoveToLabel.Label" xml:space="preserve"><value>移動到標簽</value></data>
+  <data name="MailPage_MoveToTrash.Label" xml:space="preserve"><value>移至垃圾箱</value></data>
+  <data name="TextGmailMoveTitle" xml:space="preserve"><value>將郵件移動到標簽</value></data>
+  <data name="TextGmailMoveDestination" xml:space="preserve"><value>目標標簽</value></data>
+  <data name="TextGmailMoveNoDestinations" xml:space="preserve"><value>沒有可用的自訂標簽。</value></data>
+  <data name="TextGmailMoveDestinationsFailed" xml:space="preserve"><value>無法載入 Gmail 標簽。</value></data>
+  <data name="TextGmailActionComplete" xml:space="preserve"><value>Gmail 操作已完成。</value></data>
+  <data name="TextGmailActionFailed" xml:space="preserve"><value>無法更新 Gmail 郵件。</value></data>
+  <data name="TextGmailActionOutcomeUnknown" xml:space="preserve"><value>Gmail 操作結果未知。已重新整理標簽，且未重試操作。</value></data>
+  <data name="TextGmailUndoComplete" xml:space="preserve"><value>已撤銷 Gmail 操作。</value></data>
+  <data name="TextGmailUndoFailed" xml:space="preserve"><value>無法撤銷 Gmail 操作。</value></data>
+  <data name="TextGmailUndoOutcomeUnknown" xml:space="preserve"><value>Gmail 撤銷結果未知。已重新整理標簽，且未重試操作。</value></data>
+  <data name="TextImapMoveNoDestinations" xml:space="preserve"><value>沒有可用的 IMAP 目標資料夾。</value></data>
+  <data name="TextImapMoveDestinationsFailed" xml:space="preserve"><value>無法載入 IMAP 目標資料夾。伺服器可能不支援安全移動。</value></data>
+  <data name="TextImapMoveComplete" xml:space="preserve"><value>郵件已移動。</value></data>
+  <data name="TextImapMoveFailed" xml:space="preserve"><value>無法移動 IMAP 郵件。</value></data>
+  <data name="TextImapMoveIdentityUnavailable" xml:space="preserve"><value>郵件已移動，但伺服器未返回新身份，因此無法撤銷。</value></data>
+  <data name="TextImapMoveOutcomeUnknown" xml:space="preserve"><value>移動結果未知。已重新整理資料夾，且未重試操作。</value></data>
+  <data name="TextImapUndoComplete" xml:space="preserve"><value>已撤銷 IMAP 移動。</value></data>
+  <data name="TextImapUndoFailed" xml:space="preserve"><value>無法撤銷 IMAP 移動。</value></data>
+  <data name="TextImapUndoIdentityUnavailable" xml:space="preserve"><value>郵件已移回，但伺服器未返回新的郵件身份。</value></data>
+  <data name="TextImapUndoOutcomeUnknown" xml:space="preserve"><value>撤銷結果未知。已重新整理資料夾，且未重試操作。</value></data>
+  <data name="TextLastSync" xml:space="preserve"><value>上次同步：{0}</value></data>
+  <data name="TextDeleteFailed" xml:space="preserve"><value>無法刪除，請重試。</value></data>
+  <data name="TextDeleteAgendaItem" xml:space="preserve"><value>刪除此項目？</value></data>
+  <data name="TextDeleteAgendaItemContent" xml:space="preserve"><value>此項目將從已連結的帳戶中刪除。</value></data>
+  <data name="TextDelete" xml:space="preserve"><value>刪除</value></data>
+  <data name="TextDescription" xml:space="preserve"><value>備註</value></data>
+  <data name="TextCleaning" xml:space="preserve"><value>正在清理...</value></data>
+  <data name="TextCleanFailed" xml:space="preserve"><value>清理失敗</value></data>
+  <data name="TextClear" xml:space="preserve"><value>清除</value></data>
+  <data name="TextCleaned" xml:space="preserve"><value>已清理</value></data>
+  <data name="TextCancel" xml:space="preserve"><value>取消</value></data>
+  <data name="WeatherPage_LoadFailed" xml:space="preserve"><value>天氣不可用，請檢查網路、城市和資料源設定。</value></data>
+  <data name="WeatherPage_Updated" xml:space="preserve"><value>更新時間：{0}</value></data>
+  <data name="SettingsPage_HideNotificationContent.Header" xml:space="preserve"><value>在系統通知中隱藏郵件與行程內容</value></data>
+  <data name="RssPage_ArticleStatus.Text" xml:space="preserve"><value>向下滾動載入更多</value></data>
+  <data name="RssPage_Refresh.Text" xml:space="preserve"><value>重新整理</value></data>
+  <data name="WeatherPage_BarTitle.OnContent" xml:space="preserve"><value>開啟</value></data>
+  <data name="WeatherPage_BarTitle.OffContent" xml:space="preserve"><value>關閉</value></data>
+  <data name="WeatherPage_AutoFollowLocation.OnContent" xml:space="preserve"><value>開啟</value></data>
+  <data name="WeatherPage_AutoFollowLocation.OffContent" xml:space="preserve"><value>關閉</value></data>
+  <data name="MailPage_SmtpUserName.PlaceholderText" xml:space="preserve"><value>預設使用 IMAP 使用者名</value></data>
+  <data name="TextAttachmentEmpty" xml:space="preserve"><value>不支援空附件。</value></data>
+  <data name="TextAttachmentInvalidFileName" xml:space="preserve"><value>附件檔案名無效。</value></data>
+  <data name="TextUnavailable" xml:space="preserve"><value>不可用</value></data>
+  <data name="SettingsPage_WeatherBarDiagnosticsFormat" xml:space="preserve"><value>任務欄類：{0}
+小組件橋接來源：{1}
+顯示器：{2}
+DPI：{3}
+任務欄：{4}
+天氣欄：{5}
+回退原因：{6}</value></data>
+  <data name="WeatherPage_IconPackError" xml:space="preserve"><value>圖示包操作失敗：{0}</value></data>
+  <data name="MailPage_ImapDisplayName.PlaceholderText" xml:space="preserve"><value>工作信箱</value></data>
+  <data name="MailPage_BtnGoogleAccount.Text" xml:space="preserve"><value>Google OAuth</value></data>
+  <data name="CalendarPage_ViewWeek.Content" xml:space="preserve"><value>週</value></data>
+  <data name="CalendarPage_ViewMonth.Content" xml:space="preserve"><value>月</value></data>
+  <data name="CalendarPage_ViewYear.Content" xml:space="preserve"><value>年</value></data>
+  <data name="CalendarPage_YearNoItems.Text" xml:space="preserve"><value>無行程</value></data>
+  <data name="CalendarPage_YearItemCount" xml:space="preserve"><value>{0} 項</value></data>
+  <data name="Lang_ChineseSimplified.Content" xml:space="preserve"><value>簡體中文</value></data>
+  <data name="Lang_ChineseTraditional.Content" xml:space="preserve"><value>繁體中文</value></data>
+  <data name="Lang_English.Content" xml:space="preserve"><value>English</value></data>
+  <data name="TextLastSuccessFormat" xml:space="preserve"><value>上次成功：{0:g}</value></data>
+  <data name="WeatherAlert_NowFormat" xml:space="preserve"><value>即將{0}</value></data>
+  <data name="WeatherAlert_InHoursFormat" xml:space="preserve"><value>{1}小時後{0}</value></data>
+  <data name="WeatherField_PollenValueFormat" xml:space="preserve"><value>花粉 {0}</value></data>
+  <data name="WeatherCondition_ClearSky" xml:space="preserve"><value>晴</value></data>
+  <data name="WeatherCondition_MainlyClear" xml:space="preserve"><value>大部晴朗</value></data>
+  <data name="WeatherCondition_PartlyCloudy" xml:space="preserve"><value>多云</value></data>
+  <data name="WeatherCondition_Overcast" xml:space="preserve"><value>陰</value></data>
+  <data name="WeatherCondition_Fog" xml:space="preserve"><value>霧</value></data>
+  <data name="WeatherCondition_RimeFog" xml:space="preserve"><value>凍霧</value></data>
+  <data name="WeatherCondition_LightDrizzle" xml:space="preserve"><value>小毛毛雨</value></data>
+  <data name="WeatherCondition_ModerateDrizzle" xml:space="preserve"><value>毛毛雨</value></data>
+  <data name="WeatherCondition_DenseDrizzle" xml:space="preserve"><value>大毛毛雨</value></data>
+  <data name="WeatherCondition_FreezingDrizzle" xml:space="preserve"><value>凍毛毛雨</value></data>
+  <data name="WeatherCondition_SlightRain" xml:space="preserve"><value>小雨</value></data>
+  <data name="WeatherCondition_ModerateRain" xml:space="preserve"><value>中雨</value></data>
+  <data name="WeatherCondition_HeavyRain" xml:space="preserve"><value>大雨</value></data>
+  <data name="WeatherCondition_FreezingRain" xml:space="preserve"><value>凍雨</value></data>
+  <data name="WeatherCondition_SlightSnow" xml:space="preserve"><value>小雪</value></data>
+  <data name="WeatherCondition_ModerateSnow" xml:space="preserve"><value>中雪</value></data>
+  <data name="WeatherCondition_HeavySnow" xml:space="preserve"><value>大雪</value></data>
+  <data name="WeatherCondition_SnowGrains" xml:space="preserve"><value>雪粒</value></data>
+  <data name="WeatherCondition_SlightRainShowers" xml:space="preserve"><value>小陣雨</value></data>
+  <data name="WeatherCondition_ModerateRainShowers" xml:space="preserve"><value>中陣雨</value></data>
+  <data name="WeatherCondition_ViolentRainShowers" xml:space="preserve"><value>大陣雨</value></data>
+  <data name="WeatherCondition_SlightSnowShowers" xml:space="preserve"><value>小陣雪</value></data>
+  <data name="WeatherCondition_HeavySnowShowers" xml:space="preserve"><value>大陣雪</value></data>
+  <data name="WeatherCondition_Thunderstorm" xml:space="preserve"><value>雷陣雨</value></data>
+  <data name="WeatherCondition_ThunderstormWithHail" xml:space="preserve"><value>雷陣雨伴冰雹</value></data>
+  <data name="WeatherCondition_Unknown" xml:space="preserve"><value>未知</value></data>
+  <data name="WeatherWind_N" xml:space="preserve"><value>北</value></data>
+  <data name="WeatherWind_NE" xml:space="preserve"><value>東北</value></data>
+  <data name="WeatherWind_E" xml:space="preserve"><value>東</value></data>
+  <data name="WeatherWind_SE" xml:space="preserve"><value>東南</value></data>
+  <data name="WeatherWind_S" xml:space="preserve"><value>南</value></data>
+  <data name="WeatherWind_SW" xml:space="preserve"><value>西南</value></data>
+  <data name="WeatherWind_W" xml:space="preserve"><value>西</value></data>
+  <data name="WeatherWind_NW" xml:space="preserve"><value>西北</value></data>
+  <data name="TextRainHour" xml:space="preserve"><value>{0}小時</value></data>
+</root>

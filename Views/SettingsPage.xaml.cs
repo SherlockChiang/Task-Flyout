@@ -122,7 +122,13 @@ namespace Task_Flyout.Views
             ThemeComboBox.SelectedIndex = theme switch { "Light" => 1, "Dark" => 2, _ => 0 };
 
             var lang = settings.Values["AppLang"] as string;
-            LanguageComboBox.SelectedIndex = lang switch { "zh-Hans" => 1, "en-US" => 2, _ => 0 };
+            LanguageComboBox.SelectedIndex = lang switch
+            {
+                "zh" or "zh-CN" or "zh-Hans" => 1,
+                "zh-TW" or "zh-Hant" or "zh-CHT" or "zh-HK" or "zh-MO" => 2,
+                "en" or "en-US" => 3,
+                _ => 0
+            };
 
             BackgroundToggle.IsOn = settings.Values["RunInBackground"] as bool? ?? true;
             EfficiencyModeToggle.IsOn = settings.Values["EfficiencyModeEnabled"] as bool? ?? true;
@@ -604,7 +610,7 @@ namespace Task_Flyout.Views
 
             if (LanguageComboBox.SelectedItem is ComboBoxItem item && item.Tag != null)
             {
-                string langCode = item.Tag.ToString() ?? "zh";
+                string langCode = item.Tag.ToString() ?? "en-US";
                 ApplicationData.Current.LocalSettings.Values["AppLang"] = langCode;
                 Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = langCode;
             }

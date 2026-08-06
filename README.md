@@ -35,7 +35,7 @@ a browser.
 - **Reminders** — Toast notifications a configurable number of minutes before an event starts.
 - **Native design** — Built with WinUI 3, with Mica material, light/dark themes, and a per-calendar color palette.
 - **Lightweight** — Tray-resident with launch-on-startup and background running. Switches to Windows 11 Efficiency Mode (EcoQoS) while collapsed to reduce CPU, power, and memory use.
-- **Multilingual** — English and Simplified Chinese, following the system language by default.
+- **Multilingual** — English, Simplified Chinese, and Traditional Chinese, following the system language by default.
 
 ## Installation
 

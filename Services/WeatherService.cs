@@ -863,7 +863,7 @@ namespace Task_Flyout.Services
         {
             try
             {
-                string lang = GetCurrentLanguage() == "zh" ? "zh" : "en";
+                string lang = LocalizationHelper.IsChineseLanguage(GetCurrentLanguage()) ? "zh" : "en";
                 string url = "https://nominatim.openstreetmap.org/reverse" +
                              $"?lat={latitude.ToString(CultureInfo.InvariantCulture)}" +
                              $"&lon={longitude.ToString(CultureInfo.InvariantCulture)}" +
@@ -889,7 +889,8 @@ namespace Task_Flyout.Services
                                    ?? Pick("neighbourhood") ?? Pick("quarter");
                 string? street = Pick("road") ?? Pick("pedestrian") ?? Pick("residential")
                                  ?? Pick("footway") ?? Pick("path");
-                string label = WeatherLocationLabelPolicy.FormatDetailed(province, city, district, township, street);
+                string label = LocalizationHelper.LocalizeExternalText(
+                    WeatherLocationLabelPolicy.FormatDetailed(province, city, district, township, street));
                 return string.IsNullOrWhiteSpace(label)
                     ? new ReverseGeocodeResult { Source = "osm-empty" }
                     : new ReverseGeocodeResult { Name = label, Source = string.IsNullOrWhiteSpace(street) ? "osm-area" : "osm-road" };
@@ -910,7 +911,7 @@ namespace Task_Flyout.Services
         {
             try
             {
-                string lang = GetCurrentLanguage() == "zh" ? "zh" : "en";
+                string lang = LocalizationHelper.IsChineseLanguage(GetCurrentLanguage()) ? "zh" : "en";
                 string url = "https://api.bigdatacloud.net/data/reverse-geocode-client" +
                              $"?latitude={latitude.ToString(CultureInfo.InvariantCulture)}" +
                              $"&longitude={longitude.ToString(CultureInfo.InvariantCulture)}" +
@@ -927,7 +928,8 @@ namespace Task_Flyout.Services
                 string? province = Pick("principalSubdivision");
                 string? city = Pick("city");
                 if (string.IsNullOrWhiteSpace(city)) city = Pick("locality");
-                string label = WeatherLocationLabelPolicy.FormatProvinceCity(province, city);
+                string label = LocalizationHelper.LocalizeExternalText(
+                    WeatherLocationLabelPolicy.FormatProvinceCity(province, city));
                 return string.IsNullOrWhiteSpace(label) ? null : label;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
@@ -1470,7 +1472,7 @@ namespace Task_Flyout.Services
 
             var info = new WeatherInfo
             {
-                City = context.City,
+                City = LocalizationHelper.LocalizeExternalText(context.City),
                 IconFont = context.IconFont,
                 Sunrise = sunriseTime,
                 Sunset = sunsetTime,
@@ -1765,7 +1767,7 @@ namespace Task_Flyout.Services
             CancellationToken cancellationToken)
         {
             string lang = GetCurrentLanguage();
-            string wttrLang = lang == "en" ? "en" : "zh";
+            string wttrLang = LocalizationHelper.IsChineseLanguage(lang) ? "zh" : "en";
             string searchCity = context.ProviderCity.Split(',')[0].Trim();
             string url = $"https://wttr.in/{Uri.EscapeDataString(searchCity)}?format=j1&lang={wttrLang}";
 
@@ -1795,14 +1797,14 @@ namespace Task_Flyout.Services
             var info = new WeatherInfo
             {
                 Temperature = $"{tempC}\u00B0C",
-                Description = desc,
+                Description = LocalizationHelper.LocalizeExternalText(desc),
                 Icon = WttrCodeToIcon(weatherCode, context.IconFont),
                 IconFont = context.IconFont,
                 IconLayerUris = wttrLayers,
                 IconBitmapUri = wttrLayers.Length > 0 ? wttrLayers[0] : null,
                 RawWeatherCode = wttrRawCode,
                 IsDayTime = wttrIsDay,
-                City = context.City,
+                City = LocalizationHelper.LocalizeExternalText(context.City),
                 FeelsLike = string.IsNullOrEmpty(flVal) ? "" : $"{flVal}\u00B0C",
                 Humidity = string.IsNullOrEmpty(humidityVal) ? "" : $"{humidityVal}%",
                 WindSpeed = string.IsNullOrEmpty(windVal) ? "" : $"{windVal} km/h",
@@ -1874,7 +1876,7 @@ namespace Task_Flyout.Services
                         Icon = WttrCodeToIcon(dayCode, context.IconFont),
                         IconFont = context.IconFont,
                         IconLayerUris = IconPackService.Instance.TryResolveBitmapLayers(rawDailyCode, true, isOpenMeteo: false),
-                        Description = dayDesc,
+                        Description = LocalizationHelper.LocalizeExternalText(dayDesc),
                         PrecipProbability = $"{maxRainChance}%",
                         Precipitation = string.IsNullOrEmpty(totalPrecip) ? "" : $"{totalPrecip} mm",
                         WindSpeed = string.IsNullOrEmpty(maxWind) ? "" : $"{maxWind} km/h",
@@ -1947,7 +1949,7 @@ namespace Task_Flyout.Services
                         Icon = WttrCodeToIcon(source.code, context.IconFont),
                         IconFont = context.IconFont,
                         IconLayerUris = IconPackService.Instance.TryResolveBitmapLayers(rawCode, hIsDay, isOpenMeteo: false),
-                        Description = source.hDesc,
+                        Description = LocalizationHelper.LocalizeExternalText(source.hDesc),
                         FeelsLike = string.IsNullOrEmpty(source.flC) ? "" : $"{source.flC}\u00B0C",
                         Humidity = string.IsNullOrEmpty(source.hum) ? "" : $"{source.hum}%",
                         WindSpeed = string.IsNullOrEmpty(source.ws) ? "" : $"{source.ws} km/h",

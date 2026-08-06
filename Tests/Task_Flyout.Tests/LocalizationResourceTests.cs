@@ -6,28 +6,34 @@ namespace Task_Flyout.Tests;
 public class LocalizationResourceTests
 {
     [Fact]
-    public void English_and_chinese_resources_have_unique_matching_keys()
+    public void All_localization_resources_have_unique_matching_keys()
     {
         string root = FindRepositoryRoot();
         var english = LoadResourceKeys(Path.Combine(root, "Strings", "en-US", "Resources.resw"));
-        var chinese = LoadResourceKeys(Path.Combine(root, "Strings", "zh-Hans", "Resources.resw"));
 
-        Assert.Equal(english.OrderBy(key => key), chinese.OrderBy(key => key));
+        foreach (string culture in new[] { "zh-Hans", "zh-TW" })
+        {
+            var localized = LoadResourceKeys(Path.Combine(root, "Strings", culture, "Resources.resw"));
+            Assert.Equal(english.OrderBy(key => key), localized.OrderBy(key => key));
+        }
     }
 
     [Fact]
-    public void English_and_chinese_format_placeholders_match()
+    public void All_localization_format_placeholders_match()
     {
         string root = FindRepositoryRoot();
         var english = LoadResourceValues(Path.Combine(root, "Strings", "en-US", "Resources.resw"));
-        var chinese = LoadResourceValues(Path.Combine(root, "Strings", "zh-Hans", "Resources.resw"));
         var placeholder = new Regex(@"\{\d+(?:[^}]*)\}", RegexOptions.CultureInvariant);
 
-        foreach (string key in english.Keys)
+        foreach (string culture in new[] { "zh-Hans", "zh-TW" })
         {
-            var englishIndexes = placeholder.Matches(english[key]).Select(match => Regex.Match(match.Value, @"\d+").Value).Order().ToArray();
-            var chineseIndexes = placeholder.Matches(chinese[key]).Select(match => Regex.Match(match.Value, @"\d+").Value).Order().ToArray();
-            Assert.Equal(englishIndexes, chineseIndexes);
+            var localized = LoadResourceValues(Path.Combine(root, "Strings", culture, "Resources.resw"));
+            foreach (string key in english.Keys)
+            {
+                var englishIndexes = placeholder.Matches(english[key]).Select(match => Regex.Match(match.Value, @"\d+").Value).Order().ToArray();
+                var localizedIndexes = placeholder.Matches(localized[key]).Select(match => Regex.Match(match.Value, @"\d+").Value).Order().ToArray();
+                Assert.Equal(englishIndexes, localizedIndexes);
+            }
         }
     }
 

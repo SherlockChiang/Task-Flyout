@@ -5,8 +5,13 @@ namespace Task_Flyout.Tests;
 public class LocalizationHelperTests
 {
     [Theory]
-    [InlineData("zh-CN", "zh")]
-    [InlineData("zh-Hans", "zh")]
+    [InlineData("zh-CN", "zh-Hans")]
+    [InlineData("zh-Hans", "zh-Hans")]
+    [InlineData("zh-TW", "zh-Hant")]
+    [InlineData("zh-Hant", "zh-Hant")]
+    [InlineData("zh-HK", "zh-Hant")]
+    [InlineData("zh-MO", "zh-Hant")]
+    [InlineData("zh-CHT", "zh-Hant")]
     [InlineData("en-US", "en")]
     [InlineData("fr-FR", "en")]
     [InlineData("ja-JP", "en")]
@@ -37,5 +42,11 @@ public class LocalizationHelperTests
         var start = LocalizationHelper.GetWeekStart(firstOfMonth, DayOfWeek.Monday);
 
         Assert.Equal(new DateTime(2026, 7, 27), start);
+    }
+
+    [Fact]
+    public void Converts_external_simplified_chinese_text_to_traditional()
+    {
+        Assert.Equal("天氣預報", LocalizationHelper.ConvertToTraditionalChinese("天气预报"));
     }
 }
