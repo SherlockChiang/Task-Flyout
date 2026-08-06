@@ -54,13 +54,13 @@
             <div class="lang-zh">
                 <h1 class="text-3xl font-bold mb-6 border-b border-black/10 pb-4">隐私政策</h1>
                 <div class="space-y-4 text-gray-600 leading-relaxed text-sm md:text-base">
-                    <p><strong>最后更新时间：</strong> 2026年6月</p>
+                    <p><strong>最后更新时间：</strong> 2026年8月</p>
                     <p>Task Flyout（以下简称“本软件”）采用“本地优先”的设计。<strong>开发者不运营任何服务器，您的数据保存在您自己的设备上，不会上传给开发者。</strong></p>
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">1. 各类数据如何存储</h2>
                     <ul class="list-disc pl-6 space-y-2">
                         <li><strong>邮件：</strong>账户配置与邮件元数据（发件人、主题、预览）以 Windows 数据保护接口（DPAPI）加密后缓存在本地；邮件正文按需从您的邮件服务器加载，通常不持久化保存。</li>
-                        <li><strong>日历与任务：</strong>同步得到的日程与任务缓存经 DPAPI 加密后保存在本地，用于离线查看。</li>
+                        <li><strong>日历与任务：</strong>同步得到的日程与任务缓存经 DPAPI 加密后保存在本地，用于离线查看。连接 iCloud 日历时，Apple 账户邮箱和 App 专用密码同样经 DPAPI（CurrentUser）保护，不保存 Apple 账户主密码。</li>
                         <li><strong>RSS：</strong>订阅列表与文章保存在本地的 SQLite 数据库中。订阅、文件夹和文章的标题、URL、摘要、正文与远程图片 URL 使用 Windows DPAPI（CurrentUser）保护；ID、发布时间和本地图片路径保留为明文，以支持本地关联、排序和图片缓存。删除订阅会从应用数据库移除其记录，但系统备份、文件系统快照或 SQLite 空闲页可能在一段时间内仍保留历史数据。</li>
                         <li><strong>天气：</strong>最多五个已保存地点（名称、别名和坐标）及其最近成功天气和重试状态，经 Windows DPAPI 加密后保存在本地 SQLite 数据库中；坐标不会写入 LocalSettings。请求天气时，所选地点会直接发送给 Open-Meteo 或 wttr.in。</li>
                     </ul>
@@ -69,6 +69,7 @@
                     <p><strong>本软件没有自有服务器，不收集任何遥测或使用分析，您的数据不会被收集或上传给开发者。</strong> 为实现功能，本软件仅在您的设备与下列您主动配置的官方/第三方服务之间直接通信：</p>
                     <ul class="list-disc pl-6 space-y-2">
                         <li>Google API、Microsoft Graph API（日历、任务、邮件）；</li>
+                        <li>Apple iCloud CalDAV（日历）；</li>
                         <li>您配置的 IMAP/SMTP 邮件服务器；</li>
                         <li>您订阅的 RSS 源所在站点；</li>
                         <li>天气服务（Open-Meteo 或 wttr.in）：获取天气时会向其发送您选择的地点信息。</li>
@@ -79,11 +80,12 @@
                         <li><strong>OAuth 访问/刷新令牌：</strong>通过 Windows DPAPI（<code>CurrentUser</code> 范围并附加额外 entropy）加密保存在本地。加密密钥与您当前的 Windows 用户账户绑定，其他用户或其他设备无法解密。</li>
                         <li><strong>Microsoft 登录：</strong>采用官方 MSAL 库，令牌缓存同样以 DPAPI 加密保存在本地。</li>
                         <li><strong>IMAP/SMTP 密码：</strong>保存在 <strong>Windows 凭据管理器（Credential Manager）</strong> 中，而非明文文件。</li>
+                        <li><strong>iCloud App 专用密码：</strong>通过 Windows DPAPI（<code>CurrentUser</code>）加密保存在本地，仅发送至 Apple 的 iCloud CalDAV 服务。</li>
                         <li><strong>最小权限：</strong>仅申请实现功能所必需的最少 OAuth 权限范围，并遵守 <a href="https://developers.google.com/terms/api-services-user-data-policy" class="text-[#0067C0] hover:underline" target="_blank">Google API 服务用户数据政策</a>。</li>
                     </ul>
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">4. 删除数据</h2>
-                    <p>在应用内移除某个账户会删除应用记录、IMAP/SMTP 密码、Google 授权材料和对应缓存。Microsoft 登录使用 Windows 加密的共享平台令牌缓存；应用会移除认证记录，但缓存条目可能保留到其自然过期或由 Microsoft 帐户/Windows 管理。卸载会移除应用包数据，但系统备份、通知历史和文件系统快照不受本软件控制。</p>
+                    <p>在应用内移除某个账户会删除应用记录、IMAP/SMTP 密码、Google 授权材料、iCloud App 专用密码和对应缓存。Microsoft 登录使用 Windows 加密的共享平台令牌缓存；应用会移除认证记录，但缓存条目可能保留到其自然过期或由 Microsoft 帐户/Windows 管理。卸载会移除应用包数据，但系统备份、通知历史和文件系统快照不受本软件控制。</p>
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">5. 联系我们</h2>
                     <p>如果您对本隐私政策有任何疑问或安全担忧，请通过 GitHub Issues 联系开发者。</p>
@@ -93,13 +95,13 @@
             <div class="lang-en hidden-lang">
                 <h1 class="text-3xl font-bold mb-6 border-b border-black/10 pb-4">Privacy Policy</h1>
                 <div class="space-y-4 text-gray-600 leading-relaxed text-sm md:text-base">
-                    <p><strong>Last Updated:</strong> June 2026</p>
+                    <p><strong>Last Updated:</strong> August 2026</p>
                     <p>Task Flyout ("the App") is local-first by design. <strong>The developer operates no servers; your data is kept on your own device and is never uploaded to the developer.</strong></p>
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">1. How each type of data is stored</h2>
                     <ul class="list-disc pl-6 space-y-2">
                         <li><strong>Mail:</strong> Account configuration and message metadata (sender, subject, preview) are cached locally, encrypted with the Windows Data Protection API (DPAPI). Full message bodies are loaded on demand from your mail server and are generally not persisted. One active unsent compose draft may be stored locally as a DPAPI-protected recovery record until it is sent or discarded.</li>
-                        <li><strong>Calendar &amp; tasks:</strong> Synced events and tasks are cached locally, encrypted with DPAPI, for offline viewing.</li>
+                        <li><strong>Calendar &amp; tasks:</strong> Synced events and tasks are cached locally, encrypted with DPAPI, for offline viewing. When you connect iCloud Calendar, the Apple Account email and app-specific password are also protected with DPAPI (CurrentUser); the App does not store your main Apple Account password.</li>
                         <li><strong>RSS:</strong> Your subscriptions and articles are stored in a local SQLite database. Subscription, folder, and article titles, URLs, summaries, bodies, and remote image URLs are protected with Windows DPAPI (CurrentUser); IDs, publication times, and local image paths remain plaintext to support local association, sorting, and image caching. Deleting a feed removes its records from the app database, but system backups, filesystem snapshots, or SQLite free pages can retain historic data for a period of time.</li>
                         <li><strong>Weather:</strong> Up to five saved locations (name, alias, and coordinates), their last successful weather, and retry state are encrypted with Windows DPAPI in the local SQLite database; coordinates are not written to LocalSettings. The selected location is sent directly to Open-Meteo or wttr.in when weather is requested.</li>
                     </ul>
@@ -108,6 +110,7 @@
                     <p><strong>The App has no backend of its own, collects no telemetry or usage analytics, and never sends your data to the developer.</strong> To provide its features it communicates only between your device and the following official / third-party services that you configure:</p>
                     <ul class="list-disc pl-6 space-y-2">
                         <li>Google API and Microsoft Graph API (calendar, tasks, mail);</li>
+                        <li>Apple iCloud CalDAV (calendar);</li>
                         <li>The IMAP/SMTP mail server you configure;</li>
                         <li>The websites hosting the RSS feeds you subscribe to;</li>
                         <li>The weather service (Open-Meteo or wttr.in): your chosen location is sent to it when fetching the forecast.</li>
@@ -118,11 +121,12 @@
                         <li><strong>OAuth access/refresh tokens:</strong> Encrypted at rest with the Windows DPAPI (<code>CurrentUser</code> scope plus additional entropy). The encryption key is bound to your current Windows user account, so other users or other machines cannot decrypt it.</li>
                         <li><strong>Microsoft sign-in:</strong> Uses the official MSAL library; its token cache is likewise stored locally, encrypted with DPAPI.</li>
                         <li><strong>IMAP/SMTP passwords:</strong> Stored in the <strong>Windows Credential Manager</strong>, not in a plaintext file.</li>
+                        <li><strong>iCloud app-specific password:</strong> Encrypted locally with Windows DPAPI (<code>CurrentUser</code>) and sent only to Apple's iCloud CalDAV service.</li>
                         <li><strong>Least privilege:</strong> The App requests only the minimum OAuth scopes needed for its features and complies with the <a href="https://developers.google.com/terms/api-services-user-data-policy" class="text-[#0067C0] hover:underline" target="_blank">Google API Services User Data Policy</a>.</li>
                     </ul>
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">4. Deleting your data</h2>
-                    <p>Removing an account deletes the app record, IMAP/SMTP password, Google authorization material, and associated cache. Microsoft sign-in uses a Windows-encrypted shared platform token cache; the App removes its authentication record, but cache entries can remain until they expire naturally or are managed through the Microsoft account or Windows. Uninstalling removes app package data, but system backups, notification history, and filesystem snapshots are outside the App's control.</p>
+                    <p>Removing an account deletes the app record, IMAP/SMTP password, Google authorization material, iCloud app-specific password, and associated cache. Microsoft sign-in uses a Windows-encrypted shared platform token cache; the App removes its authentication record, but cache entries can remain until they expire naturally or are managed through the Microsoft account or Windows. Uninstalling removes app package data, but system backups, notification history, and filesystem snapshots are outside the App's control.</p>
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">5. Contact Us</h2>
                     <p>If you have any questions or security concerns regarding this Privacy Policy, please contact the developer via GitHub Issues.</p>

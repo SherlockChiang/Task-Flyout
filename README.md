@@ -22,13 +22,13 @@ English · [简体中文](README.zh-CN.md)
 ## Overview
 
 Task Flyout lives in the Windows 11 system tray and brings your calendar, tasks,
-mail, RSS feeds, and weather into a single native flyout. It syncs with Google
-Calendar and Microsoft To Do, so you can see and manage your day without opening
-a browser.
+mail, RSS feeds, and weather into a single native flyout. It syncs Google,
+Microsoft, and iCloud calendars plus Google Tasks and Microsoft To Do, so you can
+see and manage your day without opening a browser.
 
 ## Features
 
-- **Calendar and tasks** — Two-way sync with Google Calendar and Microsoft To Do. Create, edit, and complete events and tasks directly from the tray.
+- **Calendar and tasks** — Two-way calendar sync with Google, Microsoft, and iCloud, plus Google Tasks and Microsoft To Do. Create, edit, and complete events and tasks directly from the tray.
 - **Mail** — Connect Gmail, Outlook, or any IMAP/SMTP account. Background polling raises a native Windows notification when new mail arrives.
 - **RSS reader** — Follow feeds in a built-in reader with per-feed image and privacy controls.
 - **Weather** — A forecast pane powered by [Open-Meteo](https://open-meteo.com/), plus an optional taskbar weather bar.
@@ -56,11 +56,18 @@ consent screen may show an "unverified app" warning. The app runs entirely on
 your machine. To continue, click **Advanced** at the bottom of the page, then
 **Go to Task_Flyout (unsafe)**.
 
+### iCloud Calendar
+
+Connect with your Apple Account email and an app-specific password generated at
+[account.apple.com](https://account.apple.com/). Apple requires two-factor
+authentication for app-specific passwords; your main Apple Account password is
+not accepted or stored. See [Apple Support](https://support.apple.com/102654).
+
 ## Privacy and security
 
-Task Flyout runs locally as a public OAuth client. All credentials, mail, and
-calendar data stay on your device and are never collected, stored, or uploaded to
-any third-party server. See the full [Privacy Policy](https://sherlockchiang.github.io/Task-Flyout/privacy.html).
+Task Flyout has no developer-operated backend. Credentials and local caches are
+protected on your device; data is sent only to the providers you configure and
+is never collected by the developer. See the full [Privacy Policy](https://sherlockchiang.github.io/Task-Flyout/privacy.html).
 
 The app declares the `runFullTrust` capability for desktop integration that
 packaged WinUI apps cannot achieve through UWP-only APIs: the tray icon, startup
