@@ -103,6 +103,7 @@ namespace Task_Flyout
             };
             SyncManager.RegisterProvider(new GoogleSyncProvider());
             SyncManager.RegisterProvider(new Services.MicrosoftSyncProvider());
+            SyncManager.RegisterProvider(new Services.ICloudSyncProvider());
         }
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)

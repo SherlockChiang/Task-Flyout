@@ -435,11 +435,20 @@
   <data name="AddAccount_MSDesc.Text" xml:space="preserve">
     <value>Outlook 日历与 To Do</value>
   </data>
+  <data name="AddAccount_ICloudTitle.Text" xml:space="preserve">
+    <value>iCloud</value>
+  </data>
+  <data name="AddAccount_ICloudDesc.Text" xml:space="preserve">
+    <value>iCloud 日历</value>
+  </data>
   <data name="AddAccount_AlreadyConnected" xml:space="preserve">
     <value>已连接</value>
   </data>
   <data name="AddAccount_Reconnect" xml:space="preserve">
     <value>重新连接全部功能</value>
+  </data>
+  <data name="AddAccount_ReconnectICloud" xml:space="preserve">
+    <value>重新连接 iCloud 日历</value>
   </data>
   <data name="AddAccount_ChecklistTitle.Text" xml:space="preserve">
     <value>账户健康与离线状态</value>
@@ -498,6 +507,17 @@
   <data name="AddAccount_ConnectMicrosoft" xml:space="preserve">
     <value>连接 Microsoft 以使用 Outlook 日历和 To Do。</value>
   </data>
+  <data name="AddAccount_ConnectICloud" xml:space="preserve">
+    <value>使用 App 专用密码连接 iCloud 日历。</value>
+  </data>
+  <data name="AddAccount_ICloudDialogTitle" xml:space="preserve"><value>连接 iCloud 日历</value></data>
+  <data name="AddAccount_ICloudAccountHeader" xml:space="preserve"><value>Apple 账户邮箱</value></data>
+  <data name="AddAccount_ICloudAccountPlaceholder" xml:space="preserve"><value>name@example.com</value></data>
+  <data name="AddAccount_ICloudPasswordHeader" xml:space="preserve"><value>App 专用密码</value></data>
+  <data name="AddAccount_ICloudPasswordHelp" xml:space="preserve"><value>管理 App 专用密码</value></data>
+  <data name="AddAccount_ICloudExplanation" xml:space="preserve"><value>请输入 Apple 账户邮箱和 App 专用密码。Task Flyout 不接受也不会存储你的 Apple 账户主密码。</value></data>
+  <data name="AddAccount_ICloudValidation" xml:space="preserve"><value>请输入有效的 Apple 账户邮箱和 App 专用密码。</value></data>
+  <data name="TextConnect" xml:space="preserve"><value>连接</value></data>
   <data name="AddAccount_ConnectMail" xml:space="preserve">
     <value>从邮件页面添加 Gmail、Outlook 或 IMAP。</value>
   </data>
@@ -1614,8 +1634,9 @@
   </data>
   <data name="AddAccount_ChecklistFormat" xml:space="preserve"><value>Google：{0}
 Microsoft：{1}
-邮件：{2}
-天气：{3}</value></data>
+iCloud：{2}
+邮件：{3}
+天气：{4}</value></data>
   <data name="TextRssRefreshBlockedPrivateNetwork" xml:space="preserve"><value>刷新被安全策略拦截：RSS 地址或重定向解析到了非公网 IP。必须为此订阅的指定主机、端口和协议单独批准本地网络访问。</value></data>
   <data name="TextAllowLocalNetworkRss" xml:space="preserve"><value>允许此订阅访问其指定的本地网络主机和端口</value></data>
   <data name="TextLocalNetworkRssWarning" xml:space="preserve"><value>仅对家庭或工作网络中可信的 RSS 源启用。重定向到其他本地主机或端口仍会被阻止。</value></data>

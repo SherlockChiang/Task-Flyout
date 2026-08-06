@@ -503,6 +503,8 @@ namespace Task_Flyout.Services
                     await google.ClearLocalAuthorizationAsync();
                 else if (provider is MicrosoftSyncProvider microsoft)
                     await microsoft.ClearLocalAuthorizationAsync();
+                else if (provider is ICloudSyncProvider iCloud)
+                    await iCloud.ClearLocalAuthorizationAsync();
             }
             catch (Exception ex)
             {

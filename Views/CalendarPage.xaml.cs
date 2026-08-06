@@ -876,12 +876,20 @@ namespace Task_Flyout.Views
         {
             if (sender is not Button btn || btn.Tag is not string providerName) return;
 
+            bool hasSharedAuthorization = ProviderAuthorizationLifecycle.HasSharedAuthorization(providerName);
+
             var dialog = new ContentDialog
             {
                 Title = _loader.GetStringOrDefault("TextRemoveAccountTitle") ?? "Remove Account",
-                Content = string.Format(_loader.GetStringOrDefault("TextProviderRemovalContent") ?? "Remove {0} from Calendar and Tasks only, or disconnect it completely from Calendar, Tasks, and Mail?", providerName),
-                PrimaryButtonText = _loader.GetStringOrDefault("TextRemoveAgendaOnly") ?? "Remove Calendar/Tasks only",
-                SecondaryButtonText = _loader.GetStringOrDefault("TextDisconnectProvider") ?? "Disconnect completely",
+                Content = hasSharedAuthorization
+                    ? string.Format(_loader.GetStringOrDefault("TextProviderRemovalContent") ?? "Remove {0} from Calendar and Tasks only, or disconnect it completely from Calendar, Tasks, and Mail?", providerName)
+                    : string.Format(_loader.GetStringOrDefault("TextRemoveAccountContent") ?? "Are you sure you want to remove the {0} account?", providerName),
+                PrimaryButtonText = hasSharedAuthorization
+                    ? _loader.GetStringOrDefault("TextRemoveAgendaOnly") ?? "Remove Calendar/Tasks only"
+                    : _loader.GetStringOrDefault("TextRemoveAccount") ?? "Remove Account",
+                SecondaryButtonText = hasSharedAuthorization
+                    ? _loader.GetStringOrDefault("TextDisconnectProvider") ?? "Disconnect completely"
+                    : "",
                 CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 XamlRoot = XamlRoot,
                 DefaultButton = ContentDialogButton.Close
@@ -892,8 +900,10 @@ namespace Task_Flyout.Views
 
             try
             {
-                if (result == ContentDialogResult.Secondary && App.Current is App app)
+                if ((!hasSharedAuthorization && result == ContentDialogResult.Primary) && App.Current is App app)
                     await app.DisconnectProviderCompletelyAsync(providerName);
+                else if (result == ContentDialogResult.Secondary && App.Current is App app2)
+                    await app2.DisconnectProviderCompletelyAsync(providerName);
                 else if (_syncManager != null)
                     await _syncManager.RemoveAgendaAccountAsync(providerName);
             }

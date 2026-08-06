@@ -435,11 +435,20 @@
   <data name="AddAccount_MSDesc.Text" xml:space="preserve">
     <value>Outlook Calendar &amp; To Do</value>
   </data>
+  <data name="AddAccount_ICloudTitle.Text" xml:space="preserve">
+    <value>iCloud</value>
+  </data>
+  <data name="AddAccount_ICloudDesc.Text" xml:space="preserve">
+    <value>iCloud Calendar</value>
+  </data>
   <data name="AddAccount_AlreadyConnected" xml:space="preserve">
     <value>Already connected</value>
   </data>
   <data name="AddAccount_Reconnect" xml:space="preserve">
     <value>Reconnect all features</value>
+  </data>
+  <data name="AddAccount_ReconnectICloud" xml:space="preserve">
+    <value>Reconnect iCloud Calendar</value>
   </data>
   <data name="AddAccount_ChecklistTitle.Text" xml:space="preserve">
     <value>Account health and offline status</value>
@@ -498,6 +507,17 @@
   <data name="AddAccount_ConnectMicrosoft" xml:space="preserve">
     <value>Connect Microsoft for Outlook Calendar and To Do.</value>
   </data>
+  <data name="AddAccount_ConnectICloud" xml:space="preserve">
+    <value>Connect iCloud Calendar with an app-specific password.</value>
+  </data>
+  <data name="AddAccount_ICloudDialogTitle" xml:space="preserve"><value>Connect iCloud Calendar</value></data>
+  <data name="AddAccount_ICloudAccountHeader" xml:space="preserve"><value>Apple Account email</value></data>
+  <data name="AddAccount_ICloudAccountPlaceholder" xml:space="preserve"><value>name@example.com</value></data>
+  <data name="AddAccount_ICloudPasswordHeader" xml:space="preserve"><value>App-specific password</value></data>
+  <data name="AddAccount_ICloudPasswordHelp" xml:space="preserve"><value>Manage app-specific passwords</value></data>
+  <data name="AddAccount_ICloudExplanation" xml:space="preserve"><value>Use your Apple Account email and an app-specific password. Your main Apple Account password is not accepted or stored.</value></data>
+  <data name="AddAccount_ICloudValidation" xml:space="preserve"><value>Enter a valid Apple Account email and app-specific password.</value></data>
+  <data name="TextConnect" xml:space="preserve"><value>Connect</value></data>
   <data name="AddAccount_ConnectMail" xml:space="preserve">
     <value>Add Gmail, Outlook, or IMAP from the Mail page.</value>
   </data>
@@ -1614,8 +1634,9 @@
   </data>
   <data name="AddAccount_ChecklistFormat" xml:space="preserve"><value>Google: {0}
 Microsoft: {1}
-Mail: {2}
-Weather: {3}</value></data>
+iCloud: {2}
+Mail: {3}
+Weather: {4}</value></data>
   <data name="TextRssRefreshBlockedPrivateNetwork" xml:space="preserve"><value>Refresh was blocked because the RSS URL or redirect resolved to a non-public IP address. Local access must be approved for this subscription's exact host, port, and protocol.</value></data>
   <data name="TextAllowLocalNetworkRss" xml:space="preserve"><value>Allow this subscription to access its exact local network host and port</value></data>
   <data name="TextLocalNetworkRssWarning" xml:space="preserve"><value>Enable only for a trusted feed on your home or work network. Redirects to a different local host or port remain blocked.</value></data>
