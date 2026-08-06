@@ -662,8 +662,8 @@ namespace Task_Flyout.Services
 
         /// <summary>Set the weather location directly from coordinates (e.g. device GPS),
         /// with a display label. Open-Meteo uses the coordinates directly.</summary>
-        public void SetCoordinates(double latitude, double longitude, string displayName)
-            => AddLocation(latitude, longitude, displayName, true);
+        public Task<bool> SetCoordinatesAsync(double latitude, double longitude, string displayName)
+            => SetCoordinatesAsync(latitude, longitude, displayName, expectedGeneration: null);
 
         public bool AddLocation(double latitude, double longitude, string displayName, bool currentLocation)
         {
@@ -773,16 +773,19 @@ namespace Task_Flyout.Services
             LocalSqliteStore.WriteProtectedText(ProtectedWeatherScope, ProtectedLocationKey, json);
         }
 
-        private void SetCoordinates(double latitude, double longitude, string displayName, long? expectedGeneration)
+        private async Task<bool> SetCoordinatesAsync(
+            double latitude,
+            double longitude,
+            string displayName,
+            long? expectedGeneration)
         {
             EnsureLocationLoaded();
             var normalized = WeatherLocationPolicy.Normalize(displayName, latitude, longitude);
             string json;
-            long generation;
             lock (_contextLock)
             {
                 if (expectedGeneration.HasValue
-                    && expectedGeneration.Value != Volatile.Read(ref _weatherDataGeneration)) return;
+                    && expectedGeneration.Value != Volatile.Read(ref _weatherDataGeneration)) return false;
 
                 lock (_locationLock)
                 {
@@ -790,10 +793,10 @@ namespace Task_Flyout.Services
                     if (current != null && _location.City == normalized.City &&
                         _location.Latitude == normalized.Latitude &&
                         _location.Longitude == normalized.Longitude)
-                        return;
+                        return false;
                     if (current == null)
                     {
-                        if (!WeatherLocationPolicy.TryAdd(_favorites, displayName, latitude, longitude, true, out current)) return;
+                        if (!WeatherLocationPolicy.TryAdd(_favorites, displayName, latitude, longitude, true, out current)) return false;
                     }
                     else
                     {
@@ -806,19 +809,20 @@ namespace Task_Flyout.Services
                     json = JsonSerializer.Serialize(_favorites, AppJsonContext.Default.WeatherFavoritesStore);
                 }
                 InvalidateWeatherContext();
-                generation = Volatile.Read(ref _weatherDataGeneration);
             }
 
-            _weatherPersistenceGate.Wait();
+            await _weatherPersistenceGate.WaitAsync();
             try
             {
-                if (generation != Volatile.Read(ref _weatherDataGeneration)) return;
-                LocalSqliteStore.WriteProtectedText(ProtectedWeatherScope, ProtectedLocationKey, json);
+                await LocalSqliteStore.WriteProtectedTextAsync(ProtectedWeatherScope, ProtectedLocationKey, json);
             }
             finally
             {
                 _weatherPersistenceGate.Release();
             }
+
+            LocationsChanged?.Invoke(this, EventArgs.Empty);
+            return true;
         }
 
         /// <summary>Outcome of a reverse-geocode, including which provider answered (for diagnostics).</summary>
@@ -853,6 +857,52 @@ namespace Task_Flyout.Services
                 return new ReverseGeocodeResult { Name = city, Source = "bigdatacloud" };
 
             return new ReverseGeocodeResult { Name = null, Source = area.Source };
+        }
+
+        public async Task<ReverseGeocodeResult> ResolvePositionLabelAsync(
+            Geoposition position,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(position);
+            var coordinates = position.Coordinate.Point.Position;
+            var reverseGeocoded = await ReverseGeocodeDetailedAsync(
+                coordinates.Latitude,
+                coordinates.Longitude,
+                cancellationToken);
+
+            string civicLabel = "";
+            try
+            {
+                var civic = position.CivicAddress;
+                civicLabel = WeatherLocationLabelPolicy.FormatProvinceCity(civic?.State, civic?.City);
+                if (string.IsNullOrWhiteSpace(civicLabel))
+                    civicLabel = civic?.Country ?? "";
+                civicLabel = LocalizationHelper.LocalizeExternalText(civicLabel);
+            }
+            catch
+            {
+            }
+
+            string previousLabel;
+            EnsureLocationLoaded();
+            lock (_locationLock)
+                previousLabel = _favorites.Locations.FirstOrDefault(location => location.IsCurrentLocation)?.DisplayLabel ?? "";
+
+            string fallback = _loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location";
+            string label = WeatherLocationLabelPolicy.ChooseSpecificLabel(
+                reverseGeocoded.Name,
+                civicLabel,
+                previousLabel,
+                fallback);
+            string source = !string.IsNullOrWhiteSpace(reverseGeocoded.Name)
+                && !WeatherLocationLabelPolicy.IsGenericCurrentLocationLabel(reverseGeocoded.Name)
+                    ? reverseGeocoded.Source
+                    : !string.IsNullOrWhiteSpace(civicLabel)
+                        ? "windows-civic"
+                        : !string.IsNullOrWhiteSpace(previousLabel)
+                            ? "cached-location"
+                            : "none";
+            return new ReverseGeocodeResult { Name = label, Source = source };
         }
 
         /// <summary>Street-level reverse geocode via OpenStreetMap Nominatim.</summary>
@@ -954,6 +1004,7 @@ namespace Task_Flyout.Services
         }
 
         private Geolocator? _trackingGeolocator;
+        private readonly SemaphoreSlim _locationTrackingGate = new(1, 1);
 
         public bool IsLocationTrackingActive => _trackingGeolocator != null;
 
@@ -964,12 +1015,14 @@ namespace Task_Flyout.Services
         /// <summary>Begin following the device location. Returns false if access was denied.</summary>
         public async Task<bool> StartLocationTrackingAsync()
         {
+            if (!AutoFollowLocation) return false;
+            await _locationTrackingGate.WaitAsync();
             try
             {
                 if (_trackingGeolocator != null) return true;
 
                 var access = await Geolocator.RequestAccessAsync();
-                if (access != GeolocationAccessStatus.Allowed) return false;
+                if (access != GeolocationAccessStatus.Allowed || !AutoFollowLocation) return false;
 
                 // High accuracy so the followed position resolves to a street; the 3km
                 // movement threshold still keeps us from refetching weather constantly.
@@ -979,12 +1032,17 @@ namespace Task_Flyout.Services
                     MovementThreshold = 3000
                 };
                 _trackingGeolocator.PositionChanged += OnTrackedPositionChanged;
+                _ = RefreshTrackedPositionAsync(_trackingGeolocator);
                 return true;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"StartLocationTracking failed: {ex.Message}");
                 return false;
+            }
+            finally
+            {
+                _locationTrackingGate.Release();
             }
         }
 
@@ -998,24 +1056,38 @@ namespace Task_Flyout.Services
         }
 
         private async void OnTrackedPositionChanged(Geolocator sender, PositionChangedEventArgs args)
+            => await ApplyTrackedPositionAsync(sender, args.Position);
+
+        private async Task RefreshTrackedPositionAsync(Geolocator sender)
+        {
+            try
+            {
+                var position = await sender.GetGeopositionAsync(
+                    TimeSpan.FromMinutes(5),
+                    TimeSpan.FromSeconds(15));
+                await ApplyTrackedPositionAsync(sender, position);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Initial tracked position failed: {ex.Message}");
+            }
+        }
+
+        private async Task ApplyTrackedPositionAsync(Geolocator sender, Geoposition position)
         {
             if (!ReferenceEquals(sender, _trackingGeolocator) || !AutoFollowLocation) return;
             long generation = Volatile.Read(ref _weatherDataGeneration);
             try
             {
-                var p = args.Position.Coordinate.Point.Position;
+                var p = position.Coordinate.Point.Position;
                 CancellationToken serviceToken;
                 lock (_contextLock) serviceToken = _weatherContextCancellation.Token;
-                string? place = await ReverseGeocodeAsync(p.Latitude, p.Longitude, serviceToken);
+                var resolved = await ResolvePositionLabelAsync(position, serviceToken);
                 if (generation != Volatile.Read(ref _weatherDataGeneration) ||
                     !ReferenceEquals(sender, _trackingGeolocator) || !AutoFollowLocation)
                     return;
-                string label = !string.IsNullOrWhiteSpace(place)
-                    ? place!
-                    : (_loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location");
-
-                SetCoordinates(p.Latitude, p.Longitude, label, generation);
-                if (generation + 1 != Volatile.Read(ref _weatherDataGeneration) || !AutoFollowLocation)
+                bool changed = await SetCoordinatesAsync(p.Latitude, p.Longitude, resolved.Name ?? "", generation);
+                if (!changed || generation + 1 != Volatile.Read(ref _weatherDataGeneration) || !AutoFollowLocation)
                     return;
                 // Coordinates are part of the cache key, so the next fetch is a miss and refetches.
                 LocationUpdated?.Invoke(this, EventArgs.Empty);

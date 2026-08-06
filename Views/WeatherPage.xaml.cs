@@ -62,9 +62,8 @@ namespace Task_Flyout.Views
             WeatherToggle.IsOn = _weatherService.IsEnabled;
             CitySearchBox.Text = _weatherService.City;
             BuildSavedLocations();
-            if (_weatherService.AutoFollowLocation && !_weatherService.IsLocationTrackingActive)
-                _weatherService.AutoFollowLocation = false;
-            AutoFollowLocationToggle.IsOn = _weatherService.IsLocationTrackingActive;
+            bool autoFollowRequested = _weatherService.AutoFollowLocation;
+            AutoFollowLocationToggle.IsOn = autoFollowRequested;
             _weatherService.LocationUpdated -= OnWeatherLocationUpdated;
             _weatherService.LocationUpdated += OnWeatherLocationUpdated;
 
@@ -105,6 +104,16 @@ namespace Task_Flyout.Views
             BuildAlertTypeToggles();
 
             _isInitializing = false;
+
+            if (autoFollowRequested && !_weatherService.IsLocationTrackingActive)
+            {
+                bool started = await _weatherService.StartLocationTrackingAsync();
+                if (!started)
+                {
+                    ShowLocationStatus(_loader.GetStringOrDefault("WeatherLocationDenied")
+                        ?? "Location is off. Turn it on in Windows Settings › Privacy & security › Location.");
+                }
+            }
 
             if (_weatherService.IsEnabled && !string.IsNullOrEmpty(_weatherService.City))
             {
@@ -898,13 +907,11 @@ namespace Task_Flyout.Views
                 var geolocator = new Geolocator { DesiredAccuracy = PositionAccuracy.High };
                 var position = await geolocator.GetGeopositionAsync();
                 var point = position.Coordinate.Point.Position;
-                var geo = await _weatherService.ReverseGeocodeDetailedAsync(
-                    point.Latitude, point.Longitude, operationCts.Token);
+                var geo = await _weatherService.ResolvePositionLabelAsync(position, operationCts.Token);
                 if (generation != _weatherLoadGeneration) return;
-                string label = !string.IsNullOrWhiteSpace(geo.Name)
-                    ? geo.Name!
-                    : (_loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location");
-                _weatherService.SetCoordinates(point.Latitude, point.Longitude, label);
+                string label = geo.Name
+                    ?? (_loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location");
+                await _weatherService.SetCoordinatesAsync(point.Latitude, point.Longitude, label);
                 BuildSavedLocations();
                 CitySearchBox.Text = label;
 
@@ -943,11 +950,10 @@ namespace Task_Flyout.Views
 
             if (AutoFollowLocationToggle.IsOn)
             {
+                _weatherService.AutoFollowLocation = true;
                 bool started = await _weatherService.StartLocationTrackingAsync();
-                _weatherService.AutoFollowLocation = started;
-                if (!started)
+                if (!started && AutoFollowLocationToggle.IsOn)
                 {
-                    AutoFollowLocationToggle.IsOn = false; // re-enters the off branch (harmless)
                     ShowLocationStatus(_loader.GetStringOrDefault("WeatherLocationDenied")
                         ?? "Location is off. Turn it on in Windows Settings › Privacy & security › Location.");
                 }

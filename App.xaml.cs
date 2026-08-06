@@ -149,9 +149,9 @@ namespace Task_Flyout
             if (ShouldWeatherBarBeEnabled())
                 StartWeatherBarWatchdog();
 
-            // Subscribe for user-started location tracking updates. Do not request location
-            // permission during app startup; only WeatherPage user actions may start tracking.
+            // Resume a previously user-enabled tracking preference after startup.
             WeatherService.LocationUpdated += OnWeatherLocationUpdated;
+            QueueLocationTrackingResume();
 
             _trayIcon.DoubleClickCommand = new RelayCommand(() => OpenMainWindowInternal());
 
@@ -367,6 +367,25 @@ namespace Task_Flyout
                 }
 
                 MyFlyoutWindow?.TrimMemoryCaches();
+            });
+        }
+
+        private void QueueLocationTrackingResume()
+        {
+            if (!WeatherService.AutoFollowLocation) return;
+
+            MainDispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, async () =>
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(3));
+                    if (WeatherService.AutoFollowLocation && !WeatherService.IsLocationTrackingActive)
+                        await WeatherService.StartLocationTrackingAsync();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Resuming location tracking failed: {ex.Message}");
+                }
             });
         }
 
