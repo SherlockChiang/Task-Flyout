@@ -63,8 +63,6 @@ Use this checklist for flows that require real Windows credentials, DPAPI, Passw
 7. Turn on auto-follow and confirm tracking starts only after the toggle action.
 8. Turn off auto-follow, restart the app, and confirm startup does not request location permission.
 
-## Weather Bar Multi-Display And Explorer Recovery
-
 ## Weather Saved Locations And Alert Details
 
 1. Migrate from a build containing one `location_v1` and `cache_v1` record; confirm it appears as the active saved location and no weather coordinates remain in LocalSettings.
@@ -76,14 +74,17 @@ Use this checklist for flows that require real Windows credentials, DPAPI, Passw
 7. With no alert, left-click Weather Bar and confirm direct Weather navigation is unchanged.
 8. With a forecast-derived alert, left-click and confirm the detail flyout header exactly matches the bar label, and shows type, derivable start/end, precipitation probability, wind and temperature values, thresholds, the full untruncated active location, disclaimer, and `Open Weather`.
 
+## Weather Bar Multi-Display And Explorer Recovery
+
 1. Enable Weather and the taskbar Weather Bar with two displays connected and taskbars visible on both displays.
 2. Confirm the bar remains on its currently attached valid taskbar across normal polling; if no attachment exists, confirm the primary taskbar is preferred and a secondary taskbar is used when the primary is unavailable.
 3. Change one display's scale/DPI and taskbar position, then confirm the bar remains inside the selected taskbar and does not overlap native Widgets or active FluentFlyout media controls.
 4. Open Settings and confirm Weather Bar Diagnostics shows the taskbar class, Widgets bridge source, monitor rectangle, DPI, taskbar rectangle, bar rectangle, and fallback reason without HWND values, window titles, process IDs, paths, location names, or account data.
 5. Click `Reattach taskbar` and confirm the bar briefly re-evaluates its attachment, remains visible, and the diagnostic geometry refreshes.
-6. Restart Windows Explorer from Task Manager while the bar is enabled. Confirm the app does not crash, the stale bar disappears with Explorer, and a fresh bar attaches after a supported primary or secondary taskbar returns (watchdog recovery can take up to 30 seconds).
-7. Repeat the Explorer restart while only a secondary taskbar is discoverable and confirm recovery does not wait for `Shell_TrayWnd`.
-8. Disconnect the display hosting the selected taskbar and confirm polling invalidates stale taskbar, FluentFlyout, and placement state before attaching to the remaining taskbar.
+6. Restart Windows Explorer from Task Manager while the bar is enabled. Confirm the app does not crash, the stale bar disappears with Explorer, and a fresh bar normally attaches within 2 seconds after a supported taskbar returns; the 30-second watchdog remains a fallback.
+7. Disable the Weather Bar, restart Windows Explorer, then re-enable the bar. Confirm a fresh native window attaches immediately instead of reusing the hidden pre-restart window.
+8. Repeat the Explorer restart while only a secondary taskbar is discoverable and confirm recovery does not wait for `Shell_TrayWnd`.
+9. Disconnect the display hosting the selected taskbar and confirm polling invalidates stale taskbar, FluentFlyout, and placement state before attaching to the remaining taskbar.
 
 ## Integration Test Environment Notes
 

@@ -1666,8 +1666,10 @@ namespace Task_Flyout
 
         public async Task RefreshWeatherAsync(bool forceRefresh = false)
         {
+            if (Volatile.Read(ref _detached) != 0 || !IsAlive()) return;
+
             var cts = ReplaceWeatherRefreshCancellation();
-            long generation = _weatherRefreshGeneration;
+            long generation = Interlocked.Read(ref _weatherRefreshGeneration);
             try
             {
                 await RefreshWeatherCoreAsync(forceRefresh, cts.Token, generation);
@@ -1691,7 +1693,7 @@ namespace Task_Flyout
             {
                 DispatcherQueue.TryEnqueue(() =>
                 {
-                    if (generation != _weatherRefreshGeneration || _userHidden) return;
+                    if (!CanApplyWeatherRefresh(generation)) return;
                     _barAlertActive = false;
                     _activeAlert = null;
                     _activeWeatherInfo = null;
@@ -1719,14 +1721,16 @@ namespace Task_Flyout
             }
 
             var info = await weatherService.GetWeatherAsync(forceRefresh, cancellationToken);
-            if (generation != _weatherRefreshGeneration) return;
+            if (generation != Interlocked.Read(ref _weatherRefreshGeneration) ||
+                Volatile.Read(ref _detached) != 0)
+                return;
             var alert = (info != null && weatherService.BarAlertsEnabled)
                 ? weatherService.DetectUpcomingAlert(info)
                 : null;
 
             DispatcherQueue.TryEnqueue(() =>
             {
-                if (generation != _weatherRefreshGeneration || _userHidden) return;
+                if (!CanApplyWeatherRefresh(generation)) return;
                 if (info == null)
                 {
                     _barAlertActive = false;
@@ -1807,7 +1811,7 @@ namespace Task_Flyout
                 {
                     NextRenderHelper.RunOnce(() =>
                     {
-                        if (generation != _weatherRefreshGeneration || !_requestIcon || !_layoutShowsIcon) return;
+                        if (!CanApplyWeatherRefresh(generation) || !_requestIcon || !_layoutShowsIcon) return;
                         WeatherIconHost.Visibility = Visibility.Visible;
                         if (useBitmap)
                             ApplyWeatherIconLayerImages(displayLayers!, layerImages);
@@ -1866,9 +1870,18 @@ namespace Task_Flyout
                 QueueBarWidthRecompute();
                 UpdateWeatherIconGlow();
                 NextRenderHelper.RunOnce(() =>
-                    PerformanceDiagnostics.MarkOnce("weatherbar.display", "weather_bar", "first_weather_display", source: "ui"));
+                {
+                    if (!CanApplyWeatherRefresh(generation)) return;
+                    PerformanceDiagnostics.MarkOnce("weatherbar.display", "weather_bar", "first_weather_display", source: "ui");
+                });
             });
         }
+
+        private bool CanApplyWeatherRefresh(long generation)
+            => generation == Interlocked.Read(ref _weatherRefreshGeneration) &&
+               Volatile.Read(ref _detached) == 0 &&
+               !_userHidden &&
+               IsAlive();
 
         private CancellationTokenSource ReplaceWeatherRefreshCancellation()
         {
@@ -2145,6 +2158,30 @@ namespace Task_Flyout
             {
                 var h = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 return h != IntPtr.Zero && IsWindow(h);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Returns true only when this native window belongs to the currently active taskbar.
+        /// A surviving HWND alone is not sufficient after Explorer recreates the shell.
+        /// </summary>
+        public bool IsAttachedToCurrentTaskbar()
+        {
+            try
+            {
+                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                if (hWnd == IntPtr.Zero || !IsWindow(hWnd) || !_isParented)
+                    return false;
+
+                IntPtr currentTaskbar = FindTaskbarWindow();
+                return currentTaskbar != IntPtr.Zero &&
+                       IsWindow(currentTaskbar) &&
+                       _taskbarHwnd == currentTaskbar &&
+                       GetParent(hWnd) == currentTaskbar;
             }
             catch
             {

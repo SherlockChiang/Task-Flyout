@@ -34,7 +34,11 @@ namespace Task_Flyout
 
         private H.NotifyIcon.TaskbarIcon? _trayIcon;
         private Microsoft.UI.Dispatching.DispatcherQueueTimer? _weatherBarWatchdog;
-        private IntPtr _weatherBarRecoveryTaskbar;
+        private H.NotifyIcon.Core.MessageWindow? _taskbarMessageWindow;
+        private long _lastWeatherBarRecreationTimestamp;
+        private static readonly TimeSpan NormalWeatherBarWatchdogInterval = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan RecoveryWeatherBarWatchdogInterval = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan WeatherBarRecreationCooldown = TimeSpan.FromSeconds(30);
         private UISettings _uiSettings = null!;
         private ResourceLoader _loader = new();
         private string _trayToolTipText = "Task Flyout";
@@ -467,52 +471,155 @@ namespace Task_Flyout
         // the dead/missing bar and rebuilds a fresh one once the taskbar is back.
         private void StartWeatherBarWatchdog()
         {
+            EnsureTaskbarRestartListener();
             if (_weatherBarWatchdog != null) return;
 
             _weatherBarWatchdog = MainDispatcherQueue.CreateTimer();
-            _weatherBarWatchdog.Interval = TimeSpan.FromSeconds(30);
+            _weatherBarWatchdog.Interval = NormalWeatherBarWatchdogInterval;
             _weatherBarWatchdog.Tick += (_, _) => CheckWeatherBarAlive();
             _weatherBarWatchdog.Start();
+        }
+
+        private void EnsureTaskbarRestartListener()
+        {
+            if (_taskbarMessageWindow != null) return;
+
+            try
+            {
+                H.NotifyIcon.Core.MessageWindow? messageWindow = _trayIcon?.TrayIcon.MessageWindow;
+                if (messageWindow == null) return;
+
+                messageWindow.TaskbarCreated += TaskbarMessageWindow_TaskbarCreated;
+                _taskbarMessageWindow = messageWindow;
+            }
+            catch (Exception ex)
+            {
+                _taskbarMessageWindow = null;
+                System.Diagnostics.Debug.WriteLine($"Taskbar restart listener failed: {ex.Message}");
+            }
+        }
+
+        private void TaskbarMessageWindow_TaskbarCreated(object? sender, EventArgs e)
+        {
+            MainDispatcherQueue.TryEnqueue(() =>
+            {
+                if (_isExiting || !ShouldWeatherBarBeEnabled()) return;
+
+                // This is a new shell generation, so an earlier reconstruction must not
+                // delay recovery for the newly created taskbar.
+                _lastWeatherBarRecreationTimestamp = 0;
+                SetWeatherBarRecoveryPolling(enabled: true);
+                CheckWeatherBarAlive();
+            });
+        }
+
+        private void SetWeatherBarRecoveryPolling(bool enabled)
+        {
+            if (_weatherBarWatchdog == null) return;
+
+            TimeSpan desired = enabled
+                ? RecoveryWeatherBarWatchdogInterval
+                : NormalWeatherBarWatchdogInterval;
+            if (_weatherBarWatchdog.Interval != desired)
+                _weatherBarWatchdog.Interval = desired;
         }
 
         private void CheckWeatherBarAlive()
         {
             try
             {
-                if (!ShouldWeatherBarBeEnabled())
+                bool enabled = ShouldWeatherBarBeEnabled();
+                bool taskbarAvailable = enabled && GetSupportedTaskbarWindow() != IntPtr.Zero;
+                WeatherBarWindow? bar = MyWeatherBar;
+                bool barExists = bar != null;
+                bool barAlive = bar?.IsAlive() == true;
+                bool attached = barAlive && bar!.IsAttachedToCurrentTaskbar();
+                TimeSpan elapsedSinceRecreation = _lastWeatherBarRecreationTimestamp == 0
+                    ? TimeSpan.MaxValue
+                    : System.Diagnostics.Stopwatch.GetElapsedTime(_lastWeatherBarRecreationTimestamp);
+
+                WeatherBarRecoveryAction action = WeatherBarRecoveryPolicy.Decide(
+                    enabled,
+                    taskbarAvailable,
+                    barExists,
+                    barAlive,
+                    attached,
+                    reattachAttempted: false,
+                    elapsedSinceRecreation,
+                    WeatherBarRecreationCooldown);
+
+                if (action == WeatherBarRecoveryAction.Stop)
                 {
                     StopWeatherBarWatchdog();
                     return;
                 }
 
-                // Alive and well — nothing to do (also covers the user-hidden case: the HWND
-                // still exists when merely hidden).
-                if (MyWeatherBar != null && MyWeatherBar.IsAlive())
+                if (action == WeatherBarRecoveryAction.WaitForTaskbar ||
+                    action == WeatherBarRecoveryAction.Cooldown)
                 {
-                    _weatherBarRecoveryTaskbar = IntPtr.Zero;
+                    SetWeatherBarRecoveryPolling(enabled: true);
                     return;
                 }
 
-                // Don't recreate mid-restart before the taskbar exists, or the new bar would
-                // briefly float as a stray top-level window.
-                IntPtr taskbar = GetSupportedTaskbarWindow();
-                if (taskbar == IntPtr.Zero || taskbar == _weatherBarRecoveryTaskbar) return;
+                if (action == WeatherBarRecoveryAction.DiscardAndWaitForTaskbar)
+                {
+                    MyWeatherBar = null;
+                    bar?.DetachForRecovery();
+                    SetWeatherBarRecoveryPolling(enabled: true);
+                    return;
+                }
 
-                var dead = MyWeatherBar;
+                if (action == WeatherBarRecoveryAction.Healthy)
+                {
+                    MarkWeatherBarHealthy();
+                    return;
+                }
+
+                if (action == WeatherBarRecoveryAction.Reattach)
+                {
+                    SetWeatherBarRecoveryPolling(enabled: true);
+                    bar!.ForceReattach();
+                    attached = bar.IsAttachedToCurrentTaskbar();
+                    action = WeatherBarRecoveryPolicy.Decide(
+                        enabled,
+                        taskbarAvailable,
+                        barExists: true,
+                        barAlive: bar.IsAlive(),
+                        attachedToCurrentTaskbar: attached,
+                        reattachAttempted: true,
+                        elapsedSinceRecreation,
+                        WeatherBarRecreationCooldown);
+                    if (action == WeatherBarRecoveryAction.Healthy)
+                    {
+                        MarkWeatherBarHealthy();
+                        return;
+                    }
+                    if (action != WeatherBarRecoveryAction.Recreate)
+                        return;
+                }
+
+                SetWeatherBarRecoveryPolling(enabled: true);
+                var dead = bar;
                 MyWeatherBar = null;
                 dead?.DetachForRecovery();
 
-                // A replacement must survive until the next watchdog tick before another
-                // attempt is allowed for this taskbar generation.
-                _weatherBarRecoveryTaskbar = taskbar;
+                _lastWeatherBarRecreationTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
                 MyWeatherBar = new WeatherBarWindow();
                 ApplyConfiguredThemeToOpenWindows();
                 MyWeatherBar.ShowBar();
+
+                if (MyWeatherBar.IsAttachedToCurrentTaskbar())
+                    MarkWeatherBarHealthy();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"WeatherBar watchdog failed: {ex.Message}");
             }
+        }
+
+        private void MarkWeatherBarHealthy()
+        {
+            SetWeatherBarRecoveryPolling(enabled: false);
         }
 
         private static IntPtr GetSupportedTaskbarWindow()
@@ -546,18 +653,20 @@ namespace Task_Flyout
             MainDispatcherQueue.TryEnqueue(async () =>
             {
                 Windows.Storage.ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] = enabled;
-                if (enabled)
-                    (App.Current as App)!._weatherBarRecoveryTaskbar = IntPtr.Zero;
 
                 if (enabled && (App.Current as App)?.WeatherService?.IsEnabled == true)
                 {
-                    (App.Current as App)?.StartWeatherBarWatchdog();
-                    if (MyWeatherBar == null)
-                    {
-                        MyWeatherBar = new WeatherBarWindow();
-                    }
-                    MyWeatherBar.ShowBar();
-                    await MyWeatherBar.RefreshWeatherAsync();
+                    var app = App.Current as App;
+                    if (app != null)
+                        app._lastWeatherBarRecreationTimestamp = 0;
+                    app?.StartWeatherBarWatchdog();
+                    app?.CheckWeatherBarAlive();
+
+                    WeatherBarWindow? bar = MyWeatherBar;
+                    if (bar == null || !bar.IsAlive()) return;
+                    bar.ShowBar();
+                    if (bar.IsAttachedToCurrentTaskbar())
+                        await bar.RefreshWeatherAsync();
                 }
                 else
                 {
@@ -571,15 +680,25 @@ namespace Task_Flyout
         {
             _weatherBarWatchdog?.Stop();
             _weatherBarWatchdog = null;
-            _weatherBarRecoveryTaskbar = IntPtr.Zero;
+            _lastWeatherBarRecreationTimestamp = 0;
+
+            if (_taskbarMessageWindow != null)
+            {
+                _taskbarMessageWindow.TaskbarCreated -= TaskbarMessageWindow_TaskbarCreated;
+                _taskbarMessageWindow = null;
+            }
         }
 
         public static void RefreshWeatherBar(bool forceRefresh = false)
         {
             MainDispatcherQueue.TryEnqueue(async () =>
             {
-                if (MyWeatherBar != null)
-                    await MyWeatherBar.RefreshWeatherAsync(forceRefresh);
+                if (Current is not App app || !app.ShouldWeatherBarBeEnabled()) return;
+
+                app.CheckWeatherBarAlive();
+                WeatherBarWindow? bar = MyWeatherBar;
+                if (bar?.IsAlive() == true && bar.IsAttachedToCurrentTaskbar())
+                    await bar.RefreshWeatherAsync(forceRefresh);
             });
         }
 
@@ -670,7 +789,7 @@ namespace Task_Flyout
             if (_isExiting) return;
             _isExiting = true;
 
-            _weatherBarWatchdog?.Stop();
+            StopWeatherBarWatchdog();
             _backgroundRefresh?.Stop();
             NotificationService?.Stop();
             MailService.StopMailPolling();

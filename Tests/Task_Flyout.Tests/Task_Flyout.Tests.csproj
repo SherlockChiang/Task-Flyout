@@ -43,6 +43,7 @@
     <Compile Include="..\..\Services\TrayStatusPolicy.cs" Link="Source\TrayStatusPolicy.cs" />
     <Compile Include="..\..\Services\TaskbarSelectionPolicy.cs" Link="Source\TaskbarSelectionPolicy.cs" />
     <Compile Include="..\..\Services\WeatherBarTaskbarStylePolicy.cs" Link="Source\WeatherBarTaskbarStylePolicy.cs" />
+    <Compile Include="..\..\Services\WeatherBarRecoveryPolicy.cs" Link="Source\WeatherBarRecoveryPolicy.cs" />
     <Compile Include="..\..\Services\ComposeDraftCoordinator.cs" Link="Source\ComposeDraftCoordinator.cs" />
     <Compile Include="..\..\Services\MailAttachmentPolicy.cs" Link="Source\MailAttachmentPolicy.cs" />
     <Compile Include="..\..\Services\RssFetchPolicy.cs" Link="Source\RssFetchPolicy.cs" />
