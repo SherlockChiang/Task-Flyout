@@ -402,11 +402,14 @@ namespace Task_Flyout
             if (_isDotRefreshPending) return;
             _isDotRefreshPending = true;
 
-            DispatcherQueue.TryEnqueue(() =>
+            if (!DispatcherQueue.TryEnqueue(() =>
             {
                 _isDotRefreshPending = false;
                 RefreshAllDots();
-            });
+            }))
+            {
+                _isDotRefreshPending = false;
+            }
         }
 
         private void RefreshAllDots()
@@ -868,7 +871,6 @@ namespace Task_Flyout
                 MainCalendar.SetDisplayDate(DateTime.Today);
             }
             UpdateSelectedDateHeader();
-            RequestDotRefresh();
             ApplyConfiguredTheme(App.GetConfiguredTheme());
             _openRequestIssued = true;
             Show();
@@ -905,6 +907,13 @@ namespace Task_Flyout
                         MainCalendar.Focus(FocusState.Programmatic);
                     }
                 });
+                if (!DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+                {
+                    if (IsOpen) RequestDotRefresh();
+                }))
+                {
+                    RequestDotRefresh();
+                }
                 QueueBackgroundRefresh();
                 return;
             }

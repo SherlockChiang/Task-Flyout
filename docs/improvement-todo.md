@@ -121,6 +121,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M2-09 | DONE | Efficiency/Lifecycle | Suspend Flyout refresh work while it is hidden. | Periodic sync runs only while visible; delayed reopen refresh is throttled, cancellable, generation-safe, and cannot resume against a shutting-down Flyout. | `perf(flyout): suspend hidden refresh work` |
 | M2-10 | DONE | Efficiency | Avoid rebuilding unchanged Flyout agenda snapshots. | Reopening within the same calendar month and cache version skips date-key materialization and agenda cloning; changing month or cache version forces a coherent snapshot refresh; month reuse behavior is tested. | `perf(flyout): skip unchanged agenda snapshots` |
 | M2-11 | DONE | Memory | Release rebuildable Flyout caches under memory pressure. | Medium/high memory pressure drops hidden Flyout weather-icon and dot-brush caches on the UI dispatcher; visible/opening Flyouts retain live UI state; cache-trim eligibility is tested. | `perf(flyout): trim rebuildable caches` |
+| M2-12 | DONE | Responsiveness | Defer Flyout calendar-dot rendering until after the window opens. | The open request performs no dot-render queueing before `Show`; visible-state handling schedules dot work at low priority; failed dispatcher enqueue does not permanently suppress later refreshes. | `perf(flyout): defer calendar dots until visible` |
 
 ### P3 - Product Follow-Ups
 
