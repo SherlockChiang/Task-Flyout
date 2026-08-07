@@ -86,6 +86,16 @@ Use this checklist for flows that require real Windows credentials, DPAPI, Passw
 8. Repeat the Explorer restart while only a secondary taskbar is discoverable and confirm recovery does not wait for `Shell_TrayWnd`.
 9. Disconnect the display hosting the selected taskbar and confirm polling invalidates stale taskbar, FluentFlyout, and placement state before attaching to the remaining taskbar.
 
+## Native Windows Widgets Mode
+
+1. Open Weather settings and confirm the new native Widgets switch is off by default; the existing Task Flyout bar and its field/alert controls behave as before.
+2. On a Windows 11 profile with the Windows Web Experience Pack registered, turn on the switch. Confirm the custom Task Flyout child window is removed, the previous `TaskbarDa` value is captured, and Explorer materializes its own `Taskbar.AugmentedEntryPointButton` entry.
+3. Click the native entry and confirm Windows opens the Widgets board and owns the weather/news data. The app must not draw a second weather pill over the native control.
+4. Restart Explorer and confirm the native entry returns without starting a custom weather-bar watchdog; open Settings diagnostics and verify the requested mode, native availability reason, and entry-point state.
+5. Turn the switch off (or disable the master Weather Bar toggle) and confirm the captured `TaskbarDa` value is restored and the custom bar returns when weather is enabled. If the user changed `TaskbarDa` manually while native mode was active, leave that user change intact.
+6. On a machine without the Web Experience Pack, turn on the switch and confirm the status explains the missing package, the Store repair button is offered, and the existing Task Flyout bar remains the visible fallback.
+7. Do not treat the fallback child window as a native Widgets control: true Explorer/XAML injection is intentionally outside the WinUI app boundary and is not part of this verification.
+
 ## Integration Test Environment Notes
 
 These checks require a dedicated Windows user profile or disposable VM because they touch system credential stores and provider OAuth state.

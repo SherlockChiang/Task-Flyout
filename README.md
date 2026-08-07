@@ -31,7 +31,7 @@ see and manage your day without opening a browser.
 - **Calendar and tasks** — Two-way calendar sync with Google, Microsoft, and iCloud, plus Google Tasks and Microsoft To Do. Create, edit, and complete events and tasks directly from the tray.
 - **Mail** — Connect Gmail, Outlook, or any IMAP/SMTP account. Background polling raises a native Windows notification when new mail arrives.
 - **RSS reader** — Follow feeds in a built-in reader with per-feed image and privacy controls.
-- **Weather** — A forecast pane powered by [Open-Meteo](https://open-meteo.com/), plus an optional taskbar weather bar.
+- **Weather** — A forecast pane powered by [Open-Meteo](https://open-meteo.com/), plus an optional taskbar weather bar. Weather settings can request the Windows-owned Widgets entry when the Web Experience Pack is available; otherwise the existing Task Flyout bar remains the fallback.
 - **Reminders** — Toast notifications a configurable number of minutes before an event starts.
 - **Native design** — Built with WinUI 3, with Mica material, light/dark themes, and a per-calendar color palette.
 - **Lightweight** — Tray-resident with launch-on-startup and background running. Switches to Windows 11 Efficiency Mode (EcoQoS) while collapsed to reduce CPU, power, and memory use.
