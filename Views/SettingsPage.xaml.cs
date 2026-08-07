@@ -204,13 +204,15 @@ namespace Task_Flyout.Views
             var unavailable = _loader.GetStringOrDefault("TextUnavailable") ?? "Unavailable";
             WeatherBarDiagnosticsText.Text = string.Format(
                 _loader.GetStringOrDefault("SettingsPage_WeatherBarDiagnosticsFormat")
-                    ?? "Taskbar class: {0}\nWidgets bridge source: {1}\nMonitor: {2}\nDPI: {3}\nTaskbar: {4}\nWeather bar: {5}\nFallback: {6}",
+                    ?? "Taskbar class: {0}\nWidgets bridge source: {1}\nMonitor: {2}\nDPI: {3}\nTaskbar: {4}\nWeather bar: {5}\nTaskbar surface: {6}\nSurface slot: {7}\nFallback: {8}",
                 diagnostics.TaskbarClass,
                 diagnostics.WidgetsBridgeSource,
                 diagnostics.MonitorRect,
                 diagnostics.Dpi == 0 ? unavailable : diagnostics.Dpi,
                 diagnostics.TaskbarRect,
                 diagnostics.BarRect,
+                diagnostics.TaskbarSurface,
+                diagnostics.SurfaceSlot,
                 diagnostics.FallbackReason);
         }
 

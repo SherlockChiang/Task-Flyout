@@ -1934,7 +1934,9 @@ Monitor: {2}
 DPI: {3}
 Taskbar: {4}
 Weather bar: {5}
-Fallback: {6}</value></data>
+Taskbar surface: {6}
+Surface slot: {7}
+Fallback: {8}</value></data>
   <data name="WeatherPage_IconPackError" xml:space="preserve"><value>Icon-pack operation failed: {0}</value></data>
   <data name="MailPage_ImapDisplayName.PlaceholderText" xml:space="preserve"><value>Work Mail</value></data>
   <data name="MailPage_BtnGoogleAccount.Text" xml:space="preserve"><value>Google OAuth</value></data>

@@ -582,7 +582,7 @@ namespace Task_Flyout
                 _layoutSuppressed = true;
                 ShowWindow(hWnd, SW_HIDE);
                 widgets = widgets with { FallbackReason = "No unobstructed taskbar space" };
-                UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets);
+                UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets, themedSlot);
                 return true;
             }
 
@@ -628,12 +628,12 @@ namespace Task_Flyout
                     {
                         widgets = widgets with { FallbackReason = "SetWindowPos failed" };
                         ResetCachedWindowPlacement();
-                        UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets);
+                        UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets, themedSlot);
                         return false;
                     }
                 }
 
-                UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets);
+                UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets, themedSlot);
                 return true;
             }
             catch
@@ -683,7 +683,12 @@ namespace Task_Flyout
             ReparentTimer_Tick(null, EventArgs.Empty);
         }
 
-        private void UpdateDiagnostics(IntPtr barHwnd, RECT taskbarRect, double scaleFactor, TaskbarWidgetGeometry widgets)
+        private void UpdateDiagnostics(
+            IntPtr barHwnd,
+            RECT taskbarRect,
+            double scaleFactor,
+            TaskbarWidgetGeometry widgets,
+            WeatherBarTaskbarSlot themedSlot)
         {
             string monitorRect = "Unavailable";
             IntPtr monitor = MonitorFromWindow(_taskbarHwnd, MONITOR_DEFAULTTONEAREST);
@@ -694,6 +699,12 @@ namespace Task_Flyout
             string barRect = GetWindowRect(barHwnd, out RECT currentBarRect)
                 ? FormatRect(currentBarRect)
                 : "Unavailable";
+            string taskbarSurface = themedSlot.IsThemed
+                ? "Windhawk Luminosity Dock"
+                : "Native taskbar";
+            string surfaceSlot = themedSlot.IsThemed
+                ? $"({themedSlot.Left}, {themedSlot.Top}) {themedSlot.Width}x{themedSlot.Height}"
+                : "Native bounds";
             _diagnostics = new WeatherBarDiagnostics(
                 GetWindowClassName(_taskbarHwnd),
                 widgets.DetectionSource,
@@ -701,6 +712,8 @@ namespace Task_Flyout
                 (uint)Math.Round(scaleFactor * 96),
                 FormatRect(taskbarRect),
                 barRect,
+                taskbarSurface,
+                surfaceSlot,
                 widgets.FallbackReason);
         }
 

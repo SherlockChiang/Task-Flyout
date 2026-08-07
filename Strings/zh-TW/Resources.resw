@@ -1934,7 +1934,9 @@ iCloud：{2}
 DPI：{3}
 任務欄：{4}
 天氣欄：{5}
-回退原因：{6}</value></data>
+任務欄表面：{6}
+表面槽位：{7}
+回退原因：{8}</value></data>
   <data name="WeatherPage_IconPackError" xml:space="preserve"><value>圖示包操作失敗：{0}</value></data>
   <data name="MailPage_ImapDisplayName.PlaceholderText" xml:space="preserve"><value>工作信箱</value></data>
   <data name="MailPage_BtnGoogleAccount.Text" xml:space="preserve"><value>Google OAuth</value></data>

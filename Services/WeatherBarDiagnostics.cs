@@ -7,9 +7,11 @@ namespace Task_Flyout.Services
         uint Dpi,
         string TaskbarRect,
         string BarRect,
+        string TaskbarSurface,
+        string SurfaceSlot,
         string FallbackReason)
     {
         public static WeatherBarDiagnostics Unavailable(string reason = "Weather bar is not running")
-            => new("Not attached", "None", "Unavailable", 0, "Unavailable", "Unavailable", reason);
+            => new("Not attached", "None", "Unavailable", 0, "Unavailable", "Unavailable", "Unavailable", "Unavailable", reason);
     }
 }
