@@ -148,3 +148,16 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 - `dotnet test Tests\Task_Flyout.Tests\Task_Flyout.Tests.csproj --no-restore`: 877 passed, 0 failed, 0 skipped.
 - `dotnet build Task_Flyout.csproj -c Release -p:Platform=x64 --no-restore`: passed with 0 warnings and 0 errors.
 - The worktree is clean, and `credentials.json`, `Secrets.cs`, `*.pfx`, `bin/`, and `obj/` are not tracked.
+
+### 2026-08-07 Windhawk Dock Verification
+
+- Read-only inspection found Windows 11 Taskbar Styler 1.8 enabled with
+  `Luminosity_variant_Dock`; the preset defaults are `DockMargin=250`,
+  `DockMarginFix=500`, `DockHeight=58`, `DockTopGap=5`, and `bcr=10`.
+- The current source maps that preset to client slot `(250, 5) 920x48` on a
+  1920x58 taskbar before widget/obstacle reduction, and the new diagnostics expose
+  the resolved surface and slot after packaging.
+- An unsigned Release x64 MSIX was generated under `AppPackages\WindhawkCheck`.
+  The installed package was not replaced during this pass, so no running tray
+  state or user Windhawk settings were changed; screenshot verification remains
+  pending installation approval.
