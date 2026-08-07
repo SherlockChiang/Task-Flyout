@@ -139,9 +139,24 @@ namespace Task_Flyout
 
             _trayIcon.LeftClickCommand = new RelayCommand(async () =>
             {
-                EfficiencyModeService.SetEfficiencyMode(false);
-                await EnsureAccountsHydratedAsync();
-                EnsureFlyoutWindow().ToggleFlyout();
+                var openRequest = PerformanceDiagnostics.StartSpan("flyout", "tray_click_to_open_request", "tray");
+                try
+                {
+                    EfficiencyModeService.SetEfficiencyMode(false);
+                    // AccountManager.Load populates an ObservableCollection. Complete
+                    // hydration before Flyout construction so its initial filter pass
+                    // observes a stable account snapshot.
+                    await EnsureAccountsHydratedAsync();
+                    var flyout = EnsureFlyoutWindow();
+                    flyout.ToggleFlyout();
+                    openRequest.Complete();
+                }
+                catch (Exception ex)
+                {
+                    openRequest.Complete("failed");
+                    System.Diagnostics.Debug.WriteLine($"Opening tray flyout failed: {ex.Message}");
+                    UpdateEfficiencyMode();
+                }
             });
 
             // Initialize weather bar if enabled
