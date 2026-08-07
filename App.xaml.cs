@@ -45,6 +45,15 @@ namespace Task_Flyout
         private string? _currentTrayIconName;
         private bool _traySyncRunning;
         private readonly DeferredStartupWork _accountHydration = new();
+        private WindowsWidgetsAvailability _windowsWidgetsAvailability =
+            WindowsWidgetsAvailability.Unavailable(
+                WindowsWidgetsAvailabilityReason.DetectionFailed,
+                "Native Widgets availability has not been checked.");
+        private DateTime _windowsWidgetsAvailabilityCheckedAtUtc = DateTime.MinValue;
+        private bool _nativeWidgetsModeActive;
+        private bool _nativeWidgetsActivationFailed;
+        private string _weatherBarModeRuntimeDetail = string.Empty;
+        private static readonly TimeSpan WindowsWidgetsAvailabilityCacheLifetime = TimeSpan.FromSeconds(30);
         public static FlyoutWindow? MyFlyoutWindow { get; private set; }
         public static MainWindow? MyMainWindow { get; private set; }
         public static WeatherBarWindow? MyWeatherBar { get; private set; }
@@ -161,8 +170,6 @@ namespace Task_Flyout
 
             // Initialize weather bar if enabled
             InitWeatherBar();
-            if (ShouldWeatherBarBeEnabled())
-                StartWeatherBarWatchdog();
 
             // Resume a previously user-enabled tracking preference after startup.
             WeatherService.LocationUpdated += OnWeatherLocationUpdated;
@@ -509,16 +516,146 @@ namespace Task_Flyout
 
         private void InitWeatherBar()
         {
-            if (ShouldWeatherBarBeEnabled())
-            {
-                MyWeatherBar = new WeatherBarWindow();
-                MyWeatherBar.ShowBar();
-            }
+            ApplyWeatherBarPresentation(forceProbe: true);
         }
 
         private bool ShouldWeatherBarBeEnabled()
-            => (ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false)
-               && WeatherService.IsEnabled;
+        {
+            if (_nativeWidgetsActivationFailed)
+            {
+                var values = ApplicationData.Current.LocalSettings.Values;
+                return (values["WeatherBarEnabled"] as bool? ?? false) && WeatherService.IsEnabled;
+            }
+
+            return ResolveWeatherBarMode().ShouldRunTaskFlyoutBar;
+        }
+
+        private WeatherBarModeResolution ResolveWeatherBarMode(bool forceProbe = false)
+        {
+            var values = ApplicationData.Current.LocalSettings.Values;
+            WeatherBarMode requestedMode = WeatherBarModeSettings.ReadAndMigrate(values);
+            bool weatherBarEnabled = values["WeatherBarEnabled"] as bool? ?? false;
+            WindowsWidgetsAvailability availability = ProbeWindowsWidgetsAvailability(forceProbe);
+            return WeatherBarModePolicy.Resolve(
+                weatherBarEnabled,
+                WeatherService.IsEnabled,
+                requestedMode,
+                availability.IsAvailable);
+        }
+
+        private WindowsWidgetsAvailability ProbeWindowsWidgetsAvailability(bool forceRefresh = false)
+        {
+            DateTime now = DateTime.UtcNow;
+            if (!forceRefresh &&
+                _windowsWidgetsAvailabilityCheckedAtUtc != DateTime.MinValue &&
+                now - _windowsWidgetsAvailabilityCheckedAtUtc < WindowsWidgetsAvailabilityCacheLifetime)
+            {
+                return _windowsWidgetsAvailability;
+            }
+
+            _windowsWidgetsAvailability = WindowsWidgetsService.Detect();
+            _windowsWidgetsAvailabilityCheckedAtUtc = now;
+            return _windowsWidgetsAvailability;
+        }
+
+        private void DisposeWeatherBar()
+        {
+            WeatherBarWindow? bar = MyWeatherBar;
+            MyWeatherBar = null;
+            try { bar?.DetachForRecovery(); } catch { }
+        }
+
+        private void ApplyWeatherBarPresentation(bool forceProbe = false)
+        {
+            try
+            {
+                WeatherBarModeResolution resolution = ResolveWeatherBarMode(forceProbe);
+                var values = ApplicationData.Current.LocalSettings.Values;
+                WeatherBarMode requestedMode = WeatherBarModeSettings.Read(values);
+
+                if (resolution.ShouldUseWindowsWidgets)
+                {
+                    StopWeatherBarWatchdog();
+                    EnsureTaskbarRestartListener();
+                    DisposeWeatherBar();
+                    if (WindowsWidgetsService.TryEnableTaskbarEntry(values, out string detail))
+                    {
+                        _nativeWidgetsModeActive = true;
+                        _nativeWidgetsActivationFailed = false;
+                        _weatherBarModeRuntimeDetail = detail;
+                    }
+                    else
+                    {
+                        // Registry writes can be blocked by policy. Preserve the
+                        // selected mode, but retain the existing bar as a safe
+                        // runtime fallback so the taskbar never goes blank.
+                        _nativeWidgetsActivationFailed = true;
+                        _weatherBarModeRuntimeDetail = detail;
+                        EnsureTaskFlyoutWeatherBar(force: true);
+                        return;
+                    }
+
+                    return;
+                }
+
+                if (_nativeWidgetsModeActive)
+                {
+                    WindowsWidgetsService.TryRestoreTaskbarEntry(values, out string detail);
+                    _nativeWidgetsModeActive = false;
+                    _weatherBarModeRuntimeDetail = detail;
+                }
+                _nativeWidgetsActivationFailed = false;
+
+                if (resolution.ShouldRunTaskFlyoutBar)
+                {
+                    EnsureTaskFlyoutWeatherBar();
+                    return;
+                }
+
+                DisposeWeatherBar();
+                StopWeatherBarWatchdog();
+                if (requestedMode == WeatherBarMode.WindowsWidgets &&
+                    resolution.FallbackReason == WeatherBarFallbackReason.WindowsWidgetsUnavailable)
+                {
+                    _weatherBarModeRuntimeDetail = ProbeWindowsWidgetsAvailability().Detail;
+                }
+            }
+            catch (Exception ex)
+            {
+                _weatherBarModeRuntimeDetail = $"Weather bar mode update failed: {ex.Message}";
+                bool fallbackAllowed =
+                    (ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false) &&
+                    WeatherService.IsEnabled;
+                _nativeWidgetsActivationFailed = fallbackAllowed;
+                if (fallbackAllowed)
+                    EnsureTaskFlyoutWeatherBar(force: true);
+                else
+                {
+                    DisposeWeatherBar();
+                    StopWeatherBarWatchdog();
+                }
+            }
+        }
+
+        private void EnsureTaskFlyoutWeatherBar(bool force = false)
+        {
+            if (!force && !ShouldWeatherBarBeEnabled())
+            {
+                DisposeWeatherBar();
+                StopWeatherBarWatchdog();
+                return;
+            }
+
+            if (MyWeatherBar == null || !MyWeatherBar.IsAlive())
+            {
+                DisposeWeatherBar();
+                MyWeatherBar = new WeatherBarWindow();
+                ApplyConfiguredThemeToOpenWindows();
+                MyWeatherBar.ShowBar();
+            }
+
+            StartWeatherBarWatchdog();
+        }
 
         // The weather bar is reparented as a taskbar child, so an Explorer restart
         // destroys its native window and it silently disappears — and any later call into the
@@ -558,7 +695,28 @@ namespace Task_Flyout
         {
             MainDispatcherQueue.TryEnqueue(() =>
             {
-                if (_isExiting || !ShouldWeatherBarBeEnabled()) return;
+                if (_isExiting) return;
+
+                WeatherBarModeResolution resolution = ResolveWeatherBarMode(forceProbe: true);
+                if (resolution.ShouldUseWindowsWidgets)
+                {
+                    var values = ApplicationData.Current.LocalSettings.Values;
+                    if (WindowsWidgetsService.TryEnableTaskbarEntry(values, out string nativeDetail))
+                    {
+                        _nativeWidgetsModeActive = true;
+                        _nativeWidgetsActivationFailed = false;
+                        _weatherBarModeRuntimeDetail = nativeDetail;
+                    }
+                    else
+                    {
+                        _nativeWidgetsActivationFailed = true;
+                        _weatherBarModeRuntimeDetail = nativeDetail;
+                        EnsureTaskFlyoutWeatherBar(force: true);
+                    }
+                    return;
+                }
+
+                if (!resolution.ShouldRunTaskFlyoutBar) return;
 
                 // This is a new shell generation, so an earlier reconstruction must not
                 // delay recovery for the newly created taskbar.
@@ -583,6 +741,13 @@ namespace Task_Flyout
         {
             try
             {
+                WeatherBarModeResolution modeResolution = ResolveWeatherBarMode();
+                if (modeResolution.ShouldUseWindowsWidgets && !_nativeWidgetsActivationFailed)
+                {
+                    ApplyWeatherBarPresentation();
+                    return;
+                }
+
                 bool enabled = ShouldWeatherBarBeEnabled();
                 bool taskbarAvailable = enabled && GetSupportedTaskbarWindow() != IntPtr.Zero;
                 WeatherBarWindow? bar = MyWeatherBar;
@@ -708,27 +873,75 @@ namespace Task_Flyout
             MainDispatcherQueue.TryEnqueue(async () =>
             {
                 Windows.Storage.ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] = enabled;
+                if (Current is not App app) return;
 
-                if (enabled && (App.Current as App)?.WeatherService?.IsEnabled == true)
-                {
-                    var app = App.Current as App;
-                    if (app != null)
-                        app._lastWeatherBarRecreationTimestamp = 0;
-                    app?.StartWeatherBarWatchdog();
-                    app?.CheckWeatherBarAlive();
+                app._lastWeatherBarRecreationTimestamp = 0;
+                app.ApplyWeatherBarPresentation(forceProbe: true);
 
-                    WeatherBarWindow? bar = MyWeatherBar;
-                    if (bar == null || !bar.IsAlive()) return;
-                    bar.ShowBar();
-                    if (bar.IsAttachedToCurrentTaskbar())
-                        await bar.RefreshWeatherAsync();
-                }
-                else
-                {
-                    MyWeatherBar?.HideBar();
-                    (App.Current as App)?.StopWeatherBarWatchdog();
-                }
+                WeatherBarWindow? bar = MyWeatherBar;
+                if (enabled && bar?.IsAlive() == true && bar.IsAttachedToCurrentTaskbar())
+                    await bar.RefreshWeatherAsync();
             });
+        }
+
+        internal static WeatherBarMode GetWeatherBarMode()
+        {
+            if (Current is not App)
+                return WeatherBarMode.TaskFlyout;
+
+            return WeatherBarModeSettings.ReadAndMigrate(
+                ApplicationData.Current.LocalSettings.Values);
+        }
+
+        internal static WindowsWidgetsAvailability GetWindowsWidgetsAvailability(bool forceRefresh = false)
+        {
+            if (Current is App app)
+                return app.ProbeWindowsWidgetsAvailability(forceRefresh);
+
+            return WindowsWidgetsService.Detect();
+        }
+
+        internal static string GetWeatherBarModeRuntimeDetail()
+            => Current is App app ? app._weatherBarModeRuntimeDetail : string.Empty;
+
+        internal static void SetWeatherBarMode(WeatherBarMode mode)
+        {
+            WeatherBarModeSettings.Write(
+                ApplicationData.Current.LocalSettings.Values,
+                mode);
+            MainDispatcherQueue.TryEnqueue(() =>
+            {
+                if (Current is not App app) return;
+                app.ApplyWeatherBarPresentation(forceProbe: true);
+            });
+        }
+
+        public static async Task<bool> OpenWindowsWidgetsSettingsAsync()
+        {
+            try
+            {
+                return await Windows.System.Launcher.LaunchUriAsync(
+                    new Uri("ms-settings:taskbar"));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Opening taskbar settings failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        public static async Task<bool> OpenWindowsWidgetsStoreAsync()
+        {
+            try
+            {
+                return await Windows.System.Launcher.LaunchUriAsync(
+                    new Uri("ms-windows-store://pdp/?ProductId=9MSSGKG348SP"));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Opening Windows Web Experience Pack failed: {ex.Message}");
+                return false;
+            }
         }
 
         private void StopWeatherBarWatchdog()

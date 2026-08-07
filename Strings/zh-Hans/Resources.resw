@@ -1409,6 +1409,20 @@
   <data name="WeatherPage_WeatherBarDesc" xml:space="preserve">
     <value>在任务栏上显示浮动天气条（替代 Win11 小组件天气）</value>
   </data>
+  <data name="WeatherPage_NativeWidgets.Header" xml:space="preserve"><value>使用原有 Windows Widgets 天气入口</value></data>
+  <data name="WeatherPage_NativeWidgets.OnContent" xml:space="preserve"><value>开启</value></data>
+  <data name="WeatherPage_NativeWidgets.OffContent" xml:space="preserve"><value>关闭</value></data>
+  <data name="WeatherPage_NativeWidgetsModeDesc" xml:space="preserve"><value>关闭：使用 Task Flyout 自绘天气栏。开启：在 Windows Web Experience 可用时请求 Explorer 原生 Widgets 入口。</value></data>
+  <data name="WeatherPage_NativeWidgetsAvailable" xml:space="preserve"><value>原生 Widgets 入口由 Explorer 管理（Taskbar.AugmentedEntryPointButton）；天气数据和组件面板由 Windows 管理。</value></data>
+  <data name="WeatherPage_NativeWidgetsUnavailable" xml:space="preserve"><value>Windows 原生 Widgets 当前不可用（{0}）。将继续使用 Task Flyout 自绘天气栏。</value></data>
+  <data name="WeatherPage_NativeWidgetsReasonUnsupported" xml:space="preserve"><value>未检测到 Windows 11 任务栏组件</value></data>
+  <data name="WeatherPage_NativeWidgetsReasonPackMissing" xml:space="preserve"><value>当前用户未注册 Windows Web Experience Pack</value></data>
+  <data name="WeatherPage_NativeWidgetsReasonTaskbarUnavailable" xml:space="preserve"><value>Explorer 任务栏尚未就绪</value></data>
+  <data name="WeatherPage_NativeWidgetsReasonDetectionFailed" xml:space="preserve"><value>可用性检测失败</value></data>
+  <data name="WeatherPage_OpenWidgetsSettings.Content" xml:space="preserve"><value>打开 Windows 任务栏设置</value></data>
+  <data name="WeatherPage_NativeWidgetsSettingsFailed" xml:space="preserve"><value>无法打开 Windows 任务栏设置。请按 Win+W，或手动打开“设置 &gt; 个性化 &gt; 任务栏”。</value></data>
+  <data name="WeatherPage_OpenWidgetsStore.Content" xml:space="preserve"><value>安装或修复 Windows Web Experience Pack</value></data>
+  <data name="WeatherPage_NativeWidgetsStoreFailed" xml:space="preserve"><value>无法打开 Microsoft Store。请在商店中搜索 Windows Web Experience Pack。</value></data>
   <data name="WeatherPage_DailyForecastTitle" xml:space="preserve">
     <value>未来 7 天预报</value>
   </data>
@@ -1937,6 +1951,9 @@ DPI：{3}
 任务栏表面：{6}
 表面槽位：{7}
 回退原因：{8}</value></data>
+  <data name="SettingsPage_WeatherBarModeDiagnosticsFormat" xml:space="preserve"><value>请求模式：{0}
+原生 Widgets：{1}；入口：{2}
+模式详情：{3}</value></data>
   <data name="WeatherPage_IconPackError" xml:space="preserve"><value>图标包操作失败：{0}</value></data>
   <data name="MailPage_ImapDisplayName.PlaceholderText" xml:space="preserve"><value>工作邮箱</value></data>
   <data name="MailPage_BtnGoogleAccount.Text" xml:space="preserve"><value>Google OAuth</value></data>

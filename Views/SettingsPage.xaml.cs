@@ -214,6 +214,17 @@ namespace Task_Flyout.Views
                 diagnostics.TaskbarSurface,
                 diagnostics.SurfaceSlot,
                 diagnostics.FallbackReason);
+
+            var mode = App.GetWeatherBarMode();
+            var native = App.GetWindowsWidgetsAvailability();
+            var runtimeDetail = App.GetWeatherBarModeRuntimeDetail();
+            WeatherBarDiagnosticsText.Text += "\n" + string.Format(
+                _loader.GetStringOrDefault("SettingsPage_WeatherBarModeDiagnosticsFormat")
+                    ?? "Requested mode: {0}\nNative Widgets: {1}; entry point: {2}\nMode detail: {3}",
+                mode,
+                native.Reason,
+                native.NativeEntryPointPresent,
+                string.IsNullOrWhiteSpace(runtimeDetail) ? unavailable : runtimeDetail);
         }
 
         private async void ReattachTaskbarButton_Click(object sender, RoutedEventArgs e)

@@ -54,6 +54,56 @@ namespace Task_Flyout.Views
             catch { return fallbackText; }
         }
 
+        private void UpdateNativeWidgetsStatus()
+        {
+            WeatherBarMode mode = App.GetWeatherBarMode();
+            WindowsWidgetsAvailability availability = App.GetWindowsWidgetsAvailability();
+            OpenWidgetsStoreButton.Visibility = availability.Reason == WindowsWidgetsAvailabilityReason.WebExperiencePackMissing
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            if (mode == WeatherBarMode.WindowsWidgets && !availability.IsAvailable)
+            {
+                NativeWidgetsStatusText.Text = string.Format(
+                    GetSafeString(
+                        "WeatherPage_NativeWidgetsUnavailable",
+                        "Windows native Widgets are unavailable ({0}). The Task Flyout weather bar remains the fallback."),
+                    GetNativeWidgetsUnavailableReason(availability.Reason));
+                return;
+            }
+
+            if (mode == WeatherBarMode.WindowsWidgets && availability.IsAvailable)
+            {
+                NativeWidgetsStatusText.Text = GetSafeString(
+                    "WeatherPage_NativeWidgetsAvailable",
+                    "Windows owns the native Widgets entry (Taskbar.AugmentedEntryPointButton); weather data and the Widgets board are managed by Windows.");
+                return;
+            }
+
+            NativeWidgetsStatusText.Text = GetSafeString(
+                "WeatherPage_NativeWidgetsModeDesc",
+                "Off: use the Task Flyout weather bar. On: request the original Windows Widgets entry when the Web Experience Pack is available.");
+        }
+
+        private string GetNativeWidgetsUnavailableReason(WindowsWidgetsAvailabilityReason reason)
+        {
+            return reason switch
+            {
+                WindowsWidgetsAvailabilityReason.UnsupportedWindowsBuild => GetSafeString(
+                    "WeatherPage_NativeWidgetsReasonUnsupported",
+                    "Windows 11 taskbar components were not detected"),
+                WindowsWidgetsAvailabilityReason.WebExperiencePackMissing => GetSafeString(
+                    "WeatherPage_NativeWidgetsReasonPackMissing",
+                    "Windows Web Experience Pack is not registered for this user"),
+                WindowsWidgetsAvailabilityReason.TaskbarUnavailable => GetSafeString(
+                    "WeatherPage_NativeWidgetsReasonTaskbarUnavailable",
+                    "Explorer's taskbar is not ready"),
+                _ => GetSafeString(
+                    "WeatherPage_NativeWidgetsReasonDetectionFailed",
+                    "availability detection failed")
+            };
+        }
+
         private async void WeatherPage_Loaded(object sender, RoutedEventArgs e)
         {
             if ((App.Current as App)?.WeatherService is not WeatherService weatherService) return;
@@ -71,6 +121,8 @@ namespace Task_Flyout.Views
             bool weatherBarEnabled = Windows.Storage.ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false;
             WeatherBarToggle.IsOn = weatherBarEnabled;
             WeatherBarDesc.Text = GetSafeString("WeatherPage_WeatherBarDesc", "Show a floating weather bar on the taskbar.");
+            NativeWidgetsToggle.IsOn = App.GetWeatherBarMode() == WeatherBarMode.WindowsWidgets;
+            UpdateNativeWidgetsStatus();
 
             // Source ComboBox
             string src = _weatherService.WeatherSource;
@@ -794,6 +846,42 @@ namespace Task_Flyout.Views
         {
             if (_isInitializing) return;
             App.ToggleWeatherBar(WeatherBarToggle.IsOn);
+            UpdateNativeWidgetsStatus();
+        }
+
+        private void NativeWidgetsToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            if (sender is ToggleSwitch toggle)
+            {
+                App.SetWeatherBarMode(toggle.IsOn
+                    ? WeatherBarMode.WindowsWidgets
+                    : WeatherBarMode.TaskFlyout);
+                UpdateNativeWidgetsStatus();
+                DispatcherQueue.TryEnqueue(UpdateNativeWidgetsStatus);
+            }
+        }
+
+        private async void OpenWidgetsSettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            bool launched = await App.OpenWindowsWidgetsSettingsAsync();
+            if (!launched)
+            {
+                NativeWidgetsStatusText.Text = GetSafeString(
+                    "WeatherPage_NativeWidgetsSettingsFailed",
+                    "Windows taskbar settings could not be opened. Press Win+W or open Settings > Personalization > Taskbar manually.");
+            }
+        }
+
+        private async void OpenWidgetsStoreButton_Click(object sender, RoutedEventArgs e)
+        {
+            bool launched = await App.OpenWindowsWidgetsStoreAsync();
+            if (!launched)
+            {
+                NativeWidgetsStatusText.Text = GetSafeString(
+                    "WeatherPage_NativeWidgetsStoreFailed",
+                    "Microsoft Store could not be opened. Search the Store for Windows Web Experience Pack.");
+            }
         }
 
         private async void CitySearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)

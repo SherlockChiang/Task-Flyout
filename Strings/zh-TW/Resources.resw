@@ -1409,6 +1409,20 @@
   <data name="WeatherPage_WeatherBarDesc" xml:space="preserve">
     <value>在任務欄上顯示浮動天氣條（替代 Win11 小組件天氣）</value>
   </data>
+  <data name="WeatherPage_NativeWidgets.Header" xml:space="preserve"><value>使用原有 Windows Widgets 天氣入口</value></data>
+  <data name="WeatherPage_NativeWidgets.OnContent" xml:space="preserve"><value>開啟</value></data>
+  <data name="WeatherPage_NativeWidgets.OffContent" xml:space="preserve"><value>關閉</value></data>
+  <data name="WeatherPage_NativeWidgetsModeDesc" xml:space="preserve"><value>關閉：使用 Task Flyout 自繪天氣列。開啟：Windows Web Experience 可用時要求 Explorer 原生 Widgets 入口。</value></data>
+  <data name="WeatherPage_NativeWidgetsAvailable" xml:space="preserve"><value>原生 Widgets 入口由 Explorer 管理（Taskbar.AugmentedEntryPointButton）；天氣資料和元件面板由 Windows 管理。</value></data>
+  <data name="WeatherPage_NativeWidgetsUnavailable" xml:space="preserve"><value>Windows 原生 Widgets 目前不可用（{0}）。將繼續使用 Task Flyout 自繪天氣列。</value></data>
+  <data name="WeatherPage_NativeWidgetsReasonUnsupported" xml:space="preserve"><value>未偵測到 Windows 11 工作列元件</value></data>
+  <data name="WeatherPage_NativeWidgetsReasonPackMissing" xml:space="preserve"><value>目前使用者未註冊 Windows Web Experience Pack</value></data>
+  <data name="WeatherPage_NativeWidgetsReasonTaskbarUnavailable" xml:space="preserve"><value>Explorer 工作列尚未就緒</value></data>
+  <data name="WeatherPage_NativeWidgetsReasonDetectionFailed" xml:space="preserve"><value>可用性偵測失敗</value></data>
+  <data name="WeatherPage_OpenWidgetsSettings.Content" xml:space="preserve"><value>開啟 Windows 工作列設定</value></data>
+  <data name="WeatherPage_NativeWidgetsSettingsFailed" xml:space="preserve"><value>無法開啟 Windows 工作列設定。請按 Win+W，或手動開啟「設定 &gt; 個人化 &gt; 工作列」。</value></data>
+  <data name="WeatherPage_OpenWidgetsStore.Content" xml:space="preserve"><value>安裝或修復 Windows Web Experience Pack</value></data>
+  <data name="WeatherPage_NativeWidgetsStoreFailed" xml:space="preserve"><value>無法開啟 Microsoft Store。請在商店中搜尋 Windows Web Experience Pack。</value></data>
   <data name="WeatherPage_DailyForecastTitle" xml:space="preserve">
     <value>未來 7 天預報</value>
   </data>
@@ -1937,6 +1951,9 @@ DPI：{3}
 任務欄表面：{6}
 表面槽位：{7}
 回退原因：{8}</value></data>
+  <data name="SettingsPage_WeatherBarModeDiagnosticsFormat" xml:space="preserve"><value>要求模式：{0}
+原生 Widgets：{1}；入口：{2}
+模式詳情：{3}</value></data>
   <data name="WeatherPage_IconPackError" xml:space="preserve"><value>圖示包操作失敗：{0}</value></data>
   <data name="MailPage_ImapDisplayName.PlaceholderText" xml:space="preserve"><value>工作信箱</value></data>
   <data name="MailPage_BtnGoogleAccount.Text" xml:space="preserve"><value>Google OAuth</value></data>
