@@ -58,6 +58,11 @@ namespace Task_Flyout
         private const double ConservativeWidgetsReservation = 340;
         private const double TaskbarObstacleClearance = 48;
         private const string WindhawkTaskbarModRegistryPath = @"SOFTWARE\Windhawk\Engine\Mods\windows-11-taskbar-styler";
+        private static readonly RegistryView[] WindhawkRegistryViews =
+        {
+            RegistryView.Registry64,
+            RegistryView.Registry32
+        };
         private bool _subclassInstalled;
         private string _lastWeatherLayerKey = "";
         private WeatherAlert? _activeAlert;
@@ -1121,40 +1126,60 @@ namespace Task_Flyout
         {
             stamp = default;
             profile = WeatherBarTaskbarStyleProfile.SystemDefault;
-            try
+
+            // Windhawk is normally installed as a 64-bit machine-wide mod, but a
+            // portable/older installation can leave the same settings in the 32-bit
+            // view. Probe the 64-bit view first (the packaged app is x64), then the
+            // 32-bit view, while keeping a missing key a normal native-fallback case.
+            bool sawExistingKey = false;
+            foreach (RegistryView view in WindhawkRegistryViews)
             {
-                using RegistryKey? key = Registry.LocalMachine.OpenSubKey(WindhawkTaskbarModRegistryPath);
-                if (key == null)
-                    return true;
-
-                bool enabled = ReadRegistryInt64(key.GetValue("Disabled")) == 0;
-                long? changeTime = ReadRegistryInt64(key.GetValue("SettingsChangeTime"));
-                stamp = new WindhawkTaskbarStyleStamp(true, enabled, changeTime);
-                if (!enabled)
-                    return true;
-
-                using RegistryKey? settings = Registry.LocalMachine.OpenSubKey(
-                    $@"{WindhawkTaskbarModRegistryPath}\Settings");
-                if (settings == null)
-                    return true;
-
-                string? theme = settings.GetValue("theme") as string;
-                var styleConstants = new List<string?>();
-                for (int index = 0; index < 256; index++)
+                try
                 {
-                    string? value = settings.GetValue($"styleConstants[{index}]")?.ToString();
-                    if (string.IsNullOrEmpty(value)) break;
-                    styleConstants.Add(value);
-                }
+                    using RegistryKey baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
+                    using RegistryKey? key = baseKey.OpenSubKey(WindhawkTaskbarModRegistryPath);
+                    if (key == null)
+                        continue;
+                    sawExistingKey = true;
 
-                profile = WeatherBarTaskbarStylePolicy.Resolve(enabled, theme, styleConstants);
-                return true;
+                    bool enabled = ReadRegistryInt64(key.GetValue("Disabled")) == 0;
+                    long? changeTime = ReadRegistryInt64(key.GetValue("SettingsChangeTime"));
+                    stamp = new WindhawkTaskbarStyleStamp(true, enabled, changeTime);
+                    if (!enabled)
+                        return true;
+
+                    using RegistryKey? settings = baseKey.OpenSubKey(
+                        $@"{WindhawkTaskbarModRegistryPath}\Settings");
+                    if (settings == null)
+                        return true;
+
+                    string? theme = settings.GetValue("theme") as string;
+                    var styleConstants = new List<string?>();
+                    for (int index = 0; index < 256; index++)
+                    {
+                        string? value = settings.GetValue($"styleConstants[{index}]")?.ToString();
+                        if (string.IsNullOrEmpty(value)) break;
+                        styleConstants.Add(value);
+                    }
+
+                    profile = WeatherBarTaskbarStylePolicy.Resolve(enabled, theme, styleConstants);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Reading Windhawk taskbar style profile ({view}) failed: {ex.Message}");
+                    if (sawExistingKey)
+                        break;
+                }
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Reading Windhawk taskbar style profile failed: {ex.Message}");
-                return false;
-            }
+
+            // If the key is temporarily locked or inaccessible, do not retain an old
+            // themed profile and continue positioning against stale Dock geometry.
+            // Returning the native profile is the same safe behavior as an absent or
+            // disabled mod and will be retried by the normal reparent timer.
+            stamp = default;
+            profile = WeatherBarTaskbarStyleProfile.SystemDefault;
+            return true;
         }
 
         private static long? ReadRegistryInt64(object? value)
