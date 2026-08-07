@@ -122,6 +122,9 @@ namespace Task_Flyout
         private bool _suppressSelectedDateChanged;
         private long _isOpenChangedToken;
         private DateTimeOffset? _lastSyncSucceededAt;
+        private FlyoutAgendaSurfaceKind _agendaSurfaceKind = FlyoutAgendaSurfaceKind.Content;
+        private string _agendaStateTitle = "";
+        private string _agendaStateSubtitle = "";
         private long _lastBackgroundRefreshStartedTimestamp;
         private CancellationTokenSource? _backgroundRefreshCts;
         private CancellationTokenSource? _weatherRefreshCts;
@@ -654,16 +657,24 @@ namespace Task_Flyout
         {
             string key = date.ToString("yyyy-MM-dd");
             var tempAgenda = new List<AgendaItem>();
+            var surfaceKind = FlyoutAgendaSurfaceKind.Content;
+            string stateTitle = "";
+            string stateSubtitle = "";
 
             if (_localCache.DayItems.Count == 0)
             {
-                tempAgenda.Add(new AgendaItem
+                if (HasConnectedAgendaAccounts())
                 {
-                    Title = _loader.GetStringOrDefault("TextWelcomeTitle") ?? "Welcome to Task Flyout",
-                    Subtitle = _loader.GetStringOrDefault("TextWelcomeSub") ?? "Click setting icon to link accounts",
-                    IsEvent = false,
-                    IsTask = false
-                });
+                    surfaceKind = FlyoutAgendaSurfaceKind.Empty;
+                    stateTitle = _loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events";
+                    stateSubtitle = _loader.GetStringOrDefault("TextNoAgendaSub") ?? "Take a break";
+                }
+                else
+                {
+                    surfaceKind = FlyoutAgendaSurfaceKind.Onboarding;
+                    stateTitle = _loader.GetStringOrDefault("TextWelcomeTitle") ?? "Welcome to Task Flyout";
+                    stateSubtitle = _loader.GetStringOrDefault("TextWelcomeSub") ?? "Click setting icon to link accounts";
+                }
             }
             else if (_localCache.DayItems.ContainsKey(key) && _localCache.DayItems[key].Any(IsItemVisible))
             {
@@ -673,13 +684,9 @@ namespace Task_Flyout
             }
             else
             {
-                tempAgenda.Add(new AgendaItem
-                {
-                    Title = _loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events",
-                    Subtitle = _loader.GetStringOrDefault("TextNoAgendaSub") ?? "Take a break",
-                    IsEvent = false,
-                    IsTask = false
-                });
+                surfaceKind = FlyoutAgendaSurfaceKind.Empty;
+                stateTitle = _loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events";
+                stateSubtitle = _loader.GetStringOrDefault("TextNoAgendaSub") ?? "Take a break";
 
                 var nextDayKey = _localCache.DayItems.Keys
                     .Where(k => string.Compare(k, key) > 0)
@@ -715,14 +722,59 @@ namespace Task_Flyout
                 }
             }
 
-            if (AgendaItems.Count == tempAgenda.Count && AgendaItems.Zip(tempAgenda, AgendaItemsEqual).All(equal => equal))
-                return;
+            bool itemsChanged = ReplaceAgendaItems(tempAgenda);
+            bool surfaceChanged = ApplyAgendaSurface(surfaceKind, stateTitle, stateSubtitle, tempAgenda.Count > 0);
+
+            if (itemsChanged || surfaceChanged)
+                AdjustWindowHeight();
+        }
+
+        private bool HasConnectedAgendaAccounts()
+            => (App.Current as App)?.SyncManager?.AccountManager.Accounts.Count > 0;
+
+        private bool ReplaceAgendaItems(IReadOnlyList<AgendaItem> items)
+        {
+            if (AgendaItems.Count == items.Count && AgendaItems.Zip(items, AgendaItemsEqual).All(equal => equal))
+                return false;
 
             AgendaItems.Clear();
-            foreach (var item in tempAgenda)
+            foreach (var item in items)
                 AgendaItems.Add(item);
+            return true;
+        }
 
-            AdjustWindowHeight();
+        private bool ApplyAgendaSurface(
+            FlyoutAgendaSurfaceKind kind,
+            string title,
+            string subtitle,
+            bool hasAgendaItems)
+        {
+            var presentation = FlyoutAgendaSurfacePolicy.GetPresentation(kind, hasAgendaItems);
+            var stateVisibility = presentation.ShowState ? Visibility.Visible : Visibility.Collapsed;
+            var listVisibility = presentation.ShowList ? Visibility.Visible : Visibility.Collapsed;
+            var retryVisibility = presentation.ShowRetry ? Visibility.Visible : Visibility.Collapsed;
+            var addAccountVisibility = presentation.ShowAddAccount ? Visibility.Visible : Visibility.Collapsed;
+            bool changed = _agendaSurfaceKind != kind
+                || _agendaStateTitle != title
+                || _agendaStateSubtitle != subtitle
+                || AgendaStatePanel.Visibility != stateVisibility
+                || AgendaListControl.Visibility != listVisibility
+                || AgendaSyncRetryButton.Visibility != retryVisibility
+                || AgendaAddAccountButton.Visibility != addAccountVisibility;
+
+            _agendaSurfaceKind = kind;
+            _agendaStateTitle = title;
+            _agendaStateSubtitle = subtitle;
+            AgendaStateTitle.Text = title;
+            AgendaStateSubtitle.Text = subtitle;
+            AgendaStateSubtitle.Visibility = string.IsNullOrWhiteSpace(subtitle)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            AgendaStatePanel.Visibility = stateVisibility;
+            AgendaListControl.Visibility = listVisibility;
+            AgendaSyncRetryButton.Visibility = retryVisibility;
+            AgendaAddAccountButton.Visibility = addAccountVisibility;
+            return changed;
         }
 
         private static bool AgendaItemsEqual(AgendaItem left, AgendaItem right)
@@ -753,14 +805,13 @@ namespace Task_Flyout
             {
                 if (!silent)
                 {
-                    AgendaItems.Clear();
-                    AgendaItems.Add(new AgendaItem
-                    {
-                        Title = _loader.GetStringOrDefault("TextWelcomeTitle") ?? "Welcome to Task Flyout",
-                        Subtitle = _loader.GetStringOrDefault("TextWelcomeSub") ?? "Click setting icon to link accounts",
-                        IsEvent = false,
-                        IsTask = false
-                    });
+                    SetSyncProgressVisible(false);
+                    ReplaceAgendaItems(Array.Empty<AgendaItem>());
+                    ApplyAgendaSurface(
+                        FlyoutAgendaSurfaceKind.Onboarding,
+                        _loader.GetStringOrDefault("TextWelcomeTitle") ?? "Welcome to Task Flyout",
+                        _loader.GetStringOrDefault("TextWelcomeSub") ?? "Click setting icon to link accounts",
+                        hasAgendaItems: false);
                     AdjustWindowHeight();
                 }
                 return;
@@ -770,17 +821,19 @@ namespace Task_Flyout
 
             try
             {
+                forceRefresh |= !silent;
+                var providerHealthBefore = CaptureConnectedProviderHealth(accountMgr);
+                DateTimeOffset refreshStartedAt = DateTimeOffset.UtcNow;
                 if (!silent)
                 {
                     SetSyncProgressVisible(true);
-                    AgendaItems.Clear();
-                    AgendaItems.Add(new AgendaItem
-                    {
-                        Title = _loader.GetStringOrDefault("TextFullSyncTitle") ?? "Full Syncing...",
-                        Subtitle = _loader.GetStringOrDefault("TextFullSyncSub") ?? "Fetching all your events and tasks",
-                        IsEvent = false,
-                        IsTask = false
-                    });
+                    ReplaceAgendaItems(Array.Empty<AgendaItem>());
+                    ApplyAgendaSurface(
+                        FlyoutAgendaSurfaceKind.Loading,
+                        _loader.GetStringOrDefault("TextFullSyncTitle") ?? "Full Syncing...",
+                        _loader.GetStringOrDefault("TextFullSyncSub") ?? "Fetching all your events and tasks",
+                        hasAgendaItems: false);
+                    AdjustWindowHeight();
                 }
 
                 var min = fullSync ? DateTime.Today.AddYears(-1) : DateTime.Today.AddDays(-QuickSyncPastDays);
@@ -793,26 +846,41 @@ namespace Task_Flyout
                 RequestDotRefresh();
                 ShowDataForDate(_selectedDay);
 
-                if (App.Current is App app) app.NotificationService?.CheckUpcomingEvents();
-                _lastSyncSucceededAt = DateTimeOffset.Now;
+                var providerAttempts = CaptureProviderAttempts(
+                    providerHealthBefore,
+                    refreshStartedAt);
+                var outcome = FlyoutAgendaSurfacePolicy.EvaluateSyncOutcome(
+                    providerAttempts.Select(entry => entry.Attempt).ToList());
+                if (!silent && outcome.CanRetry)
+                {
+                    ShowSyncFailureSurface(FormatUnavailableProviders(
+                        providerAttempts
+                            .Where(entry => entry.Attempt.Attempted && !entry.Attempt.Succeeded)
+                            .Select(entry => entry.ProviderName)
+                            .ToList()));
+                    return;
+                }
+
+                if (outcome.Kind == FlyoutSyncOutcomeKind.Success)
+                {
+                    if (App.Current is App app) app.NotificationService?.CheckUpcomingEvents();
+                    _lastSyncSucceededAt = DateTimeOffset.Now;
+                }
             }
             catch (Exception ex)
             {
                 if (!silent && !_isShuttingDown)
                 {
-                    AgendaItems.Clear();
-                    AgendaItems.Add(new AgendaItem
-                    {
-                        Title = _loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed",
-                        Subtitle = StatusMessageFormatter.Format(
-                            ex.Message,
-                            _lastSyncSucceededAt,
-                            includeLastSuccess: true,
-                            _loader.GetStringOrDefault("TextLastSuccessFormat") ?? "Last success: {0:g}",
-                            LocalizationHelper.AppCulture),
-                        IsEvent = false,
-                        IsTask = false
-                    });
+                    LoadCacheForDate(_displayedMonth);
+                    ShowDataForDate(_selectedDay);
+                    ShowSyncFailureSurface(StatusMessageFormatter.Format(
+                        UserSafeErrorMessage.FromException(
+                            ex,
+                            _loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed"),
+                        _lastSyncSucceededAt,
+                        includeLastSuccess: true,
+                        _loader.GetStringOrDefault("TextLastSuccessFormat") ?? "Last success: {0:g}",
+                        LocalizationHelper.AppCulture));
                 }
             }
             finally
@@ -821,6 +889,80 @@ namespace Task_Flyout
                     SetSyncProgressVisible(false);
                 _syncLock.Release();
             }
+        }
+
+        private Dictionary<string, ProviderHealthSnapshot> CaptureConnectedProviderHealth(
+            AccountManager accountManager)
+        {
+            return accountManager.Accounts
+                .Select(account => account.ProviderName)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    name => name,
+                    name => _syncManager.GetProviderHealth(name),
+                    StringComparer.OrdinalIgnoreCase);
+        }
+
+        private List<(string ProviderName, FlyoutProviderSyncAttempt Attempt)> CaptureProviderAttempts(
+            IReadOnlyDictionary<string, ProviderHealthSnapshot> before,
+            DateTimeOffset refreshStartedAt)
+            => before
+                .Select(entry =>
+                {
+                    var after = _syncManager.GetProviderHealth(entry.Key);
+                    bool attempted = HasProviderAttempted(entry.Value, after, refreshStartedAt);
+                    bool succeeded = HasProviderSucceeded(entry.Value, after, attempted);
+                    return (
+                        ProviderName: entry.Key,
+                        Attempt: new FlyoutProviderSyncAttempt(attempted, succeeded, after.HasCachedData));
+                })
+                .OrderBy(entry => entry.ProviderName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+        private static bool HasProviderAttempted(
+            ProviderHealthSnapshot before,
+            ProviderHealthSnapshot after,
+            DateTimeOffset refreshStartedAt)
+            => (before.Kind == ProviderHealthKind.Syncing && after.Kind != ProviderHealthKind.Syncing)
+                || (after.LastAttemptUtc.HasValue
+                    && (after.LastAttemptUtc > before.LastAttemptUtc
+                        || after.LastAttemptUtc >= refreshStartedAt));
+
+        private static bool HasProviderSucceeded(
+            ProviderHealthSnapshot before,
+            ProviderHealthSnapshot after,
+            bool attempted)
+            => attempted
+                && after.Kind == ProviderHealthKind.Ready
+                && after.LastSuccessUtc.HasValue
+                && (!before.LastSuccessUtc.HasValue || after.LastSuccessUtc > before.LastSuccessUtc)
+                && (!after.LastAttemptUtc.HasValue || after.LastSuccessUtc >= after.LastAttemptUtc);
+
+        private string FormatUnavailableProviders(IReadOnlyList<string> providerNames)
+        {
+            string names = string.Join(", ", providerNames);
+            string message = string.Format(
+                LocalizationHelper.AppCulture,
+                _loader.GetStringOrDefault("TextSyncUnavailableProvidersFormat")
+                    ?? "Couldn't refresh {0}. Cached data may still be shown.",
+                names);
+            return StatusMessageFormatter.Format(
+                message,
+                _lastSyncSucceededAt,
+                includeLastSuccess: true,
+                _loader.GetStringOrDefault("TextLastSuccessFormat") ?? "Last success: {0:g}",
+                LocalizationHelper.AppCulture);
+        }
+
+        private void ShowSyncFailureSurface(string subtitle)
+        {
+            ApplyAgendaSurface(
+                FlyoutAgendaSurfaceKind.Error,
+                _loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed",
+                subtitle,
+                AgendaItems.Count > 0);
+            AdjustWindowHeight();
         }
 
         private void SetSyncProgressVisible(bool isVisible)
@@ -1061,8 +1203,7 @@ namespace Task_Flyout
                 int listHeight = 0;
                 foreach (var item in AgendaItems)
                 {
-                    if (item.Title == (_loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events")) listHeight += 50;
-                    else if (item.Subtitle != null && item.Subtitle.Contains(_loader.GetStringOrDefault("TextUpcoming") ?? "Upcoming")) listHeight += 65;
+                    if (item.Subtitle != null && item.Subtitle.Contains(_loader.GetStringOrDefault("TextUpcoming") ?? "Upcoming")) listHeight += 65;
                     else listHeight += !string.IsNullOrEmpty(item.Location) ? 75 : 65;
                 }
 
@@ -1261,6 +1402,26 @@ namespace Task_Flyout
             {
                 System.Diagnostics.Debug.WriteLine($"Manual refresh failed: {ex}");
             }
+        }
+
+        private async void AgendaSyncRetryButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!AgendaSyncRetryButton.IsEnabled) return;
+            AgendaSyncRetryButton.IsEnabled = false;
+            try
+            {
+                await SyncAllDataAsync(silent: false, forceRefresh: true, fullSync: true);
+            }
+            finally
+            {
+                AgendaSyncRetryButton.IsEnabled = true;
+            }
+        }
+
+        private void AgendaAddAccountButton_Click(object sender, RoutedEventArgs e)
+        {
+            HideFlyout(autoHide: false);
+            App.OpenMainWindowInternal(window => window.NavigateToAddAccount());
         }
 
         public void ReloadFilters()
@@ -1553,22 +1714,12 @@ namespace Task_Flyout
 
         private void AgendaListControl_ItemClick(object sender, ItemClickEventArgs e)
         {
-            if (e.ClickedItem is AgendaItem item)
-            {
-                string noAgenda = _loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events";
-                if (item.Title != null && (item.Title.Contains(noAgenda) || item.Title.Contains("No upcoming events") || item.Title.Contains("没有安排") || item.Title.Contains("近期没有安排") || item.Title.Contains("沒有安排") || item.Title.Contains("近期沒有安排"))) return;
+            if (e.ClickedItem is not AgendaItem item
+                || !FlyoutAgendaSurfacePolicy.CanOpenEditor(item.IsEvent, item.IsTask))
+                return;
 
-                string welcomeTitle = _loader.GetStringOrDefault("TextWelcomeTitle") ?? "Welcome to Task Flyout";
-                if (item.Title == welcomeTitle || item.Title == "未连接账户" || item.Title == "未連接帳戶" || item.Title == "Welcome to Task Flyout" || item.Title == "欢迎使用 Task Flyout" || item.Title == "歡迎使用 Task Flyout")
-                {
-                    HideFlyout(autoHide: false);
-                    App.OpenMainWindowInternal(win => win.NavigateToAddAccount());
-                    return;
-                }
-
-                HideFlyout(autoHide: false);
-                App.OpenMainWindowInternal(win => win.NavigateToCalendarAndEdit(item));
-            }
+            HideFlyout(autoHide: false);
+            App.OpenMainWindowInternal(window => window.NavigateToCalendarAndEdit(item));
         }
 
         private void SetupFlyoutProviderComboBox()

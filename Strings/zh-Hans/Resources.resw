@@ -240,6 +240,9 @@
   <data name="TextSyncFailed" xml:space="preserve">
     <value>同步失败</value>
   </data>
+  <data name="TextSyncUnavailableProvidersFormat" xml:space="preserve">
+    <value>无法刷新 {0}，仍可显示缓存数据。</value>
+  </data>
   <data name="TextAddFailed" xml:space="preserve">
     <value>❌ 任务添加失败</value>
   </data>
@@ -314,6 +317,18 @@
   </data>
   <data name="Flyout_BtnAdd.ToolTipService.ToolTip" xml:space="preserve">
     <value>添加项目</value>
+  </data>
+  <data name="Flyout_AgendaRetry.Content" xml:space="preserve">
+    <value>重试同步</value>
+  </data>
+  <data name="Flyout_AgendaRetry.AutomationProperties.Name" xml:space="preserve">
+    <value>重试日历同步</value>
+  </data>
+  <data name="Flyout_AgendaAddAccount.Content" xml:space="preserve">
+    <value>添加账户</value>
+  </data>
+  <data name="Flyout_AgendaAddAccount.AutomationProperties.Name" xml:space="preserve">
+    <value>向 Task Flyout 添加账户</value>
   </data>
   <data name="Flyout_TextNew.Text" xml:space="preserve">
     <value>新建</value>

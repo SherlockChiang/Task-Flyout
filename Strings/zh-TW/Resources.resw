@@ -240,6 +240,9 @@
   <data name="TextSyncFailed" xml:space="preserve">
     <value>同步失敗</value>
   </data>
+  <data name="TextSyncUnavailableProvidersFormat" xml:space="preserve">
+    <value>無法重新整理 {0}，仍可顯示快取資料。</value>
+  </data>
   <data name="TextAddFailed" xml:space="preserve">
     <value>❌ 任務新增失敗</value>
   </data>
@@ -314,6 +317,18 @@
   </data>
   <data name="Flyout_BtnAdd.ToolTipService.ToolTip" xml:space="preserve">
     <value>新增項目</value>
+  </data>
+  <data name="Flyout_AgendaRetry.Content" xml:space="preserve">
+    <value>重試同步</value>
+  </data>
+  <data name="Flyout_AgendaRetry.AutomationProperties.Name" xml:space="preserve">
+    <value>重試行事曆同步</value>
+  </data>
+  <data name="Flyout_AgendaAddAccount.Content" xml:space="preserve">
+    <value>新增帳戶</value>
+  </data>
+  <data name="Flyout_AgendaAddAccount.AutomationProperties.Name" xml:space="preserve">
+    <value>向 Task Flyout 新增帳戶</value>
   </data>
   <data name="Flyout_TextNew.Text" xml:space="preserve">
     <value>新增</value>

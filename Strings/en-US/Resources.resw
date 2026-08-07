@@ -240,6 +240,9 @@
   <data name="TextSyncFailed" xml:space="preserve">
     <value>Sync failed</value>
   </data>
+  <data name="TextSyncUnavailableProvidersFormat" xml:space="preserve">
+    <value>Couldn't refresh {0}. Cached data may still be shown.</value>
+  </data>
   <data name="TextAddFailed" xml:space="preserve">
     <value>❌ Failed to add task</value>
   </data>
@@ -314,6 +317,18 @@
   </data>
   <data name="Flyout_BtnAdd.ToolTipService.ToolTip" xml:space="preserve">
     <value>Add item</value>
+  </data>
+  <data name="Flyout_AgendaRetry.Content" xml:space="preserve">
+    <value>Retry sync</value>
+  </data>
+  <data name="Flyout_AgendaRetry.AutomationProperties.Name" xml:space="preserve">
+    <value>Retry calendar synchronization</value>
+  </data>
+  <data name="Flyout_AgendaAddAccount.Content" xml:space="preserve">
+    <value>Add account</value>
+  </data>
+  <data name="Flyout_AgendaAddAccount.AutomationProperties.Name" xml:space="preserve">
+    <value>Add an account to Task Flyout</value>
   </data>
   <data name="Flyout_TextNew.Text" xml:space="preserve">
     <value>New</value>
