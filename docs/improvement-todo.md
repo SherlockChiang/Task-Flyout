@@ -126,6 +126,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M2-13 | DONE | Efficiency/UI | Avoid reapplying an unchanged effective Flyout theme. | Light, dark, and system-theme changes still propagate; repeated applications of the same effective theme return without redundant property updates. | `perf(flyout): skip redundant theme updates` |
 | M2-14 | DONE | UI/Compatibility | Keep Windhawk taskbar-style detection correct across registry views and transient read failures. | The x64 Windhawk view is preferred, 32-bit installations remain discoverable, and a locked/inaccessible settings key immediately falls back to native taskbar geometry instead of retaining stale Dock placement. | `fix(weatherbar): harden Windhawk style detection` |
 | M2-15 | DONE | UI/Diagnostics | Make the active taskbar surface and computed weather-bar slot visible in read-only diagnostics. | Settings diagnostics identify the detected Windhawk surface and slot bounds without exposing registry contents or personal data; native fallback remains explicit. | `feat(weatherbar): expose Windhawk surface diagnostics` |
+| M2-16 | DONE | UI/Compatibility | Place the Luminosity weather bar in the theme's left reserved strip without a startup flash. | The native window stays hidden until it is attached and positioned; the themed bar begins at client x=0 and fills `DockMargin`; full-width or unusably narrow Dock configurations retain native placement. | `fix(weatherbar): anchor Luminosity bar to left reserve` |
 
 ### P3 - Product Follow-Ups
 
@@ -154,8 +155,8 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 - Read-only inspection found Windows 11 Taskbar Styler 1.8 enabled with
   `Luminosity_variant_Dock`; the preset defaults are `DockMargin=250`,
   `DockMarginFix=500`, `DockHeight=58`, `DockTopGap=5`, and `bcr=10`.
-- The current source maps that preset to client slot `(250, 5) 920x48` on a
-  1920x58 taskbar before widget/obstacle reduction, and the new diagnostics expose
+- The current source maps that preset to client slot `(0, 5) 250x48` on a
+  1920x58 taskbar, and the new diagnostics expose
   the resolved surface and slot after packaging.
 - The Release x64 MSIX under `AppPackages\WindhawkCheck` was signed with the
   existing local sideload certificate and independently verified by SignTool and

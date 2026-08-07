@@ -99,6 +99,14 @@ namespace Task_Flyout.Services
                 physicalRightInset = 0;
             }
 
+            // Luminosity reserves DockMargin at the physical left edge before the
+            // centered dock surface begins. The weather bar belongs in that reserve,
+            // not inside the dock itself. If a custom/narrow layout leaves less than
+            // the minimum useful width, use the native placement fallback instead.
+            int minimumWeatherSlotWidth = (int)Math.Ceiling(MinimumUsableWidth * scaleFactor);
+            if (physicalLeftInset < minimumWeatherSlotWidth)
+                return new WeatherBarTaskbarSlot(false, 0, taskbarWidth, 0, taskbarHeight);
+
             int dockHeight = Math.Clamp(
                 (int)Math.Round(profile.DockHeight * scaleFactor),
                 1,
@@ -112,8 +120,8 @@ namespace Task_Flyout.Services
 
             return new WeatherBarTaskbarSlot(
                 true,
+                0,
                 physicalLeftInset,
-                taskbarWidth - physicalRightInset,
                 top,
                 height);
         }

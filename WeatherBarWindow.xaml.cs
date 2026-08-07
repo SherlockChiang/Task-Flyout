@@ -238,6 +238,10 @@ namespace Task_Flyout
             var windowId = Win32Interop.GetWindowIdFromWindow(hWnd);
             _appWindow = AppWindow.GetFromWindowId(windowId);
 
+            // WinUI assigns a default top-level rectangle before the weather bar is
+            // reparented. Hide it immediately so that rectangle can never flash as a
+            // white box near the desktop edge during startup or Explorer recovery.
+            ShowWindow(hWnd, SW_HIDE);
             ConfigureBarStyle(hWnd);
             InstallSubclass(hWnd);
             RefreshTaskbarStyleProfile(force: true);
@@ -351,7 +355,7 @@ namespace Task_Flyout
                 RefreshThemeIfTaskbarThemeChanged();
 
                 if (!_layoutSuppressed && (needsAttach || !IsWindowVisible(hWnd)) && IsWindow(hWnd))
-                    _appWindow.Show(activateWindow: false);
+                    ShowWindow(hWnd, SW_SHOWNOACTIVATE);
 
                 // Keep polling after parenting: taskbar widgets and FluentFlyout media
                 // controls can appear or disappear without changing our parent HWND.
@@ -558,9 +562,12 @@ namespace Task_Flyout
             int availablePhysicalWidth;
             if (themedSlot.IsThemed)
             {
-                x = Math.Max(x, themedSlot.Left);
-                rightBoundary = Math.Min(rightBoundary, themedSlot.Right);
-                availablePhysicalWidth = Math.Max(0, rightBoundary - obstacleClearance - x);
+                // Luminosity's DockMargin is a dedicated strip at the left edge.
+                // Occupy that strip exactly; treating it as an inset put the weather
+                // bar inside the centered dock and made its window shrink to content.
+                x = themedSlot.Left;
+                rightBoundary = themedSlot.Right;
+                availablePhysicalWidth = themedSlot.Width;
             }
             else
             {
@@ -587,7 +594,9 @@ namespace Task_Flyout
             }
 
             _layoutSuppressed = false;
-            int pillWidth = Math.Min(availablePhysicalWidth, (int)Math.Ceiling(layout.Width * scaleFactor));
+            int pillWidth = themedSlot.IsThemed
+                ? availablePhysicalWidth
+                : Math.Min(availablePhysicalWidth, (int)Math.Ceiling(layout.Width * scaleFactor));
             int y = themedSlot.IsThemed
                 ? themedSlot.Top + (themedSlot.Height - pillHeight) / 2
                 : (taskbarHeight - pillHeight) / 2;
@@ -2271,7 +2280,7 @@ namespace Task_Flyout
                 if (!_isParented && !AttachToTaskbar()) return;
 
                 if (PositionOnTaskbar(showWindow: false) && !_layoutSuppressed && IsWindow(hWnd))
-                    _appWindow.Show(activateWindow: false);
+                    ShowWindow(hWnd, SW_SHOWNOACTIVATE);
             }
             catch
             {

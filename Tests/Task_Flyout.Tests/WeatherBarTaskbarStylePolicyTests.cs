@@ -75,7 +75,7 @@ public class WeatherBarTaskbarStylePolicyTests
     }
 
     [Fact]
-    public void Maps_current_primary_taskbar_to_luminosity_surface()
+    public void Maps_current_primary_taskbar_to_luminosity_left_reserve()
     {
         var profile = WeatherBarTaskbarStylePolicy.Resolve(
             true,
@@ -85,10 +85,42 @@ public class WeatherBarTaskbarStylePolicyTests
         var slot = WeatherBarTaskbarStylePolicy.GetSlot(profile, 1920, 58, 1);
 
         Assert.True(slot.IsThemed);
-        Assert.Equal(250, slot.Left);
-        Assert.Equal(1170, slot.Right);
+        Assert.Equal(0, slot.Left);
+        Assert.Equal(250, slot.Right);
+        Assert.Equal(250, slot.Width);
         Assert.Equal(5, slot.Top);
         Assert.Equal(48, slot.Height);
+    }
+
+    [Fact]
+    public void Custom_dock_margin_sets_the_left_reserve_width()
+    {
+        var profile = WeatherBarTaskbarStylePolicy.Resolve(
+            true,
+            WeatherBarTaskbarStylePolicy.LuminosityDockTheme,
+            new[] { "DockMargin=180", "DockMarginFix=360" });
+
+        var slot = WeatherBarTaskbarStylePolicy.GetSlot(profile, 1920, 58, 1);
+
+        Assert.True(slot.IsThemed);
+        Assert.Equal(0, slot.Left);
+        Assert.Equal(180, slot.Right);
+        Assert.Equal(180, slot.Width);
+    }
+
+    [Fact]
+    public void Full_width_dock_without_a_left_reserve_uses_native_fallback()
+    {
+        var profile = WeatherBarTaskbarStylePolicy.Resolve(
+            true,
+            WeatherBarTaskbarStylePolicy.LuminosityDockTheme,
+            new[] { "DockMargin=0", "DockMarginFix=0" });
+
+        var slot = WeatherBarTaskbarStylePolicy.GetSlot(profile, 1920, 58, 1);
+
+        Assert.False(slot.IsThemed);
+        Assert.Equal(0, slot.Left);
+        Assert.Equal(1920, slot.Right);
     }
 
     [Fact]
@@ -104,7 +136,7 @@ public class WeatherBarTaskbarStylePolicyTests
     }
 
     [Fact]
-    public void Maps_current_200_percent_taskbar_to_visible_dock_surface()
+    public void Maps_current_200_percent_taskbar_to_visible_left_reserve()
     {
         var profile = WeatherBarTaskbarStylePolicy.Resolve(
             true,
@@ -114,14 +146,15 @@ public class WeatherBarTaskbarStylePolicyTests
         var slot = WeatherBarTaskbarStylePolicy.GetSlot(profile, 3840, 116, 2);
 
         Assert.True(slot.IsThemed);
-        Assert.Equal(500, slot.Left);
-        Assert.Equal(2340, slot.Right);
+        Assert.Equal(0, slot.Left);
+        Assert.Equal(500, slot.Right);
+        Assert.Equal(500, slot.Width);
         Assert.Equal(10, slot.Top);
         Assert.Equal(96, slot.Height);
     }
 
     [Fact]
-    public void Narrows_insets_instead_of_producing_negative_space()
+    public void Narrow_scaled_reserve_uses_native_fallback()
     {
         var profile = WeatherBarTaskbarStylePolicy.Resolve(
             true,
@@ -130,10 +163,10 @@ public class WeatherBarTaskbarStylePolicyTests
 
         var slot = WeatherBarTaskbarStylePolicy.GetSlot(profile, 500, 116, 2);
 
-        Assert.True(slot.IsThemed);
-        Assert.Equal(184, slot.Width);
-        Assert.True(slot.Left >= 0);
-        Assert.True(slot.Right <= 500);
+        Assert.False(slot.IsThemed);
+        Assert.Equal(0, slot.Left);
+        Assert.Equal(500, slot.Right);
+        Assert.Equal(500, slot.Width);
     }
 
     [Theory]
