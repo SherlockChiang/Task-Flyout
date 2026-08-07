@@ -163,3 +163,11 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
   PowerShell. The installed package was not replaced during this pass, so no
   running tray state or user Windhawk settings were changed; screenshot
   verification remains pending installation approval.
+
+### 2026-08-07 Windhawk Slot Fix Verification
+
+- The left-reserve fix passed the full suite: 879 tests passed, with 0 failures
+  or skips; Release x64 build completed with 0 warnings and 0 errors.
+- A fresh signed package is available under `AppPackages\WindhawkFix`; SignTool
+  verification succeeded with the existing certificate. It has not been
+  installed over the currently running package yet.
