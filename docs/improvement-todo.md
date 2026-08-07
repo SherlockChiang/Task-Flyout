@@ -157,7 +157,8 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 - The current source maps that preset to client slot `(250, 5) 920x48` on a
   1920x58 taskbar before widget/obstacle reduction, and the new diagnostics expose
   the resolved surface and slot after packaging.
-- An unsigned Release x64 MSIX was generated under `AppPackages\WindhawkCheck`.
-  The installed package was not replaced during this pass, so no running tray
-  state or user Windhawk settings were changed; screenshot verification remains
-  pending installation approval.
+- The Release x64 MSIX under `AppPackages\WindhawkCheck` was signed with the
+  existing local sideload certificate and independently verified by SignTool and
+  PowerShell. The installed package was not replaced during this pass, so no
+  running tray state or user Windhawk settings were changed; screenshot
+  verification remains pending installation approval.
