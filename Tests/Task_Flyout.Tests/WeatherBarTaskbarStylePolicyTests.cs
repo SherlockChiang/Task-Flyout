@@ -109,6 +109,59 @@ public class WeatherBarTaskbarStylePolicyTests
     }
 
     [Fact]
+    public void Left_reserve_is_clipped_after_a_native_widget()
+    {
+        var profile = WeatherBarTaskbarStylePolicy.Resolve(
+            true,
+            WeatherBarTaskbarStylePolicy.LuminosityDockTheme,
+            null);
+        var slot = WeatherBarTaskbarStylePolicy.GetSlot(profile, 1920, 58, 1);
+
+        var constrained = WeatherBarTaskbarStylePolicy.ConstrainThemedSlot(
+            slot, 1920, 58, occupiedOffset: 80, rightBoundary: 1920, gap: 6);
+
+        Assert.True(constrained.IsThemed);
+        Assert.Equal(86, constrained.Left);
+        Assert.Equal(250, constrained.Right);
+        Assert.Equal(164, constrained.Width);
+    }
+
+    [Fact]
+    public void Left_reserve_falls_back_when_a_widget_consumes_the_slot()
+    {
+        var profile = WeatherBarTaskbarStylePolicy.Resolve(
+            true,
+            WeatherBarTaskbarStylePolicy.LuminosityDockTheme,
+            null);
+        var slot = WeatherBarTaskbarStylePolicy.GetSlot(profile, 1920, 58, 1);
+
+        var constrained = WeatherBarTaskbarStylePolicy.ConstrainThemedSlot(
+            slot, 1920, 58, occupiedOffset: 300, rightBoundary: 1920, gap: 6);
+
+        Assert.False(constrained.IsThemed);
+        Assert.Equal(1920, constrained.Right);
+        Assert.Equal(58, constrained.Height);
+    }
+
+    [Fact]
+    public void Right_obstacles_clip_the_left_reserve()
+    {
+        var profile = WeatherBarTaskbarStylePolicy.Resolve(
+            true,
+            WeatherBarTaskbarStylePolicy.LuminosityDockTheme,
+            null);
+        var slot = WeatherBarTaskbarStylePolicy.GetSlot(profile, 1920, 58, 1);
+
+        var constrained = WeatherBarTaskbarStylePolicy.ConstrainThemedSlot(
+            slot, 1920, 58, occupiedOffset: 0, rightBoundary: 180, gap: 6);
+
+        Assert.True(constrained.IsThemed);
+        Assert.Equal(0, constrained.Left);
+        Assert.Equal(180, constrained.Right);
+        Assert.Equal(180, constrained.Width);
+    }
+
+    [Fact]
     public void Full_width_dock_without_a_left_reserve_uses_native_fallback()
     {
         var profile = WeatherBarTaskbarStylePolicy.Resolve(

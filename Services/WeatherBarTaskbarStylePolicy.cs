@@ -86,26 +86,21 @@ namespace Task_Flyout.Services
             }
 
             double logicalWidth = taskbarWidth / scaleFactor;
-            double availableForInsets = Math.Max(0, logicalWidth - MinimumUsableWidth);
             double requestedInsets = profile.LeftInset + profile.RightInset;
-            double insetScale = requestedInsets > availableForInsets && requestedInsets > 0
-                ? availableForInsets / requestedInsets
-                : 1;
-            int physicalLeftInset = Math.Max(0, (int)Math.Round(profile.LeftInset * insetScale * scaleFactor));
-            int physicalRightInset = Math.Max(0, (int)Math.Round(profile.RightInset * insetScale * scaleFactor));
-            if (physicalLeftInset + physicalRightInset >= taskbarWidth)
-            {
-                physicalLeftInset = 0;
-                physicalRightInset = 0;
-            }
-
-            // Luminosity reserves DockMargin at the physical left edge before the
-            // centered dock surface begins. The weather bar belongs in that reserve,
-            // not inside the dock itself. If a custom/narrow layout leaves less than
-            // the minimum useful width, use the native placement fallback instead.
-            int minimumWeatherSlotWidth = (int)Math.Ceiling(MinimumUsableWidth * scaleFactor);
-            if (physicalLeftInset < minimumWeatherSlotWidth)
+            if (profile.LeftInset < MinimumUsableWidth || requestedInsets >= logicalWidth)
                 return new WeatherBarTaskbarSlot(false, 0, taskbarWidth, 0, taskbarHeight);
+
+            // Windhawk applies these XAML margins directly in DIPs; do not compress
+            // DockMargin on smaller monitors, otherwise the weather slot no longer
+            // lines up with the theme's actual left reserve. If the margins cannot
+            // fit, retain native placement instead of inventing a scaled theme.
+            int physicalLeftInset = Math.Max(0, (int)Math.Round(profile.LeftInset * scaleFactor));
+            int physicalRightInset = Math.Max(0, (int)Math.Round(profile.RightInset * scaleFactor));
+            if (physicalLeftInset + physicalRightInset >= taskbarWidth ||
+                physicalLeftInset < (int)Math.Ceiling(MinimumUsableWidth * scaleFactor))
+            {
+                return new WeatherBarTaskbarSlot(false, 0, taskbarWidth, 0, taskbarHeight);
+            }
 
             int dockHeight = Math.Clamp(
                 (int)Math.Round(profile.DockHeight * scaleFactor),
@@ -124,6 +119,31 @@ namespace Task_Flyout.Services
                 physicalLeftInset,
                 top,
                 height);
+        }
+
+        public static WeatherBarTaskbarSlot ConstrainThemedSlot(
+            WeatherBarTaskbarSlot slot,
+            int taskbarWidth,
+            int taskbarHeight,
+            int occupiedOffset,
+            int rightBoundary,
+            int gap)
+        {
+            taskbarWidth = Math.Max(0, taskbarWidth);
+            taskbarHeight = Math.Max(0, taskbarHeight);
+            if (!slot.IsThemed)
+                return slot;
+
+            occupiedOffset = Math.Clamp(occupiedOffset, 0, taskbarWidth);
+            gap = Math.Max(0, gap);
+            int left = Math.Max(slot.Left, occupiedOffset + (occupiedOffset > slot.Left ? gap : 0));
+            int right = slot.Right;
+            if (rightBoundary > 0)
+                right = Math.Min(right, Math.Clamp(rightBoundary, 0, taskbarWidth));
+
+            return right > left
+                ? new WeatherBarTaskbarSlot(true, left, right, slot.Top, slot.Height)
+                : new WeatherBarTaskbarSlot(false, 0, taskbarWidth, 0, taskbarHeight);
         }
 
         private static Dictionary<string, double> ParseStyleConstants(IEnumerable<string?>? styleConstants)

@@ -542,11 +542,19 @@ namespace Task_Flyout
 
             IntPtr previousFluentFlyout = _fluentFlyoutHwnd;
             TaskbarWidgetGeometry widgets = GetTaskbarWidgetGeometry(hWnd, tbRect, scaleFactor);
+            int gap = (int)Math.Ceiling(6 * scaleFactor);
             WeatherBarTaskbarSlot themedSlot = WeatherBarTaskbarStylePolicy.GetSlot(
                 _taskbarStyleProfile,
                 taskbarWidth,
                 taskbarHeight,
                 scaleFactor);
+            themedSlot = WeatherBarTaskbarStylePolicy.ConstrainThemedSlot(
+                themedSlot,
+                taskbarWidth,
+                taskbarHeight,
+                widgets.OccupiedOffset,
+                widgets.RightBoundary,
+                gap);
             int pillHeight = ResponsiveLayoutPolicy.GetWeatherBarPhysicalHeight(
                 widgets.NativeWidgetHeight,
                 taskbarHeight);
@@ -555,16 +563,12 @@ namespace Task_Flyout
             if (previousFluentFlyout != _fluentFlyoutHwnd)
                 UseFastReparentPolling();
 
-            int gap = (int)Math.Ceiling(6 * scaleFactor);
             int obstacleClearance = (int)Math.Ceiling(TaskbarObstacleClearance * scaleFactor);
             int x = widgets.OccupiedOffset + (widgets.OccupiedOffset > 0 ? gap : 0);
             int rightBoundary = widgets.RightBoundary > 0 ? widgets.RightBoundary : tbClient.Right;
             int availablePhysicalWidth;
             if (themedSlot.IsThemed)
             {
-                // Luminosity's DockMargin is a dedicated strip at the left edge.
-                // Occupy that strip exactly; treating it as an inset put the weather
-                // bar inside the centered dock and made its window shrink to content.
                 x = themedSlot.Left;
                 rightBoundary = themedSlot.Right;
                 availablePhysicalWidth = themedSlot.Width;
@@ -580,9 +584,11 @@ namespace Task_Flyout
             }
 
             double taskbarLogicalWidth = (themedSlot.IsThemed ? themedSlot.Width : taskbarWidth) / scaleFactor;
-            double maximumLogicalWidth = Math.Min(
-                ResponsiveLayoutPolicy.GetWeatherBarMaximumWidth(taskbarLogicalWidth),
-                availablePhysicalWidth / scaleFactor);
+            double maximumLogicalWidth = themedSlot.IsThemed
+                ? availablePhysicalWidth / scaleFactor
+                : Math.Min(
+                    ResponsiveLayoutPolicy.GetWeatherBarMaximumWidth(taskbarLogicalWidth),
+                    availablePhysicalWidth / scaleFactor);
             var layout = ApplyLayoutPlan(maximumLogicalWidth);
             if (!layout.ShouldShow)
             {
@@ -1011,6 +1017,8 @@ namespace Task_Flyout
         private Brush? _glassHoverBrush;
         private Brush? _glassRestHighlightBrush;
         private Brush? _glassHoverHighlightBrush;
+        private Brush? _glassRestBorderBrush;
+        private Brush? _glassHoverBorderBrush;
         private const int WeatherBarIconDecodePixelWidth = 48;
         private const int MaxWeatherBarIconImageCacheSize = 32;
         private static readonly TimeSpan MinThemeApplyInterval = TimeSpan.FromMilliseconds(250);
@@ -1445,7 +1453,12 @@ namespace Task_Flyout
 
             if (topBorder != null)
             {
-                topBorder.BorderBrush = _glassTransparentBrush;
+                topBorder.BorderThickness = _taskbarStyleProfile.MatchesTaskbarSurface
+                    ? new Thickness(1)
+                    : new Thickness(0);
+                topBorder.BorderBrush = _taskbarStyleProfile.MatchesTaskbarSurface
+                    ? _glassRestBorderBrush
+                    : _glassTransparentBrush;
                 topBorder.Background = _glassRestHighlightBrush;
             }
         }
@@ -1581,6 +1594,8 @@ namespace Task_Flyout
             _glassHoverBrush = CreateGlassMaterialBrush(isHovering: true);
             _glassRestHighlightBrush = CreateGlassHighlightBrush(isHovering: false);
             _glassHoverHighlightBrush = CreateGlassHighlightBrush(isHovering: true);
+            _glassRestBorderBrush = CreateGlassBorderBrush(isHovering: false);
+            _glassHoverBorderBrush = CreateGlassBorderBrush(isHovering: true);
             _glassBrushCacheValid = true;
         }
 
@@ -1592,21 +1607,20 @@ namespace Task_Flyout
             _glassHoverBrush = null;
             _glassRestHighlightBrush = null;
             _glassHoverHighlightBrush = null;
+            _glassRestBorderBrush = null;
+            _glassHoverBorderBrush = null;
         }
 
         private Brush CreateGlassMaterialBrush(bool isHovering)
         {
             if (_taskbarStyleProfile.MatchesTaskbarSurface)
             {
-                if (!isHovering)
-                    return new SolidColorBrush(Colors.Transparent);
-
-                // Luminosity already supplies the blur and border. Keep the weather bar
-                // flush with that surface and add only the same subtle hover affordance
-                // used by native taskbar controls.
+                // The left reserve sits outside TaskbarFrame's Windhawk blur surface.
+                // Give it a small translucent fill of its own instead of leaving a
+                // transparent child window over the desktop (or exposing a white host).
                 return new SolidColorBrush(_isLightTheme
-                    ? Color.FromArgb(16, 0, 0, 0)
-                    : Color.FromArgb(22, 255, 255, 255));
+                    ? Color.FromArgb(isHovering ? (byte)64 : (byte)40, 255, 255, 255)
+                    : Color.FromArgb(isHovering ? (byte)58 : (byte)36, 20, 24, 30));
             }
 
             // The window backdrop is fully transparent, so the pill is only a faint
@@ -1670,6 +1684,17 @@ namespace Task_Flyout
             return brush;
         }
 
+        private Brush CreateGlassBorderBrush(bool isHovering)
+        {
+            if (!_taskbarStyleProfile.MatchesTaskbarSurface)
+                return new SolidColorBrush(Colors.Transparent);
+
+            byte alpha = _isLightTheme
+                ? (isHovering ? (byte)88 : (byte)56)
+                : (isHovering ? (byte)72 : (byte)44);
+            return new SolidColorBrush(Color.FromArgb(alpha, 255, 255, 255));
+        }
+
         private void MainBorder_PointerEntered(object sender, PointerRoutedEventArgs e)
         {
             var button = sender as Microsoft.UI.Xaml.Controls.Button;
@@ -1683,7 +1708,9 @@ namespace Task_Flyout
 
             if (topBorder != null)
             {
-                topBorder.BorderBrush = _glassTransparentBrush;
+                topBorder.BorderBrush = _taskbarStyleProfile.MatchesTaskbarSurface
+                    ? _glassHoverBorderBrush
+                    : _glassTransparentBrush;
                 topBorder.Background = _glassHoverHighlightBrush;
             }
         }
@@ -1703,7 +1730,9 @@ namespace Task_Flyout
 
             if (topBorder != null)
             {
-                topBorder.BorderBrush = _glassTransparentBrush;
+                topBorder.BorderBrush = _taskbarStyleProfile.MatchesTaskbarSurface
+                    ? _glassRestBorderBrush
+                    : _glassTransparentBrush;
                 topBorder.Background = _glassRestHighlightBrush;
             }
         }
