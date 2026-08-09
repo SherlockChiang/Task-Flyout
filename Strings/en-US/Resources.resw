@@ -1422,7 +1422,7 @@
   <data name="WeatherPage_NativeWidgetsReasonDetectionFailed" xml:space="preserve"><value>availability detection failed</value></data>
   <data name="WeatherPage_OpenWidgetsSettings.Content" xml:space="preserve"><value>Open Windows taskbar settings</value></data>
   <data name="WeatherPage_NativeWidgetsSettingsFailed" xml:space="preserve"><value>Windows taskbar settings could not be opened. Press Win+W or open Settings &gt; Personalization &gt; Taskbar manually.</value></data>
-  <data name="WeatherPage_OpenWidgetsBoard.Content" xml:space="preserve"><value>Open Widgets notification settings</value></data>
+  <data name="WeatherPage_OpenWidgetsBoard.Content" xml:space="preserve"><value>Open Widgets (then Settings &gt; Notifications)</value></data>
   <data name="WeatherPage_NativeWidgetsBoardFailed" xml:space="preserve"><value>The Windows Widgets board could not be opened. Press Win+W, then open Settings &gt; Notifications manually.</value></data>
   <data name="WeatherPage_OpenWidgetsStore.Content" xml:space="preserve"><value>Install or repair Windows Web Experience Pack</value></data>
   <data name="WeatherPage_NativeWidgetsStoreFailed" xml:space="preserve"><value>Microsoft Store could not be opened. Search the Store for Windows Web Experience Pack.</value></data>

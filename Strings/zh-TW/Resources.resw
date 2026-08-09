@@ -1422,7 +1422,7 @@
   <data name="WeatherPage_NativeWidgetsReasonDetectionFailed" xml:space="preserve"><value>可用性偵測失敗</value></data>
   <data name="WeatherPage_OpenWidgetsSettings.Content" xml:space="preserve"><value>開啟 Windows 工作列設定</value></data>
   <data name="WeatherPage_NativeWidgetsSettingsFailed" xml:space="preserve"><value>無法開啟 Windows 工作列設定。請按 Win+W，或手動開啟「設定 &gt; 個人化 &gt; 工作列」。</value></data>
-  <data name="WeatherPage_OpenWidgetsBoard.Content" xml:space="preserve"><value>開啟 Widgets 通知設定</value></data>
+  <data name="WeatherPage_OpenWidgetsBoard.Content" xml:space="preserve"><value>開啟 Widgets（再進入「設定 &gt; 通知」）</value></data>
   <data name="WeatherPage_NativeWidgetsBoardFailed" xml:space="preserve"><value>無法開啟 Windows Widgets 面板。請按 Win+W，然後手動開啟「設定 &gt; 通知」。</value></data>
   <data name="WeatherPage_OpenWidgetsStore.Content" xml:space="preserve"><value>安裝或修復 Windows Web Experience Pack</value></data>
   <data name="WeatherPage_NativeWidgetsStoreFailed" xml:space="preserve"><value>無法開啟 Microsoft Store。請在商店中搜尋 Windows Web Experience Pack。</value></data>

@@ -1422,7 +1422,7 @@
   <data name="WeatherPage_NativeWidgetsReasonDetectionFailed" xml:space="preserve"><value>可用性检测失败</value></data>
   <data name="WeatherPage_OpenWidgetsSettings.Content" xml:space="preserve"><value>打开 Windows 任务栏设置</value></data>
   <data name="WeatherPage_NativeWidgetsSettingsFailed" xml:space="preserve"><value>无法打开 Windows 任务栏设置。请按 Win+W，或手动打开“设置 &gt; 个性化 &gt; 任务栏”。</value></data>
-  <data name="WeatherPage_OpenWidgetsBoard.Content" xml:space="preserve"><value>打开 Widgets 通知设置</value></data>
+  <data name="WeatherPage_OpenWidgetsBoard.Content" xml:space="preserve"><value>打开 Widgets（再进入“设置 &gt; 通知”）</value></data>
   <data name="WeatherPage_NativeWidgetsBoardFailed" xml:space="preserve"><value>无法打开 Windows Widgets 面板。请按 Win+W，然后手动打开“设置 &gt; 通知”。</value></data>
   <data name="WeatherPage_OpenWidgetsStore.Content" xml:space="preserve"><value>安装或修复 Windows Web Experience Pack</value></data>
   <data name="WeatherPage_NativeWidgetsStoreFailed" xml:space="preserve"><value>无法打开 Microsoft Store。请在商店中搜索 Windows Web Experience Pack。</value></data>
