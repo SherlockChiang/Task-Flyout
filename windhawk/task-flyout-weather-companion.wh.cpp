@@ -64,8 +64,10 @@ changes.
 #include <algorithm>
 #include <atomic>
 #include <mutex>
+#include <new>
 #include <optional>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 using namespace winrt::Windows::UI::Xaml;
@@ -87,6 +89,7 @@ constexpr wchar_t kStateSchemaKey[] = L"state-schema";
 constexpr int kMaxTreeDepth = 18;
 constexpr int kMaxVisitedElements = 768;
 constexpr size_t kMaxPreviewTextLength = 48;
+constexpr DWORD kOwnerThreadDispatchWaitMs = 3000;
 
 std::atomic<bool> g_enabled;
 std::atomic<bool> g_unloading;
@@ -137,6 +140,8 @@ struct XamlUpdateGuard {
 std::mutex g_injectionsMutex;
 std::vector<InjectionState> g_injections;
 std::mutex g_threadDispatchMutex;
+std::mutex g_pendingDispatchMutex;
+std::unordered_set<DWORD> g_pendingDispatchThreads;
 
 struct RtlOsVersionInfo {
     ULONG size;
@@ -1008,7 +1013,7 @@ void DiscardStatesForExitedThread(DWORD ownerThreadId) {
     });
 }
 
-bool RunTrackedStateUpdateOnOwnerThread(DWORD ownerThreadId) noexcept {
+bool RunTrackedStateUpdateOnOwnerThreadCore(DWORD ownerThreadId) noexcept {
     if (ownerThreadId == GetCurrentThreadId()) {
         ApplyTrackedStatesFromCurrentTaskbarThread();
         return true;
@@ -1136,9 +1141,101 @@ bool RunTrackedStateUpdateOnOwnerThread(DWORD ownerThreadId) noexcept {
     return updated;
 }
 
-void RunTrackedStateUpdatesOnOwnerThreads() {
-    std::lock_guard dispatchLock(g_threadDispatchMutex);
+struct OwnerThreadDispatchContext {
+    DWORD ownerThreadId;
+    HMODULE selfModule;
+};
 
+DWORD WINAPI OwnerThreadDispatchWorker(void* parameter) {
+    auto context = static_cast<OwnerThreadDispatchContext*>(parameter);
+    DWORD ownerThreadId = context->ownerThreadId;
+    HMODULE selfModule = context->selfModule;
+    delete context;
+
+    bool updated = false;
+    {
+        std::lock_guard dispatchLock(g_threadDispatchMutex);
+        updated = RunTrackedStateUpdateOnOwnerThreadCore(ownerThreadId);
+    }
+    {
+        std::lock_guard pendingLock(g_pendingDispatchMutex);
+        g_pendingDispatchThreads.erase(ownerThreadId);
+    }
+
+    // The worker owns an extra module reference. This API releases it only
+    // after all worker code and local destructors have finished executing.
+    FreeLibraryAndExitThread(selfModule, updated ? 0 : 1);
+}
+
+bool RunTrackedStateUpdateOnOwnerThread(DWORD ownerThreadId) noexcept {
+    if (ownerThreadId == GetCurrentThreadId()) {
+        std::lock_guard dispatchLock(g_threadDispatchMutex);
+        ApplyTrackedStatesFromCurrentTaskbarThread();
+        return true;
+    }
+
+    {
+        std::lock_guard pendingLock(g_pendingDispatchMutex);
+        if (!g_pendingDispatchThreads.insert(ownerThreadId).second) {
+            Wh_Log(L"Taskbar dispatch is already pending on thread %lu",
+                   ownerThreadId);
+            return false;
+        }
+    }
+
+    auto releasePendingClaim = [ownerThreadId] {
+        std::lock_guard pendingLock(g_pendingDispatchMutex);
+        g_pendingDispatchThreads.erase(ownerThreadId);
+    };
+
+    HMODULE selfModule = nullptr;
+    if (!GetModuleHandleExW(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+            reinterpret_cast<LPCWSTR>(&OwnerThreadDispatchWorker),
+            &selfModule)) {
+        Wh_Log(L"Failed to retain the companion module for dispatch");
+        releasePendingClaim();
+        return false;
+    }
+
+    auto context = new (std::nothrow)
+        OwnerThreadDispatchContext{ownerThreadId, selfModule};
+    if (!context) {
+        FreeLibrary(selfModule);
+        releasePendingClaim();
+        return false;
+    }
+
+    HANDLE worker = CreateThread(nullptr, 0, OwnerThreadDispatchWorker,
+                                 context, 0, nullptr);
+    if (!worker) {
+        delete context;
+        FreeLibrary(selfModule);
+        releasePendingClaim();
+        Wh_Log(L"Failed to create taskbar dispatch worker");
+        return false;
+    }
+
+    DWORD waitResult =
+        WaitForSingleObject(worker, kOwnerThreadDispatchWaitMs);
+    if (waitResult == WAIT_OBJECT_0) {
+        DWORD exitCode = 1;
+        GetExitCodeThread(worker, &exitCode);
+        CloseHandle(worker);
+        return exitCode == 0;
+    }
+
+    // Never terminate the worker or unload its code while a window hook might
+    // still call it. The worker's self-reference keeps the DLL valid and it
+    // will release itself after the taskbar thread becomes responsive.
+    CloseHandle(worker);
+    Wh_Log(L"Taskbar dispatch on thread %lu exceeded %lu ms; continuing "
+           L"under a retained module reference",
+           ownerThreadId, kOwnerThreadDispatchWaitMs);
+    return false;
+}
+
+void RunTrackedStateUpdatesOnOwnerThreads() {
     // Copy thread IDs while locked, then release the lock before posting and
     // waiting; the owner-thread callback locks the state table again.
     auto ownerThreadIds = GetOwnerThreadIds();

@@ -20,8 +20,10 @@ preview:
   the width variables used by the Luminosity theme;
 - keeps the native outer button, background, hover states, click target, and
   accessibility behavior;
-- records the original opacity and hit-test values and restores them when the
-  preview is disabled or the mod unloads;
+- records the original local opacity and hit-test values and restores them when
+  the preview is disabled or the mod unloads; if a disconnected XAML child
+  rejects restoration, the visible host keeps a primitive-only recovery snapshot
+  for the next load instead of exposing a blank native surface;
 - is disabled by default and requires both Windows 11 build 26200 and the exact
   reviewed `Taskbar.View.dll` PE fingerprint before the private ABI is touched.
 

@@ -39,6 +39,19 @@ if (-not (Test-Path -LiteralPath $engineLibrary)) {
     throw "Windhawk engine import library not found: $engineLibrary"
 }
 
+$sourceText = Get-Content -LiteralPath $source -Raw
+$modIdMatch = [regex]::Match($sourceText, '(?m)^// @id\s+([A-Za-z0-9._-]+)\s*$')
+$modVersionMatch = [regex]::Match(
+    $sourceText,
+    '(?m)^// @version\s+([A-Za-z0-9._-]+)\s*$'
+)
+if (-not $modIdMatch.Success -or -not $modVersionMatch.Success) {
+    throw 'Windhawk @id or @version metadata is missing or invalid.'
+}
+$modIdDefine = '-DWH_MOD_ID=L\"' + $modIdMatch.Groups[1].Value + '\"'
+$modVersionDefine =
+    '-DWH_MOD_VERSION=L\"' + $modVersionMatch.Groups[1].Value + '\"'
+
 if (-not $OutputDirectory) {
     $OutputDirectory = Join-Path $PSScriptRoot '..\.testbuild\windhawk'
 }
@@ -54,8 +67,8 @@ $commonArguments = @(
     '-DNTDDI_VERSION=0x0A000008',
     '-D__USE_MINGW_ANSI_STDIO=0',
     '-DWH_MOD',
-    '-DWH_MOD_ID=L\"task-flyout-weather-companion\"',
-    '-DWH_MOD_VERSION=L\"0.1.0\"'
+    $modIdDefine,
+    $modVersionDefine
 )
 
 if ($Mode -eq 'Syntax') {
