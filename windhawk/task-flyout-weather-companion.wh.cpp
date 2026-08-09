@@ -4,12 +4,12 @@
 // @name:zh-CN      Task Flyout 天气伴侣（实验性）
 // @description     Replaces the contents of the Windows 11 Widgets taskbar entry while preserving its native shell and Windhawk styling.
 // @description:zh-CN 在保留 Windows 11 原生 Widgets 外壳和 Windhawk 样式的前提下替换任务栏入口内容。
-// @version         0.1.0
+// @version         0.2.0
 // @author          Task Flyout contributors
 // @homepage        https://github.com/SherlockChiang/Task-Flyout
 // @include         explorer.exe
 // @architecture    x86-64
-// @compilerOptions -lole32 -loleaut32 -lruntimeobject
+// @compilerOptions -lole32 -loleaut32 -ladvapi32 -lruntimeobject
 // ==/WindhawkMod==
 
 // Source code is published under the GNU General Public License v3.0.
@@ -18,43 +18,55 @@
 /*
 # Task Flyout Weather Companion (experimental)
 
-This proof of concept runs inside Explorer and overlays a static Task Flyout
-preview in the existing Windows 11 Widgets taskbar button. The native outer
-button, hover states, accessibility target, click behavior, and Windhawk theme
-styling remain owned by Explorer.
+This proof of concept runs inside Explorer and overlays a bounded Task Flyout
+weather snapshot in the existing Windows 11 Widgets taskbar button. The native
+outer button, hover states, accessibility target, and Windhawk theme styling
+remain owned by Explorer. The companion app must have its experimental bridge
+switch enabled; otherwise the native content is restored.
 
 The proof of concept is intentionally disabled by default and restricted to the
-Windows 11 25H2 build family used for development. It does not connect to Task
-Flyout yet. If the expected symbol or XAML tree cannot be found, it makes no
-changes.
+Windows 11 25H2 build family used for development. The optional static preview
+is disabled by default and exists only for shell tree validation. If the
+expected symbol or XAML tree cannot be found, it makes no changes.
 */
 // ==/WindhawkModReadme==
 
 // ==WindhawkModSettings==
 /*
 - enabled: false
-  $name: Enable static preview injection
-  $name:zh-CN: 启用静态预览注入
+  $name: Enable companion injection
+  $name:zh-CN: 启用伴侣注入
   $description: >-
-    Experimental. Replaces only the content inside the existing native Widgets
-    button. The button still opens the Windows Widgets board.
+    Experimental. Requires the Task Flyout app's companion bridge switch. The
+    native outer Widgets button and its theme-owned shell remain intact.
   $description:zh-CN: >-
-    实验性功能。仅替换现有原生 Widgets 按钮的内部内容，点击仍会打开
-    Windows Widgets 面板。
+    实验性功能。需要在 Task Flyout 中开启伴侣桥接开关，保留原生 Widgets
+    外壳和主题样式。
+- allowStaticPreview: false
+  $name: Allow static preview (diagnostics)
+  $name:zh-CN: 允许静态预览（诊断）
+  $description: >-
+    Shell validation only. This bypasses the app bridge and must stay off for
+    normal weather operation.
+  $description:zh-CN: >-
+    仅用于外壳验证。此选项绕过应用桥接，正常天气使用时应保持关闭。
 - previewText: "--°  Task Flyout"
   $name: Static preview text
   $name:zh-CN: 静态预览文本
-  $description: Used only to validate native-shell injection before weather IPC is enabled.
-  $description:zh-CN: 仅用于在接入天气 IPC 前验证原生外壳内注入。
+  $description: Used only when the diagnostics-only static preview is enabled.
+  $description:zh-CN: 仅在启用诊断用静态预览时使用。
 */
 // ==/WindhawkModSettings==
 
 #include <windhawk_utils.h>
 
+#include <sddl.h>
+
 #undef GetCurrentTime
 
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Data.Json.h>
 #include <winrt/Windows.UI.Xaml.Automation.h>
 #include <winrt/Windows.UI.Xaml.Controls.h>
 #include <winrt/Windows.UI.Xaml.Markup.h>
@@ -62,7 +74,9 @@ changes.
 #include <winrt/base.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
+#include <cstdint>
 #include <mutex>
 #include <new>
 #include <optional>
@@ -84,20 +98,46 @@ constexpr wchar_t kWidgetsElementName[] = L"AugmentedEntryPointButton";
 constexpr wchar_t kWidgetsAutomationId[] = L"WidgetsButton";
 constexpr wchar_t kContentGridName[] = L"AugmentedEntryPointContentGrid";
 constexpr wchar_t kHostName[] = L"TaskFlyoutWeatherHost";
+constexpr wchar_t kWeatherIconName[] = L"TaskFlyoutWeatherIcon";
 constexpr wchar_t kPreviewTextName[] = L"TaskFlyoutPreviewText";
 constexpr wchar_t kStateSchemaKey[] = L"state-schema";
+constexpr wchar_t kWeatherPipePrefix[] = L"TaskFlyout.Weather.v1";
 constexpr int kMaxTreeDepth = 18;
 constexpr int kMaxVisitedElements = 768;
 constexpr size_t kMaxPreviewTextLength = 48;
 constexpr DWORD kOwnerThreadDispatchWaitMs = 3000;
+constexpr DWORD kPipeConnectWaitMs = 250;
+constexpr DWORD kPipeIoWaitMs = 500;
+constexpr DWORD kWorkerPollIntervalMs = 15000;
+constexpr DWORD kWorkerStopWaitMs = 6000;
+constexpr size_t kMaxWeatherFieldLength = 128;
 
 std::atomic<bool> g_enabled;
+std::atomic<bool> g_allowStaticPreview;
 std::atomic<bool> g_unloading;
 std::atomic<bool> g_taskbarViewDllLoaded;
 thread_local bool g_updatingXaml;
 
 std::mutex g_settingsMutex;
 std::wstring g_previewText = L"--\x00B0  Task Flyout";
+
+struct WeatherSnapshot {
+    std::wstring icon;
+    std::wstring temperature;
+    std::wstring description;
+    std::wstring location;
+    std::wstring alert;
+    std::wstring updatedUtc;
+};
+
+std::mutex g_snapshotMutex;
+std::optional<WeatherSnapshot> g_weatherSnapshot;
+std::mutex g_workerMutex;
+std::atomic<bool> g_workerStop;
+HANDLE g_workerWakeEvent = nullptr;
+HANDLE g_workerThread = nullptr;
+
+void ApplySettingsToTaskbarWindows(bool triggerLayout);
 
 struct OriginalChildState {
     winrt::weak_ref<UIElement> element;
@@ -178,10 +218,19 @@ std::wstring SanitizePreviewText(PCWSTR value) {
     std::wstring result = value ? value : L"";
     if (result.size() > kMaxPreviewTextLength) {
         result.resize(kMaxPreviewTextLength);
+        if (!result.empty() && result.back() >= 0xD800 &&
+            result.back() <= 0xDBFF) {
+            result.pop_back();
+        }
     }
 
     for (wchar_t& character : result) {
-        if (character < L' ' || character == 0x7F) {
+        if (character < L' ' || character == 0x7F ||
+            character == 0x2028 || character == 0x2029 ||
+            character == 0x061C || character == 0x200E ||
+            character == 0x200F ||
+            (character >= 0x202A && character <= 0x202E) ||
+            (character >= 0x2066 && character <= 0x2069)) {
             character = L' ';
         }
     }
@@ -195,6 +244,7 @@ std::wstring SanitizePreviewText(PCWSTR value) {
 
 void LoadSettings() {
     g_enabled = Wh_GetIntSetting(L"enabled") != 0;
+    g_allowStaticPreview = Wh_GetIntSetting(L"allowStaticPreview") != 0;
 
     PCWSTR previewText = Wh_GetStringSetting(L"previewText");
     std::wstring sanitized = SanitizePreviewText(previewText);
@@ -235,6 +285,57 @@ FrameworkElement FindDescendantByName(DependencyObject const& root,
     }
 
     return nullptr;
+}
+
+bool SameWeatherSnapshot(std::optional<WeatherSnapshot> const& left,
+                         std::optional<WeatherSnapshot> const& right) {
+    if (left.has_value() != right.has_value()) return false;
+    if (!left) return true;
+    return left->icon == right->icon &&
+           left->temperature == right->temperature &&
+           left->description == right->description &&
+           left->location == right->location &&
+           left->alert == right->alert &&
+           left->updatedUtc == right->updatedUtc;
+}
+
+std::wstring BuildWeatherDisplayText(WeatherSnapshot const& snapshot) {
+    std::wstring detail = snapshot.alert.empty()
+                              ? snapshot.description
+                              : snapshot.alert;
+    std::wstring result = snapshot.temperature;
+    if (!detail.empty()) {
+        result += L"  ";
+        result += detail;
+    }
+    return SanitizePreviewText(result.c_str());
+}
+
+std::optional<WeatherSnapshot> GetEffectiveWeatherSnapshot() {
+    {
+        std::lock_guard lock(g_snapshotMutex);
+        if (g_weatherSnapshot) return g_weatherSnapshot;
+    }
+
+    if (!g_allowStaticPreview) return std::nullopt;
+    WeatherSnapshot preview;
+    preview.icon = L"\x2600";
+    preview.temperature = GetPreviewText();
+    preview.updatedUtc = L"diagnostic";
+    return preview;
+}
+
+void PublishWeatherSnapshot(std::optional<WeatherSnapshot> snapshot) {
+    bool changed;
+    {
+        std::lock_guard lock(g_snapshotMutex);
+        changed = !SameWeatherSnapshot(g_weatherSnapshot, snapshot);
+        if (changed) g_weatherSnapshot = std::move(snapshot);
+    }
+
+    if (changed && g_enabled && !g_unloading) {
+        ApplySettingsToTaskbarWindows(true);
+    }
 }
 
 void CollectDescendantsByName(DependencyObject const& root,
@@ -394,10 +495,11 @@ FrameworkElement CreateWeatherHost(std::wstring const& previewText) {
                 VerticalAlignment="Center"
                 Orientation="Horizontal"
                 Spacing="6">
-                <FontIcon
-                    FontFamily="Segoe Fluent Icons"
+                <TextBlock
+                    Name="TaskFlyoutWeatherIcon"
+                    FontFamily="Segoe UI Emoji"
                     FontSize="16"
-                    Glyph="&#xE706;" />
+                    Text="&#x2600;" />
                 <TextBlock
                     Name="TaskFlyoutPreviewText"
                     VerticalAlignment="Center"
@@ -413,6 +515,343 @@ FrameworkElement CreateWeatherHost(std::wstring const& previewText) {
         FindDescendantByName(host, kPreviewTextName).as<Controls::TextBlock>();
     textElement.Text(previewText);
     return host;
+}
+
+void ApplyWeatherHostSnapshot(FrameworkElement const& host,
+                              WeatherSnapshot const& snapshot) noexcept {
+    try {
+        auto icon = FindDescendantByName(host, kWeatherIconName)
+                        .try_as<Controls::TextBlock>();
+        auto text = FindDescendantByName(host, kPreviewTextName)
+                        .try_as<Controls::TextBlock>();
+        if (!icon || !text) return;
+
+        std::wstring glyph = snapshot.icon.empty() ? L"\x2600" : snapshot.icon;
+        std::wstring displayText = BuildWeatherDisplayText(snapshot);
+        if (icon.Text() != glyph) icon.Text(glyph);
+        if (text.Text() != displayText) text.Text(displayText);
+    } catch (...) {
+        // A rebuilt XAML subtree is handled by the next taskbar layout pass.
+    }
+}
+
+bool WaitForOverlappedIo(HANDLE pipe,
+                         OVERLAPPED& overlapped,
+                         DWORD& transferred) noexcept {
+    DWORD waitResult = WaitForSingleObject(overlapped.hEvent, kPipeIoWaitMs);
+    if (waitResult != WAIT_OBJECT_0) {
+        CancelIoEx(pipe, &overlapped);
+        GetOverlappedResult(pipe, &overlapped, &transferred, TRUE);
+        return false;
+    }
+
+    return GetOverlappedResult(pipe, &overlapped, &transferred, FALSE) != FALSE;
+}
+
+bool ReadPipeExact(HANDLE pipe, BYTE* buffer, DWORD length) noexcept {
+    DWORD offset = 0;
+    while (offset < length) {
+        OVERLAPPED overlapped{};
+        overlapped.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        if (!overlapped.hEvent) return false;
+
+        DWORD transferred = 0;
+        BOOL completed = ReadFile(pipe, buffer + offset, length - offset,
+                                  &transferred, &overlapped);
+        bool success = completed != FALSE;
+        if (!success && GetLastError() == ERROR_IO_PENDING) {
+            success = WaitForOverlappedIo(pipe, overlapped, transferred);
+        }
+        CloseHandle(overlapped.hEvent);
+        if (!success || transferred == 0) return false;
+        offset += transferred;
+    }
+    return true;
+}
+
+bool WritePipeExact(HANDLE pipe, BYTE const* buffer, DWORD length) noexcept {
+    DWORD offset = 0;
+    while (offset < length) {
+        OVERLAPPED overlapped{};
+        overlapped.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        if (!overlapped.hEvent) return false;
+
+        DWORD transferred = 0;
+        BOOL completed = WriteFile(pipe, buffer + offset, length - offset,
+                                   &transferred, &overlapped);
+        bool success = completed != FALSE;
+        if (!success && GetLastError() == ERROR_IO_PENDING) {
+            success = WaitForOverlappedIo(pipe, overlapped, transferred);
+        }
+        CloseHandle(overlapped.hEvent);
+        if (!success || transferred == 0) return false;
+        offset += transferred;
+    }
+    return true;
+}
+
+bool WritePipeFrame(HANDLE pipe, std::string const& payload) noexcept {
+    if (payload.size() > 4 * 1024) return false;
+    std::array<BYTE, 4> header{};
+    uint32_t length = static_cast<uint32_t>(payload.size());
+    header[0] = static_cast<BYTE>(length);
+    header[1] = static_cast<BYTE>(length >> 8);
+    header[2] = static_cast<BYTE>(length >> 16);
+    header[3] = static_cast<BYTE>(length >> 24);
+    return WritePipeExact(pipe, header.data(), static_cast<DWORD>(header.size())) &&
+           WritePipeExact(pipe,
+                          reinterpret_cast<BYTE const*>(payload.data()),
+                          static_cast<DWORD>(payload.size()));
+}
+
+bool ReadPipeFrame(HANDLE pipe, std::vector<BYTE>& payload) noexcept {
+    std::array<BYTE, 4> header{};
+    if (!ReadPipeExact(pipe, header.data(), static_cast<DWORD>(header.size()))) {
+        return false;
+    }
+
+    uint32_t length = static_cast<uint32_t>(header[0]) |
+                      (static_cast<uint32_t>(header[1]) << 8) |
+                      (static_cast<uint32_t>(header[2]) << 16) |
+                      (static_cast<uint32_t>(header[3]) << 24);
+    if (length > 16 * 1024) return false;
+
+    payload.resize(length);
+    return length == 0 || ReadPipeExact(pipe, payload.data(), length);
+}
+
+std::wstring GetWeatherPipePath() noexcept {
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
+        return {};
+    }
+
+    DWORD required = 0;
+    GetTokenInformation(token, TokenUser, nullptr, 0, &required);
+    std::vector<BYTE> tokenBuffer(required);
+    bool tokenRead = required != 0 &&
+                     GetTokenInformation(token, TokenUser, tokenBuffer.data(),
+                                         required, &required) != FALSE;
+    CloseHandle(token);
+    if (!tokenRead) return {};
+
+    auto tokenUser = reinterpret_cast<TOKEN_USER*>(tokenBuffer.data());
+    LPWSTR sidText = nullptr;
+    if (!ConvertSidToStringSidW(tokenUser->User.Sid, &sidText)) return {};
+
+    DWORD sessionId = 0;
+    bool sessionRead = ProcessIdToSessionId(GetCurrentProcessId(), &sessionId) != FALSE;
+    std::wstring path;
+    if (sessionRead) {
+        path = L"\\\\.\\pipe\\";
+        path += kWeatherPipePrefix;
+        path += L".";
+        path += sidText;
+        path += L".";
+        path += std::to_wstring(sessionId);
+    }
+    LocalFree(sidText);
+    return path;
+}
+
+std::optional<std::wstring> Utf8ToWide(std::vector<BYTE> const& bytes) noexcept {
+    if (bytes.empty()) return std::nullopt;
+    int byteCount = static_cast<int>(bytes.size());
+    int characterCount = MultiByteToWideChar(
+        CP_UTF8, MB_ERR_INVALID_CHARS,
+        reinterpret_cast<LPCCH>(bytes.data()), byteCount, nullptr, 0);
+    if (characterCount <= 0) return std::nullopt;
+
+    std::wstring result(characterCount, L'\0');
+    if (!MultiByteToWideChar(
+            CP_UTF8, MB_ERR_INVALID_CHARS,
+            reinterpret_cast<LPCCH>(bytes.data()), byteCount,
+            result.data(), characterCount)) {
+        return std::nullopt;
+    }
+    return result;
+}
+
+std::wstring GetJsonString(
+    winrt::Windows::Data::Json::JsonObject const& object,
+    PCWSTR name) noexcept {
+    try {
+        winrt::hstring value = object.GetNamedString(name, {});
+        std::wstring result(value.data(), value.size());
+        if (result.size() > kMaxWeatherFieldLength) {
+            result.resize(kMaxWeatherFieldLength);
+            if (!result.empty() && result.back() >= 0xD800 &&
+                result.back() <= 0xDBFF) {
+                result.pop_back();
+            }
+        }
+        for (wchar_t& character : result) {
+            if (character < L' ' || character == 0x7F ||
+                character == 0x2028 || character == 0x2029 ||
+                character == 0x061C || character == 0x200E ||
+                character == 0x200F ||
+                (character >= 0x202A && character <= 0x202E) ||
+                (character >= 0x2066 && character <= 0x2069)) {
+                character = L' ';
+            }
+        }
+        return result;
+    } catch (...) {
+        return {};
+    }
+}
+
+bool ParseWeatherResponse(std::vector<BYTE> const& bytes,
+                          WeatherSnapshot& snapshot) noexcept {
+    auto wide = Utf8ToWide(bytes);
+    if (!wide) return false;
+
+    try {
+        auto root = winrt::Windows::Data::Json::JsonObject::Parse(*wide);
+        if (root.GetNamedNumber(L"version", -1) != 1 ||
+            root.GetNamedString(L"status", {}) != L"ok") {
+            return false;
+        }
+
+        auto snapshotObject = root.GetNamedObject(L"snapshot", nullptr);
+        if (!snapshotObject) return false;
+        WeatherSnapshot parsed{
+            .icon = GetJsonString(snapshotObject, L"icon"),
+            .temperature = GetJsonString(snapshotObject, L"temperature"),
+            .description = GetJsonString(snapshotObject, L"description"),
+            .location = GetJsonString(snapshotObject, L"location"),
+            .alert = GetJsonString(snapshotObject, L"alert"),
+            .updatedUtc = GetJsonString(snapshotObject, L"updatedUtc"),
+        };
+        if (parsed.temperature.empty() || parsed.updatedUtc.empty()) return false;
+        snapshot = std::move(parsed);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool QueryWeatherSnapshot(WeatherSnapshot& snapshot) noexcept {
+    std::wstring pipePath = GetWeatherPipePath();
+    if (pipePath.empty() || !WaitNamedPipeW(pipePath.c_str(), kPipeConnectWaitMs)) {
+        return false;
+    }
+
+    HANDLE pipe = CreateFileW(
+        pipePath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
+        OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
+    if (pipe == INVALID_HANDLE_VALUE) return false;
+
+    DWORD mode = PIPE_READMODE_BYTE;
+    bool ready = SetNamedPipeHandleState(pipe, &mode, nullptr, nullptr) != FALSE;
+    std::string request = R"({"version":1,"command":"get-snapshot"})";
+    std::vector<BYTE> response;
+    bool success = ready && WritePipeFrame(pipe, request) &&
+                   ReadPipeFrame(pipe, response) &&
+                   ParseWeatherResponse(response, snapshot);
+    CloseHandle(pipe);
+    return success;
+}
+
+struct WeatherWorkerContext {
+    HMODULE selfModule;
+};
+
+DWORD WINAPI WeatherWorkerProc(void* parameter) {
+    auto context = static_cast<WeatherWorkerContext*>(parameter);
+    HMODULE selfModule = context->selfModule;
+    delete context;
+
+    while (!g_workerStop.load(std::memory_order_acquire)) {
+        WeatherSnapshot snapshot;
+        if (QueryWeatherSnapshot(snapshot)) {
+            PublishWeatherSnapshot(std::move(snapshot));
+        } else {
+            PublishWeatherSnapshot(std::nullopt);
+        }
+
+        if (g_workerWakeEvent) {
+            WaitForSingleObject(g_workerWakeEvent, kWorkerPollIntervalMs);
+        } else {
+            Sleep(kWorkerPollIntervalMs);
+        }
+    }
+
+    FreeLibraryAndExitThread(selfModule, 0);
+}
+
+void StartWeatherWorker() {
+    if (!g_enabled || g_allowStaticPreview || g_unloading) return;
+
+    std::lock_guard lock(g_workerMutex);
+    if (g_workerThread) {
+        if (WaitForSingleObject(g_workerThread, 0) == WAIT_OBJECT_0) {
+            CloseHandle(g_workerThread);
+            g_workerThread = nullptr;
+            if (g_workerWakeEvent) {
+                CloseHandle(g_workerWakeEvent);
+                g_workerWakeEvent = nullptr;
+            }
+        } else {
+            return;
+        }
+    }
+
+    g_workerWakeEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (!g_workerWakeEvent) return;
+    g_workerStop = false;
+
+    HMODULE selfModule = nullptr;
+    if (!GetModuleHandleExW(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+            reinterpret_cast<LPCWSTR>(&WeatherWorkerProc), &selfModule)) {
+        CloseHandle(g_workerWakeEvent);
+        g_workerWakeEvent = nullptr;
+        return;
+    }
+
+    auto context = new (std::nothrow) WeatherWorkerContext{selfModule};
+    if (!context) {
+        FreeLibrary(selfModule);
+        CloseHandle(g_workerWakeEvent);
+        g_workerWakeEvent = nullptr;
+        return;
+    }
+
+    g_workerThread = CreateThread(
+        nullptr, 0, WeatherWorkerProc, context, 0, nullptr);
+    if (!g_workerThread) {
+        delete context;
+        FreeLibrary(selfModule);
+        CloseHandle(g_workerWakeEvent);
+        g_workerWakeEvent = nullptr;
+    }
+}
+
+void StopWeatherWorker() {
+    HANDLE worker = nullptr;
+    {
+        std::lock_guard lock(g_workerMutex);
+        g_workerStop = true;
+        if (g_workerWakeEvent) SetEvent(g_workerWakeEvent);
+        worker = g_workerThread;
+    }
+
+    if (!worker) return;
+    if (WaitForSingleObject(worker, kWorkerStopWaitMs) != WAIT_OBJECT_0) {
+        Wh_Log(L"Weather companion worker is still stopping; its module reference remains held");
+        return;
+    }
+
+    std::lock_guard lock(g_workerMutex);
+    if (g_workerThread == worker) {
+        CloseHandle(g_workerThread);
+        g_workerThread = nullptr;
+        if (g_workerWakeEvent) {
+            CloseHandle(g_workerWakeEvent);
+            g_workerWakeEvent = nullptr;
+        }
+    }
 }
 
 void RemoveHostsFromGrid(Controls::Grid const& grid) {
@@ -607,7 +1046,10 @@ void CreateInjectionLocked(Controls::Grid const& contentGrid) {
     newState.contentGrid = winrt::make_weak(contentGrid);
     newState.ownerThreadId = GetCurrentThreadId();
 
-    auto host = CreateWeatherHost(GetPreviewText());
+    auto snapshot = GetEffectiveWeatherSnapshot();
+    if (!snapshot) return;
+    auto host = CreateWeatherHost(BuildWeatherDisplayText(*snapshot));
+    ApplyWeatherHostSnapshot(host, *snapshot);
     newState.host = winrt::make_weak(host);
 
     auto stateBag =
@@ -653,12 +1095,26 @@ void EnsureContentGridInjected(Controls::Grid const& contentGrid) {
         if (stateIndex != g_injections.size()) {
             if (!RestoreState(g_injections[stateIndex])) {
                 Wh_Log(L"Late injection was canceled with partial restore");
+                return;
             }
             g_injections.erase(g_injections.begin() + stateIndex);
         } else {
             if (!RecoverOrphanedHosts(contentGrid)) {
                 Wh_Log(L"Late orphan recovery was incomplete");
             }
+        }
+        return;
+    }
+
+    if (!GetEffectiveWeatherSnapshot()) {
+        if (stateIndex != g_injections.size()) {
+            if (!RestoreState(g_injections[stateIndex])) {
+                Wh_Log(L"Weather snapshot unavailable; restoration is incomplete");
+                return;
+            }
+            g_injections.erase(g_injections.begin() + stateIndex);
+        } else if (!RecoverOrphanedHosts(contentGrid)) {
+            Wh_Log(L"Weather snapshot unavailable; orphan recovery is incomplete");
         }
         return;
     }
@@ -733,11 +1189,8 @@ void EnsureContentGridInjected(Controls::Grid const& contentGrid) {
         }
     }
 
-    auto textElement =
-        FindDescendantByName(host, kPreviewTextName).as<Controls::TextBlock>();
-    std::wstring previewText = GetPreviewText();
-    if (textElement.Text() != previewText) {
-        textElement.Text(previewText);
+    if (auto snapshot = GetEffectiveWeatherSnapshot()) {
+        ApplyWeatherHostSnapshot(host, *snapshot);
     }
 }
 
@@ -879,8 +1332,8 @@ void ApplyTrackedStatesFromCurrentTaskbarThread() noexcept {
 
     try {
         DWORD currentThreadId = GetCurrentThreadId();
-        bool shouldRestore = !g_enabled || g_unloading;
-        std::wstring previewText = GetPreviewText();
+        auto snapshot = GetEffectiveWeatherSnapshot();
+        bool shouldRestore = !g_enabled || g_unloading || !snapshot;
 
         std::lock_guard lock(g_injectionsMutex);
         for (size_t index = 0; index < g_injections.size();) {
@@ -899,10 +1352,9 @@ void ApplyTrackedStatesFromCurrentTaskbarThread() noexcept {
             if (shouldRestore) {
                 if (!RestoreState(state)) {
                     Wh_Log(L"Taskbar-thread restoration was incomplete");
+                    index++;
+                    continue;
                 }
-                // All XAML references must be released on their owner thread
-                // before the mod can unload. A disconnected child that rejects
-                // a property restore is no longer a safe object to retain.
                 g_injections.erase(g_injections.begin() + index);
                 continue;
             }
@@ -932,9 +1384,7 @@ void ApplyTrackedStatesFromCurrentTaskbarThread() noexcept {
                 continue;
             }
 
-            if (textElement.Text() != previewText) {
-                textElement.Text(previewText);
-            }
+            if (snapshot) ApplyWeatherHostSnapshot(host, *snapshot);
             index++;
         }
     } catch (winrt::hresult_error const& error) {
@@ -1300,6 +1750,7 @@ HMODULE WINAPI LoadLibraryExW_Hook(LPCWSTR fileName,
         Wh_Log(L"Taskbar view module loaded late: %s", fileName);
         if (ModInitWithTaskbarView(module)) {
             Wh_ApplyHookOperations();
+            StartWeatherWorker();
             ApplySettingsToTaskbarWindows(true);
         }
     }
@@ -1349,6 +1800,7 @@ void Wh_ModAfterInit() {
     }
 
     if (g_taskbarViewDllLoaded) {
+        StartWeatherWorker();
         ApplySettingsToTaskbarWindows(true);
     }
 }
@@ -1356,6 +1808,8 @@ void Wh_ModAfterInit() {
 void Wh_ModBeforeUninit() {
     Wh_Log(L">");
     g_unloading = true;
+    StopWeatherWorker();
+    PublishWeatherSnapshot(std::nullopt);
 
     if (g_taskbarViewDllLoaded) {
         ApplySettingsToTaskbarWindows(false);
@@ -1374,6 +1828,12 @@ void Wh_ModUninit() {
 
 void Wh_ModSettingsChanged() {
     LoadSettings();
+    if (g_enabled && !g_allowStaticPreview) {
+        StartWeatherWorker();
+    } else {
+        StopWeatherWorker();
+        PublishWeatherSnapshot(std::nullopt);
+    }
     if (g_taskbarViewDllLoaded) {
         ApplySettingsToTaskbarWindows(true);
     }

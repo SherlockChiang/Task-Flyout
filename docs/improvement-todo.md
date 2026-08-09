@@ -139,7 +139,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M3-01 | TODO | Distribution | Add stable/beta update-channel support. | Users can discover and install signed updates without repeating manual certificate/package steps; rollback and channel behavior are documented. | `feat: add update channel support` |
 | M3-02 | TODO | Notifications | Add quiet hours and per-calendar notification controls. | Global defaults remain simple; users can suppress selected calendars and configure a quiet interval without losing explicit snoozes. | `feat: add notification quiet hours` |
 | M3-03 | TODO | UI/Compatibility | Runtime-validate and package the experimental Windhawk weather companion. | A disposable Explorer session verifies enable/disable/unload, Luminosity width, hover/click, primary/secondary taskbars, Explorer restart, and fail-closed behavior on an unlisted taskbar binary before any user-facing enable switch is added. | `test(windhawk): validate native weather shell` |
-| M3-04 | IN PROGRESS | Integration | Feed Task Flyout weather and activation into the native-shell companion. | A versioned, length-bounded per-user channel performs no blocking I/O on Explorer's UI thread; stale/unavailable app state fails open; native-shell click activation opens Task Flyout Weather; shutdown, reconnect, and Explorer restart leave no callbacks or handles behind. | `feat(weatherbar): define companion IPC protocol`, `feat(weatherbar): host companion weather snapshots`, `feat(windhawk): bridge weather snapshot and activation` |
+| M3-04 | IN PROGRESS | Integration | Feed Task Flyout weather and activation into the native-shell companion. | A versioned, length-bounded per-user channel performs no blocking I/O on Explorer's UI thread; stale/unavailable app state fails open; native-shell click activation opens Task Flyout Weather; shutdown, reconnect, and Explorer restart leave no callbacks or handles behind. | `feat(weatherbar): define companion IPC protocol`, `feat(weatherbar): host companion weather snapshots`, `feat(windhawk): bridge weather snapshots`, `feat(windhawk): activate Task Flyout weather` |
 
 ### Audit Verification Baseline
 
@@ -257,5 +257,24 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
   cover oversize/truncated frames, same-user round trips, slow-client shutdown,
   and recovery by a second client after a partial-frame timeout.
 - The 7 server-specific tests and full 943-test suite pass. Debug x64 builds with
-  0 warnings and 0 errors. The Windhawk-side non-blocking client and visible
-  experimental opt-in remain pending, so no Explorer process was changed.
+  0 warnings and 0 errors. The Windhawk-side client is verified below; the
+  visible experimental opt-in remains pending, so no Explorer process changed.
+
+### 2026-08-09 Weather Companion Client Verification
+
+- Windhawk companion version `0.2.0` now derives the same SID-and-session pipe
+  name as the app, uses bounded overlapped I/O only on a retained background
+  worker, validates the 16 KiB response before allocation, and parses the JSON
+  through `Windows.Data.Json` before publishing an immutable UI snapshot.
+- A valid snapshot updates the injected icon and compact temperature/condition
+  text on each taskbar owner thread. Missing, malformed, unavailable, older-than-
+  two-hour, or implausibly future data restores the untouched Windows Adaptive
+  Card. Static preview injection is now a separate diagnostics-only setting that
+  defaults off.
+- Windhawk syntax and real x64 link both pass. The compile-only DLL is 206,848
+  bytes with SHA-256
+  `D485554023F0D077338941E2C1D096D07C36DE9C1B0872AC5A61931ADBC541A7`.
+  It was not installed, enabled, or loaded into Explorer.
+- The full .NET suite now passes 949/949 and Debug x64 still builds with 0
+  warnings and 0 errors. Task Flyout click activation, localized app opt-in,
+  owner-thread unload hardening, and runtime visual validation remain pending.

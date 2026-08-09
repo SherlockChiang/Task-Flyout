@@ -101,6 +101,7 @@ if ($Mode -eq 'Syntax') {
         $output,
         '-lole32',
         '-loleaut32',
+        '-ladvapi32',
         '-lruntimeobject'
     )
 }

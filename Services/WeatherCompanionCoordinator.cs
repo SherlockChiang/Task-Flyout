@@ -8,6 +8,7 @@ namespace Task_Flyout.Services
     internal sealed class WeatherCompanionCoordinator : IAsyncDisposable
     {
         private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(30);
+        private static readonly TimeSpan MaxSnapshotAge = TimeSpan.FromHours(2);
 
         private readonly WeatherService _weatherService;
         private readonly Func<bool> _queueOpenWeather;
@@ -235,13 +236,23 @@ namespace Task_Flyout.Services
         {
             WeatherCompanionSnapshot? snapshot;
             lock (_snapshotLock) snapshot = _snapshot;
-            return ValueTask.FromResult(snapshot is WeatherCompanionSnapshot value
+            if (snapshot is not WeatherCompanionSnapshot value)
+            {
+                return ValueTask.FromResult(WeatherCompanionProtocol.SerializeResponse(
+                    WeatherCompanionResponseStatus.Unavailable,
+                    detail: "weather-cache-empty"));
+            }
+
+            return ValueTask.FromResult(WeatherCompanionProtocol.IsSnapshotFresh(
+                    value,
+                    DateTimeOffset.UtcNow,
+                    MaxSnapshotAge)
                 ? WeatherCompanionProtocol.SerializeResponse(
                     WeatherCompanionResponseStatus.Ok,
                     value)
                 : WeatherCompanionProtocol.SerializeResponse(
                     WeatherCompanionResponseStatus.Unavailable,
-                    detail: "weather-cache-empty"));
+                    detail: "weather-cache-stale"));
         }
 
         private ValueTask<byte[]> OpenWeatherResponse()

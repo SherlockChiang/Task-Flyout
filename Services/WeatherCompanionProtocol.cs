@@ -194,6 +194,20 @@ namespace Task_Flyout.Services
                 NormalizeText(alert, MaxAlertScalars),
                 updatedUtc.ToUniversalTime());
 
+        public static bool IsSnapshotFresh(
+            WeatherCompanionSnapshot snapshot,
+            DateTimeOffset nowUtc,
+            TimeSpan maxAge)
+        {
+            if (maxAge <= TimeSpan.Zero || snapshot.UpdatedUtc == DateTimeOffset.MinValue)
+                return false;
+
+            DateTimeOffset updatedUtc = snapshot.UpdatedUtc.ToUniversalTime();
+            nowUtc = nowUtc.ToUniversalTime();
+            if (updatedUtc > nowUtc + TimeSpan.FromMinutes(5)) return false;
+            return nowUtc - updatedUtc <= maxAge;
+        }
+
         public static byte[] SerializeResponse(
             WeatherCompanionResponseStatus status,
             WeatherCompanionSnapshot? snapshot = null,

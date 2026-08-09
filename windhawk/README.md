@@ -7,8 +7,8 @@ normal desktop process cannot insert or replace Explorer's internal
 
 ## Current proof of concept
 
-`task-flyout-weather-companion.wh.cpp` performs a deliberately narrow static
-preview:
+`task-flyout-weather-companion.wh.cpp` performs a deliberately narrow native-
+shell weather preview:
 
 - hooks the same `TaskbarFrame::OnTaskbarLayoutChildBoundsChanged` symbol family
   used by Windhawk's official taskbar mods;
@@ -18,6 +18,11 @@ preview:
   `AugmentedEntryPointContentGrid`;
 - leaves the Windows Adaptive Card measured but makes it transparent, preserving
   the width variables used by the Luminosity theme;
+- reads a versioned, length-bounded snapshot from Task Flyout on a background
+  worker; the pipe is scoped by user SID and Windows session, and Explorer's UI
+  thread performs no pipe or network I/O;
+- restores the Windows content when the app bridge is disabled, the pipe is
+  unavailable, the response is invalid, or the weather snapshot is stale;
 - keeps the native outer button, background, hover states, click target, and
   accessibility behavior;
 - records the original local opacity and hit-test values and restores them when
@@ -27,9 +32,11 @@ preview:
 - is disabled by default and requires both Windows 11 build 26200 and the exact
   reviewed `Taskbar.View.dll` PE fingerprint before the private ABI is touched.
 
-The preview does **not** yet read Task Flyout weather data and still opens the
-Windows Widgets board when clicked. Those are later IPC and activation phases,
-not properties of this static shell-injection check.
+The native outer button still opens the Windows Widgets board when clicked.
+Task Flyout activation remains a later phase because its XAML event subscription
+must be revoked safely on every taskbar thread before Explorer can unload the mod.
+The optional static preview is a separate diagnostics setting and is off by
+default.
 
 ## Safety boundary
 
@@ -49,8 +56,8 @@ with the user's active theme.
 1. Compile and statically review the disabled-by-default preview.
 2. Validate enable/disable/unload behavior on the current Windows build and
    Luminosity theme.
-3. Add a bounded per-user named-pipe weather snapshot channel. Explorer's UI
-   thread must never perform network or blocking pipe I/O.
+3. Add a bounded per-user named-pipe weather snapshot channel. Completed as a
+   compile-only implementation; runtime validation remains pending.
 4. Add an authenticated activation path for opening Task Flyout's weather page.
 5. Add multi-monitor/restart diagnostics and a strict compatibility matrix.
 

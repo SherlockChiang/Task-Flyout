@@ -152,4 +152,41 @@ public class WeatherCompanionProtocolTests
         Assert.Equal("invalid-request", document.RootElement.GetProperty("status").GetString());
         Assert.False(document.RootElement.TryGetProperty("snapshot", out _));
     }
+
+    [Theory]
+    [InlineData(-30, true)]
+    [InlineData(-120, true)]
+    [InlineData(-121, false)]
+    [InlineData(4, true)]
+    [InlineData(6, false)]
+    public void Snapshot_freshness_bounds_stale_and_future_data(
+        int ageMinutes,
+        bool expected)
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-08-09T04:00:00Z");
+        var snapshot = WeatherCompanionProtocol.CreateSnapshot(
+            "☀",
+            "26°C",
+            "Clear",
+            "Shanghai",
+            "",
+            now + TimeSpan.FromMinutes(ageMinutes));
+
+        Assert.Equal(expected, WeatherCompanionProtocol.IsSnapshotFresh(
+            snapshot,
+            now,
+            TimeSpan.FromHours(2)));
+    }
+
+    [Fact]
+    public void Snapshot_without_timestamp_is_not_fresh()
+    {
+        var snapshot = WeatherCompanionProtocol.CreateSnapshot(
+            "☀", "26°C", "Clear", "Shanghai", "", DateTimeOffset.MinValue);
+
+        Assert.False(WeatherCompanionProtocol.IsSnapshotFresh(
+            snapshot,
+            DateTimeOffset.UtcNow,
+            TimeSpan.FromHours(2)));
+    }
 }
