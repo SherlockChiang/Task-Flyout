@@ -140,6 +140,15 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M3-02 | TODO | Notifications | Add quiet hours and per-calendar notification controls. | Global defaults remain simple; users can suppress selected calendars and configure a quiet interval without losing explicit snoozes. | `feat: add notification quiet hours` |
 | M3-03 | TODO | UI/Compatibility | Runtime-validate and package the experimental Windhawk weather companion. | A disposable Explorer session verifies enable/disable/unload, Luminosity width, hover/click, primary/secondary taskbars, Explorer restart, and fail-closed behavior on an unlisted taskbar binary before any user-facing enable switch is added. | `test(windhawk): validate native weather shell` |
 | M3-04 | IN PROGRESS | Integration | Feed Task Flyout weather and activation into the native-shell companion. | A versioned, length-bounded per-user channel performs no blocking I/O on Explorer's UI thread; stale/unavailable app state fails open; native-shell click activation opens Task Flyout Weather; shutdown, reconnect, and Explorer restart leave no callbacks or handles behind. | `feat(weatherbar): define companion IPC protocol`, `feat(weatherbar): host companion weather snapshots`, `feat(windhawk): bridge weather snapshots`, `feat(windhawk): activate Task Flyout weather` |
+| M3-05 | IN PROGRESS | Architecture/Security | Replace the Windhawk runtime dependency with a standalone per-user taskbar broker and Explorer host. | The x64 broker and host build without Windhawk or WebView libraries; exact OS and `Taskbar.View.dll` fingerprints gate all private ABI use; unsupported systems fail closed before Explorer memory or XAML is changed. | `feat(taskbar): scaffold standalone weather host` |
+| M3-06 | TODO | UI/Compatibility | Inject an independent pure-XAML weather button into the Windows 11 taskbar. | The host uses standard `Windows.UI.Xaml` controls and taskbar theme resources, does not require the Windows Widgets entry, reserves a bounded left-side slot, and restores the original XAML tree on disable or unload. | `feat(taskbar): inject native xaml weather button` |
+| M3-07 | TODO | Integration/UI | Connect the standalone host to Task Flyout weather, activation, settings, and diagnostics. | The existing bounded per-user IPC supplies sanitized immutable snapshots; click opens Task Flyout Weather; a localized experimental switch and privacy-safe diagnostics expose active, unsupported, fallback, and recovery states. | `feat(taskbar): connect standalone weather host` |
+| M3-08 | TODO | Verification/Distribution | Validate and package the standalone taskbar component. | Compile/import checks prove the native binaries have no WebView dependency; a disposable Explorer session covers enable/disable, crash recovery, DPI, auto-hide, theme, multi-monitor, Explorer restart, unsupported binaries, signed packaging, and rollback before default exposure. | `test(taskbar): validate standalone weather injection` |
+
+M3-05 through M3-08 supersede the Windhawk runtime/package work in M3-03.
+M3-03 remains as historical POC scope and must not be installed or enabled. The
+protocol and app-side snapshot work already completed under M3-04 remains the
+transport foundation for the standalone host.
 
 ### Audit Verification Baseline
 
@@ -278,3 +287,17 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 - The full .NET suite now passes 949/949 and Debug x64 still builds with 0
   warnings and 0 errors. Task Flyout click activation, localized app opt-in,
   owner-thread unload hardening, and runtime visual validation remain pending.
+
+### 2026-08-09 Standalone Native Taskbar Direction
+
+- Runtime inspection separates the taskbar surface from the Widgets board:
+  Explorer loads `Taskbar.View.dll` plus the UWP Adaptive Cards renderer, while
+  `Widgets.exe` loads `WebView2Loader.dll` and `EmbeddedBrowserWebView.dll`.
+- The supported Windows Widgets API only hosts providers in the Widgets Board;
+  it does not expose a taskbar-entry extension point. A weather button that is
+  independent of Web Experience therefore requires a private Explorer host.
+- The target design is a signed, per-user broker plus a narrowly scoped x64 host
+  DLL. The host renders standard UWP XAML only, performs no network or WebView
+  work, and reads sanitized snapshots through the existing named pipe.
+- The current Windhawk POC remains compile-only reference material. It will not
+  be installed, loaded, or extended as the product runtime path.

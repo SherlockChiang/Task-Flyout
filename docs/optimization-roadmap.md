@@ -62,6 +62,7 @@
 | P1 | 日志 | 崩溃日志会将异常消息和 stack trace 写入本地 roaming logs；写入前已通过 `DiagnosticsRedactor` 脱敏 bearer/basic auth、cookie、URL userinfo、敏感 query 和常见 key/value secret。 | 继续避免主动记录邮件正文、OAuth 响应正文或完整外部 URL；新增诊断应复用日志脱敏 helper。 |
 | P2 | 依赖审计 | `Task_Flyout.csproj` 对 SQLite advisory GHSA-2m69-gcr7-jv3q 做了有理由的 suppress。 | 每次依赖更新时复查；一旦 SQLitePCLRaw/Microsoft.Data.Sqlite 链路提供修复版本，移除 suppress 并升级。 |
 | P2 | 网络超时 | 邮件、RSS、天气设置了 timeout；Google/Microsoft SDK 请求更多依赖 SDK 默认行为。 | 为用户触发的同步刷新增加显式取消路径，避免 OAuth/sync 流程出现无限等待感。 |
+| P0 | Explorer 进程内扩展 | 独立任务栏天气需要在 Explorer 内运行私有 XAML host；错误 ABI、未完成回调或不完整恢复会直接影响任务栏稳定性。 | 将原生 host 隔离为显式启用的独立组件；精确校验 OS/PE/XAML 树签名；未知版本在修改前失败关闭；Explorer 线程不得联网、使用 WebView 或解析不受信任 XAML；卸载前必须完成 owner-thread 恢复并等待回调归零。 |
 
 ## 测试与质量待办
 
@@ -70,6 +71,7 @@
 | P1 | 安全测试 | `NetworkSafety`、WebView2/RSS 资源策略、RSS XML 安全、RSS URL/redirect scheme/hop 上限、RSS malformed XML fallback、RSS resolved-address private host policy、Safe URI launcher、通知 activation parser 和邮件 sanitizer 边界已有测试。 | 后续主要是需要真实网络/凭据/系统环境的集成验证。 |
 | P1 | 缓存测试 | WebView2 cache prune、邮件正文 volatile LRU、邮件持久账号/文件夹排序 policy 和 JSON fallback recovery 已提取为纯逻辑并测试，覆盖低于上限不删除、按时间删除到目标大小、忽略 0 字节项、跳过当前邮件、持久顺序去重、未知项保序、空 JSON、malformed JSON 和 null deserialize fallback。 | 后续可继续覆盖更复杂的缓存迁移和旧字段兼容场景。 |
 | P1 | 同步测试 | Google/Microsoft task 日期半开区间、已完成任务包含规则、recurrence 映射、事件时间窗口和 item 模型映射 policy 已提取为纯逻辑并测试，覆盖去除时间部分、起止边界、反向区间、Google RRULE、Microsoft pattern type、创建事件频率映射、全天事件、跨午夜事件、事件/任务字段规范化和 Google page token 去重/终止。Microsoft Graph 分页仍依赖 SDK PageIterator，后续需要 mock/integration 覆盖。 |
+| P0 | 原生任务栏注入 | 新的 Broker/Host 会跨进程进入 Explorer，普通单元测试无法证明 ABI 和卸载安全。 | CI 先执行无 WebView import、PE 指纹门控、协议边界和 compile-only 检查；任何用户开关前必须在可丢弃 Explorer 会话完成启用、禁用、超时恢复、更新失配和多屏矩阵。 |
 | P2 | 性能基线 | 已新增 `docs/performance-baseline.md`，覆盖环境记录、冷启动、托盘 idle 内存、flyout 首次打开、邮件 HTML、RSS 文章和天气刷新测量流程。优化前后结果继续写入 PR 或 release notes。 |
 | P2 | 错误处理 | 日志脱敏 helper 已测试 bearer/basic auth、cookie、URL userinfo、敏感 query 和常见 key/value secret；用户可见错误消息 helper 已测试脱敏、空白折叠、空消息 fallback 和长度限制，并接入 RSS 错误状态。继续测试 OAuth 过期、IMAP 认证失败、WebView2 runtime 缺失等 fallback。 |
 
