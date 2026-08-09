@@ -1409,11 +1409,11 @@
   <data name="WeatherPage_WeatherBarDesc" xml:space="preserve">
     <value>在任务栏上显示浮动天气条（替代 Win11 小组件天气）</value>
   </data>
-  <data name="WeatherPage_NativeWidgets.Header" xml:space="preserve"><value>使用原有 Windows Widgets 天气入口</value></data>
+  <data name="WeatherPage_NativeWidgets.Header" xml:space="preserve"><value>使用 Windows 管理的 Widgets 任务栏入口</value></data>
   <data name="WeatherPage_NativeWidgets.OnContent" xml:space="preserve"><value>开启</value></data>
   <data name="WeatherPage_NativeWidgets.OffContent" xml:space="preserve"><value>关闭</value></data>
-  <data name="WeatherPage_NativeWidgetsModeDesc" xml:space="preserve"><value>关闭：使用 Task Flyout 自绘天气栏。开启：在 Windows Web Experience 可用时请求 Explorer 原生 Widgets 入口。</value></data>
-  <data name="WeatherPage_NativeWidgetsAvailable" xml:space="preserve"><value>原生 Widgets 入口由 Explorer 管理（Taskbar.AugmentedEntryPointButton）；天气数据和组件面板由 Windows 管理。</value></data>
+  <data name="WeatherPage_NativeWidgetsModeDesc" xml:space="preserve"><value>关闭：使用 Task Flyout 自绘天气栏。开启：使用 Windows 管理的 Widgets 动态内容；不会把 Task Flyout 天气数据注入 Explorer。</value></data>
+  <data name="WeatherPage_NativeWidgetsAvailable" xml:space="preserve"><value>这是 Windows 管理的动态 Widgets 内容，不是 Task Flyout 天气注入。Windows 可能轮播股票、体育和新闻公告。若希望任务栏主要显示天气，请打开“Widgets &gt; 设置 &gt; 通知”，关闭任务栏公告（也可按需关闭徽章）。</value></data>
   <data name="WeatherPage_NativeWidgetsWaiting" xml:space="preserve"><value>已请求 Windows Widgets；在 Explorer 创建原生任务栏入口之前，将继续显示 Task Flyout 自绘天气栏。</value></data>
   <data name="WeatherPage_NativeWidgetsUnavailable" xml:space="preserve"><value>Windows 原生 Widgets 当前不可用（{0}）。将继续使用 Task Flyout 自绘天气栏。</value></data>
   <data name="WeatherPage_NativeWidgetsReasonUnsupported" xml:space="preserve"><value>未检测到 Windows 11 任务栏组件</value></data>
@@ -1422,6 +1422,8 @@
   <data name="WeatherPage_NativeWidgetsReasonDetectionFailed" xml:space="preserve"><value>可用性检测失败</value></data>
   <data name="WeatherPage_OpenWidgetsSettings.Content" xml:space="preserve"><value>打开 Windows 任务栏设置</value></data>
   <data name="WeatherPage_NativeWidgetsSettingsFailed" xml:space="preserve"><value>无法打开 Windows 任务栏设置。请按 Win+W，或手动打开“设置 &gt; 个性化 &gt; 任务栏”。</value></data>
+  <data name="WeatherPage_OpenWidgetsBoard.Content" xml:space="preserve"><value>打开 Widgets 通知设置</value></data>
+  <data name="WeatherPage_NativeWidgetsBoardFailed" xml:space="preserve"><value>无法打开 Windows Widgets 面板。请按 Win+W，然后手动打开“设置 &gt; 通知”。</value></data>
   <data name="WeatherPage_OpenWidgetsStore.Content" xml:space="preserve"><value>安装或修复 Windows Web Experience Pack</value></data>
   <data name="WeatherPage_NativeWidgetsStoreFailed" xml:space="preserve"><value>无法打开 Microsoft Store。请在商店中搜索 Windows Web Experience Pack。</value></data>
   <data name="WeatherPage_DailyForecastTitle" xml:space="preserve">

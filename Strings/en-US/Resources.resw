@@ -1409,11 +1409,11 @@
   <data name="WeatherPage_WeatherBarDesc" xml:space="preserve">
     <value>Show a floating weather pill on the taskbar (replaces Win11 widget weather)</value>
   </data>
-  <data name="WeatherPage_NativeWidgets.Header" xml:space="preserve"><value>Use the original Windows Widgets weather entry</value></data>
+  <data name="WeatherPage_NativeWidgets.Header" xml:space="preserve"><value>Use the Windows-managed Widgets taskbar entry</value></data>
   <data name="WeatherPage_NativeWidgets.OnContent" xml:space="preserve"><value>On</value></data>
   <data name="WeatherPage_NativeWidgets.OffContent" xml:space="preserve"><value>Off</value></data>
-  <data name="WeatherPage_NativeWidgetsModeDesc" xml:space="preserve"><value>Off: use the Task Flyout weather bar. On: request Explorer's native Widgets entry when Windows Web Experience is available.</value></data>
-  <data name="WeatherPage_NativeWidgetsAvailable" xml:space="preserve"><value>Explorer owns the native Widgets entry (Taskbar.AugmentedEntryPointButton); Windows manages its weather data and board.</value></data>
+  <data name="WeatherPage_NativeWidgetsModeDesc" xml:space="preserve"><value>Off: use the Task Flyout weather bar. On: use Windows-managed Widgets content; this does not inject Task Flyout weather data into Explorer.</value></data>
+  <data name="WeatherPage_NativeWidgetsAvailable" xml:space="preserve"><value>This is Windows-managed dynamic Widgets content, not Task Flyout weather injection. Windows can rotate finance, sports, and news announcements. To keep weather on the taskbar, open Widgets &gt; Settings &gt; Notifications and turn off taskbar announcements (and badges if desired).</value></data>
   <data name="WeatherPage_NativeWidgetsWaiting" xml:space="preserve"><value>Windows Widgets was requested. The Task Flyout bar remains visible until Explorer creates the native taskbar entry.</value></data>
   <data name="WeatherPage_NativeWidgetsUnavailable" xml:space="preserve"><value>Windows native Widgets are unavailable ({0}). The Task Flyout weather bar remains the fallback.</value></data>
   <data name="WeatherPage_NativeWidgetsReasonUnsupported" xml:space="preserve"><value>Windows 11 taskbar components were not detected</value></data>
@@ -1422,6 +1422,8 @@
   <data name="WeatherPage_NativeWidgetsReasonDetectionFailed" xml:space="preserve"><value>availability detection failed</value></data>
   <data name="WeatherPage_OpenWidgetsSettings.Content" xml:space="preserve"><value>Open Windows taskbar settings</value></data>
   <data name="WeatherPage_NativeWidgetsSettingsFailed" xml:space="preserve"><value>Windows taskbar settings could not be opened. Press Win+W or open Settings &gt; Personalization &gt; Taskbar manually.</value></data>
+  <data name="WeatherPage_OpenWidgetsBoard.Content" xml:space="preserve"><value>Open Widgets notification settings</value></data>
+  <data name="WeatherPage_NativeWidgetsBoardFailed" xml:space="preserve"><value>The Windows Widgets board could not be opened. Press Win+W, then open Settings &gt; Notifications manually.</value></data>
   <data name="WeatherPage_OpenWidgetsStore.Content" xml:space="preserve"><value>Install or repair Windows Web Experience Pack</value></data>
   <data name="WeatherPage_NativeWidgetsStoreFailed" xml:space="preserve"><value>Microsoft Store could not be opened. Search the Store for Windows Web Experience Pack.</value></data>
   <data name="WeatherPage_DailyForecastTitle" xml:space="preserve">

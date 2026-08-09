@@ -61,6 +61,9 @@ namespace Task_Flyout.Views
             OpenWidgetsStoreButton.Visibility = availability.Reason == WindowsWidgetsAvailabilityReason.WebExperiencePackMissing
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+            OpenWidgetsBoardButton.Visibility = mode == WeatherBarMode.WindowsWidgets && availability.IsAvailable
+                ? Visibility.Visible
+                : Visibility.Collapsed;
 
             if (mode == WeatherBarMode.WindowsWidgets && !availability.IsAvailable)
             {
@@ -86,13 +89,13 @@ namespace Task_Flyout.Views
             {
                 NativeWidgetsStatusText.Text = GetSafeString(
                     "WeatherPage_NativeWidgetsAvailable",
-                    "Windows owns the native Widgets entry (Taskbar.AugmentedEntryPointButton); weather data and the Widgets board are managed by Windows.");
+                    "This is Windows-managed dynamic Widgets content, not Task Flyout weather injection. Windows can rotate finance, sports, and news announcements. To keep weather on the taskbar, open Widgets > Settings > Notifications and turn off taskbar announcements (and badges if desired).");
                 return;
             }
 
             NativeWidgetsStatusText.Text = GetSafeString(
                 "WeatherPage_NativeWidgetsModeDesc",
-                "Off: use the Task Flyout weather bar. On: request the original Windows Widgets entry when the Web Experience Pack is available.");
+                "Off: use the Task Flyout weather bar. On: use Windows-managed Widgets content; this does not inject Task Flyout weather data into Explorer.");
         }
 
         private string GetNativeWidgetsUnavailableReason(WindowsWidgetsAvailabilityReason reason)
@@ -883,6 +886,17 @@ namespace Task_Flyout.Views
                 NativeWidgetsStatusText.Text = GetSafeString(
                     "WeatherPage_NativeWidgetsSettingsFailed",
                     "Windows taskbar settings could not be opened. Press Win+W or open Settings > Personalization > Taskbar manually.");
+            }
+        }
+
+        private async void OpenWidgetsBoardButton_Click(object sender, RoutedEventArgs e)
+        {
+            bool launched = await App.OpenWindowsWidgetsBoardAsync();
+            if (!launched)
+            {
+                NativeWidgetsStatusText.Text = GetSafeString(
+                    "WeatherPage_NativeWidgetsBoardFailed",
+                    "The Windows Widgets board could not be opened. Press Win+W, then open Settings > Notifications manually.");
             }
         }
 

@@ -1078,6 +1078,33 @@ namespace Task_Flyout
             }
         }
 
+        public static async Task<bool> OpenWindowsWidgetsBoardAsync()
+        {
+            foreach (string protocol in new[] { "ms-widgets:", "ms-widgetboard:" })
+            {
+                try
+                {
+                    var uri = new Uri(protocol);
+                    Windows.System.LaunchQuerySupportStatus support =
+                        await Windows.System.Launcher.QueryUriSupportAsync(
+                            uri,
+                            Windows.System.LaunchQuerySupportType.Uri);
+                    if (support == Windows.System.LaunchQuerySupportStatus.Available &&
+                        await Windows.System.Launcher.LaunchUriAsync(uri))
+                    {
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"Opening Windows Widgets with {protocol} failed: {ex.Message}");
+                }
+            }
+
+            return false;
+        }
+
         public static async Task<bool> OpenWindowsWidgetsStoreAsync()
         {
             try

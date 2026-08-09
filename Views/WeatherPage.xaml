@@ -205,6 +205,11 @@
                     <TextBlock x:Name="NativeWidgetsStatusText" FontSize="12"
                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                TextWrapping="Wrap"/>
+                    <Button x:Uid="WeatherPage_OpenWidgetsBoard" x:Name="OpenWidgetsBoardButton"
+                            Content="Open Widgets notification settings"
+                            HorizontalAlignment="Left"
+                            Visibility="Collapsed"
+                            Click="OpenWidgetsBoardButton_Click"/>
                     <Button x:Uid="WeatherPage_OpenWidgetsSettings" x:Name="OpenWidgetsSettingsButton"
                             Content="Open Windows taskbar settings"
                             HorizontalAlignment="Left"
