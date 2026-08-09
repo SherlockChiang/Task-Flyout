@@ -57,6 +57,9 @@ namespace Task_Flyout
         private DateTime _windowsWidgetsAvailabilityCheckedAtUtc = DateTime.MinValue;
         private bool _nativeWidgetsModeActive;
         private bool _nativeWidgetsActivationFailed;
+        private volatile bool _weatherCompanionBridgeEnabled;
+        private WeatherCompanionCoordinator? _weatherCompanionCoordinator;
+        private const string WeatherCompanionBridgeEnabledSettingKey = "WeatherCompanionBridgeEnabled";
         private string _weatherBarModeRuntimeDetail = string.Empty;
         private static readonly TimeSpan WindowsWidgetsAvailabilityCacheLifetime = TimeSpan.FromSeconds(30);
         public static FlyoutWindow? MyFlyoutWindow { get; private set; }
@@ -590,6 +593,7 @@ namespace Task_Flyout
                 WeatherBarModeResolution resolution = ResolveWeatherBarMode(forceProbe);
                 var values = ApplicationData.Current.LocalSettings.Values;
                 WeatherBarMode requestedMode = WeatherBarModeSettings.Read(values);
+                UpdateWeatherCompanionBridge(values, requestedMode);
 
                 if (resolution.ShouldUseWindowsWidgets)
                 {
@@ -678,6 +682,49 @@ namespace Task_Flyout
             StopNativeWidgetsVerification();
             StopWeatherBarWatchdog();
             EnsureTaskbarRestartListener();
+        }
+
+        private void UpdateWeatherCompanionBridge(
+            System.Collections.Generic.IDictionary<string, object> values,
+            WeatherBarMode requestedMode)
+        {
+            bool enabled =
+                (values[WeatherCompanionBridgeEnabledSettingKey] as bool? ?? false) &&
+                (values["WeatherBarEnabled"] as bool? ?? false) &&
+                requestedMode == WeatherBarMode.WindowsWidgets;
+            _weatherCompanionBridgeEnabled = enabled;
+
+            if (!enabled)
+            {
+                _weatherCompanionCoordinator?.SetEnabled(false);
+                return;
+            }
+
+            try
+            {
+                if (_weatherCompanionCoordinator == null)
+                {
+                    _weatherCompanionCoordinator = new WeatherCompanionCoordinator(
+                        WeatherService,
+                        TryQueueWeatherOpen);
+                    _weatherCompanionCoordinator.Start();
+                }
+                _weatherCompanionCoordinator.SetEnabled(true);
+            }
+            catch (Exception ex)
+            {
+                _weatherCompanionBridgeEnabled = false;
+                _weatherCompanionCoordinator = null;
+                _weatherBarModeRuntimeDetail = "Weather companion bridge unavailable.";
+                System.Diagnostics.Debug.WriteLine($"Weather companion bridge failed to start: {ex.Message}");
+            }
+        }
+
+        private bool TryQueueWeatherOpen()
+        {
+            if (_isExiting) return false;
+            return MainDispatcherQueue?.TryEnqueue(() =>
+                OpenMainWindowInternal(window => window.NavigateToWeather())) == true;
         }
 
         private void KeepTaskFlyoutFallbackWhileNativeWidgetsPending(string detail)
@@ -1064,6 +1111,21 @@ namespace Task_Flyout
             });
         }
 
+        internal static bool GetWeatherCompanionBridgeEnabled()
+            => ApplicationData.Current.LocalSettings.Values[
+                WeatherCompanionBridgeEnabledSettingKey] as bool? ?? false;
+
+        internal static void SetWeatherCompanionBridgeEnabled(bool enabled)
+        {
+            ApplicationData.Current.LocalSettings.Values[
+                WeatherCompanionBridgeEnabledSettingKey] = enabled;
+            MainDispatcherQueue.TryEnqueue(() =>
+            {
+                if (Current is App app)
+                    app.ApplyWeatherBarPresentation(forceProbe: true);
+            });
+        }
+
         public static async Task<bool> OpenWindowsWidgetsSettingsAsync()
         {
             try
@@ -1136,7 +1198,12 @@ namespace Task_Flyout
         {
             MainDispatcherQueue.TryEnqueue(async () =>
             {
-                if (Current is not App app || !app.ShouldWeatherBarBeEnabled()) return;
+                if (Current is not App app) return;
+                app.UpdateWeatherCompanionBridge(
+                    ApplicationData.Current.LocalSettings.Values,
+                    WeatherBarModeSettings.Read(ApplicationData.Current.LocalSettings.Values));
+                app._weatherCompanionCoordinator?.RequestRefresh(forceRefresh);
+                if (!app.ShouldWeatherBarBeEnabled()) return;
 
                 app.CheckWeatherBarAlive();
                 WeatherBarWindow? bar = MyWeatherBar;
@@ -1231,6 +1298,21 @@ namespace Task_Flyout
         {
             if (_isExiting) return;
             _isExiting = true;
+
+            WeatherCompanionCoordinator? weatherCompanion = _weatherCompanionCoordinator;
+            _weatherCompanionCoordinator = null;
+            _weatherCompanionBridgeEnabled = false;
+            if (weatherCompanion != null)
+            {
+                try
+                {
+                    await weatherCompanion.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(2));
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Weather companion shutdown failed: {ex.Message}");
+                }
+            }
 
             StopNativeWidgetsVerification();
             StopWeatherBarWatchdog();

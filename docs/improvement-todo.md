@@ -139,7 +139,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M3-01 | TODO | Distribution | Add stable/beta update-channel support. | Users can discover and install signed updates without repeating manual certificate/package steps; rollback and channel behavior are documented. | `feat: add update channel support` |
 | M3-02 | TODO | Notifications | Add quiet hours and per-calendar notification controls. | Global defaults remain simple; users can suppress selected calendars and configure a quiet interval without losing explicit snoozes. | `feat: add notification quiet hours` |
 | M3-03 | TODO | UI/Compatibility | Runtime-validate and package the experimental Windhawk weather companion. | A disposable Explorer session verifies enable/disable/unload, Luminosity width, hover/click, primary/secondary taskbars, Explorer restart, and fail-closed behavior on an unlisted taskbar binary before any user-facing enable switch is added. | `test(windhawk): validate native weather shell` |
-| M3-04 | IN PROGRESS | Integration | Feed Task Flyout weather and activation into the native-shell companion. | A versioned, length-bounded per-user channel performs no blocking I/O on Explorer's UI thread; stale/unavailable app state fails open; native-shell click activation opens Task Flyout Weather; shutdown, reconnect, and Explorer restart leave no callbacks or handles behind. | `feat(weatherbar): define companion IPC protocol`, `feat(windhawk): bridge weather snapshot and activation` |
+| M3-04 | IN PROGRESS | Integration | Feed Task Flyout weather and activation into the native-shell companion. | A versioned, length-bounded per-user channel performs no blocking I/O on Explorer's UI thread; stale/unavailable app state fails open; native-shell click activation opens Task Flyout Weather; shutdown, reconnect, and Explorer restart leave no callbacks or handles behind. | `feat(weatherbar): define companion IPC protocol`, `feat(weatherbar): host companion weather snapshots`, `feat(windhawk): bridge weather snapshot and activation` |
 
 ### Audit Verification Baseline
 
@@ -240,5 +240,22 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
   isolate controls are removed, and emoji joiners/variation selectors remain
   intact.
 - The 20 protocol-specific tests and the full 936-test suite pass. The Debug x64
-  app build also completes with 0 warnings and 0 errors. The pipe server and
-  non-blocking Windhawk client remain the next M3-04 phases.
+  app build also completes with 0 warnings and 0 errors. The app-side server is
+  verified below; the non-blocking Windhawk client remains the next M3-04 phase.
+
+### 2026-08-09 Weather Companion Server Verification
+
+- The default-off app bridge now owns a single first-instance named pipe scoped
+  by current-user SID and Windows session, with `CurrentUserOnly` access,
+  4-byte little-endian framing, one request per connection, and a two-second
+  transaction deadline. The same server handle is reused between clients.
+- Native-mode weather refresh no longer depends on the self-drawn weather
+  window remaining alive. A background coordinator refreshes an immutable
+  snapshot immediately, every 30 minutes, and after location changes; pipe
+  handlers never perform network requests or manipulate WinUI.
+- Shutdown cancels both pending pipe I/O and weather refresh. Integration tests
+  cover oversize/truncated frames, same-user round trips, slow-client shutdown,
+  and recovery by a second client after a partial-frame timeout.
+- The 7 server-specific tests and full 943-test suite pass. Debug x64 builds with
+  0 warnings and 0 errors. The Windhawk-side non-blocking client and visible
+  experimental opt-in remain pending, so no Explorer process was changed.

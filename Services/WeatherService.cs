@@ -702,6 +702,33 @@ namespace Task_Flyout.Services
             lock (_weatherLock) return _cachedWeatherKey == BuildCurrentWeatherKey() ? _cachedWeather : null;
         }
 
+        public (WeatherInfo? Info, DateTimeOffset UpdatedUtc) GetActiveCachedWeatherState()
+        {
+            EnsureLocationLoaded();
+            string currentKey;
+            lock (_contextLock)
+            lock (_locationLock)
+            {
+                string providerCity = _favorites.Locations
+                    .FirstOrDefault(x => x.Id == _favorites.ActiveId)?.DisplayLabel
+                    ?? _location.City;
+                currentKey = $"{WeatherSource}|{providerCity}|" +
+                    $"{_location.Latitude.ToString(CultureInfo.InvariantCulture)}|" +
+                    _location.Longitude.ToString(CultureInfo.InvariantCulture);
+            }
+
+            lock (_weatherLock)
+            {
+                if (_cachedWeatherKey != currentKey || _cachedWeather == null)
+                    return (null, DateTimeOffset.MinValue);
+
+                DateTimeOffset updatedUtc = _lastFetchTime == DateTime.MinValue
+                    ? DateTimeOffset.MinValue
+                    : new DateTimeOffset(_lastFetchTime).ToUniversalTime();
+                return (_cachedWeather, updatedUtc);
+            }
+        }
+
         private string BuildCurrentWeatherKey()
         {
             string providerCity = _favorites.Locations.FirstOrDefault(x => x.Id == _favorites.ActiveId)?.DisplayLabel ?? _location.City;
