@@ -325,6 +325,12 @@ namespace Task_Flyout
         {
             try
             {
+                if (Volatile.Read(ref _detached) != 0)
+                {
+                    _reparentTimer.Stop();
+                    return;
+                }
+
                 if (_userHidden)
                 {
                     _reparentTimer.Stop();
@@ -692,7 +698,7 @@ namespace Task_Flyout
 
         public void ForceReattach()
         {
-            if (_userHidden) return;
+            if (_userHidden || Volatile.Read(ref _detached) != 0) return;
             InvalidateTaskbarAttachment("Manual reattach requested");
             UseFastReparentPolling();
             ReparentTimer_Tick(null, EventArgs.Empty);
@@ -2269,7 +2275,7 @@ namespace Task_Flyout
         /// Tear down a bar whose native window Explorer already destroyed so its timers stop
         /// keeping the object alive, allowing the App to replace it with a fresh window.
         /// </summary>
-        public void DetachForRecovery()
+        public bool DetachForRecovery()
         {
             Interlocked.Exchange(ref _detached, 1);
             CancelWeatherRefresh();
@@ -2282,9 +2288,16 @@ namespace Task_Flyout
             try
             {
                 if (IsAlive())
+                {
+                    IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                    if (hWnd != IntPtr.Zero && IsWindow(hWnd))
+                        ShowWindow(hWnd, SW_HIDE);
                     Close();
+                }
             }
             catch { }
+
+            return !IsAlive();
         }
 
         public void ShowBar()

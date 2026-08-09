@@ -1414,6 +1414,7 @@
   <data name="WeatherPage_NativeWidgets.OffContent" xml:space="preserve"><value>Off</value></data>
   <data name="WeatherPage_NativeWidgetsModeDesc" xml:space="preserve"><value>Off: use the Task Flyout weather bar. On: request Explorer's native Widgets entry when Windows Web Experience is available.</value></data>
   <data name="WeatherPage_NativeWidgetsAvailable" xml:space="preserve"><value>Explorer owns the native Widgets entry (Taskbar.AugmentedEntryPointButton); Windows manages its weather data and board.</value></data>
+  <data name="WeatherPage_NativeWidgetsWaiting" xml:space="preserve"><value>Windows Widgets was requested. The Task Flyout bar remains visible until Explorer creates the native taskbar entry.</value></data>
   <data name="WeatherPage_NativeWidgetsUnavailable" xml:space="preserve"><value>Windows native Widgets are unavailable ({0}). The Task Flyout weather bar remains the fallback.</value></data>
   <data name="WeatherPage_NativeWidgetsReasonUnsupported" xml:space="preserve"><value>Windows 11 taskbar components were not detected</value></data>
   <data name="WeatherPage_NativeWidgetsReasonPackMissing" xml:space="preserve"><value>Windows Web Experience Pack is not registered for this user</value></data>

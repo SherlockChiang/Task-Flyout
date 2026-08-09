@@ -72,7 +72,17 @@ namespace Task_Flyout.Views
                 return;
             }
 
-            if (mode == WeatherBarMode.WindowsWidgets && availability.IsAvailable)
+            if (mode == WeatherBarMode.WindowsWidgets &&
+                availability.IsAvailable &&
+                !availability.NativeEntryPointPresent)
+            {
+                NativeWidgetsStatusText.Text = GetSafeString(
+                    "WeatherPage_NativeWidgetsWaiting",
+                    "Windows Widgets was requested. The Task Flyout bar remains visible until Explorer creates the native taskbar entry.");
+                return;
+            }
+
+            if (mode == WeatherBarMode.WindowsWidgets && availability.NativeEntryPointPresent)
             {
                 NativeWidgetsStatusText.Text = GetSafeString(
                     "WeatherPage_NativeWidgetsAvailable",
@@ -835,8 +845,11 @@ namespace Task_Flyout.Views
             _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: true);
             App.RefreshWeatherBar();
 
-            // Auto-disable weather bar when weather is turned off
-            if (!WeatherToggle.IsOn && WeatherBarToggle.IsOn)
+            // Windows owns its weather data in native Widgets mode, so turning off
+            // Task Flyout's weather provider must not also hide the system entry.
+            if (!WeatherToggle.IsOn &&
+                WeatherBarToggle.IsOn &&
+                App.GetWeatherBarMode() != WeatherBarMode.WindowsWidgets)
             {
                 WeatherBarToggle.IsOn = false;
             }

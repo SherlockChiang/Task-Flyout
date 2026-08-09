@@ -1414,6 +1414,7 @@
   <data name="WeatherPage_NativeWidgets.OffContent" xml:space="preserve"><value>關閉</value></data>
   <data name="WeatherPage_NativeWidgetsModeDesc" xml:space="preserve"><value>關閉：使用 Task Flyout 自繪天氣列。開啟：Windows Web Experience 可用時要求 Explorer 原生 Widgets 入口。</value></data>
   <data name="WeatherPage_NativeWidgetsAvailable" xml:space="preserve"><value>原生 Widgets 入口由 Explorer 管理（Taskbar.AugmentedEntryPointButton）；天氣資料和元件面板由 Windows 管理。</value></data>
+  <data name="WeatherPage_NativeWidgetsWaiting" xml:space="preserve"><value>已要求 Windows Widgets；在 Explorer 建立原生工作列入口之前，將繼續顯示 Task Flyout 自繪天氣列。</value></data>
   <data name="WeatherPage_NativeWidgetsUnavailable" xml:space="preserve"><value>Windows 原生 Widgets 目前不可用（{0}）。將繼續使用 Task Flyout 自繪天氣列。</value></data>
   <data name="WeatherPage_NativeWidgetsReasonUnsupported" xml:space="preserve"><value>未偵測到 Windows 11 工作列元件</value></data>
   <data name="WeatherPage_NativeWidgetsReasonPackMissing" xml:space="preserve"><value>目前使用者未註冊 Windows Web Experience Pack</value></data>
