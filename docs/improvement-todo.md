@@ -129,6 +129,8 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M2-16 | DONE | UI/Compatibility | Place the Luminosity weather bar in the theme's left reserved strip without a startup flash. | The native window stays hidden until it is attached and positioned; the themed bar begins at client x=0 and fills `DockMargin`; full-width or unusably narrow Dock configurations retain native placement. | `fix(weatherbar): anchor Luminosity bar to left reserve` |
 | M2-17 | DONE | UI/Compatibility | Keep the left reserve safe around native Widgets and give the detached bar its own translucent surface. | Widget/obstacle overlap clips the reserve or falls back to native placement; exact DockMargin is preserved across DPI; the left-reserve bar has a non-white rest/hover fill and border instead of assuming the centered Dock blur is underneath. | `fix(weatherbar): harden Windhawk reserve geometry` |
 | M2-18 | DONE | UI/Compatibility | Offer an explicit Windows-native Widgets mode while preserving the existing weather-bar fallback. | The default remains the Task Flyout bar; the native option detects the per-user Web Experience Pack, requests Explorer's `TaskbarDa` entry, keeps the fallback visible until a plausible native taskbar bridge exists, retries delayed/failed activation, restores the user's captured value across process restarts, and never injects XAML into Explorer. | `feat(weatherbar): add native Widgets mode policy`, `feat(weatherbar): switch between native Widgets and fallback bar`, `fix(weatherbar): verify native Widgets before handoff` |
+| M2-19 | DONE | UI/Accuracy | Distinguish Windows-managed Widgets content from Task Flyout weather injection. | Settings state that Windows can rotate finance, sports, and news announcements; the app opens the supported Widgets board protocols and gives the exact manual path for disabling taskbar announcements without writing private Web Experience settings. | `fix(weatherbar): clarify Windows-managed widget content`, `fix(weatherbar): label Widgets navigation honestly` |
+| M2-20 | DONE | UI/Compatibility | Establish a compile-only Windhawk companion POC that replaces content inside the native Widgets shell. | The mod is separate from the MSIX and disabled by default; exact OS/PE and class/name/automation signatures gate the private ABI; the original Adaptive Card remains measured for Luminosity; local values and orphan recovery metadata are restored on disable/unload; owner-thread dispatch cannot leave callbacks pointing into an unloaded DLL; the bundled Windhawk compiler produces an x64 DLL without installing or loading it. | `feat(windhawk): add native weather shell POC`, `fix(windhawk): harden companion owner-thread cleanup` |
 
 ### P3 - Product Follow-Ups
 
@@ -136,6 +138,8 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | --- | --- | --- | --- | --- | --- |
 | M3-01 | TODO | Distribution | Add stable/beta update-channel support. | Users can discover and install signed updates without repeating manual certificate/package steps; rollback and channel behavior are documented. | `feat: add update channel support` |
 | M3-02 | TODO | Notifications | Add quiet hours and per-calendar notification controls. | Global defaults remain simple; users can suppress selected calendars and configure a quiet interval without losing explicit snoozes. | `feat: add notification quiet hours` |
+| M3-03 | TODO | UI/Compatibility | Runtime-validate and package the experimental Windhawk weather companion. | A disposable Explorer session verifies enable/disable/unload, Luminosity width, hover/click, primary/secondary taskbars, Explorer restart, and fail-closed behavior on an unlisted taskbar binary before any user-facing enable switch is added. | `test(windhawk): validate native weather shell` |
+| M3-04 | TODO | Integration | Feed Task Flyout weather and activation into the native-shell companion. | A versioned, length-bounded per-user channel performs no blocking I/O on Explorer's UI thread; stale/unavailable app state fails open; native-shell click activation opens Task Flyout Weather; shutdown, reconnect, and Explorer restart leave no callbacks or handles behind. | `feat(windhawk): bridge weather snapshot and activation` |
 
 ### Audit Verification Baseline
 
@@ -191,8 +195,36 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 - Native bridge confirmation now requires a visible left-side taskbar surface
   with plausible geometry. A failed custom HWND close keeps its object reference
   and hides/retries it instead of creating a duplicate child window.
+- Runtime inspection of installed `1.4.2.0` confirmed that finance content is
+  Windows Widgets' rotating announcement surface, not a stale Task Flyout bar.
+  The UI now labels this mode as Windows-managed dynamic content and opens the
+  Widgets board with instructions to disable taskbar announcements and badges.
+- A separate, disabled-by-default Windhawk companion now proves that custom
+  content can occupy the existing `AugmentedEntryPointContentGrid` without a
+  second HWND or a second XAML Diagnostics consumer. Compile/link validation is
+  complete; it has not been installed or loaded into Explorer. Runtime theme,
+  unload, multi-monitor, IPC, and click-activation checks remain M3-03/M3-04.
 - The current sandbox resolves as Windows 10 Pro 25H2 and has no registered
   Web Experience Pack for the sandbox SID, so a real native
   `AugmentedEntryPointButton` screenshot cannot be claimed here. Manual
   verification on a Windows 11 profile with Widgets enabled remains the release
-  check; the app intentionally does not inject XAML into Explorer.
+  check; the ordinary app path intentionally does not inject XAML into Explorer.
+
+### 2026-08-09 Windhawk Companion Compile Verification
+
+- The experimental companion is disabled by default and remains outside the
+  MSIX. It was not copied into Windhawk, loaded into Explorer, or enabled.
+- The current allowlist targets Windows build `26200` and the loaded
+  `Taskbar.View.dll` profile `TimeDateStamp=0x6A3CD591`,
+  `SizeOfImage=0x0098B000`, `CheckSum=0x00985653`; an unknown profile fails
+  before the internal FrameworkElement slot is read.
+- `windhawk\build-companion.ps1 -Mode Syntax` passed with the real Windhawk
+  compiler definitions, and `-Mode Link` produced an x64 DLL of 184,832 bytes
+  with SHA-256
+  `BF190118F9EBF1CC12B38D0796F170DC42EA0D7D7EB75C2D799CD7DE9D501622`.
+- Owner-thread restoration uses a self-unhooking temporary callback. A helper
+  owns an extra DLL reference and callers wait at most three seconds; if the
+  taskbar is unresponsive, the helper remains valid until it can finish rather
+  than blocking settings/unload indefinitely or calling unloaded code.
+- Runtime validation is intentionally still pending under M3-03. Weather data
+  IPC and Task Flyout click activation remain M3-04.

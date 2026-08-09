@@ -94,9 +94,27 @@ Use this checklist for flows that require real Windows credentials, DPAPI, Passw
 4. Restart Explorer and confirm the native entry returns without starting a custom weather-bar watchdog; open Settings diagnostics and verify the requested mode, native availability reason, and entry-point state.
 5. Turn the switch off (or disable the master Weather Bar toggle) and confirm the captured `TaskbarDa` value is restored and the custom bar returns when weather is enabled. If the current value no longer matches Task Flyout's owned `DWORD 1`, leave that newer value intact; simulate one failed restore and confirm the persisted snapshot is retried.
 6. On a machine without the Web Experience Pack, turn on the switch and confirm the status explains the missing package, the Store repair button is offered, and the existing Task Flyout bar remains the visible fallback.
-7. Do not treat the fallback child window as a native Widgets control: true Explorer/XAML injection is intentionally outside the WinUI app boundary and is not part of this verification.
+7. Do not treat the fallback child window as a native Widgets control: the ordinary WinUI app path does not inject Explorer XAML. The separately built experimental Windhawk companion has its own checklist below and is not installed by the MSIX.
 8. Block or delay creation of the native entry and confirm the custom bar never disappears into an empty taskbar slot. After the initial 10-second fast verification window, confirm retries back off to approximately 30 seconds and automatically hand off if the native entry later appears.
 9. Turn off Task Flyout's own weather provider while native mode remains selected and confirm Windows Widgets stays enabled; its weather data is independent of Task Flyout's provider.
+10. Allow a finance, sports, or news announcement to rotate onto the native entry and confirm Settings identifies it as Windows-managed content rather than claiming Task Flyout injection. Use the new button, open Widgets Settings > Notifications, turn off taskbar announcements, and confirm the entry returns to weather; optionally turn off notification badges as well.
+
+## Experimental Windhawk Weather Companion
+
+Run these checks only in a disposable Explorer session after the compile-only
+checkpoint has been reviewed. The companion is not part of the MSIX.
+
+1. Run `windhawk\build-companion.ps1 -Mode Syntax` and `-Mode Link`; confirm both use the installed Windhawk engine path and neither copies files into `ProgramData`, changes Windhawk configuration, loads a DLL, or restarts Explorer.
+2. Confirm the mod setting `enabled` defaults to false. With it false, install/preview the local mod and verify the native Widgets entry and its finance/weather rotation remain unchanged.
+3. Before enabling, record Windows build plus the loaded taskbar module PE timestamp, image size, and checksum. Confirm they exactly match the allowlisted profile; alter one local profile constant in a test build and verify initialization fails before `pThis` is dereferenced.
+4. Enable the static preview and confirm exactly one `TaskFlyoutWeatherHost` appears inside the existing native Widgets button. Finance, sports, and news text must no longer be visible; no independent HWND, white rectangle, or second taskbar item may appear.
+5. Confirm Luminosity still owns the outer position, background, border, radius, hover state, and width. The hidden Adaptive Card must remain measured, and the preview text must not clip at 100%, 125%, 150%, or 200% display scale.
+6. Hover and click the entry. Confirm hover remains native and the proof-of-concept click still opens Windows Widgets; it must not claim Task Flyout activation until the IPC phase is implemented.
+7. Change the preview text repeatedly and confirm one host is updated rather than duplicated. Trigger Windows ticker/template refreshes and confirm newly realized native children stay hidden but measured.
+8. Test primary and secondary taskbars, display disconnect/reconnect, Explorer restart, and a delayed Widgets entry. Each taskbar frame must have at most one host and no cross-thread XAML access.
+9. Disable and unload the mod. Confirm the host is removed and the exact prior local opacity/hit-test values return. Repeat while forcing a template rebuild; a failed child restore must retain recovery metadata rather than exposing a blank entry.
+10. Hang the taskbar UI thread in a disposable VM long enough to exceed the owner-dispatch wait. Confirm settings/unload returns after the bounded wait, the retained helper keeps callback code loaded, and cleanup finishes after the taskbar thread resumes.
+11. Do not ship or expose a Task Flyout UI switch until every check above passes and M3-04 supplies a bounded per-user weather snapshot/activation channel with no blocking Explorer UI-thread I/O.
 
 ## Integration Test Environment Notes
 
