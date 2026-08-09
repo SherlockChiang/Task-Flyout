@@ -45,6 +45,7 @@
     <Compile Include="..\..\Services\WeatherBarTaskbarStylePolicy.cs" Link="Source\WeatherBarTaskbarStylePolicy.cs" />
     <Compile Include="..\..\Services\WeatherBarModePolicy.cs" Link="Source\WeatherBarModePolicy.cs" />
     <Compile Include="..\..\Services\WeatherBarModeSettings.cs" Link="Source\WeatherBarModeSettings.cs" />
+    <Compile Include="..\..\Services\WeatherCompanionProtocol.cs" Link="Source\WeatherCompanionProtocol.cs" />
     <Compile Include="..\..\Services\WindowsWidgetsAvailabilityPolicy.cs" Link="Source\WindowsWidgetsAvailabilityPolicy.cs" />
     <Compile Include="..\..\Services\WindowsWidgetsService.cs" Link="Source\WindowsWidgetsService.cs" />
     <Compile Include="..\..\Services\WeatherBarRecoveryPolicy.cs" Link="Source\WeatherBarRecoveryPolicy.cs" />

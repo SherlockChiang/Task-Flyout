@@ -139,7 +139,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M3-01 | TODO | Distribution | Add stable/beta update-channel support. | Users can discover and install signed updates without repeating manual certificate/package steps; rollback and channel behavior are documented. | `feat: add update channel support` |
 | M3-02 | TODO | Notifications | Add quiet hours and per-calendar notification controls. | Global defaults remain simple; users can suppress selected calendars and configure a quiet interval without losing explicit snoozes. | `feat: add notification quiet hours` |
 | M3-03 | TODO | UI/Compatibility | Runtime-validate and package the experimental Windhawk weather companion. | A disposable Explorer session verifies enable/disable/unload, Luminosity width, hover/click, primary/secondary taskbars, Explorer restart, and fail-closed behavior on an unlisted taskbar binary before any user-facing enable switch is added. | `test(windhawk): validate native weather shell` |
-| M3-04 | TODO | Integration | Feed Task Flyout weather and activation into the native-shell companion. | A versioned, length-bounded per-user channel performs no blocking I/O on Explorer's UI thread; stale/unavailable app state fails open; native-shell click activation opens Task Flyout Weather; shutdown, reconnect, and Explorer restart leave no callbacks or handles behind. | `feat(windhawk): bridge weather snapshot and activation` |
+| M3-04 | IN PROGRESS | Integration | Feed Task Flyout weather and activation into the native-shell companion. | A versioned, length-bounded per-user channel performs no blocking I/O on Explorer's UI thread; stale/unavailable app state fails open; native-shell click activation opens Task Flyout Weather; shutdown, reconnect, and Explorer restart leave no callbacks or handles behind. | `feat(weatherbar): define companion IPC protocol`, `feat(windhawk): bridge weather snapshot and activation` |
 
 ### Audit Verification Baseline
 
@@ -228,3 +228,17 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
   than blocking settings/unload indefinitely or calling unloaded code.
 - Runtime validation is intentionally still pending under M3-03. Weather data
   IPC and Task Flyout click activation remain M3-04.
+
+### 2026-08-09 Weather Companion Protocol Verification
+
+- M3-04 now has a versioned JSON request/response contract with 4 KiB request
+  and 16 KiB response limits. Commands are restricted to `ping`,
+  `get-snapshot`, and `open-weather`; duplicate critical fields, malformed UTF-8,
+  excessive nesting, and trailing JSON are rejected.
+- Weather text is scalar-bounded before it reaches Explorer. C0/C1 and Unicode
+  line separators cannot create taskbar line breaks, bidirectional override and
+  isolate controls are removed, and emoji joiners/variation selectors remain
+  intact.
+- The 20 protocol-specific tests and the full 936-test suite pass. The Debug x64
+  app build also completes with 0 warnings and 0 errors. The pipe server and
+  non-blocking Windhawk client remain the next M3-04 phases.
