@@ -89,12 +89,14 @@ Use this checklist for flows that require real Windows credentials, DPAPI, Passw
 ## Native Windows Widgets Mode
 
 1. Open Weather settings and confirm the new native Widgets switch is off by default; the existing Task Flyout bar and its field/alert controls behave as before.
-2. On a Windows 11 profile with the Windows Web Experience Pack registered, turn on the switch. Confirm the custom Task Flyout child window is removed, the previous `TaskbarDa` value is captured, and Explorer materializes its own `Taskbar.AugmentedEntryPointButton` entry.
+2. On a Windows 11 profile with the Windows Web Experience Pack registered, turn on the switch. Confirm the existing Task Flyout child window remains visible while the request is pending, the previous `TaskbarDa` value is captured, and only after Explorer materializes its own `Taskbar.AugmentedEntryPointButton` entry is the custom window removed.
 3. Click the native entry and confirm Windows opens the Widgets board and owns the weather/news data. The app must not draw a second weather pill over the native control.
 4. Restart Explorer and confirm the native entry returns without starting a custom weather-bar watchdog; open Settings diagnostics and verify the requested mode, native availability reason, and entry-point state.
-5. Turn the switch off (or disable the master Weather Bar toggle) and confirm the captured `TaskbarDa` value is restored and the custom bar returns when weather is enabled. If the user changed `TaskbarDa` manually while native mode was active, leave that user change intact.
+5. Turn the switch off (or disable the master Weather Bar toggle) and confirm the captured `TaskbarDa` value is restored and the custom bar returns when weather is enabled. If the current value no longer matches Task Flyout's owned `DWORD 1`, leave that newer value intact; simulate one failed restore and confirm the persisted snapshot is retried.
 6. On a machine without the Web Experience Pack, turn on the switch and confirm the status explains the missing package, the Store repair button is offered, and the existing Task Flyout bar remains the visible fallback.
 7. Do not treat the fallback child window as a native Widgets control: true Explorer/XAML injection is intentionally outside the WinUI app boundary and is not part of this verification.
+8. Block or delay creation of the native entry and confirm the custom bar never disappears into an empty taskbar slot. After the initial 10-second fast verification window, confirm retries back off to approximately 30 seconds and automatically hand off if the native entry later appears.
+9. Turn off Task Flyout's own weather provider while native mode remains selected and confirm Windows Widgets stays enabled; its weather data is independent of Task Flyout's provider.
 
 ## Integration Test Environment Notes
 

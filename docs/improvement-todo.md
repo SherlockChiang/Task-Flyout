@@ -128,7 +128,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M2-15 | DONE | UI/Diagnostics | Make the active taskbar surface and computed weather-bar slot visible in read-only diagnostics. | Settings diagnostics identify the detected Windhawk surface and slot bounds without exposing registry contents or personal data; native fallback remains explicit. | `feat(weatherbar): expose Windhawk surface diagnostics` |
 | M2-16 | DONE | UI/Compatibility | Place the Luminosity weather bar in the theme's left reserved strip without a startup flash. | The native window stays hidden until it is attached and positioned; the themed bar begins at client x=0 and fills `DockMargin`; full-width or unusably narrow Dock configurations retain native placement. | `fix(weatherbar): anchor Luminosity bar to left reserve` |
 | M2-17 | DONE | UI/Compatibility | Keep the left reserve safe around native Widgets and give the detached bar its own translucent surface. | Widget/obstacle overlap clips the reserve or falls back to native placement; exact DockMargin is preserved across DPI; the left-reserve bar has a non-white rest/hover fill and border instead of assuming the centered Dock blur is underneath. | `fix(weatherbar): harden Windhawk reserve geometry` |
-| M2-18 | DONE | UI/Compatibility | Offer an explicit Windows-native Widgets mode while preserving the existing weather-bar fallback. | The default remains the Task Flyout bar; the native option detects the per-user Web Experience Pack, requests Explorer's `TaskbarDa` entry, restores the user's previous value when disabled, and falls back without cross-process XAML injection when the native surface is unavailable. | `feat(weatherbar): add native Widgets mode policy`, `feat(weatherbar): switch between native Widgets and fallback bar` |
+| M2-18 | DONE | UI/Compatibility | Offer an explicit Windows-native Widgets mode while preserving the existing weather-bar fallback. | The default remains the Task Flyout bar; the native option detects the per-user Web Experience Pack, requests Explorer's `TaskbarDa` entry, keeps the fallback visible until a plausible native taskbar bridge exists, retries delayed/failed activation, restores the user's captured value across process restarts, and never injects XAML into Explorer. | `feat(weatherbar): add native Widgets mode policy`, `feat(weatherbar): switch between native Widgets and fallback bar`, `fix(weatherbar): verify native Widgets before handoff` |
 
 ### P3 - Product Follow-Ups
 
@@ -184,7 +184,13 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
   `TaskbarDa` ownership, Explorer-restart recovery, localized settings/status
   text, and Store/taskbar-settings launch actions.
 - Debug x64 build completed with 0 warnings and 0 errors; the full unit suite
-  passed 907/907.
+  passed 916/916 after native handoff and TaskbarDa snapshot hardening.
+- The Task Flyout bar now remains visible while Explorer materializes the native
+  entry. Verification polls quickly for 10 seconds, then backs off to 30-second
+  recovery checks; it also retries a failed cross-process TaskbarDa restoration.
+- Native bridge confirmation now requires a visible left-side taskbar surface
+  with plausible geometry. A failed custom HWND close keeps its object reference
+  and hides/retries it instead of creating a duplicate child window.
 - The current sandbox resolves as Windows 10 Pro 25H2 and has no registered
   Web Experience Pack for the sandbox SID, so a real native
   `AugmentedEntryPointButton` screenshot cannot be claimed here. Manual
