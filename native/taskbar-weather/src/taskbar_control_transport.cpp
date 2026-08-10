@@ -3,13 +3,16 @@
 #include <Windows.h>
 
 #include <array>
+#include <atomic>
 #include <string>
 
 namespace taskflyout::taskbar {
 namespace {
 
 constexpr DWORD kControlMessageTimeoutMilliseconds = 5000;
+constexpr DWORD kAcknowledgementTimeoutMilliseconds = 1000;
 constexpr wchar_t kDefaultHostFileName[] = L"TaskFlyout.TaskbarHost.dll";
+std::atomic<std::uint32_t> g_controlNonceSequence{0};
 
 using HostApiVersionFunction = std::uint32_t(WINAPI*)();
 using HostEntryHookFunction = LRESULT(CALLBACK*)(
@@ -146,7 +149,127 @@ private:
     HHOOK hook_ = nullptr;
 };
 
+class AcknowledgementWindow final {
+public:
+    AcknowledgementWindow() = default;
+
+    AcknowledgementWindow(const AcknowledgementWindow&) = delete;
+    AcknowledgementWindow& operator=(const AcknowledgementWindow&) = delete;
+
+    ~AcknowledgementWindow() {
+        if (window_) {
+            DestroyWindow(window_);
+        }
+    }
+
+    HWND Create() noexcept {
+        window_ = CreateWindowExW(
+            0,
+            L"STATIC",
+            L"",
+            0,
+            0,
+            0,
+            0,
+            0,
+            HWND_MESSAGE,
+            nullptr,
+            GetModuleHandleW(nullptr),
+            nullptr);
+        return window_;
+    }
+
+    HWND get() const noexcept {
+        return window_;
+    }
+
+private:
+    HWND window_ = nullptr;
+};
+
+enum class AcknowledgementWaitStatus : std::uint32_t {
+    Received,
+    TimedOut,
+    WaitFailed,
+};
+
+std::uint32_t CreateControlNonce() noexcept {
+    LARGE_INTEGER counter{};
+    QueryPerformanceCounter(&counter);
+    const std::uint32_t sequence =
+        g_controlNonceSequence.fetch_add(1, std::memory_order_relaxed) + 1u;
+    std::uint32_t nonce =
+        static_cast<std::uint32_t>(counter.QuadPart) ^
+        static_cast<std::uint32_t>(counter.QuadPart >> 32u) ^
+        GetCurrentProcessId() ^
+        (GetCurrentThreadId() << 16u) ^
+        sequence;
+    if (nonce == 0) {
+        nonce = sequence == 0 ? 1u : sequence;
+    }
+    return nonce;
+}
+
+AcknowledgementWaitStatus WaitForControlAcknowledgement(
+    const HWND window,
+    const UINT messageId,
+    const std::uint32_t nonce,
+    HostControlAcknowledgement& acknowledgement,
+    DWORD& waitError) noexcept {
+    const ULONGLONG deadline =
+        GetTickCount64() + kAcknowledgementTimeoutMilliseconds;
+    for (;;) {
+        MSG message{};
+        while (PeekMessageW(
+                &message,
+                window,
+                messageId,
+                messageId,
+                PM_REMOVE)) {
+            if (static_cast<std::uint32_t>(message.wParam) != nonce) {
+                continue;
+            }
+            acknowledgement = static_cast<HostControlAcknowledgement>(
+                static_cast<std::uint32_t>(message.lParam));
+            return AcknowledgementWaitStatus::Received;
+        }
+
+        const ULONGLONG now = GetTickCount64();
+        if (now >= deadline) {
+            return AcknowledgementWaitStatus::TimedOut;
+        }
+        const DWORD wait = MsgWaitForMultipleObjectsEx(
+            0,
+            nullptr,
+            static_cast<DWORD>(deadline - now),
+            QS_POSTMESSAGE,
+            0);
+        if (wait == WAIT_TIMEOUT) {
+            return AcknowledgementWaitStatus::TimedOut;
+        }
+        if (wait == WAIT_FAILED) {
+            waitError = GetLastError();
+            return AcknowledgementWaitStatus::WaitFailed;
+        }
+    }
+}
+
 }  // namespace
+
+HostControlDispatchStatus EvaluateHostControlAcknowledgement(
+    const HostControlCommand command,
+    const HostControlAcknowledgement acknowledgement) noexcept {
+    if (!IsHostControlAcknowledgementForCommand(
+            command,
+            acknowledgement)) {
+        return HostControlDispatchStatus::AcknowledgementInvalid;
+    }
+    if (acknowledgement == HostControlAcknowledgement::StartRejected ||
+        acknowledgement == HostControlAcknowledgement::StopRejected) {
+        return HostControlDispatchStatus::ControllerRejected;
+    }
+    return HostControlDispatchStatus::Acknowledged;
+}
 
 HostControlDispatchResult DispatchHostControl(
     const HostControlCommand command,
@@ -185,6 +308,28 @@ HostControlDispatchResult DispatchHostControl(
             GetLastError());
         return result;
     }
+
+    const UINT acknowledgementMessage = RegisterWindowMessageW(
+        kHostControlAcknowledgementMessageName);
+    result.acknowledgementMessageId = acknowledgementMessage;
+    if (acknowledgementMessage == 0) {
+        result.status = HostControlDispatchStatus::MessageRegistrationFailed;
+        result.detail = Win32Detail(
+            L"register-acknowledgement-message-failed",
+            GetLastError());
+        return result;
+    }
+
+    AcknowledgementWindow acknowledgementWindow;
+    if (!acknowledgementWindow.Create()) {
+        result.status =
+            HostControlDispatchStatus::AcknowledgementWindowFailed;
+        result.detail = Win32Detail(
+            L"create-acknowledgement-window-failed",
+            GetLastError());
+        return result;
+    }
+    const std::uint32_t nonce = CreateControlNonce();
 
     const std::wstring resolvedHostPath = ResolveHostPath(hostPath);
     if (resolvedHostPath.empty()) {
@@ -227,10 +372,10 @@ HostControlDispatchResult DispatchHostControl(
 
     DWORD_PTR callbackResult = 0;
     if (!SendMessageTimeoutW(
-            taskbar,
-            controlMessage,
-            static_cast<WPARAM>(command),
-            0,
+             taskbar,
+             controlMessage,
+             static_cast<WPARAM>(EncodeHostControlRequest(command, nonce)),
+             reinterpret_cast<LPARAM>(acknowledgementWindow.get()),
             SMTO_ABORTIFHUNG | SMTO_BLOCK | SMTO_ERRORONEXIT,
             kControlMessageTimeoutMilliseconds,
             &callbackResult)) {
@@ -251,16 +396,48 @@ HostControlDispatchResult DispatchHostControl(
         return result;
     }
 
-    result.status = HostControlDispatchStatus::Dispatched;
-    result.detail = L"control-message-dispatched";
+    DWORD acknowledgementWaitError = ERROR_SUCCESS;
+    const AcknowledgementWaitStatus acknowledgementWait =
+        WaitForControlAcknowledgement(
+            acknowledgementWindow.get(),
+            acknowledgementMessage,
+            nonce,
+            result.acknowledgement,
+            acknowledgementWaitError);
+    if (acknowledgementWait == AcknowledgementWaitStatus::TimedOut) {
+        result.status = HostControlDispatchStatus::AcknowledgementTimedOut;
+        result.detail = L"controller-acknowledgement-timed-out";
+        return result;
+    }
+    if (acknowledgementWait == AcknowledgementWaitStatus::WaitFailed) {
+        result.status =
+            HostControlDispatchStatus::AcknowledgementWaitFailed;
+        result.detail = Win32Detail(
+            L"controller-acknowledgement-wait-failed",
+            acknowledgementWaitError);
+        return result;
+    }
+    result.status = EvaluateHostControlAcknowledgement(
+        command,
+        result.acknowledgement);
+    if (result.status == HostControlDispatchStatus::AcknowledgementInvalid) {
+        result.detail = L"controller-acknowledgement-invalid";
+        return result;
+    }
+    if (result.status == HostControlDispatchStatus::ControllerRejected) {
+        result.detail = L"controller-command-rejected";
+        return result;
+    }
+
+    result.detail = L"controller-command-acknowledged";
     return result;
 }
 
 const wchar_t* HostControlDispatchStatusName(
     const HostControlDispatchStatus status) noexcept {
     switch (status) {
-        case HostControlDispatchStatus::Dispatched:
-            return L"dispatched";
+        case HostControlDispatchStatus::Acknowledged:
+            return L"acknowledged";
         case HostControlDispatchStatus::InvalidCommand:
             return L"invalid-command";
         case HostControlDispatchStatus::ProbeRejected:
@@ -283,8 +460,39 @@ const wchar_t* HostControlDispatchStatusName(
             return L"message-dispatch-failed";
         case HostControlDispatchStatus::HookRemoveFailed:
             return L"hook-remove-failed";
+        case HostControlDispatchStatus::AcknowledgementWindowFailed:
+            return L"acknowledgement-window-failed";
+        case HostControlDispatchStatus::AcknowledgementTimedOut:
+            return L"acknowledgement-timed-out";
+        case HostControlDispatchStatus::AcknowledgementWaitFailed:
+            return L"acknowledgement-wait-failed";
+        case HostControlDispatchStatus::AcknowledgementInvalid:
+            return L"acknowledgement-invalid";
+        case HostControlDispatchStatus::ControllerRejected:
+            return L"controller-rejected";
     }
     return L"unknown";
+}
+
+const wchar_t* HostControlAcknowledgementName(
+    const HostControlAcknowledgement acknowledgement) noexcept {
+    switch (acknowledgement) {
+        case HostControlAcknowledgement::Unknown:
+            return L"unknown";
+        case HostControlAcknowledgement::Started:
+            return L"started";
+        case HostControlAcknowledgement::AlreadyStarted:
+            return L"already-started";
+        case HostControlAcknowledgement::Stopped:
+            return L"stopped";
+        case HostControlAcknowledgement::NotStarted:
+            return L"not-started";
+        case HostControlAcknowledgement::StartRejected:
+            return L"start-rejected";
+        case HostControlAcknowledgement::StopRejected:
+            return L"stop-rejected";
+    }
+    return L"invalid";
 }
 
 }  // namespace taskflyout::taskbar

@@ -142,7 +142,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M3-04 | IN PROGRESS | Integration | Feed Task Flyout weather and activation into the native-shell companion. | A versioned, length-bounded per-user channel performs no blocking I/O on Explorer's UI thread; stale/unavailable app state fails open; native-shell click activation opens Task Flyout Weather; shutdown, reconnect, and Explorer restart leave no callbacks or handles behind. | `feat(weatherbar): define companion IPC protocol`, `feat(weatherbar): host companion weather snapshots`, `feat(windhawk): bridge weather snapshots`, `feat(windhawk): activate Task Flyout weather` |
 | M3-05 | IN PROGRESS | Architecture/Security | Replace the Windhawk runtime dependency with a standalone per-user taskbar broker and Explorer host. | The x64 broker and host build without Windhawk or WebView libraries; exact OS and `Taskbar.View.dll` fingerprints gate all private ABI use; unsupported systems fail closed before Explorer memory or XAML is changed. | `feat(taskbar): scaffold standalone weather host` |
 | M3-06 | IN PROGRESS | UI/Compatibility | Inject an independent pure-XAML weather button into the Windows 11 taskbar. | The host uses standard `Windows.UI.Xaml` controls and taskbar theme resources, does not require the Windows Widgets entry, reserves a bounded left-side slot, and restores the original XAML tree on disable or unload. | `feat(taskbar): add pure xaml weather view`, `feat(taskbar): inject native xaml weather button` |
-| M3-07 | IN PROGRESS | Integration/UI | Connect the standalone host to Task Flyout weather, activation, settings, and diagnostics. | The existing bounded per-user IPC supplies sanitized immutable snapshots; click opens Task Flyout Weather; a localized experimental switch and privacy-safe diagnostics expose active, unsupported, fallback, and recovery states. | `feat(taskbar): consume weather snapshot pipe`, `feat(taskbar): activate weather button`, `feat(taskbar): connect standalone weather host` |
+| M3-07 | IN PROGRESS | Integration/UI | Connect the standalone host to Task Flyout weather, activation, settings, and diagnostics. | The existing bounded per-user IPC supplies sanitized immutable snapshots; click opens Task Flyout Weather; a localized experimental switch and privacy-safe diagnostics expose active, unsupported, fallback, and recovery states. | `feat(taskbar): consume weather snapshot pipe`, `feat(taskbar): activate weather button`, `feat(taskbar): acknowledge host control`, `feat(taskbar): connect standalone weather host` |
 | M3-08 | TODO | Verification/Distribution | Validate and package the standalone taskbar component. | Compile/import checks prove the native binaries have no WebView dependency; a disposable Explorer session covers enable/disable, crash recovery, DPI, auto-hide, theme, multi-monitor, Explorer restart, unsupported binaries, signed packaging, and rollback before default exposure. | `test(taskbar): validate standalone weather injection` |
 
 M3-05 through M3-08 supersede the Windhawk runtime/package work in M3-03.
@@ -523,3 +523,22 @@ transport foundation for the standalone host.
   interactive taskbar, so no Explorer injection was attempted. Settings,
   diagnostics, acknowledgement, and disposable Explorer-session validation
   keep M3-07 in progress.
+
+### 2026-08-10 Standalone Host Control Acknowledgement
+
+- The broker/host ABI is now version 3 and uses a new control message identity.
+  Each request packs a nonzero 32-bit correlation nonce with the start/stop
+  command and supplies a message-only reply window owned by the broker. The host
+  validates that window belongs to the same Windows session before changing
+  controller state.
+- Explorer posts only a fixed acknowledgement enum (`started`,
+  `already-started`, `stopped`, `not-started`, or the matching rejection). It
+  never dereferences broker memory or waits for the broker. After removing the
+  temporary hook, the broker waits at most one second, validates the nonce and
+  command/result family, and distinguishes controller rejection, timeout, wait
+  failure, and malformed replies in structured JSON.
+- Pure tests cover request packing, nonce preservation, command/result matching,
+  idempotent results, rejection, and cross-command fail-closed behavior. A fresh
+  Release x64 build passes all twelve native tests and forbidden WebView/network
+  import inspection. Live acknowledgement remains part of the disposable
+  Explorer-session validation; the build workflow does not inject the host.

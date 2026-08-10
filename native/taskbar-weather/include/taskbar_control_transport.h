@@ -10,7 +10,7 @@
 namespace taskflyout::taskbar {
 
 enum class HostControlDispatchStatus : std::uint32_t {
-    Dispatched = 0,
+    Acknowledged = 0,
     InvalidCommand = 1,
     ProbeRejected = 2,
     TaskbarWindowChanged = 3,
@@ -22,6 +22,11 @@ enum class HostControlDispatchStatus : std::uint32_t {
     HookInstallFailed = 9,
     MessageDispatchFailed = 10,
     HookRemoveFailed = 11,
+    AcknowledgementWindowFailed = 12,
+    AcknowledgementTimedOut = 13,
+    AcknowledgementWaitFailed = 14,
+    AcknowledgementInvalid = 15,
+    ControllerRejected = 16,
 };
 
 struct HostControlDispatchResult {
@@ -32,6 +37,9 @@ struct HostControlDispatchResult {
     DWORD processId = 0;
     DWORD threadId = 0;
     UINT messageId = 0;
+    UINT acknowledgementMessageId = 0;
+    HostControlAcknowledgement acknowledgement =
+        HostControlAcknowledgement::Unknown;
     std::wstring detail;
 };
 
@@ -43,7 +51,14 @@ HostControlDispatchResult DispatchHostControl(
     HostControlCommand command,
     std::wstring_view hostPath = {});
 
+HostControlDispatchStatus EvaluateHostControlAcknowledgement(
+    HostControlCommand command,
+    HostControlAcknowledgement acknowledgement) noexcept;
+
 const wchar_t* HostControlDispatchStatusName(
     HostControlDispatchStatus status) noexcept;
+
+const wchar_t* HostControlAcknowledgementName(
+    HostControlAcknowledgement acknowledgement) noexcept;
 
 }  // namespace taskflyout::taskbar

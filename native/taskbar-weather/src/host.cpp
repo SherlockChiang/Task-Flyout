@@ -14,6 +14,49 @@ UINT HostControlMessage() noexcept {
     return message;
 }
 
+UINT HostControlAcknowledgementMessage() noexcept {
+    static const UINT message = RegisterWindowMessageW(
+        taskflyout::taskbar::kHostControlAcknowledgementMessageName);
+    return message;
+}
+
+bool IsSameSessionReplyWindow(const HWND window) noexcept {
+    if (!window || !IsWindow(window)) {
+        return false;
+    }
+    DWORD replyProcessId = 0;
+    if (GetWindowThreadProcessId(window, &replyProcessId) == 0 ||
+        replyProcessId == 0) {
+        return false;
+    }
+    DWORD currentSessionId = 0;
+    DWORD replySessionId = 0;
+    return ProcessIdToSessionId(GetCurrentProcessId(), &currentSessionId) &&
+        ProcessIdToSessionId(replyProcessId, &replySessionId) &&
+        currentSessionId == replySessionId;
+}
+
+taskflyout::taskbar::HostControlAcknowledgement MapControllerResult(
+    const taskflyout::taskbar::TaskbarHostControllerResult result) noexcept {
+    using taskflyout::taskbar::HostControlAcknowledgement;
+    using taskflyout::taskbar::TaskbarHostControllerResult;
+    switch (result) {
+        case TaskbarHostControllerResult::Started:
+            return HostControlAcknowledgement::Started;
+        case TaskbarHostControllerResult::AlreadyStarted:
+            return HostControlAcknowledgement::AlreadyStarted;
+        case TaskbarHostControllerResult::Stopped:
+            return HostControlAcknowledgement::Stopped;
+        case TaskbarHostControllerResult::NotStarted:
+            return HostControlAcknowledgement::NotStarted;
+        case TaskbarHostControllerResult::StartRejected:
+            return HostControlAcknowledgement::StartRejected;
+        case TaskbarHostControllerResult::StopRejected:
+            return HostControlAcknowledgement::StopRejected;
+    }
+    return HostControlAcknowledgement::Unknown;
+}
+
 }  // namespace
 
 extern "C" __declspec(dllexport) std::uint32_t WINAPI
@@ -45,15 +88,36 @@ TaskFlyoutTaskbarHost_EntryHook(
             const auto* message = reinterpret_cast<const CWPSTRUCT*>(lParam);
             if (controlMessage != 0 && message &&
                 message->message == controlMessage) {
-                const auto command =
-                    static_cast<taskflyout::taskbar::HostControlCommand>(
-                        message->wParam);
-                if (command ==
-                    taskflyout::taskbar::HostControlCommand::Start) {
-                    taskflyout::taskbar::StartTaskbarWeatherController();
-                } else if (command ==
-                    taskflyout::taskbar::HostControlCommand::Stop) {
-                    taskflyout::taskbar::StopTaskbarWeatherController();
+                const UINT acknowledgementMessage =
+                    HostControlAcknowledgementMessage();
+                const auto request =
+                    taskflyout::taskbar::DecodeHostControlRequest(
+                        static_cast<std::uintptr_t>(message->wParam));
+                const HWND acknowledgementWindow =
+                    reinterpret_cast<HWND>(message->lParam);
+                if (request.nonce != 0 && acknowledgementMessage != 0 &&
+                    IsSameSessionReplyWindow(acknowledgementWindow)) {
+                    using taskflyout::taskbar::HostControlCommand;
+                    using taskflyout::taskbar::TaskbarHostControllerResult;
+                    TaskbarHostControllerResult result =
+                        TaskbarHostControllerResult::StartRejected;
+                    bool handled = true;
+                    if (request.command == HostControlCommand::Start) {
+                        result = taskflyout::taskbar::
+                            StartTaskbarWeatherController();
+                    } else if (request.command == HostControlCommand::Stop) {
+                        result = taskflyout::taskbar::
+                            StopTaskbarWeatherController();
+                    } else {
+                        handled = false;
+                    }
+                    if (handled) {
+                        PostMessageW(
+                            acknowledgementWindow,
+                            acknowledgementMessage,
+                            static_cast<WPARAM>(request.nonce),
+                            static_cast<LPARAM>(MapControllerResult(result)));
+                    }
                 }
             }
         } catch (...) {

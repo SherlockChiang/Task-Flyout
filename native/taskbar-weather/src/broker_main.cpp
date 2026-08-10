@@ -78,7 +78,8 @@ void PrintUsage() {
         L"Usage: TaskFlyout.TaskbarBroker.exe probe [--strict]\n"
         L"       TaskFlyout.TaskbarBroker.exe start [--host <path>]\n"
         L"       TaskFlyout.TaskbarBroker.exe stop [--host <path>]\n"
-        L"start/stop inject one temporary hook message and then remove it.\n",
+        L"start/stop wait for a bounded host acknowledgement, then remove "
+        L"the temporary hook.\n",
         stderr);
 }
 
@@ -91,7 +92,8 @@ int PrintControl(
     std::wprintf(
         L"{\"status\":\"%ls\",\"detail\":\"%ls\","
         L"\"command\":\"%ls\",\"processId\":%lu,\"threadId\":%lu,"
-        L"\"messageId\":%u,\"probeStatus\":\"%ls\"}\n",
+        L"\"messageId\":%u,\"acknowledgementMessageId\":%u,"
+        L"\"controllerStatus\":\"%ls\",\"probeStatus\":\"%ls\"}\n",
         taskflyout::taskbar::HostControlDispatchStatusName(result.status),
         EscapeJson(result.detail).c_str(),
         command == taskflyout::taskbar::HostControlCommand::Start
@@ -100,9 +102,12 @@ int PrintControl(
         result.processId,
         result.threadId,
         result.messageId,
+        result.acknowledgementMessageId,
+        taskflyout::taskbar::HostControlAcknowledgementName(
+            result.acknowledgement),
         taskflyout::taskbar::ProbeStatusName(result.probeStatus));
     return result.status ==
-        taskflyout::taskbar::HostControlDispatchStatus::Dispatched
+        taskflyout::taskbar::HostControlDispatchStatus::Acknowledged
         ? 0
         : 2;
 }

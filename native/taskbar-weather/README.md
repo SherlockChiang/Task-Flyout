@@ -42,8 +42,12 @@ After a supported probe, the broker can dispatch one explicit control command:
 
 Each command revalidates the taskbar owner and PE profile, installs a temporary
 thread-specific `WH_CALLWNDPROC` hook, sends the registered control message, and
-removes the hook before exiting. A `dispatched` result confirms delivery only;
-controller acceptance will use a separate acknowledgement channel.
+removes the hook before exiting. The request carries a per-dispatch nonce and a
+message-only broker window. The Explorer hook posts one bounded controller
+status back to that exact window; the broker waits at most one second after hook
+removal and reports `acknowledged`, `controller-rejected`, timeout, or malformed
+reply separately. No pointer is dereferenced across processes, and Explorer
+never waits on the broker.
 
 The initial allowlist is intentionally limited to the development profile:
 
