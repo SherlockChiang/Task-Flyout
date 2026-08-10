@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(TaskFlyoutTaskbarWeather LANGUAGES CXX)
+project(TaskFlyoutTaskbarWeather LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "Task Flyout taskbar weather supports Windows x64 only.")
@@ -12,6 +12,31 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
+add_library(taskbar_weather_minhook STATIC
+    third_party/minhook/src/buffer.c
+    third_party/minhook/src/hook.c
+    third_party/minhook/src/trampoline.c
+    third_party/minhook/src/hde/hde64.c
+)
+target_include_directories(taskbar_weather_minhook
+    PUBLIC third_party/minhook/include
+    PRIVATE
+        third_party/minhook/src
+        third_party/minhook/src/hde
+)
+target_compile_definitions(taskbar_weather_minhook PRIVATE
+    UNICODE
+    _UNICODE
+    WIN32_LEAN_AND_MEAN
+    NOMINMAX
+)
+if(MSVC)
+    target_compile_options(taskbar_weather_minhook PRIVATE
+        /W3
+        /guard:cf
+    )
 endif()
 
 add_library(taskbar_weather_profile STATIC

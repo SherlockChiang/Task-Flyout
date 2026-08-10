@@ -39,3 +39,9 @@ inside a taskbar-owned button so that Windows continues to own hover, pressed,
 focus, sizing, and accessibility visuals. Incoming strings are bounded and
 sanitized before they reach Explorer; the native view never accepts arbitrary
 XAML, URI, image, script, or HTML content.
+
+The future private `Taskbar.View.dll` detour uses the x64 subset of MinHook
+`v1.3.4`, pinned to commit `c3fcafdc10146beb5919319d0683e44e3c30d537`.
+It is built as a static implementation detail and is not yet connected to the
+host in this stage. Upstream provenance and the BSD license are retained under
+`third_party/minhook`.
