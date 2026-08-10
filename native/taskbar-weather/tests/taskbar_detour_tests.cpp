@@ -48,6 +48,9 @@ int wmain() {
         rejected.activeCallbacks == 0,
         L"compatibility rejection should not enter a callback");
     passed &= Expect(
+        rejected.activeCustomCallbacks == 0,
+        L"compatibility rejection should not enter a custom callback");
+    passed &= Expect(
         taskflyout::taskbar::StopTaskbarFrameDetour(RestoreNothing) ==
             taskflyout::taskbar::TaskbarDetourResult::NotActive,
         L"stopping a rejected detour should be idempotent");

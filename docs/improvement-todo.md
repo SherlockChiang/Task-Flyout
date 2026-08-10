@@ -338,11 +338,26 @@ transport foundation for the standalone host.
   and prologue immediately before MinHook creation and enable.
 - Added a default-off detour state machine. It calls the original function
   first, counts active trampoline calls, blocks custom callbacks during stop,
-  restores before disabling, drains before removing, and enters quarantine on
-  any restore/disable/drain/remove/uninitialize failure. A successfully
-  activated host is pinned until Explorer exits; no dynamic remote DLL unload
-  is attempted.
+  disables the hook before restoring, drains before removing, and enters
+  quarantine on any restore/disable/drain/remove/uninitialize failure. A
+  successfully activated host is pinned until Explorer exits; no dynamic
+  remote DLL unload is attempted.
 - The MinHook backend is pinned to the upstream x64 sources and now has a
   no-op compatibility test plus a four-step in-process smoke test. Release
   x64 build, four native tests, and WebView/network import inspection pass.
   The exported thread hook remains inert, so Explorer was not changed.
+
+### 2026-08-10 Detour Shutdown Hardening
+
+- The stop path now leaves the lifecycle lock before invoking XAML restoration
+  or MinHook operations, so restoration can safely query runtime diagnostics
+  without a lock inversion.
+- After a successful disable, the original trampoline pointer is atomically
+  cleared before active detours are drained. A thread that reached the detour
+  late therefore cannot call a trampoline after it has been removed.
+- Custom XAML callbacks have a separate drain counter and a C++ exception
+  boundary. Restoration is also exception-isolated; any failure quarantines
+  the pinned runtime instead of unloading executable code still referenced by
+  Explorer.
+- Release x64 compilation and all four native tests pass. The exported entry
+  hook is still inert, so no DLL was loaded into Explorer during verification.

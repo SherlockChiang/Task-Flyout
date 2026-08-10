@@ -38,6 +38,7 @@ enum class TaskbarDetourResult : std::uint32_t {
     UninitializeFailed = 16,
     Busy = 17,
     Quarantined = 18,
+    CallbackFailed = 19,
 };
 
 struct TaskbarDetourSnapshot {
@@ -47,12 +48,15 @@ struct TaskbarDetourSnapshot {
     HostCompatibility compatibility = HostCompatibility::Unknown;
     std::int32_t minHookStatus = -1;
     std::uint32_t activeCallbacks = 0;
+    std::uint32_t activeCustomCallbacks = 0;
     DWORD bootstrapThreadId = 0;
     bool hostPinned = false;
 };
 
-using TaskbarFrameLayoutCallback = void(WINAPI*)(void* taskbarFrame) noexcept;
-using TaskbarRestoreCallback = bool(WINAPI*)() noexcept;
+// Implementations must validate that the TaskbarFrame dispatcher has thread
+// access before touching XAML. The runtime supplies a C++ exception boundary.
+using TaskbarFrameLayoutCallback = void(WINAPI*)(void* taskbarFrame);
+using TaskbarRestoreCallback = bool(WINAPI*)();
 
 TaskbarDetourResult StartTaskbarFrameDetour(
     TaskbarFrameLayoutCallback callback) noexcept;
