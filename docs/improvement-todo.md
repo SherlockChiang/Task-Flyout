@@ -141,7 +141,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M3-03 | TODO | UI/Compatibility | Runtime-validate and package the experimental Windhawk weather companion. | A disposable Explorer session verifies enable/disable/unload, Luminosity width, hover/click, primary/secondary taskbars, Explorer restart, and fail-closed behavior on an unlisted taskbar binary before any user-facing enable switch is added. | `test(windhawk): validate native weather shell` |
 | M3-04 | IN PROGRESS | Integration | Feed Task Flyout weather and activation into the native-shell companion. | A versioned, length-bounded per-user channel performs no blocking I/O on Explorer's UI thread; stale/unavailable app state fails open; native-shell click activation opens Task Flyout Weather; shutdown, reconnect, and Explorer restart leave no callbacks or handles behind. | `feat(weatherbar): define companion IPC protocol`, `feat(weatherbar): host companion weather snapshots`, `feat(windhawk): bridge weather snapshots`, `feat(windhawk): activate Task Flyout weather` |
 | M3-05 | IN PROGRESS | Architecture/Security | Replace the Windhawk runtime dependency with a standalone per-user taskbar broker and Explorer host. | The x64 broker and host build without Windhawk or WebView libraries; exact OS and `Taskbar.View.dll` fingerprints gate all private ABI use; unsupported systems fail closed before Explorer memory or XAML is changed. | `feat(taskbar): scaffold standalone weather host` |
-| M3-06 | TODO | UI/Compatibility | Inject an independent pure-XAML weather button into the Windows 11 taskbar. | The host uses standard `Windows.UI.Xaml` controls and taskbar theme resources, does not require the Windows Widgets entry, reserves a bounded left-side slot, and restores the original XAML tree on disable or unload. | `feat(taskbar): inject native xaml weather button` |
+| M3-06 | IN PROGRESS | UI/Compatibility | Inject an independent pure-XAML weather button into the Windows 11 taskbar. | The host uses standard `Windows.UI.Xaml` controls and taskbar theme resources, does not require the Windows Widgets entry, reserves a bounded left-side slot, and restores the original XAML tree on disable or unload. | `feat(taskbar): add pure xaml weather view`, `feat(taskbar): inject native xaml weather button` |
 | M3-07 | TODO | Integration/UI | Connect the standalone host to Task Flyout weather, activation, settings, and diagnostics. | The existing bounded per-user IPC supplies sanitized immutable snapshots; click opens Task Flyout Weather; a localized experimental switch and privacy-safe diagnostics expose active, unsupported, fallback, and recovery states. | `feat(taskbar): connect standalone weather host` |
 | M3-08 | TODO | Verification/Distribution | Validate and package the standalone taskbar component. | Compile/import checks prove the native binaries have no WebView dependency; a disposable Explorer session covers enable/disable, crash recovery, DPI, auto-hide, theme, multi-monitor, Explorer restart, unsupported binaries, signed packaging, and rollback before default exposure. | `test(taskbar): validate standalone weather injection` |
 
@@ -301,3 +301,16 @@ transport foundation for the standalone host.
   work, and reads sanitized snapshots through the existing named pipe.
 - The current Windhawk POC remains compile-only reference material. It will not
   be installed, loaded, or extended as the product runtime path.
+
+### 2026-08-10 Pure XAML Weather View
+
+- Added a WebView-free `Windows.UI.Xaml` weather view composed only from
+  `Grid`, `Border`, `StackPanel`, and `TextBlock` controls. It is intentionally
+  hit-test transparent so a taskbar-owned button can retain hover, pressed,
+  focus, and accessibility behavior.
+- Added a native text boundary that removes control, line-separator, and bidi
+  override/isolate characters, collapses whitespace, bounds all fields, and
+  never splits a UTF-16 surrogate pair before text enters Explorer.
+- The x64 Release host and broker compile, both native test executables pass,
+  and import inspection finds no WebView or network library. The taskbar hook
+  remains a no-op, so this stage did not load or modify Explorer.

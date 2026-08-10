@@ -21,8 +21,15 @@ target_include_directories(taskbar_weather_profile PUBLIC include)
 target_compile_definitions(taskbar_weather_profile PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_profile PUBLIC user32)
 
+add_library(taskbar_weather_view_model STATIC
+    src/weather_view_model.cpp
+)
+target_include_directories(taskbar_weather_view_model PUBLIC include)
+target_compile_definitions(taskbar_weather_view_model PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+
 add_library(taskbar_weather_host SHARED
     src/host.cpp
+    src/weather_xaml_view.cpp
     src/host.def
 )
 set_target_properties(taskbar_weather_host PROPERTIES
@@ -30,7 +37,13 @@ set_target_properties(taskbar_weather_host PROPERTIES
 )
 target_include_directories(taskbar_weather_host PRIVATE include)
 target_compile_definitions(taskbar_weather_host PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(taskbar_weather_host PRIVATE taskbar_weather_profile user32)
+target_link_libraries(taskbar_weather_host PRIVATE
+    taskbar_weather_profile
+    taskbar_weather_view_model
+    runtimeobject
+    user32
+    windowsapp
+)
 
 add_executable(taskbar_weather_broker
     src/broker_main.cpp
@@ -49,11 +62,20 @@ target_include_directories(taskbar_weather_profile_tests PRIVATE include)
 target_compile_definitions(taskbar_weather_profile_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_profile_tests PRIVATE taskbar_weather_profile)
 
+add_executable(taskbar_weather_view_model_tests
+    tests/weather_view_model_tests.cpp
+)
+target_include_directories(taskbar_weather_view_model_tests PRIVATE include)
+target_compile_definitions(taskbar_weather_view_model_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_view_model_tests PRIVATE taskbar_weather_view_model)
+
 foreach(target
         taskbar_weather_profile
+        taskbar_weather_view_model
         taskbar_weather_host
         taskbar_weather_broker
-        taskbar_weather_profile_tests)
+        taskbar_weather_profile_tests
+        taskbar_weather_view_model_tests)
     if(MSVC)
         target_compile_options(${target} PRIVATE
             /W4
@@ -77,4 +99,7 @@ add_test(
     NAME taskbar_weather_profile_tests
     COMMAND taskbar_weather_profile_tests $<TARGET_FILE:taskbar_weather_host>
 )
-
+add_test(
+    NAME taskbar_weather_view_model_tests
+    COMMAND taskbar_weather_view_model_tests
+)

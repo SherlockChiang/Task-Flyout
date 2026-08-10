@@ -7,8 +7,9 @@ WebView-free Windows 11 taskbar weather path.
   real Explorer taskbar owner, and gates private taskbar integration on an exact
   Windows and `Taskbar.View.dll` PE profile.
 - `TaskFlyout.TaskbarHost.dll` is the narrowly scoped in-process Explorer host.
-  The current scaffold exposes a versioned probe contract and a no-op thread
-  hook only. It does not inject or modify XAML yet.
+  It now contains a standard `Windows.UI.Xaml` weather view composed from a
+  `Grid`, `Border`, `StackPanel`, and `TextBlock` controls. The thread hook is
+  still a no-op, so this stage does not install or modify the taskbar tree.
 - The native binaries must not link WebView, browser, or network libraries.
   Weather networking and cache ownership remain in the Task Flyout app; the
   host will consume only the existing sanitized named-pipe snapshot protocol.
@@ -33,3 +34,8 @@ The initial allowlist is intentionally limited to the development profile:
 
 Any mismatch fails before taskbar memory or XAML is changed.
 
+The XAML view has no background surface of its own. It is designed to sit
+inside a taskbar-owned button so that Windows continues to own hover, pressed,
+focus, sizing, and accessibility visuals. Incoming strings are bounded and
+sanitized before they reach Explorer; the native view never accepts arbitrary
+XAML, URI, image, script, or HTML content.
