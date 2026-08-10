@@ -65,6 +65,18 @@ add_library(taskbar_weather_slot_geometry STATIC
 target_include_directories(taskbar_weather_slot_geometry PUBLIC include)
 target_compile_definitions(taskbar_weather_slot_geometry PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
+add_library(taskbar_weather_slot_probe STATIC
+    src/taskbar_slot_probe.cpp
+)
+target_include_directories(taskbar_weather_slot_probe PUBLIC include)
+target_compile_definitions(taskbar_weather_slot_probe PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_slot_probe PUBLIC
+    taskbar_weather_tree_profile
+    taskbar_weather_slot_geometry
+    runtimeobject
+    windowsapp
+)
+
 add_library(taskbar_weather_mount STATIC
     src/taskbar_weather_mount.cpp
     src/weather_xaml_view.cpp
@@ -91,6 +103,17 @@ target_link_libraries(taskbar_weather_host_runtime PUBLIC
     psapi
     synchronization
     user32
+)
+
+add_library(taskbar_weather_frame_bridge STATIC
+    src/taskbar_frame_bridge.cpp
+)
+target_include_directories(taskbar_weather_frame_bridge PUBLIC include)
+target_compile_definitions(taskbar_weather_frame_bridge PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_frame_bridge PUBLIC
+    taskbar_weather_host_runtime
+    runtimeobject
+    windowsapp
 )
 
 add_library(taskbar_weather_host SHARED
@@ -161,6 +184,20 @@ target_include_directories(taskbar_weather_slot_geometry_tests PRIVATE include)
 target_compile_definitions(taskbar_weather_slot_geometry_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_slot_geometry_tests PRIVATE taskbar_weather_slot_geometry)
 
+add_executable(taskbar_weather_frame_bridge_tests
+    tests/taskbar_frame_bridge_tests.cpp
+)
+target_include_directories(taskbar_weather_frame_bridge_tests PRIVATE include)
+target_compile_definitions(taskbar_weather_frame_bridge_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_frame_bridge_tests PRIVATE taskbar_weather_frame_bridge)
+
+add_executable(taskbar_weather_slot_probe_tests
+    tests/taskbar_slot_probe_tests.cpp
+)
+target_include_directories(taskbar_weather_slot_probe_tests PRIVATE include)
+target_compile_definitions(taskbar_weather_slot_probe_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_slot_probe_tests PRIVATE taskbar_weather_slot_probe)
+
 add_executable(taskbar_weather_minhook_smoke_tests
     tests/minhook_smoke_tests.cpp
 )
@@ -173,8 +210,10 @@ foreach(target
         taskbar_weather_view_model
         taskbar_weather_tree_profile
         taskbar_weather_slot_geometry
+        taskbar_weather_slot_probe
         taskbar_weather_mount
         taskbar_weather_host_runtime
+        taskbar_weather_frame_bridge
         taskbar_weather_host
         taskbar_weather_broker
         taskbar_weather_profile_tests
@@ -183,6 +222,8 @@ foreach(target
         taskbar_weather_tree_profile_tests
         taskbar_weather_mount_tests
         taskbar_weather_slot_geometry_tests
+        taskbar_weather_frame_bridge_tests
+        taskbar_weather_slot_probe_tests
         taskbar_weather_minhook_smoke_tests)
     if(MSVC)
         target_compile_options(${target} PRIVATE
@@ -226,6 +267,14 @@ add_test(
 add_test(
     NAME taskbar_weather_slot_geometry_tests
     COMMAND taskbar_weather_slot_geometry_tests
+)
+add_test(
+    NAME taskbar_weather_frame_bridge_tests
+    COMMAND taskbar_weather_frame_bridge_tests
+)
+add_test(
+    NAME taskbar_weather_slot_probe_tests
+    COMMAND taskbar_weather_slot_probe_tests
 )
 add_test(
     NAME taskbar_weather_minhook_smoke_tests

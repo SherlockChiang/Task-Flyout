@@ -417,3 +417,29 @@ transport foundation for the standalone host.
   longer a second layout authority. The entry hook is still inert until a
   live owner-thread blocker scanner supplies the structure proof and blocker
   span.
+
+### 2026-08-10 Private TaskbarFrame ABI Bridge
+
+- Added a default-off bridge for the development profile's private
+  `TaskbarFrame` IInspectable slot. It requires an active exact-profile detour
+  on the captured owner thread before reading any private object memory.
+- The slot, interface object, and vtable are bounded with current-process
+  memory queries; QueryInterface/AddRef/Release targets must be executable
+  image code before
+  C++/WinRT projection. The projected object must then match
+  `Taskbar.TaskbarFrame` and confirm Dispatcher thread access.
+- The bridge has a pure fail-closed gate test matrix. It is not connected to
+  the exported entry hook and was not called against Explorer in this stage.
+
+### 2026-08-10 Live Left-Slot Probe
+
+- Added an owner-thread-only probe that accepts the exact two-child
+  `RootGrid` fingerprint (`BackgroundControl` + `TaskbarFrameRepeater`) or the
+  same tree plus the exact previously owned button. It rejects unknown root
+  children and bounded-count violations.
+- Realized repeater children are converted to RootGrid-space rectangles only
+  after loaded/visibility/shared-XamlRoot/transform checks. The result owns a
+  bounded blocker array and exposes a short-lived span to the geometry gate;
+  it retains no XAML references after return.
+- The probe is now compile-tested but not called by the inert host hook. A
+  different taskbar build or an unobserved child shape remains default-deny.

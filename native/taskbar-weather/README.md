@@ -65,3 +65,19 @@ trampoline is drained and removed, and quarantines rather than unloading on a
 failed disable/remove/restore. This avoids remote `SetWindowsHookEx` unload
 races; dynamic DLL unloading is deliberately deferred until a disposable
 Explorer-session test exists.
+
+The private TaskbarFrame pointer is not projected directly. A separate bridge
+first requires the active exact-profile detour and owner thread, reads the
+allowlisted IInspectable slot through bounded current-process memory reads,
+checks the IUnknown vtable methods point to executable image memory, then
+verifies
+the projected `Taskbar.TaskbarFrame` class and XAML dispatcher. The exported
+entry hook remains inert, so this bridge is compile-tested but not invoked in
+Explorer yet.
+
+The live slot probe accepts only the development tree's exact direct-child
+fingerprint (`BackgroundControl` plus `TaskbarFrameRepeater`, and optionally
+the exact button identity already owned by the lease). It snapshots bounded
+realized repeater child rectangles in RootGrid coordinates and feeds the
+geometry gate. Unknown children, invalid transforms, or a changed tree fail
+closed before append/update.
