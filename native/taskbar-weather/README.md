@@ -32,6 +32,18 @@ native profile tests, checks imports for WebView/network dependencies, and
 performs a read-only probe of the current Explorer taskbar. It never installs or
 loads the host into Explorer.
 
+After a supported probe, the broker can dispatch one explicit control command:
+
+```powershell
+.\TaskFlyout.TaskbarBroker.exe start
+.\TaskFlyout.TaskbarBroker.exe stop
+```
+
+Each command revalidates the taskbar owner and PE profile, installs a temporary
+thread-specific `WH_CALLWNDPROC` hook, sends the registered control message, and
+removes the hook before exiting. A `dispatched` result confirms delivery only;
+controller acceptance will use a separate acknowledgement channel.
+
 The initial allowlist is intentionally limited to the development profile:
 
 - Windows build `26200`
@@ -56,7 +68,7 @@ XAML, URI, image, script, or HTML content.
 The private `Taskbar.View.dll` detour uses the x64 subset of MinHook `v1.3.4`,
 pinned to commit `c3fcafdc10146beb5919319d0683e44e3c30d537`. It is built as a
 static implementation detail and is connected to the guarded host controller;
-the broker's explicit control-message sender is still a separate step. Upstream
+the broker supplies the explicit one-shot control-message sender. Upstream
 provenance and the BSD license are retained under `third_party/minhook`.
 
 The controller's first safe lifecycle pins the host DLL for the lifetime of

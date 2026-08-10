@@ -1,4 +1,5 @@
 #include "module_profile.h"
+#include "taskbar_control_transport.h"
 
 #include <Windows.h>
 
@@ -75,26 +76,86 @@ int PrintProbe(bool strictExitCode) {
 void PrintUsage() {
     std::fputws(
         L"Usage: TaskFlyout.TaskbarBroker.exe probe [--strict]\n"
-        L"This build performs compatibility probing only and never injects.\n",
+        L"       TaskFlyout.TaskbarBroker.exe start [--host <path>]\n"
+        L"       TaskFlyout.TaskbarBroker.exe stop [--host <path>]\n"
+        L"start/stop inject one temporary hook message and then remove it.\n",
         stderr);
+}
+
+int PrintControl(
+    const taskflyout::taskbar::HostControlCommand command,
+    const std::wstring_view hostPath) {
+    const auto result = taskflyout::taskbar::DispatchHostControl(
+        command,
+        hostPath);
+    std::wprintf(
+        L"{\"status\":\"%ls\",\"detail\":\"%ls\","
+        L"\"command\":\"%ls\",\"processId\":%lu,\"threadId\":%lu,"
+        L"\"messageId\":%u,\"probeStatus\":\"%ls\"}\n",
+        taskflyout::taskbar::HostControlDispatchStatusName(result.status),
+        EscapeJson(result.detail).c_str(),
+        command == taskflyout::taskbar::HostControlCommand::Start
+            ? L"start"
+            : L"stop",
+        result.processId,
+        result.threadId,
+        result.messageId,
+        taskflyout::taskbar::ProbeStatusName(result.probeStatus));
+    return result.status ==
+        taskflyout::taskbar::HostControlDispatchStatus::Dispatched
+        ? 0
+        : 2;
 }
 
 }  // namespace
 
 int wmain(int argc, wchar_t** argv) {
-    if (argc < 2 || std::wstring_view(argv[1]) != L"probe") {
+    if (argc < 2) {
         PrintUsage();
         return 64;
     }
 
-    bool strict = false;
-    if (argc == 3 && std::wstring_view(argv[2]) == L"--strict") {
-        strict = true;
-    } else if (argc != 2) {
+    const std::wstring_view command(argv[1]);
+    if (command == L"probe") {
+        bool strict = false;
+        if (argc == 3 && std::wstring_view(argv[2]) == L"--strict") {
+            strict = true;
+        } else if (argc != 2) {
+            PrintUsage();
+            return 64;
+        }
+        return PrintProbe(strict);
+    }
+
+    taskflyout::taskbar::HostControlCommand controlCommand;
+    if (command == L"start") {
+        controlCommand = taskflyout::taskbar::HostControlCommand::Start;
+    } else if (command == L"stop") {
+        controlCommand = taskflyout::taskbar::HostControlCommand::Stop;
+    } else {
         PrintUsage();
         return 64;
     }
 
-    return PrintProbe(strict);
+    std::wstring hostPath;
+    if (argc == 2) {
+        try {
+            return PrintControl(controlCommand, hostPath);
+        } catch (...) {
+            std::fputws(L"{\"status\":\"internal-error\"}\n", stderr);
+            return 70;
+        }
+    }
+    if (argc == 4 && std::wstring_view(argv[2]) == L"--host") {
+        hostPath = argv[3];
+        try {
+            return PrintControl(controlCommand, hostPath);
+        } catch (...) {
+            std::fputws(L"{\"status\":\"internal-error\"}\n", stderr);
+            return 70;
+        }
+    }
+
+    PrintUsage();
+    return 64;
 }
-

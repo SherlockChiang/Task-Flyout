@@ -460,3 +460,18 @@ transport foundation for the standalone host.
   sender, named-pipe weather snapshot wiring, and disposable Explorer-session
   validation remain pending; no Explorer injection was attempted in the build
   sandbox.
+
+### 2026-08-10 One-shot Broker Control Transport
+
+- Added explicit `start` and `stop` broker commands. Each command requires a
+  supported disk-side profile, rechecks that the `Shell_TrayWnd` PID/thread did
+  not change, verifies the adjacent host API, installs a thread-specific
+  `WH_CALLWNDPROC` hook, and sends the private registered message with a bounded
+  timeout.
+- The temporary hook is removed after a synchronous dispatch. On timeout or
+  removal failure the broker avoids an eager `FreeLibrary`; a successful start
+  still relies on the host's existing self-pin before the hook is removed.
+- Release x64, forbidden-import inspection, and all eleven native tests pass.
+  The sandbox returns a structured `probe-rejected` result because it cannot see
+  the interactive taskbar, so no Explorer injection was attempted. A controller
+  acknowledgement channel and live named-pipe weather snapshots remain pending.

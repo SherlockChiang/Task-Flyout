@@ -128,6 +128,16 @@ target_link_libraries(taskbar_weather_host_controller PUBLIC
     taskbar_weather_mount
 )
 
+add_library(taskbar_weather_control_transport STATIC
+    src/taskbar_control_transport.cpp
+)
+target_include_directories(taskbar_weather_control_transport PUBLIC include)
+target_compile_definitions(taskbar_weather_control_transport PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_control_transport PUBLIC
+    taskbar_weather_profile
+    user32
+)
+
 add_library(taskbar_weather_host SHARED
     src/host.cpp
     src/host.def
@@ -153,7 +163,11 @@ set_target_properties(taskbar_weather_broker PROPERTIES
 )
 target_include_directories(taskbar_weather_broker PRIVATE include)
 target_compile_definitions(taskbar_weather_broker PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(taskbar_weather_broker PRIVATE taskbar_weather_profile user32)
+target_link_libraries(taskbar_weather_broker PRIVATE
+    taskbar_weather_control_transport
+    taskbar_weather_profile
+    user32
+)
 
 add_executable(taskbar_weather_profile_tests
     tests/module_profile_tests.cpp
@@ -218,6 +232,13 @@ target_include_directories(taskbar_weather_host_controller_tests PRIVATE include
 target_compile_definitions(taskbar_weather_host_controller_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_host_controller_tests PRIVATE taskbar_weather_host_controller)
 
+add_executable(taskbar_weather_control_transport_tests
+    tests/taskbar_control_transport_tests.cpp
+)
+target_include_directories(taskbar_weather_control_transport_tests PRIVATE include)
+target_compile_definitions(taskbar_weather_control_transport_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_control_transport_tests PRIVATE taskbar_weather_control_transport)
+
 add_executable(taskbar_weather_minhook_smoke_tests
     tests/minhook_smoke_tests.cpp
 )
@@ -235,6 +256,7 @@ foreach(target
         taskbar_weather_host_runtime
         taskbar_weather_frame_bridge
         taskbar_weather_host_controller
+        taskbar_weather_control_transport
         taskbar_weather_host
         taskbar_weather_broker
         taskbar_weather_profile_tests
@@ -246,6 +268,7 @@ foreach(target
         taskbar_weather_frame_bridge_tests
         taskbar_weather_slot_probe_tests
         taskbar_weather_host_controller_tests
+        taskbar_weather_control_transport_tests
         taskbar_weather_minhook_smoke_tests)
     if(MSVC)
         target_compile_options(${target} PRIVATE
@@ -301,6 +324,10 @@ add_test(
 add_test(
     NAME taskbar_weather_host_controller_tests
     COMMAND taskbar_weather_host_controller_tests
+)
+add_test(
+    NAME taskbar_weather_control_transport_tests
+    COMMAND taskbar_weather_control_transport_tests
 )
 add_test(
     NAME taskbar_weather_minhook_smoke_tests
