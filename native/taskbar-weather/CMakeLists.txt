@@ -52,6 +52,20 @@ add_library(taskbar_weather_view_model STATIC
 target_include_directories(taskbar_weather_view_model PUBLIC include)
 target_compile_definitions(taskbar_weather_view_model PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
+add_library(taskbar_weather_host_runtime STATIC
+    src/loaded_taskbar_profile.cpp
+    src/taskbar_detour.cpp
+)
+target_include_directories(taskbar_weather_host_runtime PUBLIC include)
+target_compile_definitions(taskbar_weather_host_runtime PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_host_runtime PUBLIC
+    taskbar_weather_profile
+    taskbar_weather_minhook
+    psapi
+    synchronization
+    user32
+)
+
 add_library(taskbar_weather_host SHARED
     src/host.cpp
     src/weather_xaml_view.cpp
@@ -63,6 +77,7 @@ set_target_properties(taskbar_weather_host PROPERTIES
 target_include_directories(taskbar_weather_host PRIVATE include)
 target_compile_definitions(taskbar_weather_host PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_host PRIVATE
+    taskbar_weather_host_runtime
     taskbar_weather_profile
     taskbar_weather_view_model
     runtimeobject
@@ -94,13 +109,30 @@ target_include_directories(taskbar_weather_view_model_tests PRIVATE include)
 target_compile_definitions(taskbar_weather_view_model_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_view_model_tests PRIVATE taskbar_weather_view_model)
 
+add_executable(taskbar_weather_detour_tests
+    tests/taskbar_detour_tests.cpp
+)
+target_include_directories(taskbar_weather_detour_tests PRIVATE include)
+target_compile_definitions(taskbar_weather_detour_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_detour_tests PRIVATE taskbar_weather_host_runtime)
+
+add_executable(taskbar_weather_minhook_smoke_tests
+    tests/minhook_smoke_tests.cpp
+)
+target_include_directories(taskbar_weather_minhook_smoke_tests PRIVATE include)
+target_compile_definitions(taskbar_weather_minhook_smoke_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_minhook_smoke_tests PRIVATE taskbar_weather_minhook)
+
 foreach(target
         taskbar_weather_profile
         taskbar_weather_view_model
+        taskbar_weather_host_runtime
         taskbar_weather_host
         taskbar_weather_broker
         taskbar_weather_profile_tests
-        taskbar_weather_view_model_tests)
+        taskbar_weather_view_model_tests
+        taskbar_weather_detour_tests
+        taskbar_weather_minhook_smoke_tests)
     if(MSVC)
         target_compile_options(${target} PRIVATE
             /W4
@@ -127,4 +159,12 @@ add_test(
 add_test(
     NAME taskbar_weather_view_model_tests
     COMMAND taskbar_weather_view_model_tests
+)
+add_test(
+    NAME taskbar_weather_detour_tests
+    COMMAND taskbar_weather_detour_tests
+)
+add_test(
+    NAME taskbar_weather_minhook_smoke_tests
+    COMMAND taskbar_weather_minhook_smoke_tests
 )

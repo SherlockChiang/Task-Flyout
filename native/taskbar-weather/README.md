@@ -10,6 +10,8 @@ WebView-free Windows 11 taskbar weather path.
   It now contains a standard `Windows.UI.Xaml` weather view composed from a
   `Grid`, `Border`, `StackPanel`, and `TextBlock` controls. The thread hook is
   still a no-op, so this stage does not install or modify the taskbar tree.
+  The separately tested detour controller is default-off and is not reached
+  by the exported hook callback yet.
 - The native binaries must not link WebView, browser, or network libraries.
   Weather networking and cache ownership remain in the Task Flyout app; the
   host will consume only the existing sanitized named-pipe snapshot protocol.
@@ -51,3 +53,10 @@ The future private `Taskbar.View.dll` detour uses the x64 subset of MinHook
 It is built as a static implementation detail and is not yet connected to the
 host in this stage. Upstream provenance and the BSD license are retained under
 `third_party/minhook`.
+
+The controller's first safe lifecycle pins the host DLL for the lifetime of
+Explorer after activation, retains a `Taskbar.View.dll` lease until the
+trampoline is drained and removed, and quarantines rather than unloading on a
+failed disable/remove/restore. This avoids remote `SetWindowsHookEx` unload
+races; dynamic DLL unloading is deliberately deferred until a disposable
+Explorer-session test exists.

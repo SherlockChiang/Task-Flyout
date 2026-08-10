@@ -329,3 +329,20 @@ transport foundation for the standalone host.
   before MinHook or XAML mutation is reached.
 - Release x64 compilation and both native tests pass. The entry hook remains a
   no-op and this verification did not load the host into Explorer.
+
+### 2026-08-10 Default-off Detour Lifecycle
+
+- Extracted the Explorer-side profile verifier so the runtime owns a retained
+  `Taskbar.View.dll` module lease, checks the taskbar owner PID/thread, requires
+  `MEM_IMAGE` executable target memory, and rechecks the loaded PE fingerprint
+  and prologue immediately before MinHook creation and enable.
+- Added a default-off detour state machine. It calls the original function
+  first, counts active trampoline calls, blocks custom callbacks during stop,
+  restores before disabling, drains before removing, and enters quarantine on
+  any restore/disable/drain/remove/uninitialize failure. A successfully
+  activated host is pinned until Explorer exits; no dynamic remote DLL unload
+  is attempted.
+- The MinHook backend is pinned to the upstream x64 sources and now has a
+  no-op compatibility test plus a four-step in-process smoke test. Release
+  x64 build, four native tests, and WebView/network import inspection pass.
+  The exported thread hook remains inert, so Explorer was not changed.
