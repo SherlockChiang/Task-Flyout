@@ -52,6 +52,17 @@ add_library(taskbar_weather_view_model STATIC
 target_include_directories(taskbar_weather_view_model PUBLIC include)
 target_compile_definitions(taskbar_weather_view_model PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
+add_library(taskbar_weather_pipe_client STATIC
+    src/weather_pipe_client.cpp
+)
+target_include_directories(taskbar_weather_pipe_client PUBLIC include)
+target_compile_definitions(taskbar_weather_pipe_client PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_pipe_client PUBLIC
+    taskbar_weather_view_model
+    advapi32
+    windowsapp
+)
+
 add_library(taskbar_weather_tree_profile STATIC
     src/taskbar_tree_profile.cpp
 )
@@ -126,6 +137,7 @@ target_link_libraries(taskbar_weather_host_controller PUBLIC
     taskbar_weather_frame_bridge
     taskbar_weather_slot_probe
     taskbar_weather_mount
+    taskbar_weather_pipe_client
 )
 
 add_library(taskbar_weather_control_transport STATIC
@@ -232,6 +244,13 @@ target_include_directories(taskbar_weather_host_controller_tests PRIVATE include
 target_compile_definitions(taskbar_weather_host_controller_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_host_controller_tests PRIVATE taskbar_weather_host_controller)
 
+add_executable(taskbar_weather_pipe_client_tests
+    tests/weather_pipe_client_tests.cpp
+)
+target_include_directories(taskbar_weather_pipe_client_tests PRIVATE include)
+target_compile_definitions(taskbar_weather_pipe_client_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_pipe_client_tests PRIVATE taskbar_weather_pipe_client)
+
 add_executable(taskbar_weather_control_transport_tests
     tests/taskbar_control_transport_tests.cpp
 )
@@ -249,6 +268,7 @@ target_link_libraries(taskbar_weather_minhook_smoke_tests PRIVATE taskbar_weathe
 foreach(target
         taskbar_weather_profile
         taskbar_weather_view_model
+        taskbar_weather_pipe_client
         taskbar_weather_tree_profile
         taskbar_weather_slot_geometry
         taskbar_weather_slot_probe
@@ -268,6 +288,7 @@ foreach(target
         taskbar_weather_frame_bridge_tests
         taskbar_weather_slot_probe_tests
         taskbar_weather_host_controller_tests
+        taskbar_weather_pipe_client_tests
         taskbar_weather_control_transport_tests
         taskbar_weather_minhook_smoke_tests)
     if(MSVC)
@@ -324,6 +345,10 @@ add_test(
 add_test(
     NAME taskbar_weather_host_controller_tests
     COMMAND taskbar_weather_host_controller_tests
+)
+add_test(
+    NAME taskbar_weather_pipe_client_tests
+    COMMAND taskbar_weather_pipe_client_tests
 )
 add_test(
     NAME taskbar_weather_control_transport_tests

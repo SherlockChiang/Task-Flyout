@@ -142,7 +142,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M3-04 | IN PROGRESS | Integration | Feed Task Flyout weather and activation into the native-shell companion. | A versioned, length-bounded per-user channel performs no blocking I/O on Explorer's UI thread; stale/unavailable app state fails open; native-shell click activation opens Task Flyout Weather; shutdown, reconnect, and Explorer restart leave no callbacks or handles behind. | `feat(weatherbar): define companion IPC protocol`, `feat(weatherbar): host companion weather snapshots`, `feat(windhawk): bridge weather snapshots`, `feat(windhawk): activate Task Flyout weather` |
 | M3-05 | IN PROGRESS | Architecture/Security | Replace the Windhawk runtime dependency with a standalone per-user taskbar broker and Explorer host. | The x64 broker and host build without Windhawk or WebView libraries; exact OS and `Taskbar.View.dll` fingerprints gate all private ABI use; unsupported systems fail closed before Explorer memory or XAML is changed. | `feat(taskbar): scaffold standalone weather host` |
 | M3-06 | IN PROGRESS | UI/Compatibility | Inject an independent pure-XAML weather button into the Windows 11 taskbar. | The host uses standard `Windows.UI.Xaml` controls and taskbar theme resources, does not require the Windows Widgets entry, reserves a bounded left-side slot, and restores the original XAML tree on disable or unload. | `feat(taskbar): add pure xaml weather view`, `feat(taskbar): inject native xaml weather button` |
-| M3-07 | TODO | Integration/UI | Connect the standalone host to Task Flyout weather, activation, settings, and diagnostics. | The existing bounded per-user IPC supplies sanitized immutable snapshots; click opens Task Flyout Weather; a localized experimental switch and privacy-safe diagnostics expose active, unsupported, fallback, and recovery states. | `feat(taskbar): connect standalone weather host` |
+| M3-07 | IN PROGRESS | Integration/UI | Connect the standalone host to Task Flyout weather, activation, settings, and diagnostics. | The existing bounded per-user IPC supplies sanitized immutable snapshots; click opens Task Flyout Weather; a localized experimental switch and privacy-safe diagnostics expose active, unsupported, fallback, and recovery states. | `feat(taskbar): consume weather snapshot pipe`, `feat(taskbar): connect standalone weather host` |
 | M3-08 | TODO | Verification/Distribution | Validate and package the standalone taskbar component. | Compile/import checks prove the native binaries have no WebView dependency; a disposable Explorer session covers enable/disable, crash recovery, DPI, auto-hide, theme, multi-monitor, Explorer restart, unsupported binaries, signed packaging, and rollback before default exposure. | `test(taskbar): validate standalone weather injection` |
 
 M3-05 through M3-08 supersede the Windhawk runtime/package work in M3-03.
@@ -475,3 +475,27 @@ transport foundation for the standalone host.
   The sandbox returns a structured `probe-rejected` result because it cannot see
   the interactive taskbar, so no Explorer injection was attempted. A controller
   acknowledgement channel and live named-pipe weather snapshots remain pending.
+
+### 2026-08-10 Standalone Host Weather Snapshot Pipe
+
+- The Explorer host now derives the same current-user SID and session-scoped
+  `TaskFlyout.Weather.v1` pipe as the app and requests `get-snapshot` on a
+  retained MTA worker. The XAML owner thread performs no pipe or JSON work.
+- Framing is fixed at a four-byte little-endian header and a 16 KiB response
+  limit. Connect and overlapped read/write waits are bounded by one query
+  deadline; the stop event interrupts pending I/O and cancellation is drained
+  before stack state is released. Strict UTF-8, protocol version/status,
+  required temperature, and UTC freshness are checked before the existing
+  native text sanitizer creates the immutable view model. Alert text takes
+  precedence over the ordinary description when the server supplies it.
+- Snapshots older than two hours or more than five minutes in the future are
+  rejected. Missing, malformed, unavailable, stale, or failed queries clear a
+  previously published model and request relayout instead of displaying stale
+  weather indefinitely.
+- Controller stop signals and joins the worker with a two-second owner-thread
+  bound before XAML restoration and detour removal. JSON response, alert,
+  freshness, length, cancellation, and status policy tests now accompany the
+  existing native matrix. Release x64 compilation, forbidden-import inspection,
+  and all twelve native tests pass. The build sandbox still cannot access an
+  interactive taskbar, so no Explorer injection or live pipe round trip was
+  attempted.
