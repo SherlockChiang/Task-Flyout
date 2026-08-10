@@ -361,3 +361,18 @@ transport foundation for the standalone host.
   Explorer.
 - Release x64 compilation and all four native tests pass. The exported entry
   hook is still inert, so no DLL was loaded into Explorer during verification.
+
+### 2026-08-10 Taskbar XAML Tree Probe
+
+- Added a read-only, bounded probe for the Explorer taskbar visual tree. It
+  requires the expected `Taskbar.TaskbarFrame` identity, one direct
+  `RootGrid`, one direct `Taskbar.TaskbarBackground#BackgroundControl`, one
+  direct `TaskbarFrameRepeater`, compatible geometry, and a shared `XamlRoot`.
+- Duplicate, missing, oversized, detached, or unavailable trees fail closed;
+  the probe never appends controls or changes Windows-owned properties.
+- `LandmarksMatched` is deliberately not a mutation permit. A build-specific
+  primary/secondary direct-child fingerprint is still required before the
+  append-only mount can consume this probe.
+- Added pure signature tests and included the probe in the native Release test
+  matrix. Five native tests pass; the interactive taskbar remains unavailable
+  in the build sandbox, so no Explorer runtime probe or injection was run.

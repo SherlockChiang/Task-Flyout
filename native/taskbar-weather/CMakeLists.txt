@@ -52,6 +52,13 @@ add_library(taskbar_weather_view_model STATIC
 target_include_directories(taskbar_weather_view_model PUBLIC include)
 target_compile_definitions(taskbar_weather_view_model PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
+add_library(taskbar_weather_tree_profile STATIC
+    src/taskbar_tree_profile.cpp
+)
+target_include_directories(taskbar_weather_tree_profile PUBLIC include)
+target_compile_definitions(taskbar_weather_tree_profile PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_tree_profile PUBLIC runtimeobject)
+
 add_library(taskbar_weather_host_runtime STATIC
     src/loaded_taskbar_profile.cpp
     src/taskbar_detour.cpp
@@ -116,6 +123,13 @@ target_include_directories(taskbar_weather_detour_tests PRIVATE include)
 target_compile_definitions(taskbar_weather_detour_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_detour_tests PRIVATE taskbar_weather_host_runtime)
 
+add_executable(taskbar_weather_tree_profile_tests
+    tests/taskbar_tree_profile_tests.cpp
+)
+target_include_directories(taskbar_weather_tree_profile_tests PRIVATE include)
+target_compile_definitions(taskbar_weather_tree_profile_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_tree_profile_tests PRIVATE taskbar_weather_tree_profile)
+
 add_executable(taskbar_weather_minhook_smoke_tests
     tests/minhook_smoke_tests.cpp
 )
@@ -126,12 +140,14 @@ target_link_libraries(taskbar_weather_minhook_smoke_tests PRIVATE taskbar_weathe
 foreach(target
         taskbar_weather_profile
         taskbar_weather_view_model
+        taskbar_weather_tree_profile
         taskbar_weather_host_runtime
         taskbar_weather_host
         taskbar_weather_broker
         taskbar_weather_profile_tests
         taskbar_weather_view_model_tests
         taskbar_weather_detour_tests
+        taskbar_weather_tree_profile_tests
         taskbar_weather_minhook_smoke_tests)
     if(MSVC)
         target_compile_options(${target} PRIVATE
@@ -163,6 +179,10 @@ add_test(
 add_test(
     NAME taskbar_weather_detour_tests
     COMMAND taskbar_weather_detour_tests
+)
+add_test(
+    NAME taskbar_weather_tree_profile_tests
+    COMMAND taskbar_weather_tree_profile_tests
 )
 add_test(
     NAME taskbar_weather_minhook_smoke_tests
