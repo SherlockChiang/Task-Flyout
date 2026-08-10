@@ -73,6 +73,7 @@ target_include_directories(taskbar_weather_mount PUBLIC include)
 target_compile_definitions(taskbar_weather_mount PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_mount PUBLIC
     taskbar_weather_tree_profile
+    taskbar_weather_slot_geometry
     taskbar_weather_view_model
     runtimeobject
     windowsapp

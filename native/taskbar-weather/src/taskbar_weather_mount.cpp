@@ -19,6 +19,7 @@ using winrt::Windows::UI::Xaml::VerticalAlignment;
 constexpr double kButtonWidth = 220.0;
 constexpr double kButtonMinWidth = 112.0;
 constexpr double kButtonHeight = 40.0;
+constexpr std::uint32_t kMaxRootGridDefinitions = 16;
 
 bool IsOnOwnerThread(const TaskbarWeatherMountState& state) noexcept {
     if (state.ownerThreadId == 0 ||
@@ -97,7 +98,8 @@ bool IsOwnedButton(
 }
 
 Button CreateWeatherButton(
-    const WeatherXamlView& view) {
+    const WeatherXamlView& view,
+    const TaskbarSlotRectDips& candidate) {
     if (!ValidateWeatherXamlView(view)) {
         throw winrt::hresult_error(E_INVALIDARG);
     }
@@ -111,13 +113,17 @@ Button CreateWeatherButton(
         button,
         L"Task Flyout weather");
     button.Content(view.root);
-    button.Width(kButtonWidth);
+    button.Width(candidate.width);
     button.MinWidth(kButtonMinWidth);
-    button.MaxWidth(kButtonWidth);
-    button.Height(kButtonHeight);
-    button.Margin(Thickness{8.0, 0.0, 0.0, 0.0});
+    button.MaxWidth(candidate.width);
+    button.Height(candidate.height);
+    button.Margin(Thickness{
+        candidate.x,
+        candidate.y,
+        0.0,
+        0.0});
     button.HorizontalAlignment(HorizontalAlignment::Left);
-    button.VerticalAlignment(VerticalAlignment::Center);
+    button.VerticalAlignment(VerticalAlignment::Top);
     button.HorizontalContentAlignment(HorizontalAlignment::Stretch);
     button.VerticalContentAlignment(VerticalAlignment::Center);
     return button;
@@ -130,11 +136,14 @@ TaskbarMountStatus EvaluateTaskbarMountGate(
     if (input.treeStatus != TaskbarTreeProbeStatus::LandmarksMatched) {
         return TaskbarMountStatus::TreeNotReady;
     }
-    if (!input.structureAllowlisted) {
+    if (input.slotStatus == TaskbarSlotGeometryStatus::UnknownStructure) {
         return TaskbarMountStatus::StructureNotAllowlisted;
     }
-    if (!input.leftSlotAvailable) {
+    if (input.slotStatus == TaskbarSlotGeometryStatus::CandidateConflicted) {
         return TaskbarMountStatus::LeftSlotUnavailable;
+    }
+    if (input.slotStatus != TaskbarSlotGeometryStatus::CandidateAvailable) {
+        return TaskbarMountStatus::SlotGeometryInvalid;
     }
     if (!input.ownerThread) {
         return TaskbarMountStatus::WrongOwnerThread;
@@ -145,22 +154,15 @@ TaskbarMountStatus EvaluateTaskbarMountGate(
 TaskbarMountStatus MountWeatherButton(
     const TaskbarTreeProfile& profile,
     const WeatherViewModel& model,
-    bool structureAllowlisted,
-    bool leftSlotAvailable,
+    const TaskbarSlotGeometryInput& geometryInput,
     TaskbarWeatherMountState& state) noexcept {
-    const TaskbarMountGateInput gate{
-        profile.status,
-        structureAllowlisted,
-        leftSlotAvailable,
-        profile.ownerThreadId != 0 &&
-            profile.ownerThreadId == GetCurrentThreadId()};
-    const TaskbarMountStatus gateStatus =
-        EvaluateTaskbarMountGate(gate);
-    if (gateStatus != TaskbarMountStatus::Mounted) {
-        return gateStatus;
-    }
-    if (!profile.rootGrid || !profile.frame) {
+    if (profile.status != TaskbarTreeProbeStatus::LandmarksMatched ||
+        !profile.rootGrid || !profile.frame) {
         return TaskbarMountStatus::TreeNotReady;
+    }
+    if (profile.ownerThreadId == 0 ||
+        profile.ownerThreadId != GetCurrentThreadId()) {
+        return TaskbarMountStatus::WrongOwnerThread;
     }
     try {
         if (!profile.frame.Dispatcher() ||
@@ -169,6 +171,40 @@ TaskbarMountStatus MountWeatherButton(
         }
     } catch (...) {
         return TaskbarMountStatus::WrongOwnerThread;
+    }
+
+    TaskbarSlotGeometryInput verifiedGeometry = geometryInput;
+    TaskbarSlotGeometryResult geometry;
+    try {
+        if (!profile.signature.frameGeometryValid ||
+            !profile.signature.rootGridGeometryValid) {
+            return TaskbarMountStatus::TreeNotReady;
+        }
+        // Dimensions come from the current XAML tree, never from a stale
+        // caller snapshot. The blocker span and structure proof still must be
+        // collected by the owner-thread scanner for this exact tree.
+        verifiedGeometry.frameWidthDips = profile.frame.ActualWidth();
+        verifiedGeometry.frameHeightDips = profile.frame.ActualHeight();
+        verifiedGeometry.rootGridWidthDips = profile.rootGrid.ActualWidth();
+        verifiedGeometry.rootGridHeightDips = profile.rootGrid.ActualHeight();
+        verifiedGeometry.desiredWidthDips = kButtonWidth;
+        verifiedGeometry.desiredHeightDips = kButtonHeight;
+        verifiedGeometry.minimumWidthDips = kButtonMinWidth;
+        verifiedGeometry.minimumHeightDips = 24.0;
+        verifiedGeometry.gapDips = 4.0;
+        geometry = EvaluateTaskbarSlotGeometry(verifiedGeometry);
+    } catch (...) {
+        return TaskbarMountStatus::SlotGeometryInvalid;
+    }
+    const TaskbarMountGateInput gate{
+        profile.status,
+        geometry.status,
+        profile.ownerThreadId != 0 &&
+            profile.ownerThreadId == GetCurrentThreadId()};
+    const TaskbarMountStatus gateStatus =
+        EvaluateTaskbarMountGate(gate);
+    if (gateStatus != TaskbarMountStatus::Mounted) {
+        return gateStatus;
     }
     if (state.mounted) {
         const auto stateRoot = state.rootGrid.get();
@@ -198,7 +234,19 @@ TaskbarMountStatus MountWeatherButton(
     }
 
     try {
-        button = CreateWeatherButton(view);
+        button = CreateWeatherButton(view, geometry.candidate);
+        const std::uint32_t rowCount =
+            profile.rootGrid.RowDefinitions().Size();
+        const std::uint32_t columnCount =
+            profile.rootGrid.ColumnDefinitions().Size();
+        if (rowCount > kMaxRootGridDefinitions ||
+            columnCount > kMaxRootGridDefinitions) {
+            return TaskbarMountStatus::SlotGeometryInvalid;
+        }
+        Grid::SetRow(button, 0);
+        Grid::SetColumn(button, 0);
+        Grid::SetRowSpan(button, rowCount == 0 ? 1 : rowCount);
+        Grid::SetColumnSpan(button, columnCount == 0 ? 1 : columnCount);
         profile.rootGrid.Children().Append(button);
 
         state.rootGrid = profile.rootGrid;
@@ -332,6 +380,8 @@ const wchar_t* TaskbarMountStatusName(
             return L"restore-failed";
         case TaskbarMountStatus::RollbackFailed:
             return L"rollback-failed";
+        case TaskbarMountStatus::SlotGeometryInvalid:
+            return L"slot-geometry-invalid";
     }
     return L"unknown";
 }

@@ -21,8 +21,7 @@ int wmain() {
     bool passed = true;
     TaskbarMountGateInput input;
     input.treeStatus = TaskbarTreeProbeStatus::XamlTreeUnavailable;
-    input.structureAllowlisted = true;
-    input.leftSlotAvailable = true;
+    input.slotStatus = TaskbarSlotGeometryStatus::CandidateAvailable;
     input.ownerThread = true;
     passed &= Expect(
         EvaluateTaskbarMountGate(input) ==
@@ -30,20 +29,19 @@ int wmain() {
         L"unavailable taskbar tree must not be mounted");
 
     input.treeStatus = TaskbarTreeProbeStatus::LandmarksMatched;
-    input.structureAllowlisted = false;
+    input.slotStatus = TaskbarSlotGeometryStatus::UnknownStructure;
     passed &= Expect(
         EvaluateTaskbarMountGate(input) ==
             TaskbarMountStatus::StructureNotAllowlisted,
         L"landmarks alone must not permit mutation");
 
-    input.structureAllowlisted = true;
-    input.leftSlotAvailable = false;
+    input.slotStatus = TaskbarSlotGeometryStatus::CandidateConflicted;
     passed &= Expect(
         EvaluateTaskbarMountGate(input) ==
             TaskbarMountStatus::LeftSlotUnavailable,
         L"an occupied left slot must fail closed");
 
-    input.leftSlotAvailable = true;
+    input.slotStatus = TaskbarSlotGeometryStatus::CandidateAvailable;
     input.ownerThread = false;
     passed &= Expect(
         EvaluateTaskbarMountGate(input) ==
@@ -55,6 +53,11 @@ int wmain() {
         EvaluateTaskbarMountGate(input) ==
             TaskbarMountStatus::Mounted,
         L"all explicit mount gates should allow the lease");
+    input.slotStatus = TaskbarSlotGeometryStatus::GapInvalid;
+    passed &= Expect(
+        EvaluateTaskbarMountGate(input) ==
+            TaskbarMountStatus::SlotGeometryInvalid,
+        L"invalid slot geometry must fail closed");
     passed &= Expect(
         TaskbarMountStatusName(TaskbarMountStatus::RollbackFailed) ==
             std::wstring_view(L"rollback-failed"),

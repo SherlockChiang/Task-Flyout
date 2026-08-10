@@ -1,6 +1,7 @@
 #pragma once
 
 #include "taskbar_tree_profile.h"
+#include "taskbar_slot_geometry.h"
 #include "weather_view_model.h"
 #include "weather_xaml_view.h"
 
@@ -29,13 +30,14 @@ enum class TaskbarMountStatus : std::uint32_t {
     AppendFailed = 10,
     RestoreFailed = 11,
     RollbackFailed = 12,
+    SlotGeometryInvalid = 13,
 };
 
 struct TaskbarMountGateInput {
     TaskbarTreeProbeStatus treeStatus =
         TaskbarTreeProbeStatus::XamlTreeUnavailable;
-    bool structureAllowlisted = false;
-    bool leftSlotAvailable = false;
+    TaskbarSlotGeometryStatus slotStatus =
+        TaskbarSlotGeometryStatus::UnknownStructure;
     bool ownerThread = false;
 };
 
@@ -61,8 +63,7 @@ struct TaskbarWeatherMountState {
 TaskbarMountStatus MountWeatherButton(
     const TaskbarTreeProfile& profile,
     const WeatherViewModel& model,
-    bool structureAllowlisted,
-    bool leftSlotAvailable,
+    const TaskbarSlotGeometryInput& geometryInput,
     TaskbarWeatherMountState& state) noexcept;
 
 TaskbarMountStatus UpdateWeatherButton(

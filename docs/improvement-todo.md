@@ -406,3 +406,14 @@ transport foundation for the standalone host.
   a usable candidate from an occupied one without reading or mutating XAML.
   It is not yet connected to the mount lease or entry hook, so this stage does
   not inject into or otherwise modify Explorer.
+
+### 2026-08-10 Geometry-bound Mount Layout
+
+- The mount lease now consumes a `TaskbarSlotGeometryInput`, re-reads the
+  current frame/root dimensions on the owner thread, and refuses all slot
+  statuses except `candidate-available`.
+- The created standard XAML button uses the proven candidate rectangle for its
+  width, height, and top/left margin; the old independent fixed margin is no
+  longer a second layout authority. The entry hook is still inert until a
+  live owner-thread blocker scanner supplies the structure proof and blocker
+  span.
