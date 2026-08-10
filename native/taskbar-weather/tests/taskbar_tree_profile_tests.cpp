@@ -21,6 +21,8 @@ taskflyout::taskbar::TaskbarTreeSignature LandmarkSignature() {
     signature.rootGridLoaded = true;
     signature.rootGridGeometryValid = true;
     signature.rootGridSharesXamlRoot = true;
+    signature.dispatcherAvailable = true;
+    signature.dispatcherHasThreadAccess = true;
     signature.rootGridDirectCount = 1;
     signature.backgroundDirectCount = 1;
     signature.repeaterDirectCount = 1;
@@ -94,6 +96,18 @@ int wmain() {
         EvaluateTaskbarTreeSignature(mutated) ==
             TaskbarTreeProbeStatus::RootGridXamlRootMismatch,
         L"RootGrid on another XamlRoot should fail closed");
+    mutated = supported;
+    mutated.dispatcherAvailable = false;
+    passed &= Expect(
+        EvaluateTaskbarTreeSignature(mutated) ==
+            TaskbarTreeProbeStatus::DispatcherUnavailable,
+        L"missing XAML dispatcher should fail closed");
+    mutated = supported;
+    mutated.dispatcherHasThreadAccess = false;
+    passed &= Expect(
+        EvaluateTaskbarTreeSignature(mutated) ==
+            TaskbarTreeProbeStatus::DispatcherThreadMismatch,
+        L"wrong XAML dispatcher thread should fail closed");
     mutated = supported;
     mutated.backgroundDirectCount = 0;
     passed &= Expect(

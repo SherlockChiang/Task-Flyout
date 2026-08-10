@@ -3,6 +3,7 @@
 #include <Windows.h>
 
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.UI.Core.h>
 #include <winrt/Windows.UI.Xaml.h>
 #include <winrt/Windows.UI.Xaml.Media.h>
 
@@ -25,6 +26,8 @@ constexpr wchar_t kRepeaterClass[] =
     L"Microsoft.UI.Xaml.Controls.ItemsRepeater";
 constexpr wchar_t kRepeaterName[] = L"TaskbarFrameRepeater";
 constexpr double kGeometryTolerance = 2.0;
+constexpr int kMaxFrameDirectChildren = 64;
+constexpr int kMaxRootGridDirectChildren = 128;
 
 bool IsReasonableTaskbarGeometry(
     const FrameworkElement& element) noexcept {
@@ -116,6 +119,12 @@ TaskbarTreeProbeStatus EvaluateTaskbarTreeSignature(
     if (!signature.rootGridSharesXamlRoot) {
         return TaskbarTreeProbeStatus::RootGridXamlRootMismatch;
     }
+    if (!signature.dispatcherAvailable) {
+        return TaskbarTreeProbeStatus::DispatcherUnavailable;
+    }
+    if (!signature.dispatcherHasThreadAccess) {
+        return TaskbarTreeProbeStatus::DispatcherThreadMismatch;
+    }
     if (signature.backgroundDirectCount == 0) {
         return TaskbarTreeProbeStatus::BackgroundMissing;
     }
@@ -159,6 +168,12 @@ TaskbarTreeProfile ProbeTaskbarFrameTree(
         }
 
         const int directChildCount = VisualTreeHelper::GetChildrenCount(frame);
+        if (directChildCount < 0 ||
+            directChildCount > kMaxFrameDirectChildren) {
+            profile.status = TaskbarTreeProbeStatus::XamlTreeUnavailable;
+            profile.detail = L"frame-child-count-out-of-bounds";
+            return profile;
+        }
         for (int index = 0; index < directChildCount; ++index) {
             const auto child = VisualTreeHelper::GetChild(frame, index);
             const auto childElement = child.try_as<FrameworkElement>();
@@ -191,6 +206,15 @@ TaskbarTreeProfile ProbeTaskbarFrameTree(
         profile.signature.rootGridGeometryValid =
             IsRootGridGeometryCompatible(profile.frame, profile.rootGrid);
         try {
+            const auto dispatcher = profile.frame.Dispatcher();
+            profile.signature.dispatcherAvailable = !!dispatcher;
+            profile.signature.dispatcherHasThreadAccess =
+                dispatcher && dispatcher.HasThreadAccess();
+        } catch (...) {
+            profile.signature.dispatcherAvailable = false;
+            profile.signature.dispatcherHasThreadAccess = false;
+        }
+        try {
             const auto frameXamlRoot = profile.frame.XamlRoot();
             const auto rootGridXamlRoot = profile.rootGrid.XamlRoot();
             profile.signature.rootGridSharesXamlRoot =
@@ -202,10 +226,15 @@ TaskbarTreeProfile ProbeTaskbarFrameTree(
 
         const int rootChildCount =
             VisualTreeHelper::GetChildrenCount(profile.rootGrid);
+        if (rootChildCount < 0 ||
+            rootChildCount > kMaxRootGridDirectChildren) {
+            profile.status = TaskbarTreeProbeStatus::XamlTreeUnavailable;
+            profile.detail = L"root-child-count-out-of-bounds";
+            profile.rootGrid = nullptr;
+            return profile;
+        }
         profile.signature.rootGridChildCount =
-            rootChildCount < 0
-                ? 0
-                : static_cast<std::uint32_t>(rootChildCount);
+            static_cast<std::uint32_t>(rootChildCount);
         for (int index = 0; index < rootChildCount; ++index) {
             const auto child =
                 VisualTreeHelper::GetChild(profile.rootGrid, index);
@@ -268,6 +297,10 @@ const wchar_t* TaskbarTreeProbeStatusName(
             return L"root-grid-geometry-invalid";
         case TaskbarTreeProbeStatus::RootGridXamlRootMismatch:
             return L"root-grid-xaml-root-mismatch";
+        case TaskbarTreeProbeStatus::DispatcherUnavailable:
+            return L"dispatcher-unavailable";
+        case TaskbarTreeProbeStatus::DispatcherThreadMismatch:
+            return L"dispatcher-thread-mismatch";
         case TaskbarTreeProbeStatus::BackgroundMissing:
             return L"background-missing";
         case TaskbarTreeProbeStatus::BackgroundDuplicate:

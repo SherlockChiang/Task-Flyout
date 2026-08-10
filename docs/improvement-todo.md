@@ -376,3 +376,19 @@ transport foundation for the standalone host.
 - Added pure signature tests and included the probe in the native Release test
   matrix. Five native tests pass; the interactive taskbar remains unavailable
   in the build sandbox, so no Explorer runtime probe or injection was run.
+
+### 2026-08-10 Append-only XAML Mount Lease
+
+- Added a default-deny mount lease that creates only standard
+  `Windows.UI.Xaml.Controls.Button`/`Grid` content and appends it to the
+  probed `RootGrid`; no WebView, Adaptive Card, Widgets, or network code is
+  involved in the view.
+- The lease has explicit gates for a future build-specific direct-child
+  allowlist, left-slot collision result, and XAML dispatcher thread access.
+  Until those gates are supplied it returns `structure-not-allowlisted` or
+  `left-slot-unavailable` and performs no mutation.
+- Restore removes only the exact button object it appended, keeps state on
+  failed removal, verifies the owned name/automation/content identity, and
+  keeps only weak XAML references between callbacks. Six native Release tests
+  pass; the host entry hook remains inert and Explorer was not loaded or
+  changed.

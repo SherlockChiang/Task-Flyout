@@ -12,6 +12,11 @@ WebView-free Windows 11 taskbar weather path.
   still a no-op, so this stage does not install or modify the taskbar tree.
   The separately tested detour controller is default-off and is not reached
   by the exported hook callback yet.
+- The host also builds a reversible, append-only mount lease for a standard
+  XAML `Button`. It requires an exact taskbar-tree profile, dispatcher thread
+  access, a build-specific structure allowlist, and a proven free left-side
+  slot. The latter two gates intentionally have no permissive default, so the
+  lease cannot mutate Explorer until the runtime scanner supplies evidence.
 - The native binaries must not link WebView, browser, or network libraries.
   Weather networking and cache ownership remain in the Task Flyout app; the
   host will consume only the existing sanitized named-pipe snapshot protocol.

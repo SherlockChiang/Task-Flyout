@@ -17,11 +17,13 @@ enum class TaskbarTreeProbeStatus : std::uint32_t {
     RootGridNotLoaded = 7,
     RootGridGeometryInvalid = 8,
     RootGridXamlRootMismatch = 9,
-    BackgroundMissing = 10,
-    BackgroundDuplicate = 11,
-    RepeaterMissing = 12,
-    RepeaterDuplicate = 13,
-    XamlTreeUnavailable = 14,
+    DispatcherUnavailable = 10,
+    DispatcherThreadMismatch = 11,
+    BackgroundMissing = 12,
+    BackgroundDuplicate = 13,
+    RepeaterMissing = 14,
+    RepeaterDuplicate = 15,
+    XamlTreeUnavailable = 16,
 };
 
 struct TaskbarTreeSignature {
@@ -33,6 +35,8 @@ struct TaskbarTreeSignature {
     bool rootGridLoaded = false;
     bool rootGridGeometryValid = false;
     bool rootGridSharesXamlRoot = false;
+    bool dispatcherAvailable = false;
+    bool dispatcherHasThreadAccess = false;
     std::uint32_t rootGridChildCount = 0;
     std::uint32_t backgroundDirectCount = 0;
     std::uint32_t repeaterDirectCount = 0;
