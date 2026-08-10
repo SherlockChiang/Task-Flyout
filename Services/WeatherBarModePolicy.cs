@@ -9,14 +9,16 @@ namespace Task_Flyout.Services
     internal enum WeatherBarMode
     {
         TaskFlyout,
-        WindowsWidgets
+        WindowsWidgets,
+        StandaloneTaskbar
     }
 
     internal enum WeatherBarPresentation
     {
         Disabled,
         TaskFlyout,
-        WindowsWidgets
+        WindowsWidgets,
+        StandaloneTaskbar
     }
 
     internal enum WeatherBarFallbackReason
@@ -25,7 +27,9 @@ namespace Task_Flyout.Services
         WeatherBarDisabled,
         TaskFlyoutWeatherDisabled,
         WindowsWidgetsUnavailable,
-        WindowsWidgetsUnavailableAndTaskFlyoutWeatherDisabled
+        WindowsWidgetsUnavailableAndTaskFlyoutWeatherDisabled,
+        StandaloneTaskbarUnavailable,
+        StandaloneTaskbarUnavailableAndTaskFlyoutWeatherDisabled
     }
 
     internal readonly record struct WeatherBarModeResolution(
@@ -37,7 +41,9 @@ namespace Task_Flyout.Services
 
         public bool ShouldUseWindowsWidgets => Presentation == WeatherBarPresentation.WindowsWidgets;
 
-        public bool IsFallback => RequestedMode == WeatherBarMode.WindowsWidgets &&
+        public bool ShouldUseStandaloneTaskbar => Presentation == WeatherBarPresentation.StandaloneTaskbar;
+
+        public bool IsFallback => RequestedMode != WeatherBarMode.TaskFlyout &&
                                   Presentation == WeatherBarPresentation.TaskFlyout;
     }
 
@@ -45,6 +51,7 @@ namespace Task_Flyout.Services
     {
         public const string TaskFlyoutSettingValue = "TaskFlyout";
         public const string WindowsWidgetsSettingValue = "WindowsWidgets";
+        public const string StandaloneTaskbarSettingValue = "StandaloneTaskbar";
 
         /// <summary>
         /// Missing and unrecognised values preserve the pre-mode-selector behaviour.
@@ -54,13 +61,19 @@ namespace Task_Flyout.Services
             if (string.Equals(persistedValue?.Trim(), WindowsWidgetsSettingValue, StringComparison.OrdinalIgnoreCase))
                 return WeatherBarMode.WindowsWidgets;
 
+            if (string.Equals(persistedValue?.Trim(), StandaloneTaskbarSettingValue, StringComparison.OrdinalIgnoreCase))
+                return WeatherBarMode.StandaloneTaskbar;
+
             return WeatherBarMode.TaskFlyout;
         }
 
         public static string Serialize(WeatherBarMode mode)
-            => mode == WeatherBarMode.WindowsWidgets
-                ? WindowsWidgetsSettingValue
-                : TaskFlyoutSettingValue;
+            => mode switch
+            {
+                WeatherBarMode.WindowsWidgets => WindowsWidgetsSettingValue,
+                WeatherBarMode.StandaloneTaskbar => StandaloneTaskbarSettingValue,
+                _ => TaskFlyoutSettingValue
+            };
 
         /// <summary>
         /// Resolves the requested mode without performing any shell or registry mutation.
@@ -71,7 +84,8 @@ namespace Task_Flyout.Services
             bool weatherBarEnabled,
             bool taskFlyoutWeatherEnabled,
             WeatherBarMode requestedMode,
-            bool windowsWidgetsAvailable)
+            bool windowsWidgetsAvailable,
+            bool standaloneTaskbarActive = false)
         {
             if (!weatherBarEnabled)
             {
@@ -103,6 +117,30 @@ namespace Task_Flyout.Services
                     requestedMode,
                     WeatherBarPresentation.Disabled,
                     WeatherBarFallbackReason.WindowsWidgetsUnavailableAndTaskFlyoutWeatherDisabled);
+            }
+
+            if (requestedMode == WeatherBarMode.StandaloneTaskbar)
+            {
+                if (taskFlyoutWeatherEnabled && standaloneTaskbarActive)
+                {
+                    return new WeatherBarModeResolution(
+                        requestedMode,
+                        WeatherBarPresentation.StandaloneTaskbar,
+                        WeatherBarFallbackReason.None);
+                }
+
+                if (taskFlyoutWeatherEnabled)
+                {
+                    return new WeatherBarModeResolution(
+                        requestedMode,
+                        WeatherBarPresentation.TaskFlyout,
+                        WeatherBarFallbackReason.StandaloneTaskbarUnavailable);
+                }
+
+                return new WeatherBarModeResolution(
+                    requestedMode,
+                    WeatherBarPresentation.Disabled,
+                    WeatherBarFallbackReason.StandaloneTaskbarUnavailableAndTaskFlyoutWeatherDisabled);
             }
 
             return taskFlyoutWeatherEnabled

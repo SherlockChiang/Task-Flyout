@@ -542,3 +542,16 @@ transport foundation for the standalone host.
   Release x64 build passes all twelve native tests and forbidden WebView/network
   import inspection. Live acknowledgement remains part of the disposable
   Explorer-session validation; the build workflow does not inject the host.
+
+### 2026-08-11 Standalone Taskbar Mode Policy
+
+- Added a stable persisted `StandaloneTaskbar` mode without changing the safe
+  migration default. Missing, malformed, and future values still normalize to
+  the existing Task Flyout weather bar.
+- The policy hands off the taskbar surface only after the standalone host is
+  active and the Task Flyout weather provider is enabled. Until acknowledgement,
+  the existing weather bar remains visible; without provider data the surface
+  stays disabled rather than presenting a non-functional native button.
+- Mode parsing, serialization, fallback, provider dependency, and active-host
+  behavior pass all 26 focused policy/settings tests. Broker lifecycle control,
+  localized UI, and privacy-safe runtime diagnostics remain pending under M3-07.

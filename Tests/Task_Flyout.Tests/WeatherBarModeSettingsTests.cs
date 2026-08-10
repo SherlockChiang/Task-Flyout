@@ -52,4 +52,15 @@ public class WeatherBarModeSettingsTests
 
         Assert.Equal(WeatherBarMode.WindowsWidgets, WeatherBarModeSettings.Read(values));
     }
+
+    [Fact]
+    public void Write_round_trips_standalone_mode()
+    {
+        var values = new Dictionary<string, object>();
+
+        WeatherBarModeSettings.Write(values, WeatherBarMode.StandaloneTaskbar);
+
+        Assert.Equal("StandaloneTaskbar", values[WeatherBarModeSettings.SettingKey]);
+        Assert.Equal(WeatherBarMode.StandaloneTaskbar, WeatherBarModeSettings.Read(values));
+    }
 }

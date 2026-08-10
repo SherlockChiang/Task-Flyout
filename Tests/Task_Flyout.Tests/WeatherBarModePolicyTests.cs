@@ -15,12 +15,19 @@ public class WeatherBarModePolicyTests
     [Theory]
     [InlineData("WindowsWidgets")]
     [InlineData("windowswidgets")]
-    public void Native_mode_parse_is_case_insensitive(string value)
+    public void Windows_widgets_mode_parse_is_case_insensitive(string value)
         => Assert.Equal(WeatherBarMode.WindowsWidgets, WeatherBarModePolicy.Parse(value));
+
+    [Theory]
+    [InlineData("StandaloneTaskbar")]
+    [InlineData("standalonetaskbar")]
+    public void Standalone_mode_parse_is_case_insensitive(string value)
+        => Assert.Equal(WeatherBarMode.StandaloneTaskbar, WeatherBarModePolicy.Parse(value));
 
     [Theory]
     [InlineData("TaskFlyout")]
     [InlineData("WindowsWidgets")]
+    [InlineData("StandaloneTaskbar")]
     public void Modes_serialize_to_stable_setting_values(string expected)
         => Assert.Equal(expected, WeatherBarModePolicy.Serialize(WeatherBarModePolicy.Parse(expected)));
 
@@ -102,13 +109,59 @@ public class WeatherBarModePolicyTests
             result.FallbackReason);
     }
 
+    [Fact]
+    public void Active_standalone_host_owns_surface_when_task_flyout_weather_is_enabled()
+    {
+        var result = Resolve(
+            WeatherBarMode.StandaloneTaskbar,
+            standaloneTaskbarActive: true);
+
+        Assert.True(result.ShouldUseStandaloneTaskbar);
+        Assert.False(result.ShouldRunTaskFlyoutBar);
+        Assert.False(result.ShouldUseWindowsWidgets);
+        Assert.False(result.IsFallback);
+        Assert.Equal(WeatherBarFallbackReason.None, result.FallbackReason);
+    }
+
+    [Fact]
+    public void Inactive_standalone_host_keeps_existing_bar_visible()
+    {
+        var result = Resolve(
+            WeatherBarMode.StandaloneTaskbar,
+            standaloneTaskbarActive: false);
+
+        Assert.True(result.ShouldRunTaskFlyoutBar);
+        Assert.True(result.IsFallback);
+        Assert.Equal(
+            WeatherBarFallbackReason.StandaloneTaskbarUnavailable,
+            result.FallbackReason);
+    }
+
+    [Fact]
+    public void Standalone_mode_requires_task_flyout_weather_provider()
+    {
+        var result = Resolve(
+            WeatherBarMode.StandaloneTaskbar,
+            taskFlyoutWeatherEnabled: false,
+            standaloneTaskbarActive: true);
+
+        Assert.Equal(WeatherBarPresentation.Disabled, result.Presentation);
+        Assert.False(result.ShouldUseStandaloneTaskbar);
+        Assert.False(result.IsFallback);
+        Assert.Equal(
+            WeatherBarFallbackReason.StandaloneTaskbarUnavailableAndTaskFlyoutWeatherDisabled,
+            result.FallbackReason);
+    }
+
     private static WeatherBarModeResolution Resolve(
         WeatherBarMode mode,
         bool taskFlyoutWeatherEnabled = true,
-        bool windowsWidgetsAvailable = true)
+        bool windowsWidgetsAvailable = true,
+        bool standaloneTaskbarActive = false)
         => WeatherBarModePolicy.Resolve(
             weatherBarEnabled: true,
             taskFlyoutWeatherEnabled,
             mode,
-            windowsWidgetsAvailable);
+            windowsWidgetsAvailable,
+            standaloneTaskbarActive);
 }
