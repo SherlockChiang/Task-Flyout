@@ -11,16 +11,17 @@ enum class TaskbarFrameBridgeStatus : std::uint32_t {
     NullPrivateObject = 1,
     CompatibilityRejected = 2,
     DetourInactive = 3,
-    WrongOwnerThread = 4,
-    InspectableSlotUnreadable = 5,
-    InspectablePointerNull = 6,
-    InspectableObjectUnreadable = 7,
-    InspectableVtableUnreadable = 8,
-    InspectableMethodInvalid = 9,
-    ProjectionFailed = 10,
-    FrameTypeMismatch = 11,
-    DispatcherUnavailable = 12,
-    DispatcherThreadMismatch = 13,
+    CallbackScopeInactive = 4,
+    WrongOwnerThread = 5,
+    InspectableSlotUnreadable = 6,
+    InspectablePointerNull = 7,
+    InspectableObjectUnreadable = 8,
+    InspectableVtableUnreadable = 9,
+    InspectableMethodInvalid = 10,
+    ProjectionFailed = 11,
+    FrameTypeMismatch = 12,
+    DispatcherUnavailable = 13,
+    DispatcherThreadMismatch = 14,
 };
 
 // Pure gate used to test the fail-closed ordering without manufacturing a
@@ -29,6 +30,7 @@ struct TaskbarFrameBridgeGateInput {
     bool privateObjectPresent = false;
     bool compatibilitySupported = false;
     bool detourActive = false;
+    bool callbackScopeActive = false;
     bool ownerThread = false;
     bool inspectableSlotReadable = false;
     bool inspectablePointerPresent = false;

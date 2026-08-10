@@ -1,7 +1,7 @@
 #pragma once
 
+#include "taskbar_slot_probe.h"
 #include "taskbar_tree_profile.h"
-#include "taskbar_slot_geometry.h"
 #include "weather_view_model.h"
 #include "weather_xaml_view.h"
 
@@ -63,7 +63,7 @@ struct TaskbarWeatherMountState {
 TaskbarMountStatus MountWeatherButton(
     const TaskbarTreeProfile& profile,
     const WeatherViewModel& model,
-    const TaskbarSlotGeometryInput& geometryInput,
+    const TaskbarSlotProbeResult& slotProbe,
     TaskbarWeatherMountState& state) noexcept;
 
 TaskbarMountStatus UpdateWeatherButton(

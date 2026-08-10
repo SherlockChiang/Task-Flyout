@@ -8,10 +8,10 @@ WebView-free Windows 11 taskbar weather path.
   Windows and `Taskbar.View.dll` PE profile.
 - `TaskFlyout.TaskbarHost.dll` is the narrowly scoped in-process Explorer host.
   It now contains a standard `Windows.UI.Xaml` weather view composed from a
-  `Grid`, `Border`, `StackPanel`, and `TextBlock` controls. The thread hook is
-  still a no-op, so this stage does not install or modify the taskbar tree.
-  The separately tested detour controller is default-off and is not reached
-  by the exported hook callback yet.
+  `Grid`, `Border`, `StackPanel`, and `TextBlock` controls. The exported
+  `WH_CALLWNDPROC` entry hook accepts only the private start/stop control
+  message; without that message the host remains inert. The controller is
+  default-off and starts the detour only on the taskbar owner thread.
 - The host also builds a reversible, append-only mount lease for a standard
   XAML `Button`. It requires an exact taskbar-tree profile, dispatcher thread
   access, a build-specific structure allowlist, and a proven free left-side
@@ -53,11 +53,11 @@ focus, sizing, and accessibility visuals. Incoming strings are bounded and
 sanitized before they reach Explorer; the native view never accepts arbitrary
 XAML, URI, image, script, or HTML content.
 
-The future private `Taskbar.View.dll` detour uses the x64 subset of MinHook
-`v1.3.4`, pinned to commit `c3fcafdc10146beb5919319d0683e44e3c30d537`.
-It is built as a static implementation detail and is not yet connected to the
-host in this stage. Upstream provenance and the BSD license are retained under
-`third_party/minhook`.
+The private `Taskbar.View.dll` detour uses the x64 subset of MinHook `v1.3.4`,
+pinned to commit `c3fcafdc10146beb5919319d0683e44e3c30d537`. It is built as a
+static implementation detail and is connected to the guarded host controller;
+the broker's explicit control-message sender is still a separate step. Upstream
+provenance and the BSD license are retained under `third_party/minhook`.
 
 The controller's first safe lifecycle pins the host DLL for the lifetime of
 Explorer after activation, retains a `Taskbar.View.dll` lease until the
@@ -67,13 +67,14 @@ races; dynamic DLL unloading is deliberately deferred until a disposable
 Explorer-session test exists.
 
 The private TaskbarFrame pointer is not projected directly. A separate bridge
-first requires the active exact-profile detour and owner thread, reads the
-allowlisted IInspectable slot through bounded current-process memory reads,
-checks the IUnknown vtable methods point to executable image memory, then
-verifies
-the projected `Taskbar.TaskbarFrame` class and XAML dispatcher. The exported
-entry hook remains inert, so this bridge is compile-tested but not invoked in
-Explorer yet.
+first requires the active exact-profile detour, the owner thread, and a TLS
+token proving the exact callback scope. It treats slot 3 as the embedded
+IInspectable interface address, bounds the vtable with current-process memory
+reads, invokes `QueryInterface(IFrameworkElement)` inside an SEH boundary, and
+verifies the returned vtable before transferring ownership to C++/WinRT. The
+projected object must then match `Taskbar.TaskbarFrame` and its XAML dispatcher.
+The entry hook remains inert until an explicit control message, so this path is
+compile-tested and not automatically injected by the build script.
 
 The live slot probe accepts only the development tree's exact direct-child
 fingerprint (`BackgroundControl` plus `TaskbarFrameRepeater`, and optionally

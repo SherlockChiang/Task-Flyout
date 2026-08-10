@@ -191,7 +191,7 @@ const wchar_t* TaskbarSlotStructureStatusName(
 }
 
 TaskbarSlotGeometryInput TaskbarSlotProbeResult::MakeGeometryInput()
-    const noexcept {
+    const & noexcept {
     TaskbarSlotGeometryInput input;
     input.frameWidthDips = frameWidthDips;
     input.frameHeightDips = frameHeightDips;
@@ -204,8 +204,10 @@ TaskbarSlotGeometryInput TaskbarSlotProbeResult::MakeGeometryInput()
     input.gapDips = options.gapDips;
     input.structureKnown =
         structureStatus == TaskbarSlotStructureStatus::Matched;
-    input.blockersKnown = blockersKnown;
-    input.interactiveBlockers = blockersKnown
+    const bool blockerStorageValid =
+        blockersKnown && blockerCount <= blockerStorage.size();
+    input.blockersKnown = blockerStorageValid;
+    input.interactiveBlockers = blockerStorageValid
         ? std::span<const TaskbarSlotRectDips>(
               blockerStorage.data(), blockerCount)
         : std::span<const TaskbarSlotRectDips>{};
@@ -363,17 +365,17 @@ TaskbarSlotProbeResult ProbeTaskbarSlot(
                     TaskbarSlotProbeStatus::RepeaterChildStateUnavailable;
                 return result;
             }
-            // Collapsed or not-yet-loaded realized elements occupy no current
-            // interactive bounds. They are intentionally omitted from this
-            // synchronous snapshot; any subsequent layout callback must
-            // probe again before using the result.
-            if (!visible) {
-                continue;
-            }
             if (!loaded) {
                 result.status =
                     TaskbarSlotProbeStatus::RepeaterChildStateUnavailable;
                 return result;
+            }
+            // Collapsed realized elements occupy no current interactive bounds.
+            // They are intentionally omitted from this synchronous snapshot;
+            // any subsequent layout callback must probe again before using the
+            // result.
+            if (!visible) {
+                continue;
             }
 
             const double width = childElement.ActualWidth();

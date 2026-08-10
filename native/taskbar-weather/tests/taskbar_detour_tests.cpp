@@ -22,6 +22,10 @@ bool Expect(bool condition, const wchar_t* message) {
 
 int wmain() {
     bool passed = true;
+    passed &= Expect(
+        !taskflyout::taskbar::IsInsideTaskbarFrameCallback(
+            reinterpret_cast<void*>(1)),
+        L"private frame lifetime token must be false outside callback");
     const auto initial =
         taskflyout::taskbar::GetTaskbarDetourSnapshot();
     passed &= Expect(

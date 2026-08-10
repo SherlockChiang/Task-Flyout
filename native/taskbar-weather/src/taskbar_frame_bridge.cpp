@@ -19,6 +19,12 @@ namespace {
 constexpr std::size_t kTaskbarFrameIInspectableSlot = 3;
 constexpr wchar_t kTaskbarFrameClass[] = L"Taskbar.TaskbarFrame";
 
+using QueryInterfaceFunction = HRESULT(STDMETHODCALLTYPE*)(
+    void* object,
+    REFIID interfaceId,
+    void** result);
+using ReleaseFunction = ULONG(STDMETHODCALLTYPE*)(void* object);
+
 bool IsReadableProtection(const DWORD protection) noexcept {
     if ((protection & (PAGE_GUARD | PAGE_NOACCESS)) != 0) {
         return false;
@@ -101,6 +107,66 @@ bool ReadCurrentProcessValue(const void* address, T& value) noexcept {
            bytesRead == sizeof(T);
 }
 
+bool ReadInspectableMethods(
+    void* interfaceAddress,
+    std::array<void*, 3>& methods) noexcept {
+    methods.fill(nullptr);
+    void** vtable = nullptr;
+    if (!ReadCurrentProcessValue(interfaceAddress, vtable) || !vtable) {
+        return false;
+    }
+    return ReadCurrentProcessValue(vtable, methods);
+}
+
+bool TryQueryInterface(
+    void* interfaceAddress,
+    REFIID interfaceId,
+    void** result) noexcept {
+    if (!result) {
+        return false;
+    }
+    *result = nullptr;
+
+    std::array<void*, 3> methods{};
+    if (!ReadInspectableMethods(interfaceAddress, methods) ||
+        !IsExecutableAddress(methods[0]) ||
+        !IsExecutableAddress(methods[1]) ||
+        !IsExecutableAddress(methods[2])) {
+        return false;
+    }
+
+    const auto queryInterface =
+        reinterpret_cast<QueryInterfaceFunction>(methods[0]);
+    __try {
+        const HRESULT status = queryInterface(interfaceAddress, interfaceId, result);
+        if (FAILED(status) || !*result) {
+            *result = nullptr;
+            return false;
+        }
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        *result = nullptr;
+        return false;
+    }
+}
+
+void ReleaseRawInterface(void* interfaceAddress) noexcept {
+    if (!interfaceAddress) {
+        return;
+    }
+    std::array<void*, 3> methods{};
+    if (!ReadInspectableMethods(interfaceAddress, methods) ||
+        !IsExecutableAddress(methods[2])) {
+        return;
+    }
+
+    const auto release = reinterpret_cast<ReleaseFunction>(methods[2]);
+    __try {
+        release(interfaceAddress);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+}
+
 }  // namespace
 
 TaskbarFrameBridgeStatus EvaluateTaskbarFrameBridgeGate(
@@ -113,6 +179,9 @@ TaskbarFrameBridgeStatus EvaluateTaskbarFrameBridgeGate(
     }
     if (!input.detourActive) {
         return TaskbarFrameBridgeStatus::DetourInactive;
+    }
+    if (!input.callbackScopeActive) {
+        return TaskbarFrameBridgeStatus::CallbackScopeInactive;
     }
     if (!input.ownerThread) {
         return TaskbarFrameBridgeStatus::WrongOwnerThread;
@@ -161,11 +230,13 @@ TaskbarFrameBridgeResult ResolveTaskbarFrameFromPrivateAbi(
     gate.compatibilitySupported =
         snapshot.compatibility == HostCompatibility::Supported;
     gate.detourActive = snapshot.state == TaskbarDetourState::Active;
+    gate.callbackScopeActive =
+        IsInsideTaskbarFrameCallback(privateTaskbarFrame);
     gate.ownerThread = snapshot.bootstrapThreadId != 0 &&
         snapshot.bootstrapThreadId == GetCurrentThreadId();
     result.status = EvaluateTaskbarFrameBridgeGate(gate);
     if (!gate.compatibilitySupported || !gate.detourActive ||
-        !gate.ownerThread) {
+        !gate.callbackScopeActive || !gate.ownerThread) {
         return result;
     }
 
@@ -181,23 +252,21 @@ TaskbarFrameBridgeResult ResolveTaskbarFrameFromPrivateAbi(
     const auto* slotAddress = reinterpret_cast<const void*>(
         objectAddress + slotOffset);
 
-    void* inspectablePointer = nullptr;
+    void* inspectablePointer = const_cast<void*>(slotAddress);
     gate.inspectableSlotReadable =
-        ReadCurrentProcessValue(slotAddress, inspectablePointer);
+        IsReadableRange(slotAddress, sizeof(void*));
     gate.inspectablePointerPresent = inspectablePointer != nullptr;
     result.status = EvaluateTaskbarFrameBridgeGate(gate);
     if (!gate.inspectableSlotReadable || !gate.inspectablePointerPresent) {
         return result;
     }
 
-    void** vtable = nullptr;
+    std::array<void*, 3> methods{};
     gate.inspectableObjectReadable =
-        ReadCurrentProcessValue(inspectablePointer, vtable);
+        ReadCurrentProcessValue(inspectablePointer, methods[0]);
     if (gate.inspectableObjectReadable) {
-        constexpr std::size_t methodCount = 3;
-        std::array<void*, methodCount> methods{};
         gate.inspectableVtableReadable =
-            vtable && ReadCurrentProcessValue(vtable, methods);
+            ReadInspectableMethods(inspectablePointer, methods);
         gate.inspectableMethodsValid =
             gate.inspectableVtableReadable &&
             IsExecutableAddress(methods[0]) &&
@@ -211,11 +280,34 @@ TaskbarFrameBridgeResult ResolveTaskbarFrameFromPrivateAbi(
         return result;
     }
 
+    void* rawFrame = nullptr;
+    if (!TryQueryInterface(
+            inspectablePointer,
+            winrt::guid_of<winrt::Windows::UI::Xaml::IFrameworkElement>(),
+            &rawFrame)) {
+        result.status = TaskbarFrameBridgeStatus::ProjectionFailed;
+        return result;
+    }
+
+    std::array<void*, 3> projectedMethods{};
+    if (!ReadInspectableMethods(rawFrame, projectedMethods)) {
+        ReleaseRawInterface(rawFrame);
+        result.status = TaskbarFrameBridgeStatus::InspectableVtableUnreadable;
+        return result;
+    }
+    if (!IsExecutableAddress(projectedMethods[0]) ||
+        !IsExecutableAddress(projectedMethods[1]) ||
+        !IsExecutableAddress(projectedMethods[2])) {
+        ReleaseRawInterface(rawFrame);
+        result.status = TaskbarFrameBridgeStatus::InspectableMethodInvalid;
+        return result;
+    }
+
     try {
-        winrt::Windows::Foundation::IUnknown inspectable;
-        winrt::copy_from_abi(inspectable, &inspectablePointer);
-        result.frame = inspectable.try_as<
-            winrt::Windows::UI::Xaml::FrameworkElement>();
+        result.frame = winrt::Windows::UI::Xaml::FrameworkElement(
+            rawFrame,
+            winrt::take_ownership_from_abi);
+        rawFrame = nullptr;
         gate.projectionSucceeded = !!result.frame;
         gate.frameTypeMatches = gate.projectionSucceeded &&
             winrt::get_class_name(result.frame) == kTaskbarFrameClass;
@@ -227,6 +319,9 @@ TaskbarFrameBridgeResult ResolveTaskbarFrameFromPrivateAbi(
         }
     } catch (...) {
         result.frame = nullptr;
+    }
+    if (rawFrame) {
+        ReleaseRawInterface(rawFrame);
     }
 
     result.status = EvaluateTaskbarFrameBridgeGate(gate);
@@ -247,6 +342,8 @@ const wchar_t* TaskbarFrameBridgeStatusName(
             return L"compatibility-rejected";
         case TaskbarFrameBridgeStatus::DetourInactive:
             return L"detour-inactive";
+        case TaskbarFrameBridgeStatus::CallbackScopeInactive:
+            return L"callback-scope-inactive";
         case TaskbarFrameBridgeStatus::WrongOwnerThread:
             return L"wrong-owner-thread";
         case TaskbarFrameBridgeStatus::InspectableSlotUnreadable:

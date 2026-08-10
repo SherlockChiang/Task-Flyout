@@ -18,6 +18,7 @@ taskflyout::taskbar::TaskbarFrameBridgeGateInput ValidGate() {
     input.privateObjectPresent = true;
     input.compatibilitySupported = true;
     input.detourActive = true;
+    input.callbackScopeActive = true;
     input.ownerThread = true;
     input.inspectableSlotReadable = true;
     input.inspectablePointerPresent = true;
@@ -55,6 +56,12 @@ int wmain() {
         EvaluateTaskbarFrameBridgeGate(input) ==
             TaskbarFrameBridgeStatus::DetourInactive,
         L"the private bridge is valid only inside the active detour");
+    input = ValidGate();
+    input.callbackScopeActive = false;
+    passed &= Expect(
+        EvaluateTaskbarFrameBridgeGate(input) ==
+            TaskbarFrameBridgeStatus::CallbackScopeInactive,
+        L"the private pointer must be used only inside its callback scope");
     input = ValidGate();
     input.ownerThread = false;
     passed &= Expect(

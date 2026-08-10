@@ -97,7 +97,8 @@ struct TaskbarSlotProbeResult {
     double rootGridHeightDips = 0.0;
     bool blockersKnown = false;
 
-    TaskbarSlotGeometryInput MakeGeometryInput() const noexcept;
+    TaskbarSlotGeometryInput MakeGeometryInput() const & noexcept;
+    TaskbarSlotGeometryInput MakeGeometryInput() const && = delete;
 };
 
 // Probe one current taskbar visual-tree snapshot.  All XAML access, including

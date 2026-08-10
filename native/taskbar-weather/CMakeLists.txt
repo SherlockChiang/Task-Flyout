@@ -84,6 +84,7 @@ add_library(taskbar_weather_mount STATIC
 target_include_directories(taskbar_weather_mount PUBLIC include)
 target_compile_definitions(taskbar_weather_mount PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_mount PUBLIC
+    taskbar_weather_slot_probe
     taskbar_weather_tree_profile
     taskbar_weather_slot_geometry
     taskbar_weather_view_model
@@ -116,6 +117,17 @@ target_link_libraries(taskbar_weather_frame_bridge PUBLIC
     windowsapp
 )
 
+add_library(taskbar_weather_host_controller STATIC
+    src/taskbar_host_controller.cpp
+)
+target_include_directories(taskbar_weather_host_controller PUBLIC include)
+target_compile_definitions(taskbar_weather_host_controller PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_host_controller PUBLIC
+    taskbar_weather_frame_bridge
+    taskbar_weather_slot_probe
+    taskbar_weather_mount
+)
+
 add_library(taskbar_weather_host SHARED
     src/host.cpp
     src/host.def
@@ -126,6 +138,7 @@ set_target_properties(taskbar_weather_host PROPERTIES
 target_include_directories(taskbar_weather_host PRIVATE include)
 target_compile_definitions(taskbar_weather_host PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_host PRIVATE
+    taskbar_weather_host_controller
     taskbar_weather_host_runtime
     taskbar_weather_mount
     taskbar_weather_profile
@@ -198,6 +211,13 @@ target_include_directories(taskbar_weather_slot_probe_tests PRIVATE include)
 target_compile_definitions(taskbar_weather_slot_probe_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_slot_probe_tests PRIVATE taskbar_weather_slot_probe)
 
+add_executable(taskbar_weather_host_controller_tests
+    tests/taskbar_host_controller_tests.cpp
+)
+target_include_directories(taskbar_weather_host_controller_tests PRIVATE include)
+target_compile_definitions(taskbar_weather_host_controller_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_host_controller_tests PRIVATE taskbar_weather_host_controller)
+
 add_executable(taskbar_weather_minhook_smoke_tests
     tests/minhook_smoke_tests.cpp
 )
@@ -214,6 +234,7 @@ foreach(target
         taskbar_weather_mount
         taskbar_weather_host_runtime
         taskbar_weather_frame_bridge
+        taskbar_weather_host_controller
         taskbar_weather_host
         taskbar_weather_broker
         taskbar_weather_profile_tests
@@ -224,6 +245,7 @@ foreach(target
         taskbar_weather_slot_geometry_tests
         taskbar_weather_frame_bridge_tests
         taskbar_weather_slot_probe_tests
+        taskbar_weather_host_controller_tests
         taskbar_weather_minhook_smoke_tests)
     if(MSVC)
         target_compile_options(${target} PRIVATE
@@ -275,6 +297,10 @@ add_test(
 add_test(
     NAME taskbar_weather_slot_probe_tests
     COMMAND taskbar_weather_slot_probe_tests
+)
+add_test(
+    NAME taskbar_weather_host_controller_tests
+    COMMAND taskbar_weather_host_controller_tests
 )
 add_test(
     NAME taskbar_weather_minhook_smoke_tests

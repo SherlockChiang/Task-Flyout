@@ -35,6 +35,7 @@ bool g_hookEnabled = false;
 int g_hostModuleAnchor = 0;
 thread_local std::uint32_t g_detourDepth = 0;
 thread_local bool g_insideCustomUpdate = false;
+thread_local const void* g_currentTaskbarFrame = nullptr;
 
 class ExclusiveRuntimeLock final {
 public:
@@ -137,6 +138,25 @@ private:
     bool acquired_ = false;
 };
 
+class CurrentTaskbarFrameGuard final {
+public:
+    explicit CurrentTaskbarFrameGuard(const void* frame) noexcept
+        : previous_(g_currentTaskbarFrame) {
+        g_currentTaskbarFrame = frame;
+    }
+
+    CurrentTaskbarFrameGuard(const CurrentTaskbarFrameGuard&) = delete;
+    CurrentTaskbarFrameGuard& operator=(
+        const CurrentTaskbarFrameGuard&) = delete;
+
+    ~CurrentTaskbarFrameGuard() {
+        g_currentTaskbarFrame = previous_;
+    }
+
+private:
+    const void* previous_ = nullptr;
+};
+
 LONG ReadActiveCallbackCount() noexcept {
     return InterlockedCompareExchange(&g_activeCallbacks, 0, 0);
 }
@@ -202,6 +222,7 @@ void WINAPI TaskbarFrameLayoutDetour(void* taskbarFrame) {
         CustomUpdateGuard updateGuard;
         if (callback && updateGuard) {
             ActiveCustomCallbackLease customCallbackLease;
+            CurrentTaskbarFrameGuard frameGuard(taskbarFrame);
             if (g_state.load(std::memory_order_acquire) ==
                     TaskbarDetourState::Active &&
                 callback == g_callback.load(std::memory_order_acquire)) {
@@ -605,6 +626,14 @@ TaskbarDetourSnapshot GetTaskbarDetourSnapshot() noexcept {
     snapshot.bootstrapThreadId = g_bootstrapThreadId;
     snapshot.hostPinned = g_hostPinned;
     return snapshot;
+}
+
+bool IsInsideTaskbarFrameCallback(
+    const void* privateTaskbarFrame) noexcept {
+    return privateTaskbarFrame != nullptr &&
+           g_detourDepth != 0 &&
+           g_insideCustomUpdate &&
+           g_currentTaskbarFrame == privateTaskbarFrame;
 }
 
 }  // namespace taskflyout::taskbar

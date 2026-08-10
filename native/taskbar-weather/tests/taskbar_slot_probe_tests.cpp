@@ -89,6 +89,16 @@ int wmain() {
             TaskbarSlotGeometryStatus::CandidateConflicted,
         L"the live blocker snapshot should feed the geometry policy");
 
+    result.blockerCount =
+        static_cast<std::uint32_t>(result.blockerStorage.size() + 1);
+    const auto invalidInput = result.MakeGeometryInput();
+    passed &= Expect(
+        !invalidInput.blockersKnown &&
+            invalidInput.interactiveBlockers.empty() &&
+            EvaluateTaskbarSlotGeometry(invalidInput).status ==
+                TaskbarSlotGeometryStatus::UnknownStructure,
+        L"an invalid owned blocker count must fail without creating a span");
+
     passed &= Expect(
         std::wstring_view(TaskbarSlotProbeStatusName(
             TaskbarSlotProbeStatus::RepeaterChildTransformInvalid)) ==

@@ -154,7 +154,7 @@ TaskbarMountStatus EvaluateTaskbarMountGate(
 TaskbarMountStatus MountWeatherButton(
     const TaskbarTreeProfile& profile,
     const WeatherViewModel& model,
-    const TaskbarSlotGeometryInput& geometryInput,
+    const TaskbarSlotProbeResult& slotProbe,
     TaskbarWeatherMountState& state) noexcept {
     if (profile.status != TaskbarTreeProbeStatus::LandmarksMatched ||
         !profile.rootGrid || !profile.frame) {
@@ -173,7 +173,23 @@ TaskbarMountStatus MountWeatherButton(
         return TaskbarMountStatus::WrongOwnerThread;
     }
 
-    TaskbarSlotGeometryInput verifiedGeometry = geometryInput;
+    if (slotProbe.status != TaskbarSlotProbeStatus::SnapshotReady ||
+        slotProbe.structureStatus != TaskbarSlotStructureStatus::Matched ||
+        !slotProbe.blockersKnown ||
+        slotProbe.blockerCount > slotProbe.blockerStorage.size()) {
+        return TaskbarMountStatus::StructureNotAllowlisted;
+    }
+    if (slotProbe.geometry.status ==
+        TaskbarSlotGeometryStatus::CandidateConflicted) {
+        return TaskbarMountStatus::LeftSlotUnavailable;
+    }
+    if (slotProbe.geometry.status !=
+        TaskbarSlotGeometryStatus::CandidateAvailable) {
+        return TaskbarMountStatus::SlotGeometryInvalid;
+    }
+
+    TaskbarSlotGeometryInput verifiedGeometry =
+        slotProbe.MakeGeometryInput();
     TaskbarSlotGeometryResult geometry;
     try {
         if (!profile.signature.frameGeometryValid ||
@@ -181,8 +197,8 @@ TaskbarMountStatus MountWeatherButton(
             return TaskbarMountStatus::TreeNotReady;
         }
         // Dimensions come from the current XAML tree, never from a stale
-        // caller snapshot. The blocker span and structure proof still must be
-        // collected by the owner-thread scanner for this exact tree.
+        // probe snapshot. The blocker span and structure proof must come from
+        // the owner-thread scanner for this exact tree.
         verifiedGeometry.frameWidthDips = profile.frame.ActualWidth();
         verifiedGeometry.frameHeightDips = profile.frame.ActualHeight();
         verifiedGeometry.rootGridWidthDips = profile.rootGrid.ActualWidth();

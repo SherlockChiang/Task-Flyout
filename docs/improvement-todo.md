@@ -443,3 +443,20 @@ transport foundation for the standalone host.
   it retains no XAML references after return.
 - The probe is now compile-tested but not called by the inert host hook. A
   different taskbar build or an unobserved child shape remains default-deny.
+
+### 2026-08-10 Guarded Host Controller Wiring
+
+- Connected the verified frame bridge, live tree/slot probe, and reversible
+  mount lease behind the default-off taskbar detour controller. The mount API
+  now consumes the owner-thread `TaskbarSlotProbeResult` directly, so callers
+  cannot supply an independent structure or blocker proof.
+- Corrected the private ABI interpretation: slot 3 is the embedded
+  IInspectable interface address. Raw `QueryInterface(IFrameworkElement)` is
+  isolated behind an SEH boundary, the returned vtable is checked, and the
+  bridge requires a TLS token for the exact active detour callback.
+- The exported `WH_CALLWNDPROC` entry hook now accepts only the private start /
+  stop control message and keeps the host inert otherwise. Release x64 build,
+  import inspection, and all ten native tests pass. The broker's control-message
+  sender, named-pipe weather snapshot wiring, and disposable Explorer-session
+  validation remain pending; no Explorer injection was attempted in the build
+  sandbox.

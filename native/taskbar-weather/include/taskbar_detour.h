@@ -66,4 +66,10 @@ TaskbarDetourResult StopTaskbarFrameDetour(
 
 TaskbarDetourSnapshot GetTaskbarDetourSnapshot() noexcept;
 
+// True only while the detour is synchronously invoking the custom callback
+// for this exact private object on the current thread. It is a TLS lifetime
+// token, not a general indication that the global hook is active.
+bool IsInsideTaskbarFrameCallback(
+    const void* privateTaskbarFrame) noexcept;
+
 }  // namespace taskflyout::taskbar

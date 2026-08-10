@@ -7,6 +7,13 @@
 namespace taskflyout::taskbar {
 
 inline constexpr std::uint32_t kHostApiVersion = 2;
+inline constexpr wchar_t kHostControlMessageName[] =
+    L"TaskFlyout.TaskbarHost.Control.v1.{7C091D78-7BD5-4E99-B7BD-647E45F30CF6}";
+
+enum class HostControlCommand : std::uintptr_t {
+    Start = 1,
+    Stop = 2,
+};
 
 enum class HostCompatibility : std::uint32_t {
     Unknown = 0,
