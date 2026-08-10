@@ -31,8 +31,14 @@ The initial allowlist is intentionally limited to the development profile:
 - `Taskbar.View.dll` timestamp `0x6A3CD591`
 - image size `0x0098B000`
 - checksum `0x00985653`
+- `TaskbarFrame::OnTaskbarLayoutChildBoundsChanged` RVA `0x001F3540`
+- exact 20-byte x64 function prologue
 
-Any mismatch fails before taskbar memory or XAML is changed.
+The broker validates the PE profile and on-disk prologue. The Explorer host
+then holds a module reference and validates the loaded PE fingerprint, image
+bounds, executable page, and in-memory prologue again. Any mismatch fails
+before a detour is created or taskbar XAML is changed. The private
+`IInspectable` slot is used only by this exact profile.
 
 The XAML view has no background surface of its own. It is designed to sit
 inside a taskbar-owned button so that Windows continues to own hover, pressed,

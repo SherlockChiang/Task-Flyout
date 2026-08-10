@@ -314,3 +314,18 @@ transport foundation for the standalone host.
 - The x64 Release host and broker compile, both native test executables pass,
   and import inspection finds no WebView or network library. The taskbar hook
   remains a no-op, so this stage did not load or modify Explorer.
+
+### 2026-08-10 Standalone Taskbar Hook Profile
+
+- The development `Taskbar.View.dll` PDB resolves
+  `TaskbarFrame::OnTaskbarLayoutChildBoundsChanged` to RVA `0x001F3540`.
+  Symbol lookup is an offline development step; no PDB or symbol service is
+  used by the shipped host.
+- Compatibility now requires the Windows build, PE timestamp/image
+  size/checksum, target RVA, and exact 20-byte x64 prologue to match. The
+  Explorer-side probe additionally holds a module reference and requires the
+  loaded PE fingerprint plus an in-bounds executable memory region with the
+  same bytes, so an updated, replaced, or already-patched target fails closed
+  before MinHook or XAML mutation is reached.
+- Release x64 compilation and both native tests pass. The entry hook remains a
+  no-op and this verification did not load the host into Explorer.

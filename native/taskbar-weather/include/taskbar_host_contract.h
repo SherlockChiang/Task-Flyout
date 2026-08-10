@@ -6,7 +6,7 @@
 
 namespace taskflyout::taskbar {
 
-inline constexpr std::uint32_t kHostApiVersion = 1;
+inline constexpr std::uint32_t kHostApiVersion = 2;
 
 enum class HostCompatibility : std::uint32_t {
     Unknown = 0,
@@ -16,6 +16,7 @@ enum class HostCompatibility : std::uint32_t {
     TaskbarViewMissing = 4,
     TaskbarViewUnreadable = 5,
     TaskbarViewNotAllowlisted = 6,
+    TaskbarHookTargetMismatch = 7,
 };
 
 struct HostCompatibilityReport {

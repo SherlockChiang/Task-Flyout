@@ -3,9 +3,12 @@
 #include <TlHelp32.h>
 
 #include <array>
+#include <algorithm>
 #include <cwchar>
+#include <limits>
 #include <memory>
 #include <string_view>
+#include <vector>
 
 namespace taskflyout::taskbar {
 namespace {
@@ -19,6 +22,41 @@ struct HandleCloser {
 };
 
 using UniqueHandle = std::unique_ptr<void, HandleCloser>;
+
+bool ReadExactAt(
+    HANDLE file,
+    std::uint64_t offset,
+    void* buffer,
+    DWORD bytes,
+    std::uint64_t fileSize,
+    const wchar_t* failureDetail,
+    std::wstring& detail) noexcept {
+    if (offset > fileSize || bytes > fileSize - offset) {
+        detail = failureDetail;
+        return false;
+    }
+
+    if (offset > static_cast<std::uint64_t>(std::numeric_limits<LONGLONG>::max())) {
+        detail = failureDetail;
+        return false;
+    }
+
+    LARGE_INTEGER fileOffset{};
+    fileOffset.QuadPart = static_cast<LONGLONG>(offset);
+    if (!SetFilePointerEx(file, fileOffset, nullptr, FILE_BEGIN)) {
+        detail = failureDetail;
+        return false;
+    }
+
+    DWORD bytesRead = 0;
+    if (!ReadFile(file, buffer, bytes, &bytesRead, nullptr) ||
+        bytesRead != bytes) {
+        detail = failureDetail;
+        return false;
+    }
+
+    return true;
+}
 
 struct RtlOsVersionInfo {
     ULONG size;
@@ -175,6 +213,200 @@ bool IsAllowlisted(
            fingerprint.checksum == kValidatedTaskbarViewChecksum;
 }
 
+bool ReadPeBytesAtRva(
+    const std::wstring& path,
+    std::uint32_t rva,
+    std::span<std::uint8_t> output,
+    std::wstring& detail) noexcept {
+    if (output.empty()) {
+        detail = L"empty-pe-range";
+        return false;
+    }
+
+    UniqueHandle file(CreateFileW(
+        path.c_str(),
+        GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr));
+    if (!file || file.get() == INVALID_HANDLE_VALUE) {
+        detail = L"open-pe-failed";
+        return false;
+    }
+
+    LARGE_INTEGER fileSizeValue{};
+    if (!GetFileSizeEx(file.get(), &fileSizeValue) ||
+        fileSizeValue.QuadPart < 0) {
+        detail = L"pe-size-failed";
+        return false;
+    }
+    const auto fileSize = static_cast<std::uint64_t>(fileSizeValue.QuadPart);
+    if (output.size() > std::numeric_limits<DWORD>::max()) {
+        detail = L"pe-range-too-large";
+        return false;
+    }
+
+    IMAGE_DOS_HEADER dos{};
+    if (!ReadExactAt(
+            file.get(),
+            0,
+            &dos,
+            sizeof(dos),
+            fileSize,
+            L"invalid-dos-header",
+            detail) ||
+        dos.e_magic != IMAGE_DOS_SIGNATURE ||
+        dos.e_lfanew < static_cast<LONG>(sizeof(IMAGE_DOS_HEADER))) {
+        detail = L"invalid-dos-header";
+        return false;
+    }
+
+    const auto peOffset = static_cast<std::uint64_t>(dos.e_lfanew);
+    DWORD signature = 0;
+    IMAGE_FILE_HEADER fileHeader{};
+    if (!ReadExactAt(
+            file.get(),
+            peOffset,
+            &signature,
+            sizeof(signature),
+            fileSize,
+            L"invalid-pe-header",
+            detail) ||
+        !ReadExactAt(
+            file.get(),
+            peOffset + sizeof(signature),
+            &fileHeader,
+            sizeof(fileHeader),
+            fileSize,
+            L"invalid-pe-header",
+            detail) ||
+        signature != IMAGE_NT_SIGNATURE ||
+        fileHeader.Machine != IMAGE_FILE_MACHINE_AMD64 ||
+        fileHeader.SizeOfOptionalHeader != sizeof(IMAGE_OPTIONAL_HEADER64) ||
+        fileHeader.NumberOfSections == 0 ||
+        fileHeader.NumberOfSections > 96) {
+        detail = L"invalid-pe-header";
+        return false;
+    }
+
+    IMAGE_OPTIONAL_HEADER64 optionalHeader{};
+    const auto optionalHeaderOffset =
+        peOffset + sizeof(signature) + sizeof(fileHeader);
+    if (!ReadExactAt(
+            file.get(),
+            optionalHeaderOffset,
+            &optionalHeader,
+            sizeof(optionalHeader),
+            fileSize,
+            L"invalid-pe-header",
+            detail) ||
+        optionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC ||
+        optionalHeader.SizeOfHeaders == 0 ||
+        optionalHeader.SizeOfHeaders > optionalHeader.SizeOfImage) {
+        detail = L"invalid-pe-header";
+        return false;
+    }
+
+    const std::uint64_t rangeEnd =
+        static_cast<std::uint64_t>(rva) + output.size();
+    if (rangeEnd < rva ||
+        rangeEnd > std::numeric_limits<std::uint32_t>::max()) {
+        detail = L"pe-range-overflow";
+        return false;
+    }
+    if (rangeEnd > optionalHeader.SizeOfImage) {
+        detail = L"pe-range-outside-image";
+        return false;
+    }
+
+    if (rva < optionalHeader.SizeOfHeaders &&
+        rangeEnd <= optionalHeader.SizeOfHeaders) {
+        if (!ReadExactAt(
+                file.get(),
+                rva,
+                output.data(),
+                static_cast<DWORD>(output.size()),
+                fileSize,
+                L"read-pe-range-failed",
+                detail)) {
+            return false;
+        }
+        detail = L"ok";
+        return true;
+    }
+
+    std::vector<IMAGE_SECTION_HEADER> sections(
+        fileHeader.NumberOfSections);
+    const auto sectionTableOffset =
+        optionalHeaderOffset + fileHeader.SizeOfOptionalHeader;
+    const auto sectionTableBytes =
+        sections.size() * sizeof(IMAGE_SECTION_HEADER);
+    if (sectionTableBytes > std::numeric_limits<DWORD>::max() ||
+        !ReadExactAt(
+            file.get(),
+            sectionTableOffset,
+            sections.data(),
+            static_cast<DWORD>(sectionTableBytes),
+            fileSize,
+            L"invalid-section-table",
+            detail)) {
+        detail = L"invalid-section-table";
+        return false;
+    }
+
+    for (const IMAGE_SECTION_HEADER& section : sections) {
+        const std::uint64_t sectionStart = section.VirtualAddress;
+        const std::uint64_t sectionExtent = std::max(
+            section.Misc.VirtualSize,
+            section.SizeOfRawData);
+        const std::uint64_t sectionEnd = sectionStart + sectionExtent;
+        if (rva < sectionStart || rangeEnd > sectionEnd) {
+            continue;
+        }
+
+        const std::uint64_t offsetInSection = rva - sectionStart;
+        const std::uint64_t rawEnd =
+            static_cast<std::uint64_t>(section.PointerToRawData) +
+            section.SizeOfRawData;
+        if (rawEnd < section.PointerToRawData || rawEnd > fileSize ||
+            offsetInSection + output.size() > section.SizeOfRawData) {
+            detail = L"pe-range-not-backed-by-file";
+            return false;
+        }
+
+        const std::uint64_t fileOffset =
+            static_cast<std::uint64_t>(section.PointerToRawData) +
+            offsetInSection;
+        if (!ReadExactAt(
+                file.get(),
+                fileOffset,
+                output.data(),
+                static_cast<DWORD>(output.size()),
+                fileSize,
+                L"read-pe-range-failed",
+                detail)) {
+            return false;
+        }
+
+        detail = L"ok";
+        return true;
+    }
+
+    detail = L"pe-rva-not-mapped";
+    return false;
+}
+
+bool MatchesTaskbarFrameHookPrologue(
+    std::span<const std::uint8_t> bytes) noexcept {
+    return bytes.size() == kTaskbarFrameLayoutHookPrologue.size() &&
+           std::equal(
+               bytes.begin(),
+               bytes.end(),
+               kTaskbarFrameLayoutHookPrologue.begin());
+}
+
 ProbeResult ProbePrimaryTaskbar() noexcept {
     ProbeResult result;
     result.windowsBuild = GetWindowsBuildNumber();
@@ -242,6 +474,21 @@ ProbeResult ProbePrimaryTaskbar() noexcept {
         return result;
     }
 
+    std::array<std::uint8_t, kTaskbarFrameLayoutHookPrologue.size()>
+        hookPrologue{};
+    if (!ReadPeBytesAtRva(
+            result.module.taskbarViewPath,
+            kTaskbarFrameLayoutHookRva,
+            hookPrologue,
+            result.detail) ||
+        !MatchesTaskbarFrameHookPrologue(hookPrologue)) {
+        result.status = ProbeStatus::TaskbarHookTargetMismatch;
+        if (result.detail == L"ok") {
+            result.detail = L"taskbar-hook-prologue-mismatch";
+        }
+        return result;
+    }
+
     result.status = ProbeStatus::Supported;
     result.detail = L"supported";
     return result;
@@ -267,10 +514,11 @@ const wchar_t* ProbeStatusName(ProbeStatus status) noexcept {
             return L"unsupported-windows-build";
         case ProbeStatus::TaskbarViewNotAllowlisted:
             return L"taskbar-view-not-allowlisted";
+        case ProbeStatus::TaskbarHookTargetMismatch:
+            return L"taskbar-hook-target-mismatch";
     }
 
     return L"unknown";
 }
 
 }  // namespace taskflyout::taskbar
-
