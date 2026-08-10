@@ -172,6 +172,27 @@ int wmain() {
         passed &= Expect(
             malformed.status == WeatherPipeQueryStatus::InvalidResponse,
             L"malformed JSON should be rejected");
+
+        passed &= Expect(
+            ParseWeatherOpenResponse(
+                LR"({"version":1,"status":"ok"})") ==
+                WeatherPipeActivationStatus::Queued,
+            L"an ok open-weather response should acknowledge queued work");
+        passed &= Expect(
+            ParseWeatherOpenResponse(
+                LR"({"version":1,"status":"unavailable","detail":"app-closing"})") ==
+                WeatherPipeActivationStatus::Rejected,
+            L"an unavailable open-weather response should be rejected");
+        passed &= Expect(
+            ParseWeatherOpenResponse(
+                LR"({"version":2,"status":"ok"})") ==
+                WeatherPipeActivationStatus::InvalidResponse,
+            L"an open-weather acknowledgement cannot override a version "
+            L"mismatch");
+        passed &= Expect(
+            ParseWeatherOpenResponse(L"{not-json") ==
+                WeatherPipeActivationStatus::InvalidResponse,
+            L"a malformed open-weather acknowledgement should be rejected");
     }
 
     HANDLE cancellationEvent = CreateEventW(nullptr, TRUE, TRUE, nullptr);
@@ -183,6 +204,11 @@ int wmain() {
         passed &= Expect(
             cancelled.status == WeatherPipeQueryStatus::Cancelled,
             L"a pre-signalled stop event should cancel before pipe discovery");
+        passed &= Expect(
+            RequestWeatherOpen(cancellationEvent) ==
+                WeatherPipeActivationStatus::Cancelled,
+            L"a pre-signalled stop event should cancel activation before "
+            L"pipe discovery");
         CloseHandle(cancellationEvent);
     }
 
@@ -206,6 +232,29 @@ int wmain() {
         std::wstring_view(WeatherPipeQueryStatusName(
             static_cast<WeatherPipeQueryStatus>(99))) == L"unknown",
         L"unknown query result statuses fail closed to an explicit name");
+
+    constexpr std::array activationStatuses{
+        std::pair{WeatherPipeActivationStatus::Queued, L"queued"},
+        std::pair{
+            WeatherPipeActivationStatus::PipeUnavailable,
+            L"pipe-unavailable"},
+        std::pair{WeatherPipeActivationStatus::IoFailed, L"io-failed"},
+        std::pair{
+            WeatherPipeActivationStatus::InvalidResponse,
+            L"invalid-response"},
+        std::pair{WeatherPipeActivationStatus::Rejected, L"rejected"},
+        std::pair{WeatherPipeActivationStatus::Cancelled, L"cancelled"},
+    };
+    for (const auto& [status, expected] : activationStatuses) {
+        passed &= Expect(
+            std::wstring_view(WeatherPipeActivationStatusName(status)) ==
+                expected,
+            L"each activation result status has a stable diagnostic name");
+    }
+    passed &= Expect(
+        std::wstring_view(WeatherPipeActivationStatusName(
+            static_cast<WeatherPipeActivationStatus>(99))) == L"unknown",
+        L"unknown activation statuses fail closed to an explicit name");
 
     if (apartmentInitialized) {
         winrt::uninit_apartment();

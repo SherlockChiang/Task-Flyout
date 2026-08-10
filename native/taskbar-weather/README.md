@@ -19,7 +19,8 @@ WebView-free Windows 11 taskbar weather path.
   lease cannot mutate Explorer until the runtime scanner supplies evidence.
 - The native binaries must not link WebView, browser, or network libraries.
   Weather networking and cache ownership remain in the Task Flyout app; the
-  host consumes only the existing sanitized named-pipe snapshot protocol.
+  host consumes only the existing sanitized named-pipe snapshot protocol and
+  sends the app-owned `open-weather` activation command.
 
 Build and run the compile-only checks from the repository root:
 
@@ -75,9 +76,14 @@ older than two hours or more than five minutes in the future is rejected. Only
 the sanitized icon, temperature, and alert-or-condition model crosses to the
 taskbar layout callback; the worker never calls XAML. Missing, malformed,
 unavailable, or stale data clears the cached model and requests a taskbar
-relayout. Controller shutdown signals and joins the worker with a two-second
-owner-thread bound before restoring the owned XAML lease and removing the
-detour.
+relayout. The XAML Button click handler captures only a stateless signal
+callback. It coalesces repeated clicks through an auto-reset event; the same
+MTA worker performs one non-retried `open-weather` exchange, so Explorer's UI
+thread never opens the pipe or parses JSON. Controller shutdown first rejects
+new activation signals, then signals and joins the worker with a two-second
+owner-thread bound. It still attempts to revoke every Click token and restore
+the owned XAML lease if the worker misses that bound; incomplete cleanup is
+reported as a rejected stop rather than discarded state.
 
 The private `Taskbar.View.dll` detour uses the x64 subset of MinHook `v1.3.4`,
 pinned to commit `c3fcafdc10146beb5919319d0683e44e3c30d537`. It is built as a

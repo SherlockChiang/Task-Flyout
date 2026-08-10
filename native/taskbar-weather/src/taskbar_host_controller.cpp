@@ -44,6 +44,53 @@ WeatherViewModel g_weatherModel{};
 bool g_weatherModelAvailable = false;
 HANDLE g_weatherPipeStopEvent = nullptr;
 HANDLE g_weatherPipeThread = nullptr;
+HANDLE g_weatherOpenEvent = nullptr;
+SRWLOCK g_weatherActivationLock = SRWLOCK_INIT;
+std::atomic_bool g_weatherActivationPending{false};
+bool g_weatherActivationEnabled = false;
+
+void DisableWeatherActivationRequests() noexcept {
+    AcquireSRWLockExclusive(&g_weatherActivationLock);
+    g_weatherActivationEnabled = false;
+    g_weatherActivationPending.store(false, std::memory_order_release);
+    ReleaseSRWLockExclusive(&g_weatherActivationLock);
+}
+
+HANDLE DetachWeatherActivationEvent() noexcept {
+    AcquireSRWLockExclusive(&g_weatherActivationLock);
+    g_weatherActivationEnabled = false;
+    g_weatherActivationPending.store(false, std::memory_order_release);
+    HANDLE event = g_weatherOpenEvent;
+    g_weatherOpenEvent = nullptr;
+    ReleaseSRWLockExclusive(&g_weatherActivationLock);
+    return event;
+}
+
+void EnableWeatherActivationRequests(const HANDLE event) noexcept {
+    AcquireSRWLockExclusive(&g_weatherActivationLock);
+    g_weatherActivationPending.store(false, std::memory_order_release);
+    g_weatherOpenEvent = event;
+    g_weatherActivationEnabled = event != nullptr;
+    ReleaseSRWLockExclusive(&g_weatherActivationLock);
+}
+
+void WINAPI QueueWeatherOpenRequest() noexcept {
+    AcquireSRWLockShared(&g_weatherActivationLock);
+    if (g_weatherActivationEnabled && g_weatherOpenEvent) {
+        bool expected = false;
+        if (g_weatherActivationPending.compare_exchange_strong(
+                expected,
+                true,
+                std::memory_order_acq_rel,
+                std::memory_order_acquire) &&
+            !SetEvent(g_weatherOpenEvent)) {
+            g_weatherActivationPending.store(
+                false,
+                std::memory_order_release);
+        }
+    }
+    ReleaseSRWLockShared(&g_weatherActivationLock);
+}
 
 const WeatherViewModel& PreviewModel() {
     static const WeatherViewModel model = CreateWeatherViewModel(
@@ -121,47 +168,88 @@ WeatherViewModel CurrentWeatherModel() {
 struct WeatherPipeWorkerContext final {
     HMODULE selfModule = nullptr;
     HANDLE stopEvent = nullptr;
+    HANDLE openEvent = nullptr;
 };
 
 DWORD WINAPI WeatherPipeWorkerProc(void* parameter) {
     auto* context = static_cast<WeatherPipeWorkerContext*>(parameter);
     HMODULE selfModule = context->selfModule;
     HANDLE stopEvent = context->stopEvent;
+    HANDLE openEvent = context->openEvent;
     delete context;
 
     bool apartmentInitialized = false;
-    while (WaitForSingleObject(stopEvent, 0) == WAIT_TIMEOUT) {
+    bool pollSnapshot = true;
+    for (;;) {
+        if (WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0) {
+            break;
+        }
         if (!apartmentInitialized) {
             try {
                 winrt::init_apartment(
                     winrt::apartment_type::multi_threaded);
                 apartmentInitialized = true;
             } catch (...) {
-                if (WaitForSingleObject(
-                        stopEvent,
-                        kWeatherPipePollIntervalMilliseconds) ==
-                    WAIT_OBJECT_0) {
+                const std::array<HANDLE, 2> waitHandles{
+                    stopEvent,
+                    openEvent};
+                const DWORD wait = WaitForMultipleObjects(
+                    static_cast<DWORD>(waitHandles.size()),
+                    waitHandles.data(),
+                    FALSE,
+                    kWeatherPipePollIntervalMilliseconds);
+                if (wait == WAIT_OBJECT_0 || wait == WAIT_FAILED) {
                     break;
                 }
                 continue;
             }
         }
 
-        const WeatherPipeQueryResult query =
-            QueryWeatherPipe(stopEvent);
-        if (query.status == WeatherPipeQueryStatus::Cancelled ||
-            WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0) {
+        if (g_weatherActivationPending.load(std::memory_order_acquire)) {
+            const WeatherPipeActivationStatus activation =
+                RequestWeatherOpen(stopEvent);
+            g_weatherActivationPending.store(
+                false,
+                std::memory_order_release);
+            if (activation == WeatherPipeActivationStatus::Cancelled ||
+                WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0) {
+                break;
+            }
+            continue;
+        }
+
+        if (pollSnapshot) {
+            const WeatherPipeQueryResult query =
+                QueryWeatherPipe(stopEvent);
+            if (query.status == WeatherPipeQueryStatus::Cancelled ||
+                WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0) {
+                break;
+            }
+            if (query.status == WeatherPipeQueryStatus::Updated) {
+                PublishWeatherModel(query.model);
+            } else {
+                InvalidateWeatherModel();
+            }
+            pollSnapshot = false;
+        }
+
+        const std::array<HANDLE, 2> waitHandles{stopEvent, openEvent};
+        const DWORD wait = WaitForMultipleObjects(
+            static_cast<DWORD>(waitHandles.size()),
+            waitHandles.data(),
+            FALSE,
+            kWeatherPipePollIntervalMilliseconds);
+        if (wait == WAIT_OBJECT_0 || wait == WAIT_FAILED) {
             break;
         }
-        if (query.status == WeatherPipeQueryStatus::Updated) {
-            PublishWeatherModel(query.model);
-        } else {
-            InvalidateWeatherModel();
+        if (wait == WAIT_OBJECT_0 + 1u) {
+            // The auto-reset event has been consumed. Keep the pending bit set
+            // until the request finishes so clicks during one exchange merge.
+            continue;
         }
-        if (WaitForSingleObject(
-                stopEvent,
-                kWeatherPipePollIntervalMilliseconds) ==
-            WAIT_OBJECT_0) {
+        if (wait == WAIT_TIMEOUT) {
+            pollSnapshot = true;
+        } else if (wait != WAIT_OBJECT_0 + 1u) {
             break;
         }
     }
@@ -182,8 +270,12 @@ bool StartWeatherPipeWorker() noexcept {
         if (workerState != WAIT_OBJECT_0) {
             return false;
         }
+        HANDLE oldOpenEvent = DetachWeatherActivationEvent();
         CloseHandle(g_weatherPipeThread);
         CloseHandle(g_weatherPipeStopEvent);
+        if (oldOpenEvent) {
+            CloseHandle(oldOpenEvent);
+        }
         g_weatherPipeThread = nullptr;
         g_weatherPipeStopEvent = nullptr;
     }
@@ -192,21 +284,29 @@ bool StartWeatherPipeWorker() noexcept {
     if (!stopEvent) {
         return false;
     }
+    HANDLE openEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (!openEvent) {
+        CloseHandle(stopEvent);
+        return false;
+    }
 
     HMODULE selfModule = nullptr;
     if (!GetModuleHandleExW(
             GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
-            reinterpret_cast<LPCWSTR>(&WeatherPipeWorkerProc),
-            &selfModule)) {
+             reinterpret_cast<LPCWSTR>(&WeatherPipeWorkerProc),
+             &selfModule)) {
+        CloseHandle(openEvent);
         CloseHandle(stopEvent);
         return false;
     }
 
     auto* context = new (std::nothrow) WeatherPipeWorkerContext{
         selfModule,
-        stopEvent};
+        stopEvent,
+        openEvent};
     if (!context) {
         FreeLibrary(selfModule);
+        CloseHandle(openEvent);
         CloseHandle(stopEvent);
         return false;
     }
@@ -222,17 +322,23 @@ bool StartWeatherPipeWorker() noexcept {
     if (!thread) {
         delete context;
         FreeLibrary(selfModule);
+        CloseHandle(openEvent);
         CloseHandle(stopEvent);
         return false;
     }
 
     g_weatherPipeStopEvent = stopEvent;
     g_weatherPipeThread = thread;
+    EnableWeatherActivationRequests(openEvent);
     return true;
 }
 
 bool StopWeatherPipeWorker() noexcept {
     if (!g_weatherPipeThread) {
+        HANDLE openEvent = DetachWeatherActivationEvent();
+        if (openEvent) {
+            CloseHandle(openEvent);
+        }
         (void)ClearWeatherModel();
         return true;
     }
@@ -246,8 +352,12 @@ bool StopWeatherPipeWorker() noexcept {
         return false;
     }
 
+    HANDLE openEvent = DetachWeatherActivationEvent();
     CloseHandle(g_weatherPipeThread);
     CloseHandle(g_weatherPipeStopEvent);
+    if (openEvent) {
+        CloseHandle(openEvent);
+    }
     g_weatherPipeThread = nullptr;
     g_weatherPipeStopEvent = nullptr;
     (void)ClearWeatherModel();
@@ -260,10 +370,28 @@ void ResetExpiredLease(TaskbarFrameLease& lease) noexcept {
     }
     try {
         if (!lease.frame.get()) {
-            lease = {};
+            if (!lease.mount.mounted) {
+                lease = {};
+                return;
+            }
+            // A frame weak reference can expire before the Button weak
+            // reference. Give the owner thread one last chance to revoke the
+            // event token; never discard a live token with a blind reset.
+            if (!lease.mount.button.get()) {
+                lease = {};
+                return;
+            }
+            if (RestoreWeatherButton(lease.mount) ==
+                TaskbarMountStatus::Restored) {
+                lease = {};
+            }
         }
     } catch (...) {
-        lease = {};
+        // Keep a mounted lease after an exception so stop/quarantine can
+        // retry token revocation instead of losing ownership metadata.
+        if (!lease.mount.mounted) {
+            lease = {};
+        }
     }
 }
 
@@ -284,9 +412,11 @@ TaskbarFrameLease* FindOrCreateLease(
                 return &lease;
             }
         } catch (...) {
-            lease = {};
-            if (!freeLease) {
-                freeLease = &lease;
+            if (!lease.mount.mounted) {
+                lease = {};
+                if (!freeLease) {
+                    freeLease = &lease;
+                }
             }
         }
     }
@@ -363,6 +493,7 @@ void WINAPI OnTaskbarFrameLayout(void* privateTaskbarFrame) {
         profile,
         CurrentWeatherModel(),
         slot,
+        &QueueWeatherOpenRequest,
         lease->mount);
     switch (mountStatus) {
         case TaskbarMountStatus::Mounted:
@@ -466,14 +597,21 @@ TaskbarHostControllerResult StartTaskbarWeatherController() noexcept {
 }
 
 TaskbarHostControllerResult StopTaskbarWeatherController() noexcept {
-    if (!StopWeatherPipeWorker()) {
-        Runtime().lastResult.store(
-            TaskbarHostControllerResult::StopRejected,
-            std::memory_order_release);
-        return TaskbarHostControllerResult::StopRejected;
+    // Disable producer-side signalling before joining the worker. The
+    // exclusive lock drains any click callback currently inside SetEvent.
+    DisableWeatherActivationRequests();
+    const bool workerStopped = StopWeatherPipeWorker();
+
+    // Always attempt XAML restoration, even if the worker missed its bounded
+    // stop deadline. A retained Click token is a separate cleanup obligation.
+    const TaskbarDetourResult detourResult =
+        StopTaskbarFrameDetour(&RestoreAllTaskbarFrames);
+    TaskbarHostControllerResult result = MapStopResult(detourResult);
+    if (!workerStopped ||
+        (detourResult != TaskbarDetourResult::Removed &&
+         detourResult != TaskbarDetourResult::NotActive)) {
+        result = TaskbarHostControllerResult::StopRejected;
     }
-    const TaskbarHostControllerResult result = MapStopResult(
-        StopTaskbarFrameDetour(&RestoreAllTaskbarFrames));
     Runtime().lastResult.store(result, std::memory_order_release);
     return result;
 }

@@ -5,6 +5,8 @@
 #include "weather_view_model.h"
 #include "weather_xaml_view.h"
 
+#include <Windows.h>
+
 #include <winrt/Windows.UI.Xaml.Controls.h>
 
 #include <cstdint>
@@ -33,6 +35,11 @@ enum class TaskbarMountStatus : std::uint32_t {
     SlotGeometryInvalid = 13,
 };
 
+// The callback is deliberately stateless. It is invoked on the taskbar's
+// XAML thread and must only enqueue work for the retained worker; it must not
+// capture a frame, a lease, or perform pipe I/O.
+using WeatherButtonActivationCallback = void(WINAPI*)() noexcept;
+
 struct TaskbarMountGateInput {
     TaskbarTreeProbeStatus treeStatus =
         TaskbarTreeProbeStatus::XamlTreeUnavailable;
@@ -56,7 +63,9 @@ struct TaskbarWeatherMountState {
     winrt::weak_ref<winrt::Windows::UI::Xaml::Controls::TextBlock>
         temperature;
     winrt::weak_ref<winrt::Windows::UI::Xaml::Controls::TextBlock> condition;
+    winrt::event_token clickToken{};
     std::uint32_t ownerThreadId = 0;
+    bool clickAttached = false;
     bool mounted = false;
 };
 
@@ -64,6 +73,7 @@ TaskbarMountStatus MountWeatherButton(
     const TaskbarTreeProfile& profile,
     const WeatherViewModel& model,
     const TaskbarSlotProbeResult& slotProbe,
+    WeatherButtonActivationCallback activationCallback,
     TaskbarWeatherMountState& state) noexcept;
 
 TaskbarMountStatus UpdateWeatherButton(

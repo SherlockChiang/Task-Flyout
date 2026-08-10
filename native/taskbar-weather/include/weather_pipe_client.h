@@ -60,4 +60,24 @@ WeatherPipeQueryResult QueryWeatherPipe(
 const wchar_t* WeatherPipeQueryStatusName(
     WeatherPipeQueryStatus status) noexcept;
 
+enum class WeatherPipeActivationStatus : std::uint32_t {
+    Queued = 0,
+    PipeUnavailable = 1,
+    IoFailed = 2,
+    InvalidResponse = 3,
+    Rejected = 4,
+    Cancelled = 5,
+};
+
+WeatherPipeActivationStatus ParseWeatherOpenResponse(
+    std::wstring_view responseJson) noexcept;
+
+// Requests app-owned navigation without performing work on the XAML thread.
+// The caller should invoke this only from the retained pipe worker.
+WeatherPipeActivationStatus RequestWeatherOpen(
+    HANDLE cancellationEvent = nullptr) noexcept;
+
+const wchar_t* WeatherPipeActivationStatusName(
+    WeatherPipeActivationStatus status) noexcept;
+
 }  // namespace taskflyout::taskbar

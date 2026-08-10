@@ -27,6 +27,8 @@ constexpr std::uint64_t kSnapshotFutureToleranceTicks =
     5u * 60u * kFileTimeTicksPerSecond;
 constexpr char kSnapshotRequest[] =
     R"({"version":1,"command":"get-snapshot"})";
+constexpr char kOpenWeatherRequest[] =
+    R"({"version":1,"command":"open-weather"})";
 
 class HandleGuard final {
 public:
@@ -537,6 +539,98 @@ std::wstring GetBoundedJsonString(
     return std::wstring(value.data(), value.size());
 }
 
+enum class WeatherPipeExchangeStatus : std::uint32_t {
+    Completed,
+    PipeUnavailable,
+    IoFailed,
+    Cancelled,
+};
+
+struct WeatherPipeExchangeResult {
+    WeatherPipeExchangeStatus status =
+        WeatherPipeExchangeStatus::IoFailed;
+    std::vector<std::uint8_t> response;
+};
+
+WeatherPipeExchangeResult ExchangeWeatherPipe(
+    const std::string_view request,
+    const HANDLE cancellationEvent) noexcept {
+    WeatherPipeExchangeResult result;
+    try {
+        if (IsCancellationRequested(cancellationEvent)) {
+            result.status = WeatherPipeExchangeStatus::Cancelled;
+            return result;
+        }
+        const ULONGLONG queryStartedTicks = GetTickCount64();
+        const std::wstring pipePath = BuildWeatherPipePath();
+        if (pipePath.empty()) {
+            result.status = WeatherPipeExchangeStatus::PipeUnavailable;
+            return result;
+        }
+        const DWORD remainingQueryWait =
+            RemainingQueryWaitMilliseconds(queryStartedTicks);
+        if (remainingQueryWait == 0) {
+            return result;
+        }
+        const DWORD connectWait =
+            remainingQueryWait < kPipeConnectWaitMilliseconds
+                ? remainingQueryWait
+                : kPipeConnectWaitMilliseconds;
+        if (!WaitNamedPipeW(pipePath.c_str(), connectWait)) {
+            result.status = IsCancellationRequested(cancellationEvent)
+                ? WeatherPipeExchangeStatus::Cancelled
+                : WeatherPipeExchangeStatus::PipeUnavailable;
+            return result;
+        }
+        if (IsCancellationRequested(cancellationEvent)) {
+            result.status = WeatherPipeExchangeStatus::Cancelled;
+            return result;
+        }
+
+        HandleGuard pipe(CreateFileW(
+            pipePath.c_str(),
+            GENERIC_READ | GENERIC_WRITE,
+            0,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_FLAG_OVERLAPPED,
+            nullptr));
+        if (!pipe.get() || pipe.get() == INVALID_HANDLE_VALUE) {
+            return result;
+        }
+
+        DWORD mode = PIPE_READMODE_BYTE;
+        if (!SetNamedPipeHandleState(pipe.get(), &mode, nullptr, nullptr) ||
+            !WritePipeFrame(
+                pipe.get(),
+                request,
+                cancellationEvent,
+                queryStartedTicks)) {
+            result.status = IsCancellationRequested(cancellationEvent)
+                ? WeatherPipeExchangeStatus::Cancelled
+                : WeatherPipeExchangeStatus::IoFailed;
+            return result;
+        }
+
+        if (!ReadPipeFrame(
+                pipe.get(),
+                result.response,
+                cancellationEvent,
+                queryStartedTicks)) {
+            result.status = IsCancellationRequested(cancellationEvent)
+                ? WeatherPipeExchangeStatus::Cancelled
+                : WeatherPipeExchangeStatus::IoFailed;
+            return result;
+        }
+        result.status = IsCancellationRequested(cancellationEvent)
+            ? WeatherPipeExchangeStatus::Cancelled
+            : WeatherPipeExchangeStatus::Completed;
+        return result;
+    } catch (...) {
+        return result;
+    }
+}
+
 }  // namespace
 
 WeatherSnapshotFreshness EvaluateWeatherSnapshotFreshness(
@@ -635,80 +729,24 @@ WeatherPipeQueryResult QueryWeatherPipe(
     const HANDLE cancellationEvent) noexcept {
     WeatherPipeQueryResult result;
     try {
-        if (IsCancellationRequested(cancellationEvent)) {
-            result.status = WeatherPipeQueryStatus::Cancelled;
-            return result;
-        }
-        const ULONGLONG queryStartedTicks = GetTickCount64();
-        const std::wstring pipePath = BuildWeatherPipePath();
-        if (pipePath.empty()) {
-            result.status = WeatherPipeQueryStatus::PipeUnavailable;
-            return result;
-        }
-        const DWORD remainingQueryWait =
-            RemainingQueryWaitMilliseconds(queryStartedTicks);
-        if (remainingQueryWait == 0) {
-            result.status = WeatherPipeQueryStatus::IoFailed;
-            return result;
-        }
-        const DWORD connectWait =
-            remainingQueryWait < kPipeConnectWaitMilliseconds
-                ? remainingQueryWait
-                : kPipeConnectWaitMilliseconds;
-        if (!WaitNamedPipeW(pipePath.c_str(), connectWait)) {
-            result.status = IsCancellationRequested(cancellationEvent)
-                ? WeatherPipeQueryStatus::Cancelled
-                : WeatherPipeQueryStatus::PipeUnavailable;
-            return result;
-        }
-        if (IsCancellationRequested(cancellationEvent)) {
-            result.status = WeatherPipeQueryStatus::Cancelled;
-            return result;
+        const WeatherPipeExchangeResult exchange = ExchangeWeatherPipe(
+            kSnapshotRequest,
+            cancellationEvent);
+        switch (exchange.status) {
+            case WeatherPipeExchangeStatus::PipeUnavailable:
+                result.status = WeatherPipeQueryStatus::PipeUnavailable;
+                return result;
+            case WeatherPipeExchangeStatus::IoFailed:
+                result.status = WeatherPipeQueryStatus::IoFailed;
+                return result;
+            case WeatherPipeExchangeStatus::Cancelled:
+                result.status = WeatherPipeQueryStatus::Cancelled;
+                return result;
+            case WeatherPipeExchangeStatus::Completed:
+                break;
         }
 
-        HandleGuard pipe(CreateFileW(
-            pipePath.c_str(),
-            GENERIC_READ | GENERIC_WRITE,
-            0,
-            nullptr,
-            OPEN_EXISTING,
-            FILE_FLAG_OVERLAPPED,
-            nullptr));
-        if (!pipe.get() || pipe.get() == INVALID_HANDLE_VALUE) {
-            result.status = WeatherPipeQueryStatus::IoFailed;
-            return result;
-        }
-
-        DWORD mode = PIPE_READMODE_BYTE;
-        if (!SetNamedPipeHandleState(pipe.get(), &mode, nullptr, nullptr) ||
-            !WritePipeFrame(
-                pipe.get(),
-                kSnapshotRequest,
-                cancellationEvent,
-                queryStartedTicks)) {
-            result.status = IsCancellationRequested(cancellationEvent)
-                ? WeatherPipeQueryStatus::Cancelled
-                : WeatherPipeQueryStatus::IoFailed;
-            return result;
-        }
-
-        std::vector<std::uint8_t> response;
-        if (!ReadPipeFrame(
-                pipe.get(),
-                response,
-                cancellationEvent,
-                queryStartedTicks)) {
-            result.status = IsCancellationRequested(cancellationEvent)
-                ? WeatherPipeQueryStatus::Cancelled
-                : WeatherPipeQueryStatus::IoFailed;
-            return result;
-        }
-        if (IsCancellationRequested(cancellationEvent)) {
-            result.status = WeatherPipeQueryStatus::Cancelled;
-            return result;
-        }
-
-        const std::wstring responseJson = Utf8ToWide(response);
+        const std::wstring responseJson = Utf8ToWide(exchange.response);
         if (responseJson.empty()) {
             result.status = WeatherPipeQueryStatus::InvalidResponse;
             return result;
@@ -724,6 +762,56 @@ WeatherPipeQueryResult QueryWeatherPipe(
     } catch (...) {
         result.status = WeatherPipeQueryStatus::InvalidResponse;
         return result;
+    }
+}
+
+WeatherPipeActivationStatus ParseWeatherOpenResponse(
+    const std::wstring_view responseJson) noexcept {
+    if (responseJson.empty()) {
+        return WeatherPipeActivationStatus::InvalidResponse;
+    }
+    try {
+        const auto root =
+            winrt::Windows::Data::Json::JsonObject::Parse(
+                std::wstring(responseJson));
+        if (root.GetNamedNumber(L"version", -1.0) != 1.0) {
+            return WeatherPipeActivationStatus::InvalidResponse;
+        }
+        const winrt::hstring status = root.GetNamedString(L"status", {});
+        if (status == L"ok") {
+            return WeatherPipeActivationStatus::Queued;
+        }
+        if (status == L"unavailable") {
+            return WeatherPipeActivationStatus::Rejected;
+        }
+    } catch (...) {
+    }
+    return WeatherPipeActivationStatus::InvalidResponse;
+}
+
+WeatherPipeActivationStatus RequestWeatherOpen(
+    const HANDLE cancellationEvent) noexcept {
+    try {
+        const WeatherPipeExchangeResult exchange = ExchangeWeatherPipe(
+            kOpenWeatherRequest,
+            cancellationEvent);
+        switch (exchange.status) {
+            case WeatherPipeExchangeStatus::PipeUnavailable:
+                return WeatherPipeActivationStatus::PipeUnavailable;
+            case WeatherPipeExchangeStatus::IoFailed:
+                return WeatherPipeActivationStatus::IoFailed;
+            case WeatherPipeExchangeStatus::Cancelled:
+                return WeatherPipeActivationStatus::Cancelled;
+            case WeatherPipeExchangeStatus::Completed:
+                break;
+        }
+        const std::wstring responseJson = Utf8ToWide(exchange.response);
+        if (responseJson.empty()) {
+            return WeatherPipeActivationStatus::InvalidResponse;
+        }
+        return ParseWeatherOpenResponse(responseJson);
+    } catch (...) {
+        return WeatherPipeActivationStatus::InvalidResponse;
     }
 }
 
@@ -743,6 +831,25 @@ const wchar_t* WeatherPipeQueryStatusName(
         case WeatherPipeQueryStatus::StaleSnapshot:
             return L"stale-snapshot";
         case WeatherPipeQueryStatus::Cancelled:
+            return L"cancelled";
+    }
+    return L"unknown";
+}
+
+const wchar_t* WeatherPipeActivationStatusName(
+    const WeatherPipeActivationStatus status) noexcept {
+    switch (status) {
+        case WeatherPipeActivationStatus::Queued:
+            return L"queued";
+        case WeatherPipeActivationStatus::PipeUnavailable:
+            return L"pipe-unavailable";
+        case WeatherPipeActivationStatus::IoFailed:
+            return L"io-failed";
+        case WeatherPipeActivationStatus::InvalidResponse:
+            return L"invalid-response";
+        case WeatherPipeActivationStatus::Rejected:
+            return L"rejected";
+        case WeatherPipeActivationStatus::Cancelled:
             return L"cancelled";
     }
     return L"unknown";

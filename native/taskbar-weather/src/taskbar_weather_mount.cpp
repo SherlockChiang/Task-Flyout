@@ -6,12 +6,14 @@
 #include <winrt/Windows.UI.Core.h>
 #include <winrt/Windows.UI.Xaml.Automation.h>
 #include <winrt/Windows.UI.Xaml.Controls.h>
+#include <winrt/Windows.UI.Xaml.Controls.Primitives.h>
 
 namespace taskflyout::taskbar {
 namespace {
 
 using winrt::Windows::UI::Xaml::Controls::Button;
 using winrt::Windows::UI::Xaml::Controls::Grid;
+using winrt::Windows::UI::Xaml::Controls::Primitives::IButtonBase;
 using winrt::Windows::UI::Xaml::HorizontalAlignment;
 using winrt::Windows::UI::Xaml::Thickness;
 using winrt::Windows::UI::Xaml::VerticalAlignment;
@@ -99,7 +101,10 @@ bool IsOwnedButton(
 
 Button CreateWeatherButton(
     const WeatherXamlView& view,
-    const TaskbarSlotRectDips& candidate) {
+    const TaskbarSlotRectDips& candidate,
+    const WeatherButtonActivationCallback activationCallback,
+    winrt::event_token& clickToken,
+    bool& clickAttached) {
     if (!ValidateWeatherXamlView(view)) {
         throw winrt::hresult_error(E_INVALIDARG);
     }
@@ -126,7 +131,46 @@ Button CreateWeatherButton(
     button.VerticalAlignment(VerticalAlignment::Top);
     button.HorizontalContentAlignment(HorizontalAlignment::Stretch);
     button.VerticalContentAlignment(VerticalAlignment::Center);
+    if (activationCallback) {
+        clickToken = button.Click(
+            [activationCallback](
+                const winrt::Windows::Foundation::IInspectable&,
+                const winrt::Windows::UI::Xaml::RoutedEventArgs&) noexcept {
+                activationCallback();
+            });
+        clickAttached = true;
+    }
     return button;
+}
+
+bool DetachWeatherButtonClick(
+    const Button& button,
+    winrt::event_token& clickToken,
+    bool& clickAttached) noexcept {
+    if (!clickAttached) {
+        return true;
+    }
+    try {
+        if (!button) {
+            // The event source has already been destroyed. There is no live
+            // handler left to revoke, so dropping the token is safe.
+            clickAttached = false;
+            clickToken = {};
+            return true;
+        }
+        const auto buttonBase = button.as<IButtonBase>();
+        auto* buttonAbi = reinterpret_cast<winrt::impl::abi_t<IButtonBase>*>(
+            winrt::get_abi(buttonBase));
+        if (!buttonAbi || FAILED(static_cast<HRESULT>(
+                buttonAbi->remove_Click(clickToken)))) {
+            return false;
+        }
+        clickAttached = false;
+        clickToken = {};
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 }  // namespace
@@ -155,7 +199,11 @@ TaskbarMountStatus MountWeatherButton(
     const TaskbarTreeProfile& profile,
     const WeatherViewModel& model,
     const TaskbarSlotProbeResult& slotProbe,
+    const WeatherButtonActivationCallback activationCallback,
     TaskbarWeatherMountState& state) noexcept {
+    if (!activationCallback) {
+        return TaskbarMountStatus::InvalidState;
+    }
     if (profile.status != TaskbarTreeProbeStatus::LandmarksMatched ||
         !profile.rootGrid || !profile.frame) {
         return TaskbarMountStatus::TreeNotReady;
@@ -223,13 +271,20 @@ TaskbarMountStatus MountWeatherButton(
         return gateStatus;
     }
     if (state.mounted) {
-        const auto stateRoot = state.rootGrid.get();
-        const auto stateButton = state.button.get();
+        Grid stateRoot{nullptr};
+        Button stateButton{nullptr};
+        try {
+            stateRoot = state.rootGrid.get();
+            stateButton = state.button.get();
+        } catch (...) {
+            return TaskbarMountStatus::InvalidState;
+        }
         if (!stateRoot || !stateButton) {
-            if (state.ownerThreadId != GetCurrentThreadId()) {
-                return TaskbarMountStatus::WrongOwnerThread;
+            const TaskbarMountStatus restoreStatus =
+                RestoreWeatherButton(state);
+            if (restoreStatus != TaskbarMountStatus::Restored) {
+                return restoreStatus;
             }
-            state = {};
         } else if (stateRoot == profile.rootGrid &&
                    IsOnOwnerThread(state)) {
             const auto updateStatus = UpdateWeatherButton(model, state);
@@ -243,6 +298,8 @@ TaskbarMountStatus MountWeatherButton(
 
     Button button{nullptr};
     WeatherXamlView view;
+    winrt::event_token clickToken{};
+    bool clickAttached = false;
     try {
         view = CreateWeatherXamlView(model);
     } catch (...) {
@@ -250,7 +307,12 @@ TaskbarMountStatus MountWeatherButton(
     }
 
     try {
-        button = CreateWeatherButton(view, geometry.candidate);
+        button = CreateWeatherButton(
+            view,
+            geometry.candidate,
+            activationCallback,
+            clickToken,
+            clickAttached);
         const std::uint32_t rowCount =
             profile.rootGrid.RowDefinitions().Size();
         const std::uint32_t columnCount =
@@ -263,29 +325,49 @@ TaskbarMountStatus MountWeatherButton(
         Grid::SetColumn(button, 0);
         Grid::SetRowSpan(button, rowCount == 0 ? 1 : rowCount);
         Grid::SetColumnSpan(button, columnCount == 0 ? 1 : columnCount);
-        profile.rootGrid.Children().Append(button);
-
+        // Publish all recovery metadata before append. If append succeeds but
+        // a later operation fails, quarantine/stop can still identify the
+        // exact Button and retry cleanup on this owner thread.
         state.rootGrid = profile.rootGrid;
         state.button = button;
         state.viewRoot = view.root;
         state.icon = view.icon;
         state.temperature = view.temperature;
         state.condition = view.condition;
+        state.clickToken = clickToken;
         state.ownerThreadId = GetCurrentThreadId();
+        state.clickAttached = clickAttached;
+        state.mounted = false;
+
+        profile.rootGrid.Children().Append(button);
         state.mounted = true;
         return TaskbarMountStatus::Mounted;
     } catch (...) {
-        // If append succeeded but state publication failed, the button is
-        // still discoverable by its exact object identity in the root grid.
-        bool rollbackComplete = true;
+        // If append partially succeeded, the button is still discoverable by
+        // its exact object identity in the root grid.
+        bool rollbackComplete = DetachWeatherButtonClick(
+            button,
+            clickToken,
+            clickAttached);
         try {
             if (profile.rootGrid && button) {
                 const auto removal = RemoveExactChildIfPresent(
                     profile.rootGrid, button);
-                rollbackComplete = removal != ExactChildRemoval::Failed;
+                rollbackComplete = rollbackComplete &&
+                    removal != ExactChildRemoval::Failed;
             }
         } catch (...) {
             rollbackComplete = false;
+        }
+        if (rollbackComplete) {
+            state = {};
+        } else {
+            // State was fully prepared before append. Preserve whether token
+            // revocation succeeded and conservatively retain ownership for a
+            // later restore attempt if exact-child removal could not finish.
+            state.clickToken = clickToken;
+            state.clickAttached = clickAttached;
+            state.mounted = true;
         }
         return rollbackComplete
             ? TaskbarMountStatus::AppendFailed
@@ -331,14 +413,31 @@ TaskbarMountStatus RestoreWeatherButton(
         return TaskbarMountStatus::WrongOwnerThread;
     }
 
-    const auto rootGrid = state.rootGrid.get();
-    const auto button = state.button.get();
-    if (!rootGrid || !button) {
+    Grid rootGrid{nullptr};
+    Button button{nullptr};
+    try {
+        rootGrid = state.rootGrid.get();
+        button = state.button.get();
+    } catch (...) {
+        return TaskbarMountStatus::RestoreFailed;
+    }
+    if (!button) {
+        // A dead event source cannot retain the callback.
         state = {};
         return TaskbarMountStatus::Restored;
     }
     if (!IsOnOwnerThread(state)) {
         return TaskbarMountStatus::WrongOwnerThread;
+    }
+    if (!DetachWeatherButtonClick(
+            button,
+            state.clickToken,
+            state.clickAttached)) {
+        return TaskbarMountStatus::RestoreFailed;
+    }
+    if (!rootGrid) {
+        state = {};
+        return TaskbarMountStatus::Restored;
     }
     // The saved COM identity is the ownership token. Name, automation, and
     // Content are intentionally not required for restore because Explorer or
