@@ -63,6 +63,18 @@ int wmain() {
             std::wstring_view(L"rollback-failed"),
         L"rollback failure should remain diagnosable");
 
+    auto cleanup = EvaluateTaskbarMountRollback(
+        true,
+        false);
+    passed &= Expect(
+        cleanup.clickAttached && !cleanup.childPresent &&
+            HasTaskbarMountCleanupObligations(cleanup),
+        L"removed child must not remain an obligation after token failure");
+    cleanup.clickAttached = false;
+    passed &= Expect(
+        !HasTaskbarMountCleanupObligations(cleanup),
+        L"a later successful token revoke must release the retained lease");
+
     if (!passed) {
         return 1;
     }

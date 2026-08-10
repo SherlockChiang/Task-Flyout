@@ -23,6 +23,18 @@ bool Expect(bool condition, const wchar_t* message) {
 int wmain() {
     bool passed = true;
     passed &= Expect(
+        taskflyout::taskbar::PlanTaskbarDetourStop(
+            taskflyout::taskbar::TaskbarDetourState::Quarantined,
+            true) ==
+            taskflyout::taskbar::TaskbarDetourStopAction::RestoreOnly,
+        L"quarantined owner-thread stop must retry XAML restoration");
+    passed &= Expect(
+        taskflyout::taskbar::PlanTaskbarDetourStop(
+            taskflyout::taskbar::TaskbarDetourState::Quarantined,
+            false) ==
+            taskflyout::taskbar::TaskbarDetourStopAction::WrongTaskbarThread,
+        L"quarantined restore must remain on the bootstrap thread");
+    passed &= Expect(
         !taskflyout::taskbar::IsInsideTaskbarFrameCallback(
             reinterpret_cast<void*>(1)),
         L"private frame lifetime token must be false outside callback");

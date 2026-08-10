@@ -41,6 +41,14 @@ enum class TaskbarDetourResult : std::uint32_t {
     CallbackFailed = 19,
 };
 
+enum class TaskbarDetourStopAction : std::uint32_t {
+    NotActive = 0,
+    Busy = 1,
+    WrongTaskbarThread = 2,
+    StopAndRemove = 3,
+    RestoreOnly = 4,
+};
+
 struct TaskbarDetourSnapshot {
     TaskbarDetourState state = TaskbarDetourState::Dormant;
     TaskbarDetourResult lastResult =
@@ -63,6 +71,10 @@ TaskbarDetourResult StartTaskbarFrameDetour(
 
 TaskbarDetourResult StopTaskbarFrameDetour(
     TaskbarRestoreCallback restore) noexcept;
+
+TaskbarDetourStopAction PlanTaskbarDetourStop(
+    TaskbarDetourState state,
+    bool onBootstrapThread) noexcept;
 
 TaskbarDetourSnapshot GetTaskbarDetourSnapshot() noexcept;
 

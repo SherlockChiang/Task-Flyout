@@ -555,3 +555,16 @@ transport foundation for the standalone host.
 - Mode parsing, serialization, fallback, provider dependency, and active-host
   behavior pass all 26 focused policy/settings tests. Broker lifecycle control,
   localized UI, and privacy-safe runtime diagnostics remain pending under M3-07.
+
+### 2026-08-11 Native Quarantine Cleanup Retry
+
+- Quarantined detours now keep the host pinned but permit an owner-thread
+  restore-only stop attempt. This retries XAML lease restoration and Click-token
+  revocation without pretending that the private hook can be safely unloaded.
+- Mount rollback tracks the Click token and exact child removal as separate
+  obligations. If the child was already removed, a later successful token
+  revocation can now release the retained lease instead of remaining stuck in
+  `mounted` state.
+- The native Release build, forbidden-import inspection, and all 12 tests pass;
+  the read-only probe still reports `taskbar-window-missing`, so no Explorer
+  injection was attempted.

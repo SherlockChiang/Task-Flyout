@@ -370,6 +370,29 @@ TaskbarDetourResult RollBackInstallation(
 
 }  // namespace
 
+TaskbarDetourStopAction PlanTaskbarDetourStop(
+    const TaskbarDetourState state,
+    const bool onBootstrapThread) noexcept {
+    switch (state) {
+        case TaskbarDetourState::Dormant:
+        case TaskbarDetourState::Removed:
+            return TaskbarDetourStopAction::NotActive;
+        case TaskbarDetourState::Active:
+            return onBootstrapThread
+                ? TaskbarDetourStopAction::StopAndRemove
+                : TaskbarDetourStopAction::WrongTaskbarThread;
+        case TaskbarDetourState::Quarantined:
+            return onBootstrapThread
+                ? TaskbarDetourStopAction::RestoreOnly
+                : TaskbarDetourStopAction::WrongTaskbarThread;
+        case TaskbarDetourState::Validating:
+        case TaskbarDetourState::Installing:
+        case TaskbarDetourState::Stopping:
+            return TaskbarDetourStopAction::Busy;
+    }
+    return TaskbarDetourStopAction::Busy;
+}
+
 TaskbarDetourResult StartTaskbarFrameDetour(
     TaskbarFrameLayoutCallback callback) noexcept {
     if (!callback) {
@@ -497,6 +520,7 @@ TaskbarDetourResult StopTaskbarFrameDetour(
     bool hookEnabled = false;
     bool hookCreated = false;
     bool minHookInitialized = false;
+    bool restoreOnly = false;
     {
         // Only transition state while holding the lock.  The callbacks below
         // are application/XAML code and must never run while this lock is held:
@@ -504,38 +528,55 @@ TaskbarDetourResult StopTaskbarFrameDetour(
         ExclusiveRuntimeLock lock;
         const TaskbarDetourState state =
             g_state.load(std::memory_order_acquire);
-        if (state == TaskbarDetourState::Dormant ||
-            state == TaskbarDetourState::Removed) {
-            RecordResult(TaskbarDetourResult::NotActive);
-            return TaskbarDetourResult::NotActive;
+        const TaskbarDetourStopAction action = PlanTaskbarDetourStop(
+            state,
+            g_bootstrapThreadId != 0 &&
+                GetCurrentThreadId() == g_bootstrapThreadId);
+        switch (action) {
+            case TaskbarDetourStopAction::NotActive:
+                RecordResult(TaskbarDetourResult::NotActive);
+                return TaskbarDetourResult::NotActive;
+            case TaskbarDetourStopAction::Busy:
+                RecordResult(TaskbarDetourResult::Busy);
+                return TaskbarDetourResult::Busy;
+            case TaskbarDetourStopAction::WrongTaskbarThread:
+                RecordResult(TaskbarDetourResult::WrongTaskbarThread);
+                return TaskbarDetourResult::WrongTaskbarThread;
+            case TaskbarDetourStopAction::RestoreOnly:
+                // Quarantine keeps the hook/module pinned, but it must not
+                // strand a recoverable XAML lease or Click token forever.
+                g_callback.store(nullptr, std::memory_order_release);
+                restoreOnly = true;
+                break;
+            case TaskbarDetourStopAction::StopAndRemove:
+                g_state.store(TaskbarDetourState::Stopping,
+                              std::memory_order_release);
+                g_callback.store(nullptr, std::memory_order_release);
+                hookTarget = g_taskbarModule.hookTarget;
+                hookEnabled = g_hookEnabled;
+                hookCreated = g_hookCreated;
+                minHookInitialized = g_minHookInitialized;
+                break;
         }
-        if (state == TaskbarDetourState::Quarantined) {
-            RecordResult(TaskbarDetourResult::Quarantined);
-            return TaskbarDetourResult::Quarantined;
-        }
-        if (state != TaskbarDetourState::Active ||
-            GetCurrentThreadId() != g_bootstrapThreadId) {
-            const TaskbarDetourResult result =
-                state == TaskbarDetourState::Active
-                    ? TaskbarDetourResult::WrongTaskbarThread
-                    : TaskbarDetourResult::Busy;
-            RecordResult(result);
-            return result;
-        }
-
-        g_state.store(TaskbarDetourState::Stopping,
-                      std::memory_order_release);
-        g_callback.store(nullptr, std::memory_order_release);
-        hookTarget = g_taskbarModule.hookTarget;
-        hookEnabled = g_hookEnabled;
-        hookCreated = g_hookCreated;
-        minHookInitialized = g_minHookInitialized;
     }
 
     // No new custom callback can start after the state transition.  Drain any
     // callback which raced with it before touching the XAML tree.
     if (!DrainCustomCallbacks()) {
         return Quarantine(TaskbarDetourResult::DrainTimedOut);
+    }
+
+    if (restoreOnly) {
+        bool restored = false;
+        try {
+            restored = restore();
+        } catch (...) {
+            restored = false;
+        }
+        return Quarantine(
+            restored
+                ? TaskbarDetourResult::Quarantined
+                : TaskbarDetourResult::RestoreFailed);
     }
 
     // Disable first, then publish a null original before waiting for entries

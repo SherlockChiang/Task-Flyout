@@ -48,8 +48,20 @@ struct TaskbarMountGateInput {
     bool ownerThread = false;
 };
 
+struct TaskbarMountCleanupObligations {
+    bool clickAttached = false;
+    bool childPresent = false;
+};
+
 TaskbarMountStatus EvaluateTaskbarMountGate(
     const TaskbarMountGateInput& input) noexcept;
+
+TaskbarMountCleanupObligations EvaluateTaskbarMountRollback(
+    bool clickAttached,
+    bool childRemovalFailed) noexcept;
+
+bool HasTaskbarMountCleanupObligations(
+    const TaskbarMountCleanupObligations& obligations) noexcept;
 
 // This state contains weak apartment-affine references. Create, update,
 // restore, and destroy it on the same TaskbarFrame XAML owner thread. It is
@@ -66,6 +78,7 @@ struct TaskbarWeatherMountState {
     winrt::event_token clickToken{};
     std::uint32_t ownerThreadId = 0;
     bool clickAttached = false;
+    bool childPresent = false;
     bool mounted = false;
 };
 

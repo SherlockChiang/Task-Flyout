@@ -195,6 +195,19 @@ TaskbarMountStatus EvaluateTaskbarMountGate(
     return TaskbarMountStatus::Mounted;
 }
 
+TaskbarMountCleanupObligations EvaluateTaskbarMountRollback(
+    const bool clickAttached,
+    const bool childRemovalFailed) noexcept {
+    return TaskbarMountCleanupObligations{
+        clickAttached,
+        childRemovalFailed};
+}
+
+bool HasTaskbarMountCleanupObligations(
+    const TaskbarMountCleanupObligations& obligations) noexcept {
+    return obligations.clickAttached || obligations.childPresent;
+}
+
 TaskbarMountStatus MountWeatherButton(
     const TaskbarTreeProfile& profile,
     const WeatherViewModel& model,
@@ -337,36 +350,47 @@ TaskbarMountStatus MountWeatherButton(
         state.clickToken = clickToken;
         state.ownerThreadId = GetCurrentThreadId();
         state.clickAttached = clickAttached;
+        state.childPresent = false;
         state.mounted = false;
 
         profile.rootGrid.Children().Append(button);
+        state.childPresent = true;
         state.mounted = true;
         return TaskbarMountStatus::Mounted;
     } catch (...) {
         // If append partially succeeded, the button is still discoverable by
         // its exact object identity in the root grid.
-        bool rollbackComplete = DetachWeatherButtonClick(
+        DetachWeatherButtonClick(
             button,
             clickToken,
             clickAttached);
+        bool childRemovalFailed = false;
         try {
             if (profile.rootGrid && button) {
                 const auto removal = RemoveExactChildIfPresent(
                     profile.rootGrid, button);
-                rollbackComplete = rollbackComplete &&
-                    removal != ExactChildRemoval::Failed;
+                childRemovalFailed =
+                    removal == ExactChildRemoval::Failed;
             }
         } catch (...) {
-            rollbackComplete = false;
+            childRemovalFailed = true;
         }
+        const TaskbarMountCleanupObligations obligations =
+            EvaluateTaskbarMountRollback(
+                clickAttached,
+                childRemovalFailed);
+        const bool rollbackComplete =
+            !HasTaskbarMountCleanupObligations(obligations);
         if (rollbackComplete) {
             state = {};
         } else {
-            // State was fully prepared before append. Preserve whether token
-            // revocation succeeded and conservatively retain ownership for a
-            // later restore attempt if exact-child removal could not finish.
+            // Token revocation and exact-child removal are independent cleanup
+            // obligations. Preserve only the obligations which remain so a
+            // later restore cannot mistake an already removed child for an
+            // external mutation.
             state.clickToken = clickToken;
-            state.clickAttached = clickAttached;
+            state.clickAttached = obligations.clickAttached;
+            state.childPresent = obligations.childPresent;
             state.mounted = true;
         }
         return rollbackComplete
@@ -378,10 +402,11 @@ TaskbarMountStatus MountWeatherButton(
 TaskbarMountStatus UpdateWeatherButton(
     const WeatherViewModel& model,
     TaskbarWeatherMountState& state) noexcept {
-    if (!state.mounted || !IsOnOwnerThread(state)) {
-        return state.mounted
-            ? TaskbarMountStatus::WrongOwnerThread
-            : TaskbarMountStatus::InvalidState;
+    if (!state.mounted || !state.childPresent) {
+        return TaskbarMountStatus::InvalidState;
+    }
+    if (!IsOnOwnerThread(state)) {
+        return TaskbarMountStatus::WrongOwnerThread;
     }
     try {
         const auto rootGrid = state.rootGrid.get();
@@ -435,6 +460,10 @@ TaskbarMountStatus RestoreWeatherButton(
             state.clickAttached)) {
         return TaskbarMountStatus::RestoreFailed;
     }
+    if (!state.childPresent) {
+        state = {};
+        return TaskbarMountStatus::Restored;
+    }
     if (!rootGrid) {
         state = {};
         return TaskbarMountStatus::Restored;
@@ -445,6 +474,7 @@ TaskbarMountStatus RestoreWeatherButton(
     // Update remains strict and stops before touching a changed element.
     switch (RemoveExactChildIfPresent(rootGrid, button)) {
         case ExactChildRemoval::Removed:
+            state.childPresent = false;
             state = {};
             return TaskbarMountStatus::Restored;
         case ExactChildRemoval::Absent:
