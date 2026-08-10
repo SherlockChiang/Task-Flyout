@@ -392,3 +392,17 @@ transport foundation for the standalone host.
   keeps only weak XAML references between callbacks. Six native Release tests
   pass; the host entry hook remains inert and Explorer was not loaded or
   changed.
+
+### 2026-08-10 Default-deny Left Slot Geometry Policy
+
+- Added a pure DIP geometry strategy for a left-anchored, vertically centered
+  weather-button candidate. It accepts only a caller-proven current structure
+  and blocker snapshot; either unknown flag returns `unknown-structure` and no
+  actionable candidate.
+- Frame, `RootGrid`, requested size, gap, and every blocker rectangle are
+  finite and bounded. NaN, infinity, endpoint overflow, undersized slots, a
+  root outside its frame, and more than 64 interactive blockers fail closed.
+- Collision uses the requested safety gap on all four sides and distinguishes
+  a usable candidate from an occupied one without reading or mutating XAML.
+  It is not yet connected to the mount lease or entry hook, so this stage does
+  not inject into or otherwise modify Explorer.
