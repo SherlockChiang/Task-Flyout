@@ -332,6 +332,7 @@ HostControlDispatchResult DispatchHostControl(
         return result;
     }
     const std::uint32_t nonce = CreateControlNonce();
+    result.controlNonce = nonce;
 
     const std::wstring resolvedHostPath = ResolveHostPath(hostPath);
     if (resolvedHostPath.empty()) {

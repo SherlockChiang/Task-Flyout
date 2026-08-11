@@ -38,6 +38,7 @@ struct HostControlDispatchResult {
     DWORD threadId = 0;
     UINT messageId = 0;
     UINT acknowledgementMessageId = 0;
+    std::uint32_t controlNonce = 0;
     HostControlAcknowledgement acknowledgement =
         HostControlAcknowledgement::Unknown;
     std::wstring detail;

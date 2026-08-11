@@ -68,6 +68,26 @@ int wmain() {
             TaskbarHostFrameAction::NoChange,
         L"an unresolved private pointer cannot identify a lease to restore");
 
+    passed &= Expect(
+        IsTaskbarMountObservationFresh(true, 100u, 112u, 12u),
+        L"a ready observation remains fresh at the lease boundary");
+    passed &= Expect(
+        !IsTaskbarMountObservationFresh(true, 100u, 113u, 12u) &&
+            !IsTaskbarMountObservationFresh(false, 100u, 101u, 12u) &&
+            !IsTaskbarMountObservationFresh(true, 0u, 101u, 12u) &&
+            !IsTaskbarMountObservationFresh(true, 102u, 101u, 12u),
+        L"stale, lost, missing, and future observations fail closed");
+    passed &= Expect(
+        EvaluateTaskbarMountReportAction(true, false, true) ==
+                TaskbarMountReportAction::PendingLost &&
+            EvaluateTaskbarMountReportAction(false, true, false) ==
+                TaskbarMountReportAction::Current &&
+            EvaluateTaskbarMountReportAction(false, false, true) ==
+                TaskbarMountReportAction::Current &&
+            EvaluateTaskbarMountReportAction(false, false, false) ==
+                TaskbarMountReportAction::None,
+        L"a pending lost report must win over a later ready proof");
+
     if (!passed) {
         return 1;
     }

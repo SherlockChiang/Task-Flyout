@@ -47,8 +47,10 @@ removes the hook before exiting. The request carries a per-dispatch nonce and a
 message-only broker window. The Explorer hook posts one bounded controller
 status back to that exact window; the broker waits at most one second after hook
 removal and reports `acknowledged`, `controller-rejected`, timeout, or malformed
-reply separately. No pointer is dereferenced across processes, and Explorer
-never waits on the broker.
+reply separately. An acknowledged start also returns that nonce so the app can
+bind later pipe reports to the exact Explorer process and controller generation.
+No pointer is dereferenced across processes, and Explorer never waits on the
+broker.
 
 `status` is a fail-closed readiness query. It returns `mount-ready` only after
 the controller revalidates, on the taskbar XAML owner thread, that the exact
@@ -91,11 +93,19 @@ unavailable, or stale data clears the cached model and requests a taskbar
 relayout. The XAML Button click handler captures only a stateless signal
 callback. It coalesces repeated clicks through an auto-reset event; the same
 MTA worker performs one non-retried `open-weather` exchange, so Explorer's UI
-thread never opens the pipe or parses JSON. Controller shutdown first rejects
-new activation signals, then signals and joins the worker with a two-second
-owner-thread bound. It still attempts to revoke every Click token and restore
-the owned XAML lease if the worker misses that bound; incomplete cleanup is
-reported as a rejected stop rather than discarded state.
+thread never opens the pipe or parses JSON. The XAML owner thread also
+revalidates the complete mount identity after each guarded layout callback and
+publishes only a numeric ready/lost snapshot. The worker reports state changes
+over the same pipe and requests another asynchronous taskbar layout pass every
+five seconds; it renews ready only after a newer owner-thread proof. A ready
+observation older than twelve seconds is downgraded to lost instead of being
+replayed. The app accepts a
+report only when the kernel-reported pipe client PID and the start nonce match
+its current controller generation. Controller shutdown first revokes that
+generation, rejects new activation signals, then signals and joins the worker
+with a two-second owner-thread bound. It still attempts to revoke every Click
+token and restore the owned XAML lease if the worker misses that bound;
+incomplete cleanup is reported as a rejected stop rather than discarded state.
 
 The private `Taskbar.View.dll` detour uses the x64 subset of MinHook `v1.3.4`,
 pinned to commit `c3fcafdc10146beb5919319d0683e44e3c30d537`. It is built as a

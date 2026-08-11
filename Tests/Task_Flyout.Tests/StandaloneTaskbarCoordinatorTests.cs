@@ -125,6 +125,36 @@ public class StandaloneTaskbarCoordinatorTests
     }
 
     [Fact]
+    public async Task Authenticated_lost_beats_a_late_broker_ready_result()
+    {
+        var statusEntered = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseStatus = new TaskCompletionSource<StandaloneTaskbarBrokerResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new FakeClient
+        {
+            Status = _ =>
+            {
+                statusEntered.TrySetResult(true);
+                return releaseStatus.Task;
+            }
+        };
+        await using var coordinator = new StandaloneTaskbarCoordinator(client);
+
+        Task enable = coordinator.SetEnabledAsync(true);
+        await statusEntered.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.True(coordinator.ReportMountReadiness(Report(1, ready: false)));
+        releaseStatus.TrySetResult(new StandaloneTaskbarBrokerResult(
+            StandaloneTaskbarBrokerResultKind.ControllerMountReady));
+        await enable.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(
+            StandaloneTaskbarRuntimeState.ControllerActiveUnverified,
+            coordinator.Status.State);
+        Assert.True(coordinator.Status.KeepTaskFlyoutFallback);
+    }
+
+    [Fact]
     public async Task Missing_heartbeat_expires_ready_and_restores_fallback()
     {
         await using var coordinator = new StandaloneTaskbarCoordinator(

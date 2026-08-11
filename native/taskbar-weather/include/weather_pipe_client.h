@@ -5,6 +5,7 @@
 #include <Windows.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace taskflyout::taskbar {
@@ -79,5 +80,34 @@ WeatherPipeActivationStatus RequestWeatherOpen(
 
 const wchar_t* WeatherPipeActivationStatusName(
     WeatherPipeActivationStatus status) noexcept;
+
+enum class WeatherPipeMountReadinessStatus : std::uint32_t {
+    Accepted = 0,
+    PipeUnavailable = 1,
+    IoFailed = 2,
+    InvalidResponse = 3,
+    Rejected = 4,
+    Cancelled = 5,
+};
+
+// Builds one fixed-schema request containing only controller-owned numeric
+// identity and state. Zero identity/generation values fail closed to an empty
+// request and are never sent.
+std::string BuildMountReadinessRequest(
+    std::uint32_t controllerNonce,
+    std::uint64_t mountGeneration,
+    bool ready);
+
+WeatherPipeMountReadinessStatus ParseMountReadinessResponse(
+    std::wstring_view responseJson) noexcept;
+
+WeatherPipeMountReadinessStatus ReportMountReadiness(
+    std::uint32_t controllerNonce,
+    std::uint64_t mountGeneration,
+    bool ready,
+    HANDLE cancellationEvent = nullptr) noexcept;
+
+const wchar_t* WeatherPipeMountReadinessStatusName(
+    WeatherPipeMountReadinessStatus status) noexcept;
 
 }  // namespace taskflyout::taskbar

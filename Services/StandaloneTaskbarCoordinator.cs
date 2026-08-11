@@ -618,7 +618,8 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
         lock (_stateLock)
         {
             if (generation != _generation || !_desiredEnabled ||
-                _controllerIdentity is not { IsValid: true })
+                _controllerIdentity is not { IsValid: true } ||
+                _lastMountState == WeatherCompanionMountState.Lost)
             {
                 leaseVersion = 0;
                 return false;

@@ -20,6 +20,8 @@ namespace {
 
 constexpr std::size_t kMaxTaskbarFrameLeases = 4;
 constexpr DWORD kWeatherPipePollIntervalMilliseconds = 15000;
+constexpr DWORD kMountReadinessReportIntervalMilliseconds = 5000;
+constexpr ULONGLONG kMountObservationMaximumAgeMilliseconds = 12000;
 constexpr DWORD kWeatherPipeStopWaitMilliseconds = 2000;
 
 struct TaskbarFrameLease {
@@ -48,6 +50,137 @@ HANDLE g_weatherOpenEvent = nullptr;
 SRWLOCK g_weatherActivationLock = SRWLOCK_INIT;
 std::atomic_bool g_weatherActivationPending{false};
 bool g_weatherActivationEnabled = false;
+SRWLOCK g_mountReadinessLock = SRWLOCK_INIT;
+std::uint32_t g_controllerNonce = 0;
+bool g_mountObservedReady = false;
+ULONGLONG g_mountObservedAtTicks = 0;
+std::uint64_t g_mountObservationGeneration = 1;
+std::uint64_t g_mountProofSequence = 1;
+bool g_mountLostPending = false;
+std::uint64_t g_mountPendingLostGeneration = 0;
+HANDLE g_mountReadinessEvent = nullptr;
+
+struct MountReadinessSnapshot {
+    std::uint32_t controllerNonce = 0;
+    std::uint64_t generation = 1;
+    std::uint64_t proofSequence = 1;
+    bool ready = false;
+    bool pendingLost = false;
+};
+
+void AdvanceNonZeroSequence(std::uint64_t& sequence) noexcept {
+    ++sequence;
+    if (sequence == 0) {
+        sequence = 1;
+    }
+}
+
+void SignalMountReadinessWorkerLocked() noexcept {
+    if (g_mountReadinessEvent) {
+        (void)SetEvent(g_mountReadinessEvent);
+    }
+}
+
+void SignalMountReadinessWorker() noexcept {
+    AcquireSRWLockShared(&g_mountReadinessLock);
+    SignalMountReadinessWorkerLocked();
+    ReleaseSRWLockShared(&g_mountReadinessLock);
+}
+
+void ResetMountReadinessSession(
+    const std::uint32_t controllerNonce) noexcept {
+    AcquireSRWLockExclusive(&g_mountReadinessLock);
+    g_controllerNonce = controllerNonce;
+    g_mountObservedReady = false;
+    g_mountObservedAtTicks = GetTickCount64();
+    AdvanceNonZeroSequence(g_mountObservationGeneration);
+    AdvanceNonZeroSequence(g_mountProofSequence);
+    g_mountLostPending = false;
+    g_mountPendingLostGeneration = 0;
+    SignalMountReadinessWorkerLocked();
+    ReleaseSRWLockExclusive(&g_mountReadinessLock);
+}
+
+void PublishMountReadinessObservation(const bool ready) noexcept {
+    AcquireSRWLockExclusive(&g_mountReadinessLock);
+    const bool changed = g_mountObservedReady != ready;
+    g_mountObservedReady = ready;
+    g_mountObservedAtTicks = GetTickCount64();
+    AdvanceNonZeroSequence(g_mountProofSequence);
+    if (changed) {
+        AdvanceNonZeroSequence(g_mountObservationGeneration);
+        if (!ready) {
+            g_mountLostPending = true;
+            g_mountPendingLostGeneration =
+                g_mountObservationGeneration;
+        }
+        SignalMountReadinessWorkerLocked();
+    }
+    ReleaseSRWLockExclusive(&g_mountReadinessLock);
+}
+
+MountReadinessSnapshot CaptureMountReadinessObservation(
+    const ULONGLONG nowTicks) noexcept {
+    AcquireSRWLockExclusive(&g_mountReadinessLock);
+    if (g_mountObservedReady &&
+        !IsTaskbarMountObservationFresh(
+            true,
+            g_mountObservedAtTicks,
+            nowTicks,
+            kMountObservationMaximumAgeMilliseconds)) {
+        g_mountObservedReady = false;
+        g_mountObservedAtTicks = nowTicks;
+        AdvanceNonZeroSequence(g_mountObservationGeneration);
+        g_mountLostPending = true;
+        g_mountPendingLostGeneration = g_mountObservationGeneration;
+    }
+    const MountReadinessSnapshot snapshot = g_mountLostPending
+        ? MountReadinessSnapshot{
+            g_controllerNonce,
+            g_mountPendingLostGeneration,
+            g_mountProofSequence,
+            false,
+            true}
+        : MountReadinessSnapshot{
+            g_controllerNonce,
+            g_mountObservationGeneration,
+            g_mountProofSequence,
+            g_mountObservedReady,
+            false};
+    ReleaseSRWLockExclusive(&g_mountReadinessLock);
+    return snapshot;
+}
+
+void AcknowledgePendingMountLost(
+    const std::uint32_t controllerNonce,
+    const std::uint64_t generation) noexcept {
+    AcquireSRWLockExclusive(&g_mountReadinessLock);
+    if (g_controllerNonce == controllerNonce &&
+        g_mountLostPending &&
+        g_mountPendingLostGeneration == generation) {
+        g_mountLostPending = false;
+        g_mountPendingLostGeneration = 0;
+        if (g_mountObservedReady) {
+            SignalMountReadinessWorkerLocked();
+        }
+    }
+    ReleaseSRWLockExclusive(&g_mountReadinessLock);
+}
+
+void EnableMountReadinessEvent(const HANDLE event) noexcept {
+    AcquireSRWLockExclusive(&g_mountReadinessLock);
+    g_mountReadinessEvent = event;
+    SignalMountReadinessWorkerLocked();
+    ReleaseSRWLockExclusive(&g_mountReadinessLock);
+}
+
+HANDLE DetachMountReadinessEvent() noexcept {
+    AcquireSRWLockExclusive(&g_mountReadinessLock);
+    HANDLE event = g_mountReadinessEvent;
+    g_mountReadinessEvent = nullptr;
+    ReleaseSRWLockExclusive(&g_mountReadinessLock);
+    return event;
+}
 
 void DisableWeatherActivationRequests() noexcept {
     AcquireSRWLockExclusive(&g_weatherActivationLock);
@@ -169,17 +302,37 @@ struct WeatherPipeWorkerContext final {
     HMODULE selfModule = nullptr;
     HANDLE stopEvent = nullptr;
     HANDLE openEvent = nullptr;
+    HANDLE mountReadinessEvent = nullptr;
 };
+
+DWORD RemainingWorkerWait(
+    const ULONGLONG nowTicks,
+    const ULONGLONG deadlineTicks) noexcept {
+    if (deadlineTicks <= nowTicks) {
+        return 0;
+    }
+    const ULONGLONG remaining = deadlineTicks - nowTicks;
+    return remaining > MAXDWORD
+        ? MAXDWORD
+        : static_cast<DWORD>(remaining);
+}
 
 DWORD WINAPI WeatherPipeWorkerProc(void* parameter) {
     auto* context = static_cast<WeatherPipeWorkerContext*>(parameter);
     HMODULE selfModule = context->selfModule;
     HANDLE stopEvent = context->stopEvent;
     HANDLE openEvent = context->openEvent;
+    HANDLE mountReadinessEvent = context->mountReadinessEvent;
     delete context;
 
     bool apartmentInitialized = false;
-    bool pollSnapshot = true;
+    ULONGLONG nextWeatherPollTicks = 0;
+    ULONGLONG nextMountReportTicks = 0;
+    std::uint32_t lastControllerNonce = 0;
+    std::uint64_t lastAcceptedMountGeneration = 0;
+    std::uint64_t lastAcceptedReadyProofSequence = 0;
+    bool lastAcceptedMountReady = false;
+    bool mountReportAccepted = false;
     for (;;) {
         if (WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0) {
             break;
@@ -190,14 +343,15 @@ DWORD WINAPI WeatherPipeWorkerProc(void* parameter) {
                     winrt::apartment_type::multi_threaded);
                 apartmentInitialized = true;
             } catch (...) {
-                const std::array<HANDLE, 2> waitHandles{
+                const std::array<HANDLE, 3> waitHandles{
                     stopEvent,
-                    openEvent};
+                    openEvent,
+                    mountReadinessEvent};
                 const DWORD wait = WaitForMultipleObjects(
                     static_cast<DWORD>(waitHandles.size()),
                     waitHandles.data(),
                     FALSE,
-                    kWeatherPipePollIntervalMilliseconds);
+                    kMountReadinessReportIntervalMilliseconds);
                 if (wait == WAIT_OBJECT_0 || wait == WAIT_FAILED) {
                     break;
                 }
@@ -218,7 +372,9 @@ DWORD WINAPI WeatherPipeWorkerProc(void* parameter) {
             continue;
         }
 
-        if (pollSnapshot) {
+        ULONGLONG nowTicks = GetTickCount64();
+        if (nextWeatherPollTicks == 0 ||
+            nowTicks >= nextWeatherPollTicks) {
             const WeatherPipeQueryResult query =
                 QueryWeatherPipe(stopEvent);
             if (query.status == WeatherPipeQueryStatus::Cancelled ||
@@ -230,15 +386,99 @@ DWORD WINAPI WeatherPipeWorkerProc(void* parameter) {
             } else {
                 InvalidateWeatherModel();
             }
-            pollSnapshot = false;
+            nextWeatherPollTicks =
+                GetTickCount64() + kWeatherPipePollIntervalMilliseconds;
         }
 
-        const std::array<HANDLE, 2> waitHandles{stopEvent, openEvent};
+        nowTicks = GetTickCount64();
+        if (nextMountReportTicks == 0 ||
+            nowTicks >= nextMountReportTicks) {
+            const MountReadinessSnapshot snapshot =
+                CaptureMountReadinessObservation(nowTicks);
+            const std::uint32_t controllerNonce =
+                snapshot.controllerNonce;
+            if (controllerNonce != 0) {
+                if (controllerNonce != lastControllerNonce) {
+                    lastControllerNonce = controllerNonce;
+                    lastAcceptedMountGeneration = 0;
+                    lastAcceptedReadyProofSequence = 0;
+                    lastAcceptedMountReady = false;
+                    mountReportAccepted = false;
+                }
+                const bool stateChanged = !mountReportAccepted ||
+                    snapshot.generation != lastAcceptedMountGeneration ||
+                    snapshot.ready != lastAcceptedMountReady;
+                const bool hasNewReadyProof = snapshot.ready &&
+                    snapshot.proofSequence !=
+                        lastAcceptedReadyProofSequence;
+                const TaskbarMountReportAction action =
+                    EvaluateTaskbarMountReportAction(
+                        snapshot.pendingLost,
+                        stateChanged,
+                        hasNewReadyProof);
+                if (action != TaskbarMountReportAction::None) {
+                    const WeatherPipeMountReadinessStatus report =
+                        ReportMountReadiness(
+                            controllerNonce,
+                            snapshot.generation,
+                            snapshot.ready,
+                            stopEvent);
+                    if (report ==
+                            WeatherPipeMountReadinessStatus::Cancelled ||
+                        WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0) {
+                        break;
+                    }
+                    if (report ==
+                        WeatherPipeMountReadinessStatus::Accepted) {
+                        mountReportAccepted = true;
+                        lastAcceptedMountGeneration = snapshot.generation;
+                        lastAcceptedMountReady = snapshot.ready;
+                        if (snapshot.ready) {
+                            lastAcceptedReadyProofSequence =
+                                snapshot.proofSequence;
+                        }
+                        if (snapshot.pendingLost) {
+                            AcknowledgePendingMountLost(
+                                controllerNonce,
+                                snapshot.generation);
+                        }
+                    }
+                }
+                // Drive the next owner-thread proof. This notification is only
+                // a request; a later ready heartbeat is sent only after the
+                // proof sequence actually advances.
+                RequestTaskbarRelayout();
+            } else {
+                lastControllerNonce = 0;
+                mountReportAccepted = false;
+            }
+            nextMountReportTicks = GetTickCount64() +
+                kMountReadinessReportIntervalMilliseconds;
+        }
+
+        nowTicks = GetTickCount64();
+        const DWORD weatherWait = RemainingWorkerWait(
+            nowTicks,
+            nextWeatherPollTicks);
+        const DWORD mountWait = RemainingWorkerWait(
+            nowTicks,
+            nextMountReportTicks);
+        const DWORD waitTimeout = weatherWait < mountWait
+            ? weatherWait
+            : mountWait;
+        if (waitTimeout == 0) {
+            continue;
+        }
+
+        const std::array<HANDLE, 3> waitHandles{
+            stopEvent,
+            openEvent,
+            mountReadinessEvent};
         const DWORD wait = WaitForMultipleObjects(
             static_cast<DWORD>(waitHandles.size()),
             waitHandles.data(),
             FALSE,
-            kWeatherPipePollIntervalMilliseconds);
+            waitTimeout);
         if (wait == WAIT_OBJECT_0 || wait == WAIT_FAILED) {
             break;
         }
@@ -247,9 +487,11 @@ DWORD WINAPI WeatherPipeWorkerProc(void* parameter) {
             // until the request finishes so clicks during one exchange merge.
             continue;
         }
-        if (wait == WAIT_TIMEOUT) {
-            pollSnapshot = true;
-        } else if (wait != WAIT_OBJECT_0 + 1u) {
+        if (wait == WAIT_OBJECT_0 + 2u) {
+            nextMountReportTicks = 0;
+            continue;
+        }
+        if (wait != WAIT_TIMEOUT) {
             break;
         }
     }
@@ -271,10 +513,14 @@ bool StartWeatherPipeWorker() noexcept {
             return false;
         }
         HANDLE oldOpenEvent = DetachWeatherActivationEvent();
+        HANDLE oldMountReadinessEvent = DetachMountReadinessEvent();
         CloseHandle(g_weatherPipeThread);
         CloseHandle(g_weatherPipeStopEvent);
         if (oldOpenEvent) {
             CloseHandle(oldOpenEvent);
+        }
+        if (oldMountReadinessEvent) {
+            CloseHandle(oldMountReadinessEvent);
         }
         g_weatherPipeThread = nullptr;
         g_weatherPipeStopEvent = nullptr;
@@ -289,12 +535,20 @@ bool StartWeatherPipeWorker() noexcept {
         CloseHandle(stopEvent);
         return false;
     }
+    HANDLE mountReadinessEvent =
+        CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (!mountReadinessEvent) {
+        CloseHandle(openEvent);
+        CloseHandle(stopEvent);
+        return false;
+    }
 
     HMODULE selfModule = nullptr;
     if (!GetModuleHandleExW(
             GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
              reinterpret_cast<LPCWSTR>(&WeatherPipeWorkerProc),
              &selfModule)) {
+        CloseHandle(mountReadinessEvent);
         CloseHandle(openEvent);
         CloseHandle(stopEvent);
         return false;
@@ -303,9 +557,11 @@ bool StartWeatherPipeWorker() noexcept {
     auto* context = new (std::nothrow) WeatherPipeWorkerContext{
         selfModule,
         stopEvent,
-        openEvent};
+        openEvent,
+        mountReadinessEvent};
     if (!context) {
         FreeLibrary(selfModule);
+        CloseHandle(mountReadinessEvent);
         CloseHandle(openEvent);
         CloseHandle(stopEvent);
         return false;
@@ -322,6 +578,7 @@ bool StartWeatherPipeWorker() noexcept {
     if (!thread) {
         delete context;
         FreeLibrary(selfModule);
+        CloseHandle(mountReadinessEvent);
         CloseHandle(openEvent);
         CloseHandle(stopEvent);
         return false;
@@ -330,14 +587,19 @@ bool StartWeatherPipeWorker() noexcept {
     g_weatherPipeStopEvent = stopEvent;
     g_weatherPipeThread = thread;
     EnableWeatherActivationRequests(openEvent);
+    EnableMountReadinessEvent(mountReadinessEvent);
     return true;
 }
 
 bool StopWeatherPipeWorker() noexcept {
     if (!g_weatherPipeThread) {
         HANDLE openEvent = DetachWeatherActivationEvent();
+        HANDLE mountReadinessEvent = DetachMountReadinessEvent();
         if (openEvent) {
             CloseHandle(openEvent);
+        }
+        if (mountReadinessEvent) {
+            CloseHandle(mountReadinessEvent);
         }
         (void)ClearWeatherModel();
         return true;
@@ -353,10 +615,14 @@ bool StopWeatherPipeWorker() noexcept {
     }
 
     HANDLE openEvent = DetachWeatherActivationEvent();
+    HANDLE mountReadinessEvent = DetachMountReadinessEvent();
     CloseHandle(g_weatherPipeThread);
     CloseHandle(g_weatherPipeStopEvent);
     if (openEvent) {
         CloseHandle(openEvent);
+    }
+    if (mountReadinessEvent) {
+        CloseHandle(mountReadinessEvent);
     }
     g_weatherPipeThread = nullptr;
     g_weatherPipeStopEvent = nullptr;
@@ -442,6 +708,29 @@ bool RestoreLease(TaskbarFrameLease& lease) noexcept {
         TaskbarMountStatus::Restored;
 }
 
+bool RefreshCurrentMountReadiness() noexcept {
+    bool ready = false;
+    auto& runtime = Runtime();
+    for (auto& lease : runtime.leases) {
+        ResetExpiredLease(lease);
+        if (!ready && lease.occupied) {
+            try {
+                ready = IsWeatherButtonMountReady(lease.mount);
+            } catch (...) {
+                ready = false;
+            }
+        }
+    }
+    PublishMountReadinessObservation(ready);
+    return ready;
+}
+
+struct MountReadinessRefreshScope final {
+    ~MountReadinessRefreshScope() {
+        (void)RefreshCurrentMountReadiness();
+    }
+};
+
 void ThrowCallbackFailure() {
     struct CallbackFailure final {};
     throw CallbackFailure{};
@@ -451,8 +740,10 @@ void WINAPI OnTaskbarFrameLayout(void* privateTaskbarFrame) {
     const TaskbarFrameBridgeResult bridge =
         ResolveTaskbarFrameFromPrivateAbi(privateTaskbarFrame);
     if (bridge.status != TaskbarFrameBridgeStatus::Resolved) {
+        PublishMountReadinessObservation(false);
         return;
     }
+    MountReadinessRefreshScope readinessRefresh;
 
     const TaskbarTreeProfile profile =
         ProbeTaskbarFrameTree(bridge.frame);
@@ -580,7 +871,19 @@ TaskbarHostFrameAction EvaluateTaskbarHostFrameAction(
         : TaskbarHostFrameAction::NoChange;
 }
 
-TaskbarHostControllerResult StartTaskbarWeatherController() noexcept {
+TaskbarHostControllerResult StartTaskbarWeatherController(
+    const std::uint32_t controllerNonce) noexcept {
+    if (controllerNonce == 0) {
+        Runtime().lastResult.store(
+            TaskbarHostControllerResult::StartRejected,
+            std::memory_order_release);
+        return TaskbarHostControllerResult::StartRejected;
+    }
+
+    // Revoke the previous reporting identity before changing detour/worker
+    // state. Publish the new nonce only after both are known to be active, so
+    // an in-flight worker can never pair it with the previous mount snapshot.
+    ResetMountReadinessSession(0);
     const TaskbarDetourResult detourResult =
         StartTaskbarFrameDetour(&OnTaskbarFrameLayout);
     TaskbarHostControllerResult result = MapStartResult(detourResult);
@@ -592,11 +895,18 @@ TaskbarHostControllerResult StartTaskbarWeatherController() noexcept {
         }
         result = TaskbarHostControllerResult::StartRejected;
     }
+    if (result == TaskbarHostControllerResult::Started ||
+        result == TaskbarHostControllerResult::AlreadyStarted) {
+        ResetMountReadinessSession(controllerNonce);
+        SignalMountReadinessWorker();
+        RequestTaskbarRelayout();
+    }
     Runtime().lastResult.store(result, std::memory_order_release);
     return result;
 }
 
 TaskbarHostControllerResult StopTaskbarWeatherController() noexcept {
+    ResetMountReadinessSession(0);
     // Disable producer-side signalling before joining the worker. The
     // exclusive lock drains any click callback currently inside SetEvent.
     DisableWeatherActivationRequests();
@@ -629,21 +939,19 @@ TaskbarHostControllerResult QueryTaskbarWeatherControllerStatus() noexcept {
     }
 
     auto& runtime = Runtime();
-    for (auto& lease : runtime.leases) {
-        ResetExpiredLease(lease);
-        if (lease.occupied &&
-            IsWeatherButtonMountReady(lease.mount)) {
-            runtime.lastResult.store(
-                TaskbarHostControllerResult::MountReady,
-                std::memory_order_release);
-            return TaskbarHostControllerResult::MountReady;
-        }
+    if (RefreshCurrentMountReadiness()) {
+        SignalMountReadinessWorker();
+        runtime.lastResult.store(
+            TaskbarHostControllerResult::MountReady,
+            std::memory_order_release);
+        return TaskbarHostControllerResult::MountReady;
     }
 
     // Starting the controller and publishing a weather snapshot both request
     // layout, but a coalesced shell notification may not yield a frame callback.
     // A bounded status poll can safely request another asynchronous pass.
     RequestTaskbarRelayout();
+    SignalMountReadinessWorker();
     runtime.lastResult.store(
         TaskbarHostControllerResult::MountPending,
         std::memory_order_release);

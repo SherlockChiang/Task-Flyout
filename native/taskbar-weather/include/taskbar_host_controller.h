@@ -29,6 +29,34 @@ struct TaskbarHostFrameDecisionInput {
 TaskbarHostFrameAction EvaluateTaskbarHostFrameAction(
     const TaskbarHostFrameDecisionInput& input) noexcept;
 
+constexpr bool IsTaskbarMountObservationFresh(
+    const bool ready,
+    const std::uint64_t observedAtTicks,
+    const std::uint64_t nowTicks,
+    const std::uint64_t maximumAgeTicks) noexcept {
+    return ready && observedAtTicks != 0 && maximumAgeTicks != 0 &&
+        nowTicks >= observedAtTicks &&
+        nowTicks - observedAtTicks <= maximumAgeTicks;
+}
+
+enum class TaskbarMountReportAction : std::uint32_t {
+    None = 0,
+    Current = 1,
+    PendingLost = 2,
+};
+
+constexpr TaskbarMountReportAction EvaluateTaskbarMountReportAction(
+    const bool pendingLost,
+    const bool stateChanged,
+    const bool hasNewReadyProof) noexcept {
+    if (pendingLost) {
+        return TaskbarMountReportAction::PendingLost;
+    }
+    return stateChanged || hasNewReadyProof
+        ? TaskbarMountReportAction::Current
+        : TaskbarMountReportAction::None;
+}
+
 enum class TaskbarHostControllerResult : std::uint32_t {
     Started = 0,
     AlreadyStarted = 1,
@@ -44,7 +72,8 @@ enum class TaskbarHostControllerResult : std::uint32_t {
 // These functions must be called from the primary taskbar owner thread. The
 // controller is activated only by the exported WH_CALLWNDPROC entry hook's
 // private control message; loading the DLL alone remains inert.
-TaskbarHostControllerResult StartTaskbarWeatherController() noexcept;
+TaskbarHostControllerResult StartTaskbarWeatherController(
+    std::uint32_t controllerNonce) noexcept;
 TaskbarHostControllerResult StopTaskbarWeatherController() noexcept;
 TaskbarHostControllerResult QueryTaskbarWeatherControllerStatus() noexcept;
 

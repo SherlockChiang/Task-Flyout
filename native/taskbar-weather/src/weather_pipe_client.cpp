@@ -765,6 +765,84 @@ WeatherPipeQueryResult QueryWeatherPipe(
     }
 }
 
+std::string BuildMountReadinessRequest(
+    const std::uint32_t controllerNonce,
+    const std::uint64_t mountGeneration,
+    const bool ready) {
+    if (controllerNonce == 0 || mountGeneration == 0) {
+        return {};
+    }
+    std::string request =
+        R"({"version":1,"command":"report-mount-readiness","controllerNonce":)";
+    request += std::to_string(controllerNonce);
+    request += R"(,"mountGeneration":)";
+    request += std::to_string(mountGeneration);
+    request += R"(,"mountState":")";
+    request += ready ? "ready" : "lost";
+    request += R"("})";
+    return request;
+}
+
+WeatherPipeMountReadinessStatus ParseMountReadinessResponse(
+    const std::wstring_view responseJson) noexcept {
+    if (responseJson.empty()) {
+        return WeatherPipeMountReadinessStatus::InvalidResponse;
+    }
+    try {
+        const auto root =
+            winrt::Windows::Data::Json::JsonObject::Parse(
+                std::wstring(responseJson));
+        if (root.GetNamedNumber(L"version", -1.0) != 1.0) {
+            return WeatherPipeMountReadinessStatus::InvalidResponse;
+        }
+        const winrt::hstring status = root.GetNamedString(L"status", {});
+        if (status == L"ok") {
+            return WeatherPipeMountReadinessStatus::Accepted;
+        }
+        if (status == L"unavailable") {
+            return WeatherPipeMountReadinessStatus::Rejected;
+        }
+    } catch (...) {
+    }
+    return WeatherPipeMountReadinessStatus::InvalidResponse;
+}
+
+WeatherPipeMountReadinessStatus ReportMountReadiness(
+    const std::uint32_t controllerNonce,
+    const std::uint64_t mountGeneration,
+    const bool ready,
+    const HANDLE cancellationEvent) noexcept {
+    try {
+        const std::string request = BuildMountReadinessRequest(
+            controllerNonce,
+            mountGeneration,
+            ready);
+        if (request.empty()) {
+            return WeatherPipeMountReadinessStatus::InvalidResponse;
+        }
+        const WeatherPipeExchangeResult exchange = ExchangeWeatherPipe(
+            request,
+            cancellationEvent);
+        switch (exchange.status) {
+            case WeatherPipeExchangeStatus::PipeUnavailable:
+                return WeatherPipeMountReadinessStatus::PipeUnavailable;
+            case WeatherPipeExchangeStatus::IoFailed:
+                return WeatherPipeMountReadinessStatus::IoFailed;
+            case WeatherPipeExchangeStatus::Cancelled:
+                return WeatherPipeMountReadinessStatus::Cancelled;
+            case WeatherPipeExchangeStatus::Completed:
+                break;
+        }
+        const std::wstring responseJson = Utf8ToWide(exchange.response);
+        if (responseJson.empty()) {
+            return WeatherPipeMountReadinessStatus::InvalidResponse;
+        }
+        return ParseMountReadinessResponse(responseJson);
+    } catch (...) {
+        return WeatherPipeMountReadinessStatus::InvalidResponse;
+    }
+}
+
 WeatherPipeActivationStatus ParseWeatherOpenResponse(
     const std::wstring_view responseJson) noexcept {
     if (responseJson.empty()) {
@@ -850,6 +928,25 @@ const wchar_t* WeatherPipeActivationStatusName(
         case WeatherPipeActivationStatus::Rejected:
             return L"rejected";
         case WeatherPipeActivationStatus::Cancelled:
+            return L"cancelled";
+    }
+    return L"unknown";
+}
+
+const wchar_t* WeatherPipeMountReadinessStatusName(
+    const WeatherPipeMountReadinessStatus status) noexcept {
+    switch (status) {
+        case WeatherPipeMountReadinessStatus::Accepted:
+            return L"accepted";
+        case WeatherPipeMountReadinessStatus::PipeUnavailable:
+            return L"pipe-unavailable";
+        case WeatherPipeMountReadinessStatus::IoFailed:
+            return L"io-failed";
+        case WeatherPipeMountReadinessStatus::InvalidResponse:
+            return L"invalid-response";
+        case WeatherPipeMountReadinessStatus::Rejected:
+            return L"rejected";
+        case WeatherPipeMountReadinessStatus::Cancelled:
             return L"cancelled";
     }
     return L"unknown";

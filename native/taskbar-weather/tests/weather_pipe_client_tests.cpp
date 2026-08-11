@@ -193,6 +193,36 @@ int wmain() {
             ParseWeatherOpenResponse(L"{not-json") ==
                 WeatherPipeActivationStatus::InvalidResponse,
             L"a malformed open-weather acknowledgement should be rejected");
+
+        passed &= Expect(
+            BuildMountReadinessRequest(17u, 23u, true) ==
+                R"({"version":1,"command":"report-mount-readiness","controllerNonce":17,"mountGeneration":23,"mountState":"ready"})",
+            L"a ready report should use the fixed bounded schema");
+        passed &= Expect(
+            BuildMountReadinessRequest(17u, 24u, false) ==
+                R"({"version":1,"command":"report-mount-readiness","controllerNonce":17,"mountGeneration":24,"mountState":"lost"})",
+            L"a lost report should use the fixed bounded schema");
+        passed &= Expect(
+            BuildMountReadinessRequest(0u, 1u, true).empty() &&
+                BuildMountReadinessRequest(1u, 0u, true).empty(),
+            L"zero controller identities or generations fail closed");
+        passed &= Expect(
+            ParseMountReadinessResponse(
+                LR"({"version":1,"status":"ok"})") ==
+                WeatherPipeMountReadinessStatus::Accepted,
+            L"an ok report response should renew the mount lease");
+        passed &= Expect(
+            ParseMountReadinessResponse(
+                LR"({"version":1,"status":"unavailable"})") ==
+                WeatherPipeMountReadinessStatus::Rejected,
+            L"an unavailable report response should reject the lease");
+        passed &= Expect(
+            ParseMountReadinessResponse(
+                LR"({"version":2,"status":"ok"})") ==
+                WeatherPipeMountReadinessStatus::InvalidResponse &&
+                ParseMountReadinessResponse(L"{not-json") ==
+                    WeatherPipeMountReadinessStatus::InvalidResponse,
+            L"version mismatches and malformed lease replies fail closed");
     }
 
     HANDLE cancellationEvent = CreateEventW(nullptr, TRUE, TRUE, nullptr);
@@ -209,6 +239,11 @@ int wmain() {
                 WeatherPipeActivationStatus::Cancelled,
             L"a pre-signalled stop event should cancel activation before "
             L"pipe discovery");
+        passed &= Expect(
+            ReportMountReadiness(17u, 23u, true, cancellationEvent) ==
+                WeatherPipeMountReadinessStatus::Cancelled,
+            L"a pre-signalled stop event should cancel a readiness report "
+            L"before pipe discovery");
         CloseHandle(cancellationEvent);
     }
 
@@ -255,6 +290,29 @@ int wmain() {
         std::wstring_view(WeatherPipeActivationStatusName(
             static_cast<WeatherPipeActivationStatus>(99))) == L"unknown",
         L"unknown activation statuses fail closed to an explicit name");
+
+    constexpr std::array mountStatuses{
+        std::pair{WeatherPipeMountReadinessStatus::Accepted, L"accepted"},
+        std::pair{
+            WeatherPipeMountReadinessStatus::PipeUnavailable,
+            L"pipe-unavailable"},
+        std::pair{WeatherPipeMountReadinessStatus::IoFailed, L"io-failed"},
+        std::pair{
+            WeatherPipeMountReadinessStatus::InvalidResponse,
+            L"invalid-response"},
+        std::pair{WeatherPipeMountReadinessStatus::Rejected, L"rejected"},
+        std::pair{WeatherPipeMountReadinessStatus::Cancelled, L"cancelled"},
+    };
+    for (const auto& [status, expected] : mountStatuses) {
+        passed &= Expect(
+            std::wstring_view(WeatherPipeMountReadinessStatusName(status)) ==
+                expected,
+            L"each mount report result has a stable diagnostic name");
+    }
+    passed &= Expect(
+        std::wstring_view(WeatherPipeMountReadinessStatusName(
+            static_cast<WeatherPipeMountReadinessStatus>(99))) == L"unknown",
+        L"unknown mount report statuses fail closed to an explicit name");
 
     if (apartmentInitialized) {
         winrt::uninit_apartment();
