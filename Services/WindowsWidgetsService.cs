@@ -34,8 +34,8 @@ namespace Task_Flyout.Services
         internal const string CapturedPresentKey = "WeatherBarNativeTaskbarDaPresent";
         internal const string CapturedValueKey = "WeatherBarNativeTaskbarDaValue";
         internal const string CapturedKindKey = "WeatherBarNativeTaskbarDaKind";
-        private const string TaskbarStateMutexName = @"Local\TaskFlyout.WindowsWidgets.TaskbarDa";
-        private const int TaskbarStateMutexTimeoutMilliseconds = 3000;
+        internal const string TaskbarStateMutexName = @"Local\TaskFlyout.WindowsWidgets.TaskbarDa";
+        internal const int TaskbarStateMutexTimeoutMilliseconds = 3000;
         private const int WM_SETTINGCHANGE = 0x001A;
         private const int HWND_BROADCAST = 0xffff;
         private const uint SMTO_ABORTIFHUNG = 0x0002;
@@ -101,6 +101,13 @@ namespace Task_Flyout.Services
                 if (!lockTaken)
                 {
                     detail = "Another Task Flyout process is updating the Windows Widgets taskbar setting.";
+                    return false;
+                }
+
+                if (StandaloneTaskbarWidgetsService.HasCapturedTaskbarEntry(
+                        localSettings))
+                {
+                    detail = "Standalone taskbar mode still owns the Windows Widgets taskbar setting.";
                     return false;
                 }
 
@@ -537,7 +544,7 @@ namespace Task_Flyout.Services
             }
         }
 
-        private static bool TryEnterTaskbarStateMutex(Mutex stateMutex)
+        internal static bool TryEnterTaskbarStateMutex(Mutex stateMutex)
         {
             try
             {
@@ -551,7 +558,7 @@ namespace Task_Flyout.Services
             }
         }
 
-        private static void ReleaseTaskbarStateMutex(Mutex stateMutex, ref bool lockTaken)
+        internal static void ReleaseTaskbarStateMutex(Mutex stateMutex, ref bool lockTaken)
         {
             if (!lockTaken) return;
             try
@@ -568,23 +575,25 @@ namespace Task_Flyout.Services
             }
         }
 
-        private static void BroadcastTaskbarSettingsChanged()
+        internal static bool BroadcastTaskbarSettingsChanged()
         {
             try
             {
-                _ = SendMessageTimeout(
+                bool notified = SendMessageTimeout(
                     new IntPtr(HWND_BROADCAST),
                     WM_SETTINGCHANGE,
                     IntPtr.Zero,
                     "TraySettings",
                     SMTO_ABORTIFHUNG,
                     1000,
-                    out _);
+                    out _) != IntPtr.Zero;
                 SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+                return notified;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Broadcasting taskbar settings failed: {ex.Message}");
+                return false;
             }
         }
 
