@@ -1417,6 +1417,8 @@
   <data name="WeatherPage_StandaloneStatus_WeatherProviderDisabled" xml:space="preserve"><value>Turn on Task Flyout weather first; the native button depends on the app-owned weather provider.</value></data>
   <data name="WeatherPage_StandaloneStatus_Preparing" xml:space="preserve"><value>Preparing the native button and removing the Windows Widgets entry. The Task Flyout bar remains the fallback.</value></data>
   <data name="WeatherPage_StandaloneStatus_ActiveUnverified" xml:space="preserve"><value>The native controller acknowledged startup. Visibility is not yet proven, so the Task Flyout bar remains the fallback.</value></data>
+  <data name="WeatherPage_StandaloneStatus_Active" xml:space="preserve"><value>The native XAML weather button is mounted and now owns the taskbar surface. The Task Flyout fallback is closed.</value></data>
+  <data name="WeatherPage_StandaloneStatus_ClosingFallback" xml:space="preserve"><value>The native button is mounted. Task Flyout is retrying a safe close of the fallback bar.</value></data>
   <data name="WeatherPage_StandaloneStatus_BinaryMissing" xml:space="preserve"><value>The standalone native binaries are not available beside the app. The Task Flyout bar remains the fallback.</value></data>
   <data name="WeatherPage_StandaloneStatus_Unsupported" xml:space="preserve"><value>This Windows taskbar build is not in the exact native compatibility profile. No Explorer change was attempted.</value></data>
   <data name="WeatherPage_StandaloneStatus_TemporarilyUnavailable" xml:space="preserve"><value>Explorer or its taskbar is temporarily unavailable. The Task Flyout bar remains the fallback.</value></data>

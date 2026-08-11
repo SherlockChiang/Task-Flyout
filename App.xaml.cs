@@ -566,9 +566,9 @@ namespace Task_Flyout
                 WeatherService.IsEnabled,
                 requestedMode,
                 availability.IsAvailable,
-                // Broker acknowledgement does not prove that the later taskbar
-                // layout callback mounted a visible XAML button yet.
-                standaloneTaskbarActive: false);
+                standaloneTaskbarActive:
+                    _standaloneTaskbarCoordinator?.Status.State ==
+                        StandaloneTaskbarRuntimeState.MountReady);
         }
 
         private WindowsWidgetsAvailability ProbeWindowsWidgetsAvailability(bool forceRefresh = false)
@@ -743,7 +743,7 @@ namespace Task_Flyout
                 bool standaloneCleanupPending =
                     !standaloneTransition.IsCompleted ||
                     (_standaloneTaskbarCoordinator?.RequiresStop ?? false);
-                if (!standaloneRequested && standaloneTransitionWasIncomplete)
+                if (standaloneTransitionWasIncomplete)
                 {
                     QueueWeatherPresentationAfterStandaloneTransition(
                         standaloneTransition);
@@ -829,6 +829,22 @@ namespace Task_Flyout
                 if (resolution.ShouldRunTaskFlyoutBar)
                 {
                     EnsureTaskFlyoutWeatherBar();
+                    return;
+                }
+
+                if (resolution.ShouldUseStandaloneTaskbar)
+                {
+                    if (!DisposeWeatherBar())
+                    {
+                        _weatherBarModeRuntimeDetail =
+                            "standalone:fallback-close-pending";
+                        StartWeatherBarWatchdog();
+                        SetWeatherBarRecoveryPolling(enabled: true);
+                        return;
+                    }
+
+                    StopWeatherBarWatchdog();
+                    EnsureTaskbarRestartListener();
                     return;
                 }
 
@@ -1060,10 +1076,11 @@ namespace Task_Flyout
                 _weatherBarModeRuntimeDetail =
                     $"standalone:{status.DiagnosticKey}";
                 NotifyWeatherBarModeStatusChanged();
-                WeatherBarMode requestedMode = WeatherBarModeSettings.Read(
-                    ApplicationData.Current.LocalSettings.Values);
-                if (requestedMode != WeatherBarMode.StandaloneTaskbar)
-                    ApplyWeatherBarPresentation();
+                // Mount readiness is a separate, asynchronous proof. Re-run the
+                // pure presentation policy for every current controller state;
+                // repeated desired-state calls are idempotent and do not retry
+                // the broker, while ready/lost transitions close/reopen fallback.
+                ApplyWeatherBarPresentation();
             });
         }
 
@@ -1535,6 +1552,18 @@ namespace Task_Flyout
                 if (modeResolution.ShouldUseWindowsWidgets && !_nativeWidgetsActivationFailed)
                 {
                     ApplyWeatherBarPresentation();
+                    return;
+                }
+                if (modeResolution.ShouldUseStandaloneTaskbar)
+                {
+                    if (!DisposeWeatherBar())
+                    {
+                        SetWeatherBarRecoveryPolling(enabled: true);
+                        return;
+                    }
+
+                    StopWeatherBarWatchdog();
+                    EnsureTaskbarRestartListener();
                     return;
                 }
 

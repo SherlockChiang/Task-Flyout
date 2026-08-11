@@ -149,6 +149,10 @@ namespace Task_Flyout.Views
                     "Preparing the native button and removing the Windows Widgets entry. The Task Flyout bar remains the fallback.",
                 StandaloneTaskbarUiStatusKind.ActiveUnverified =>
                     "The native controller acknowledged startup. Visibility is not yet proven, so the Task Flyout bar remains the fallback.",
+                StandaloneTaskbarUiStatusKind.Active =>
+                    "The native XAML weather button is mounted and now owns the taskbar surface. The Task Flyout fallback is closed.",
+                StandaloneTaskbarUiStatusKind.ClosingFallback =>
+                    "The native button is mounted. Task Flyout is retrying a safe close of the fallback bar.",
                 StandaloneTaskbarUiStatusKind.BinaryMissing =>
                     "The standalone native binaries are not available beside the app. The Task Flyout bar remains the fallback.",
                 StandaloneTaskbarUiStatusKind.Unsupported =>

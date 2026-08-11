@@ -7,9 +7,14 @@ namespace Task_Flyout.Services;
 internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
 {
     public static readonly TimeSpan ShutdownTimeout = TimeSpan.FromSeconds(15);
+    public static readonly TimeSpan MountReadyPollInterval =
+        TimeSpan.FromMilliseconds(400);
+    public const int MountReadyMaxAttempts = 5;
 
     private readonly IStandaloneTaskbarBrokerClient _client;
     private readonly TimeSpan _shutdownTimeout;
+    private readonly TimeSpan _mountReadyPollInterval;
+    private readonly int _mountReadyMaxAttempts;
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly object _stateLock = new();
     private readonly object _notificationLock = new();
@@ -43,12 +48,22 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
     internal StandaloneTaskbarCoordinator(
         IStandaloneTaskbarBrokerClient client,
         TimeSpan shutdownTimeout,
-        bool cleanupRequired = false)
+        bool cleanupRequired = false,
+        TimeSpan? mountReadyPollInterval = null,
+        int mountReadyMaxAttempts = MountReadyMaxAttempts)
     {
         if (shutdownTimeout <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(shutdownTimeout));
+        TimeSpan pollInterval =
+            mountReadyPollInterval ?? MountReadyPollInterval;
+        if (pollInterval < TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(mountReadyPollInterval));
+        if (mountReadyMaxAttempts <= 0)
+            throw new ArgumentOutOfRangeException(nameof(mountReadyMaxAttempts));
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _shutdownTimeout = shutdownTimeout;
+        _mountReadyPollInterval = pollInterval;
+        _mountReadyMaxAttempts = mountReadyMaxAttempts;
         _stopRequired = cleanupRequired;
     }
 
@@ -277,11 +292,82 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
         if (!IsCurrent(generation, enabled: true))
             return;
 
+        StandaloneTaskbarRuntimeState startState =
+            StandaloneTaskbarLifecyclePolicy.MapStart(start.Kind);
         PublishIfCurrent(
             generation,
-            new StandaloneTaskbarRuntimeStatus(
-                StandaloneTaskbarLifecyclePolicy.MapStart(start.Kind)),
+            new StandaloneTaskbarRuntimeStatus(startState),
             notifyStatus);
+        if (startState !=
+                StandaloneTaskbarRuntimeState.ControllerActiveUnverified ||
+            !IsCurrent(generation, enabled: true))
+        {
+            return;
+        }
+
+        await VerifyMountReadyAsync(
+            generation,
+            cancellationToken,
+            notifyStatus).ConfigureAwait(false);
+    }
+
+    private async Task VerifyMountReadyAsync(
+        long generation,
+        CancellationToken cancellationToken,
+        bool notifyStatus)
+    {
+        for (int attempt = 0; attempt < _mountReadyMaxAttempts; attempt++)
+        {
+            if (attempt != 0 && _mountReadyPollInterval > TimeSpan.Zero)
+            {
+                await Task.Delay(
+                    _mountReadyPollInterval,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            if (!IsCurrent(generation, enabled: true))
+                return;
+
+            StandaloneTaskbarBrokerResult status;
+            try
+            {
+                status = await _client.GetStatusAsync(cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                // Status is an additive proof channel. An older or failed
+                // implementation cannot invalidate the acknowledged start,
+                // but it also cannot hide the safe fallback.
+                return;
+            }
+
+            if (!IsCurrent(generation, enabled: true))
+                return;
+
+            StandaloneTaskbarRuntimeState mapped =
+                StandaloneTaskbarLifecyclePolicy.MapStatus(status.Kind);
+            if (status.Kind ==
+                StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified)
+            {
+                continue;
+            }
+            if (mapped ==
+                StandaloneTaskbarRuntimeState.ControllerActiveUnverified)
+            {
+                return;
+            }
+
+            PublishIfCurrent(
+                generation,
+                new StandaloneTaskbarRuntimeStatus(mapped),
+                notifyStatus);
+            return;
+        }
     }
 
     private async Task StopCoreAsync(

@@ -10,6 +10,7 @@ public class StandaloneTaskbarUiStatusPolicyTests
     [InlineData(true, true, false, "ControllerActiveUnverified", false, null, "WeatherProviderDisabled")]
     [InlineData(true, true, true, "Starting", true, null, "Preparing")]
     [InlineData(true, true, true, "ControllerActiveUnverified", true, null, "ActiveUnverified")]
+    [InlineData(true, true, true, "MountReady", true, null, "Active")]
     [InlineData(true, true, true, "BinaryMissing", false, null, "BinaryMissing")]
     [InlineData(true, true, true, "Unsupported", false, null, "Unsupported")]
     [InlineData(true, true, true, "TemporarilyUnavailable", false, null, "TemporarilyUnavailable")]
@@ -40,6 +41,7 @@ public class StandaloneTaskbarUiStatusPolicyTests
     [InlineData("standalone:windows-widgets-external-change-preserved", "WidgetsConflict")]
     [InlineData("standalone:windows-widgets-invalid-snapshot", "WidgetsConflict")]
     [InlineData("standalone:taskbar-control-suppressed", "ControlSuppressed")]
+    [InlineData("standalone:fallback-close-pending", "ClosingFallback")]
     public void Suppression_details_take_priority_over_controller_state(
         string detail,
         string expected)

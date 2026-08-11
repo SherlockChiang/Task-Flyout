@@ -9,6 +9,8 @@ internal enum StandaloneTaskbarUiStatusKind
     WeatherProviderDisabled,
     Preparing,
     ActiveUnverified,
+    Active,
+    ClosingFallback,
     BinaryMissing,
     Unsupported,
     TemporarilyUnavailable,
@@ -51,6 +53,8 @@ internal static class StandaloneTaskbarUiStatusPolicy
         string detail = runtimeDetail ?? string.Empty;
         if (Contains(detail, "taskbar-control-suppressed"))
             return StandaloneTaskbarUiStatusKind.ControlSuppressed;
+        if (Contains(detail, "fallback-close-pending"))
+            return StandaloneTaskbarUiStatusKind.ClosingFallback;
         if (Contains(detail, "windows-widgets-external-change-preserved") ||
             Contains(detail, "windows-widgets-invalid-snapshot") ||
             Contains(detail, "windows-widgets-conflicting-owner"))
@@ -69,6 +73,8 @@ internal static class StandaloneTaskbarUiStatusPolicy
         {
             StandaloneTaskbarRuntimeState.ControllerActiveUnverified =>
                 StandaloneTaskbarUiStatusKind.ActiveUnverified,
+            StandaloneTaskbarRuntimeState.MountReady =>
+                StandaloneTaskbarUiStatusKind.Active,
             StandaloneTaskbarRuntimeState.BinaryMissing =>
                 StandaloneTaskbarUiStatusKind.BinaryMissing,
             StandaloneTaskbarRuntimeState.Unsupported =>

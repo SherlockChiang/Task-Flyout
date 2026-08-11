@@ -7,6 +7,7 @@ internal enum StandaloneTaskbarRuntimeState
     Disabled,
     Starting,
     ControllerActiveUnverified,
+    MountReady,
     Stopping,
     Inactive,
     BinaryMissing,
@@ -22,16 +23,16 @@ internal enum StandaloneTaskbarRuntimeState
 internal readonly record struct StandaloneTaskbarRuntimeStatus(
     StandaloneTaskbarRuntimeState State)
 {
-    // There is no mount-ready acknowledgement in the current native ABI. Keep
-    // the existing app-owned bar for every requested standalone state until a
-    // later protocol version can prove the XAML button is visible.
-    public bool KeepTaskFlyoutFallback => State != StandaloneTaskbarRuntimeState.Disabled;
+    public bool KeepTaskFlyoutFallback => State is not
+        (StandaloneTaskbarRuntimeState.Disabled or
+         StandaloneTaskbarRuntimeState.MountReady);
 
     public string DiagnosticKey => State switch
     {
         StandaloneTaskbarRuntimeState.Disabled => "disabled",
         StandaloneTaskbarRuntimeState.Starting => "starting",
         StandaloneTaskbarRuntimeState.ControllerActiveUnverified => "controller-active-unverified",
+        StandaloneTaskbarRuntimeState.MountReady => "mount-ready",
         StandaloneTaskbarRuntimeState.Stopping => "stopping",
         StandaloneTaskbarRuntimeState.Inactive => "inactive",
         StandaloneTaskbarRuntimeState.BinaryMissing => "binary-missing",
@@ -113,6 +114,32 @@ internal static class StandaloneTaskbarLifecyclePolicy
                 StandaloneTaskbarRuntimeState.Cancelled,
             StandaloneTaskbarBrokerResultKind.InvalidResponse =>
                 StandaloneTaskbarRuntimeState.InvalidResponse,
+            _ => StandaloneTaskbarRuntimeState.Recovery
+        };
+
+    public static StandaloneTaskbarRuntimeState MapStatus(
+        StandaloneTaskbarBrokerResultKind result)
+        => result switch
+        {
+            StandaloneTaskbarBrokerResultKind.ControllerMountReady =>
+                StandaloneTaskbarRuntimeState.MountReady,
+            StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified or
+            StandaloneTaskbarBrokerResultKind.Failed or
+            StandaloneTaskbarBrokerResultKind.Ambiguous or
+            StandaloneTaskbarBrokerResultKind.TimedOut =>
+                StandaloneTaskbarRuntimeState.ControllerActiveUnverified,
+            StandaloneTaskbarBrokerResultKind.BinaryMissing =>
+                StandaloneTaskbarRuntimeState.BinaryMissing,
+            StandaloneTaskbarBrokerResultKind.Unsupported =>
+                StandaloneTaskbarRuntimeState.Unsupported,
+            StandaloneTaskbarBrokerResultKind.TemporarilyUnavailable =>
+                StandaloneTaskbarRuntimeState.TemporarilyUnavailable,
+            StandaloneTaskbarBrokerResultKind.Rejected =>
+                StandaloneTaskbarRuntimeState.Rejected,
+            StandaloneTaskbarBrokerResultKind.InvalidResponse =>
+                StandaloneTaskbarRuntimeState.InvalidResponse,
+            StandaloneTaskbarBrokerResultKind.Cancelled =>
+                StandaloneTaskbarRuntimeState.Cancelled,
             _ => StandaloneTaskbarRuntimeState.Recovery
         };
 }

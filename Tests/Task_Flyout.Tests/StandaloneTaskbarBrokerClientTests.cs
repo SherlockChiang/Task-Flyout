@@ -182,7 +182,7 @@ public class StandaloneTaskbarBrokerClientTests
                     Path.GetFullPath(directory),
                     StandaloneTaskbarBinaryLocator.HostFileName),
                 runner.Arguments[2]);
-            Assert.Equal(StandaloneTaskbarBrokerClient.ControlTimeout, runner.Timeout);
+            Assert.Equal(StandaloneTaskbarBrokerClient.StatusTimeout, runner.Timeout);
         }
         finally
         {
@@ -211,6 +211,14 @@ public class StandaloneTaskbarBrokerClientTests
             var start = await new StandaloneTaskbarBrokerClient(directory, startRunner)
                 .StartAsync();
             Assert.Equal(StandaloneTaskbarBrokerResultKind.Ambiguous, start.Kind);
+
+            var statusRunner = new FakeRunner
+            {
+                Result = ProcessResult(StandaloneTaskbarBrokerProcessKind.TimedOut)
+            };
+            var status = await new StandaloneTaskbarBrokerClient(directory, statusRunner)
+                .GetStatusAsync();
+            Assert.Equal(StandaloneTaskbarBrokerResultKind.TimedOut, status.Kind);
         }
         finally
         {
@@ -269,6 +277,17 @@ public class StandaloneTaskbarBrokerClientTests
                         StandaloneTaskbarBrokerProcessKind.OutputReadFailed)
                 }).StopAsync();
             Assert.Equal(StandaloneTaskbarBrokerResultKind.Ambiguous, stop.Kind);
+
+            var status = await new StandaloneTaskbarBrokerClient(
+                directory,
+                new FakeRunner
+                {
+                    Result = ProcessResult(
+                        StandaloneTaskbarBrokerProcessKind.OutputReadFailed)
+                }).GetStatusAsync();
+            Assert.Equal(
+                StandaloneTaskbarBrokerResultKind.InvalidResponse,
+                status.Kind);
         }
         finally
         {

@@ -5,14 +5,15 @@ namespace Task_Flyout.Tests;
 public class StandaloneTaskbarLifecyclePolicyTests
 {
     [Fact]
-    public void Every_requested_state_keeps_the_safe_fallback_until_mount_ready_exists()
+    public void Only_disabled_or_mount_ready_states_can_close_the_fallback()
     {
         foreach (StandaloneTaskbarRuntimeState state in Enum.GetValues<StandaloneTaskbarRuntimeState>())
         {
             var status = new StandaloneTaskbarRuntimeStatus(state);
 
             Assert.Equal(
-                state != StandaloneTaskbarRuntimeState.Disabled,
+                state is not (StandaloneTaskbarRuntimeState.Disabled or
+                    StandaloneTaskbarRuntimeState.MountReady),
                 status.KeepTaskFlyoutFallback);
         }
     }
@@ -25,6 +26,7 @@ public class StandaloneTaskbarLifecyclePolicyTests
             (StandaloneTaskbarRuntimeState.Disabled, "disabled"),
             (StandaloneTaskbarRuntimeState.Starting, "starting"),
             (StandaloneTaskbarRuntimeState.ControllerActiveUnverified, "controller-active-unverified"),
+            (StandaloneTaskbarRuntimeState.MountReady, "mount-ready"),
             (StandaloneTaskbarRuntimeState.Stopping, "stopping"),
             (StandaloneTaskbarRuntimeState.Inactive, "inactive"),
             (StandaloneTaskbarRuntimeState.BinaryMissing, "binary-missing"),
@@ -115,6 +117,33 @@ public class StandaloneTaskbarLifecyclePolicyTests
             (StandaloneTaskbarBrokerResultKind.TimedOut, StandaloneTaskbarRuntimeState.TemporarilyUnavailable),
             (StandaloneTaskbarBrokerResultKind.Cancelled, StandaloneTaskbarRuntimeState.Cancelled)
         ], StandaloneTaskbarLifecyclePolicy.MapStop);
+    }
+
+    [Fact]
+    public void Status_result_matrix_is_complete_and_only_live_proof_is_ready()
+    {
+        AssertCompleteMatrix(
+        [
+            (StandaloneTaskbarBrokerResultKind.BinaryMissing, StandaloneTaskbarRuntimeState.BinaryMissing),
+            (StandaloneTaskbarBrokerResultKind.ProbeSupported, StandaloneTaskbarRuntimeState.Recovery),
+            (StandaloneTaskbarBrokerResultKind.Unsupported, StandaloneTaskbarRuntimeState.Unsupported),
+            (StandaloneTaskbarBrokerResultKind.TemporarilyUnavailable, StandaloneTaskbarRuntimeState.TemporarilyUnavailable),
+            (StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified, StandaloneTaskbarRuntimeState.ControllerActiveUnverified),
+            (StandaloneTaskbarBrokerResultKind.ControllerMountReady, StandaloneTaskbarRuntimeState.MountReady),
+            (StandaloneTaskbarBrokerResultKind.ControllerInactive, StandaloneTaskbarRuntimeState.Recovery),
+            (StandaloneTaskbarBrokerResultKind.Rejected, StandaloneTaskbarRuntimeState.Rejected),
+            (StandaloneTaskbarBrokerResultKind.Ambiguous, StandaloneTaskbarRuntimeState.ControllerActiveUnverified),
+            (StandaloneTaskbarBrokerResultKind.Failed, StandaloneTaskbarRuntimeState.ControllerActiveUnverified),
+            (StandaloneTaskbarBrokerResultKind.InvalidResponse, StandaloneTaskbarRuntimeState.InvalidResponse),
+            (StandaloneTaskbarBrokerResultKind.TimedOut, StandaloneTaskbarRuntimeState.ControllerActiveUnverified),
+            (StandaloneTaskbarBrokerResultKind.Cancelled, StandaloneTaskbarRuntimeState.Cancelled)
+        ], StandaloneTaskbarLifecyclePolicy.MapStatus);
+
+        Assert.False(new StandaloneTaskbarRuntimeStatus(
+            StandaloneTaskbarRuntimeState.MountReady).KeepTaskFlyoutFallback);
+        Assert.True(new StandaloneTaskbarRuntimeStatus(
+            StandaloneTaskbarRuntimeState.ControllerActiveUnverified)
+            .KeepTaskFlyoutFallback);
     }
 
     private static void AssertCompleteMatrix(

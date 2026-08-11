@@ -1417,6 +1417,8 @@
   <data name="WeatherPage_StandaloneStatus_WeatherProviderDisabled" xml:space="preserve"><value>请先开启 Task Flyout 天气；原生按钮依赖由应用管理的天气提供程序。</value></data>
   <data name="WeatherPage_StandaloneStatus_Preparing" xml:space="preserve"><value>正在准备原生按钮并移除 Windows Widgets 入口。Task Flyout 自绘天气栏将继续作为回退。</value></data>
   <data name="WeatherPage_StandaloneStatus_ActiveUnverified" xml:space="preserve"><value>原生控制器已确认启动，但尚未证明按钮可见，因此继续保留 Task Flyout 自绘天气栏作为回退。</value></data>
+  <data name="WeatherPage_StandaloneStatus_Active" xml:space="preserve"><value>原生 XAML 天气按钮已完成挂载并接管任务栏显示，Task Flyout 自绘天气栏回退已关闭。</value></data>
+  <data name="WeatherPage_StandaloneStatus_ClosingFallback" xml:space="preserve"><value>原生按钮已完成挂载，Task Flyout 正在重试安全关闭自绘天气栏回退。</value></data>
   <data name="WeatherPage_StandaloneStatus_BinaryMissing" xml:space="preserve"><value>应用旁缺少独立原生组件。Task Flyout 自绘天气栏将继续作为回退。</value></data>
   <data name="WeatherPage_StandaloneStatus_Unsupported" xml:space="preserve"><value>当前 Windows 任务栏版本不在精确兼容配置中，未尝试修改 Explorer。</value></data>
   <data name="WeatherPage_StandaloneStatus_TemporarilyUnavailable" xml:space="preserve"><value>Explorer 或任务栏暂时不可用。Task Flyout 自绘天气栏将继续作为回退。</value></data>

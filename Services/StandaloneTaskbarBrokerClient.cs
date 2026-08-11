@@ -376,6 +376,7 @@ internal sealed class StandaloneTaskbarBrokerClient : IStandaloneTaskbarBrokerCl
 {
     public static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(3);
     public static readonly TimeSpan ControlTimeout = TimeSpan.FromSeconds(10);
+    public static readonly TimeSpan StatusTimeout = TimeSpan.FromSeconds(2);
 
     private readonly string _baseDirectory;
     private readonly IStandaloneTaskbarBrokerProcessRunner _runner;
@@ -433,6 +434,7 @@ internal sealed class StandaloneTaskbarBrokerClient : IStandaloneTaskbarBrokerCl
         }
 
         bool isProbe = command is null;
+        bool isStatus = command == StandaloneTaskbarBrokerCommand.Status;
         var arguments = new List<string>(isProbe ? 2 : 4);
         if (isProbe)
         {
@@ -459,7 +461,11 @@ internal sealed class StandaloneTaskbarBrokerClient : IStandaloneTaskbarBrokerCl
             await _runner.RunAsync(
                 paths.BrokerPath,
                 arguments,
-                isProbe ? ProbeTimeout : ControlTimeout,
+                isProbe
+                    ? ProbeTimeout
+                    : isStatus
+                        ? StatusTimeout
+                        : ControlTimeout,
                 cancellationToken).ConfigureAwait(false);
 
         switch (processResult.Kind)
@@ -477,14 +483,14 @@ internal sealed class StandaloneTaskbarBrokerClient : IStandaloneTaskbarBrokerCl
                     processResult.StandardOutput,
                     processResult.ExitCode);
             case StandaloneTaskbarBrokerProcessKind.TimedOut:
-                return new(isProbe
+                return new(isProbe || isStatus
                     ? StandaloneTaskbarBrokerResultKind.TimedOut
                     : StandaloneTaskbarBrokerResultKind.Ambiguous);
             case StandaloneTaskbarBrokerProcessKind.Cancelled:
                 return new(StandaloneTaskbarBrokerResultKind.Cancelled);
             case StandaloneTaskbarBrokerProcessKind.OutputLimitExceeded:
             case StandaloneTaskbarBrokerProcessKind.OutputReadFailed:
-                return new(isProbe
+                return new(isProbe || isStatus
                     ? StandaloneTaskbarBrokerResultKind.InvalidResponse
                     : StandaloneTaskbarBrokerResultKind.Ambiguous);
             case StandaloneTaskbarBrokerProcessKind.LaunchFailed:

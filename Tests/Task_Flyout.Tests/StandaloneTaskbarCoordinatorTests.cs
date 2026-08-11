@@ -15,7 +15,7 @@ public class StandaloneTaskbarCoordinatorTests
 
         await coordinator.SetEnabledAsync(true);
 
-        Assert.Equal(new[] { "probe", "start" }, client.Calls);
+        Assert.Equal(new[] { "probe", "start", "status" }, client.Calls);
         Assert.Equal(
             StandaloneTaskbarRuntimeState.ControllerActiveUnverified,
             coordinator.Status.State);
@@ -28,6 +28,110 @@ public class StandaloneTaskbarCoordinatorTests
                 StandaloneTaskbarRuntimeState.ControllerActiveUnverified
             },
             states);
+    }
+
+    [Fact]
+    public async Task Live_mount_proof_closes_the_safe_fallback()
+    {
+        var client = new FakeClient
+        {
+            Status = _ => Result(
+                StandaloneTaskbarBrokerResultKind.ControllerMountReady)
+        };
+        await using var coordinator = new StandaloneTaskbarCoordinator(client);
+        var states = new List<StandaloneTaskbarRuntimeState>();
+        coordinator.StatusChanged += status => states.Add(status.State);
+
+        await coordinator.SetEnabledAsync(true);
+
+        Assert.Equal(new[] { "probe", "start", "status" }, client.Calls);
+        Assert.Equal(
+            StandaloneTaskbarRuntimeState.MountReady,
+            coordinator.Status.State);
+        Assert.False(coordinator.Status.KeepTaskFlyoutFallback);
+        Assert.Equal(
+            new[]
+            {
+                StandaloneTaskbarRuntimeState.Starting,
+                StandaloneTaskbarRuntimeState.ControllerActiveUnverified,
+                StandaloneTaskbarRuntimeState.MountReady
+            },
+            states);
+    }
+
+    [Fact]
+    public async Task Pending_mount_is_polled_with_a_strict_attempt_bound()
+    {
+        int statusCalls = 0;
+        var client = new FakeClient
+        {
+            Status = _ => Result(
+                ++statusCalls == 3
+                    ? StandaloneTaskbarBrokerResultKind.ControllerMountReady
+                    : StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified)
+        };
+        await using var coordinator = new StandaloneTaskbarCoordinator(
+            client,
+            TimeSpan.FromSeconds(1),
+            mountReadyPollInterval: TimeSpan.Zero,
+            mountReadyMaxAttempts: 3);
+
+        await coordinator.SetEnabledAsync(true);
+
+        Assert.Equal(
+            new[] { "probe", "start", "status", "status", "status" },
+            client.Calls);
+        Assert.Equal(3, statusCalls);
+        Assert.Equal(
+            StandaloneTaskbarRuntimeState.MountReady,
+            coordinator.Status.State);
+    }
+
+    [Fact]
+    public async Task Pending_mount_exhaustion_never_closes_fallback()
+    {
+        var client = new FakeClient
+        {
+            Status = _ => Result(
+                StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified)
+        };
+        await using var coordinator = new StandaloneTaskbarCoordinator(
+            client,
+            TimeSpan.FromSeconds(1),
+            mountReadyPollInterval: TimeSpan.Zero,
+            mountReadyMaxAttempts: 2);
+
+        await coordinator.SetEnabledAsync(true);
+
+        Assert.Equal(
+            new[] { "probe", "start", "status", "status" },
+            client.Calls);
+        Assert.Equal(
+            StandaloneTaskbarRuntimeState.ControllerActiveUnverified,
+            coordinator.Status.State);
+        Assert.True(coordinator.Status.KeepTaskFlyoutFallback);
+    }
+
+    [Fact]
+    public async Task Status_failure_is_not_retried_or_promoted_to_ready()
+    {
+        var client = new FakeClient
+        {
+            Status = _ => Result(StandaloneTaskbarBrokerResultKind.TimedOut)
+        };
+        await using var coordinator = new StandaloneTaskbarCoordinator(
+            client,
+            TimeSpan.FromSeconds(1),
+            mountReadyPollInterval: TimeSpan.Zero,
+            mountReadyMaxAttempts: 5);
+
+        await coordinator.SetEnabledAsync(true);
+
+        Assert.Equal(new[] { "probe", "start", "status" }, client.Calls);
+        Assert.Equal(
+            StandaloneTaskbarRuntimeState.ControllerActiveUnverified,
+            coordinator.Status.State);
+        Assert.True(coordinator.Status.KeepTaskFlyoutFallback);
     }
 
     [Fact]
@@ -139,7 +243,7 @@ public class StandaloneTaskbarCoordinatorTests
         await coordinator.RefreshAsync();
 
         Assert.Equal(
-            new[] { "probe", "start", "probe", "start" },
+            new[] { "probe", "start", "status", "probe", "start", "status" },
             client.Calls);
         Assert.Contains(StandaloneTaskbarRuntimeState.Recovery, states);
         Assert.Equal(
@@ -246,7 +350,7 @@ public class StandaloneTaskbarCoordinatorTests
         await Task.WhenAll(first, second);
 
         Assert.Same(first, second);
-        Assert.Equal(new[] { "probe", "start", "stop" }, client.Calls);
+        Assert.Equal(new[] { "probe", "start", "status", "stop" }, client.Calls);
     }
 
     [Fact]
@@ -259,7 +363,7 @@ public class StandaloneTaskbarCoordinatorTests
         await coordinator.SetEnabledAsync(true);
         await coordinator.SetEnabledAsync(false);
 
-        Assert.Equal(new[] { "probe", "start", "stop" }, client.Calls);
+        Assert.Equal(new[] { "probe", "start", "status", "stop" }, client.Calls);
         Assert.Equal(StandaloneTaskbarRuntimeState.Disabled, coordinator.Status.State);
     }
 
@@ -274,7 +378,7 @@ public class StandaloneTaskbarCoordinatorTests
         await Task.WhenAll(first, second);
 
         Assert.Same(first, second);
-        Assert.Equal(new[] { "probe", "start" }, client.Calls);
+        Assert.Equal(new[] { "probe", "start", "status" }, client.Calls);
     }
 
     [Fact]
@@ -293,7 +397,7 @@ public class StandaloneTaskbarCoordinatorTests
         await coordinator.SetEnabledAsync(true);
         await coordinator.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(1));
 
-        Assert.Equal(new[] { "probe", "start", "stop" }, client.Calls);
+        Assert.Equal(new[] { "probe", "start", "status", "stop" }, client.Calls);
         Assert.Equal(StandaloneTaskbarRuntimeState.Cancelled, coordinator.Status.State);
         never.TrySetResult(new(StandaloneTaskbarBrokerResultKind.ControllerInactive));
         await WaitUntilAsync(
@@ -355,7 +459,7 @@ public class StandaloneTaskbarCoordinatorTests
             _ => Result(StandaloneTaskbarBrokerResultKind.ControllerInactive);
 
         public Func<CancellationToken, Task<StandaloneTaskbarBrokerResult>> Status { get; init; } =
-            _ => Result(StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified);
+            _ => Result(StandaloneTaskbarBrokerResultKind.Failed);
 
         public ConcurrentQueue<string> CallQueue { get; } = new();
 
