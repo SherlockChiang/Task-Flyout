@@ -2,6 +2,7 @@
 #include "taskbar_mount_readiness_state.h"
 
 #include <cstdio>
+#include <limits>
 
 namespace {
 
@@ -129,11 +130,16 @@ int wmain() {
         readiness,
         18u,
         pendingLost.generation);
+    const bool wrongGenerationAcknowledged = AcknowledgeTaskbarMountLost(
+        readiness,
+        17u,
+        pendingLost.generation + 1u);
     const bool lostStillPending =
         SnapshotTaskbarMountReadiness(readiness, 115u, 12u).pendingLost;
     passed &= Expect(
-        !wrongControllerAcknowledged && lostStillPending,
-        L"an acknowledgement from another controller cannot clear lost");
+        !wrongControllerAcknowledged && !wrongGenerationAcknowledged &&
+            lostStillPending,
+        L"another controller or generation cannot clear pending lost");
     passed &= Expect(
         AcknowledgeTaskbarMountLost(
             readiness,
@@ -155,6 +161,12 @@ int wmain() {
         stale.controllerNonce == 23u && !stale.ready &&
             stale.pendingLost,
         L"an expired owner-thread proof should become a latched lost report");
+    const TaskbarMountReadinessSnapshot repeatedStale =
+        SnapshotTaskbarMountReadiness(readiness, 215u, 12u);
+    passed &= Expect(
+        repeatedStale.pendingLost &&
+            repeatedStale.generation == stale.generation,
+        L"re-reading a latched stale proof must not advance generation");
     BeginTaskbarMountReadinessSession(readiness, 24u, 215u);
     const bool oldSessionAcknowledged = AcknowledgeTaskbarMountLost(
         readiness,
@@ -167,6 +179,17 @@ int wmain() {
             !newSession.ready && !newSession.pendingLost &&
             newSession.generation > stale.generation,
         L"an old in-flight acknowledgement cannot mutate a new session");
+
+    TaskbarMountReadinessState wrapping;
+    wrapping.observationGeneration =
+        std::numeric_limits<std::uint64_t>::max();
+    wrapping.proofSequence = std::numeric_limits<std::uint64_t>::max();
+    BeginTaskbarMountReadinessSession(wrapping, 31u, 300u);
+    const TaskbarMountReadinessSnapshot wrapped =
+        SnapshotTaskbarMountReadiness(wrapping, 300u, 12u);
+    passed &= Expect(
+        wrapped.generation == 1u && wrapped.proofSequence == 1u,
+        L"sequence wrap should preserve non-zero protocol values");
 
     if (!passed) {
         return 1;
