@@ -125,33 +125,28 @@ namespace Task_Flyout.Services
                             OwnsSetting: true);
                     }
 
+                    if (!applied)
+                    {
+                        // A prepared snapshot cannot prove whether this process
+                        // reached the registry write. The current value may also
+                        // have been changed by the user or policy after a crash.
+                        // Keep the marker quarantined for a safe mode-exit release,
+                        // but never adopt or replay an ambiguous value.
+                        return new StandaloneTaskbarWidgetsResult(
+                            StandaloneTaskbarWidgetsResultKind.ExternalChangePreserved,
+                            Succeeded: false,
+                            RegistryChanged: false,
+                            IsEffectivelySuppressed:
+                                IsServiceOwnedTaskbarValue(current),
+                            OwnsSetting: true);
+                    }
+
                     if (IsServiceOwnedTaskbarValue(current))
                     {
-                        TryMarkApplied(localSettings);
                         return new StandaloneTaskbarWidgetsResult(
                             StandaloneTaskbarWidgetsResultKind.RecoveredSuppression,
                             Succeeded: true,
                             RegistryChanged: false,
-                            IsEffectivelySuppressed: true,
-                            OwnsSetting: true);
-                    }
-
-                    if (!applied && SnapshotMatchesCurrent(snapshot, current))
-                    {
-                        if (!TryPrepareNotification(localSettings))
-                        {
-                            return new StandaloneTaskbarWidgetsResult(
-                                StandaloneTaskbarWidgetsResultKind.SettingsFailure,
-                                Succeeded: false,
-                                RegistryChanged: false,
-                                OwnsSetting: true);
-                        }
-                        store.Set(0, RegistryValueKind.DWord);
-                        TryMarkApplied(localSettings);
-                        return new StandaloneTaskbarWidgetsResult(
-                            StandaloneTaskbarWidgetsResultKind.Suppressed,
-                            Succeeded: true,
-                            RegistryChanged: true,
                             IsEffectivelySuppressed: true,
                             OwnsSetting: true);
                     }
@@ -197,7 +192,15 @@ namespace Task_Flyout.Services
                         OwnsSetting: true);
                 }
                 store.Set(0, RegistryValueKind.DWord);
-                TryMarkApplied(localSettings);
+                if (!TryMarkApplied(localSettings))
+                {
+                    return new StandaloneTaskbarWidgetsResult(
+                        StandaloneTaskbarWidgetsResultKind.SettingsFailure,
+                        Succeeded: false,
+                        RegistryChanged: true,
+                        IsEffectivelySuppressed: true,
+                        OwnsSetting: true);
+                }
                 return new StandaloneTaskbarWidgetsResult(
                     StandaloneTaskbarWidgetsResultKind.Suppressed,
                     Succeeded: true,
@@ -236,7 +239,7 @@ namespace Task_Flyout.Services
                 if (!TryReadCapturedTaskbarEntry(
                         localSettings,
                         out TaskbarEntrySnapshot snapshot,
-                        out _))
+                        out bool applied))
                 {
                     return new StandaloneTaskbarWidgetsResult(
                         StandaloneTaskbarWidgetsResultKind.InvalidSnapshot,
@@ -246,6 +249,26 @@ namespace Task_Flyout.Services
                 }
 
                 TaskbarDaRegistryValue current = store.Read();
+                if (!applied)
+                {
+                    // Applied=false is deliberately not ownership: a crash may
+                    // have happened on either side of the registry write. Release
+                    // only our metadata and leave the current value untouched.
+                    if (!TryClearCapturedTaskbarEntry(localSettings))
+                    {
+                        return new StandaloneTaskbarWidgetsResult(
+                            StandaloneTaskbarWidgetsResultKind.SettingsFailure,
+                            Succeeded: false,
+                            RegistryChanged: false,
+                            OwnsSetting: true);
+                    }
+
+                    return new StandaloneTaskbarWidgetsResult(
+                        StandaloneTaskbarWidgetsResultKind.ExternalChangePreserved,
+                        Succeeded: true,
+                        RegistryChanged: false);
+                }
+
                 bool changed = false;
                 StandaloneTaskbarWidgetsResultKind resultKind;
                 if (IsServiceOwnedTaskbarValue(current))
@@ -439,23 +462,6 @@ namespace Task_Flyout.Services
                value.Value is int number &&
                number == 0;
 
-        internal static bool SnapshotMatchesCurrent(
-            TaskbarEntrySnapshot snapshot,
-            TaskbarDaRegistryValue current)
-        {
-            if (snapshot.WasPresent != current.IsPresent)
-                return false;
-            if (!snapshot.WasPresent)
-                return true;
-            if (current.Kind != snapshot.Kind || current.Value == null)
-                return false;
-            return WindowsWidgetsService.TryDeserializeRegistryValue(
-                       snapshot.SerializedValue,
-                       snapshot.Kind,
-                       out object? original) &&
-                   RegistryValueObjectsEqual(original, current.Value);
-        }
-
         internal static bool RegistryValuesEqual(
             TaskbarDaRegistryValue left,
             TaskbarDaRegistryValue right)
@@ -594,16 +600,21 @@ namespace Task_Flyout.Services
             }
         }
 
-        private static void TryMarkApplied(
+        private static bool TryMarkApplied(
             IDictionary<string, object> localSettings)
         {
-            try { localSettings[CapturedAppliedKey] = true; }
+            try
+            {
+                localSettings[CapturedAppliedKey] = true;
+                return true;
+            }
             catch (Exception ex)
             {
-                // The committed original snapshot plus an exact current DWORD 0
-                // remains sufficient for safe restoration after this hint fails.
+                // The write is now ambiguous across a crash boundary. Callers
+                // quarantine Applied=false and never infer ownership from DWORD 0.
                 Debug.WriteLine(
                     $"Marking standalone Widgets suppression applied failed: {ex.Message}");
+                return false;
             }
         }
 

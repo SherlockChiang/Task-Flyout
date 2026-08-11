@@ -255,7 +255,7 @@ public class StandaloneTaskbarWidgetsServiceTests
     }
 
     [Fact]
-    public void Prepared_snapshot_resumes_only_when_registry_still_matches()
+    public void Prepared_snapshot_never_replays_an_ambiguous_registry_write()
     {
         var values = new Dictionary<string, object>();
         var original = new TaskbarDaRegistryValue(
@@ -268,14 +268,80 @@ public class StandaloneTaskbarWidgetsServiceTests
         StandaloneTaskbarWidgetsResult result =
             StandaloneTaskbarWidgetsService.EnsureSuppressedCore(values, store);
 
-        Assert.True(result.Succeeded);
-        Assert.Equal(StandaloneTaskbarWidgetsResultKind.Suppressed, result.Kind);
-        Assert.Equal(0, store.Value);
+        Assert.False(result.Succeeded);
+        Assert.Equal(
+            StandaloneTaskbarWidgetsResultKind.ExternalChangePreserved,
+            result.Kind);
+        Assert.Equal(1, store.Value);
+        Assert.Empty(store.Writes);
         Assert.True(StandaloneTaskbarWidgetsService.TryReadCapturedTaskbarEntry(
             values,
             out _,
             out bool applied));
-        Assert.True(applied);
+        Assert.False(applied);
+    }
+
+    [Fact]
+    public void Failed_applied_marker_is_quarantined_without_rewriting_taskbar_da()
+    {
+        var values = new TrackingDictionary
+        {
+            ThrowOnAppliedTrue = true
+        };
+        var store = new FakeStore(1, RegistryValueKind.DWord);
+
+        StandaloneTaskbarWidgetsResult first =
+            StandaloneTaskbarWidgetsService.EnsureSuppressedCore(values, store);
+
+        Assert.False(first.Succeeded);
+        Assert.Equal(
+            StandaloneTaskbarWidgetsResultKind.SettingsFailure,
+            first.Kind);
+        Assert.True(first.RegistryChanged);
+        Assert.True(first.IsEffectivelySuppressed);
+        Assert.True(first.OwnsSetting);
+        Assert.Single(store.Writes);
+
+        store.Writes.Clear();
+        StandaloneTaskbarWidgetsResult retry =
+            StandaloneTaskbarWidgetsService.EnsureSuppressedCore(values, store);
+        Assert.Equal(
+            StandaloneTaskbarWidgetsResultKind.ExternalChangePreserved,
+            retry.Kind);
+        Assert.False(retry.Succeeded);
+        Assert.Empty(store.Writes);
+
+        store.ReplaceExternally(1, RegistryValueKind.DWord);
+        StandaloneTaskbarWidgetsResult afterExternalRestore =
+            StandaloneTaskbarWidgetsService.EnsureSuppressedCore(values, store);
+        Assert.Equal(
+            StandaloneTaskbarWidgetsResultKind.ExternalChangePreserved,
+            afterExternalRestore.Kind);
+        Assert.Empty(store.Writes);
+    }
+
+    [Fact]
+    public void Restore_of_unconfirmed_snapshot_releases_metadata_only()
+    {
+        var values = new Dictionary<string, object>();
+        StandaloneTaskbarWidgetsService.WriteCapturedTaskbarEntry(
+            values,
+            new TaskbarDaRegistryValue(
+                IsPresent: true,
+                Value: 1,
+                RegistryValueKind.DWord));
+        var store = new FakeStore(0, RegistryValueKind.DWord);
+
+        StandaloneTaskbarWidgetsResult result =
+            StandaloneTaskbarWidgetsService.RestoreCore(values, store);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(
+            StandaloneTaskbarWidgetsResultKind.ExternalChangePreserved,
+            result.Kind);
+        Assert.Equal(0, store.Value);
+        Assert.Empty(store.Writes);
+        Assert.False(StandaloneTaskbarWidgetsService.HasCapturedTaskbarEntry(values));
     }
 
     [Fact]
@@ -419,6 +485,7 @@ public class StandaloneTaskbarWidgetsServiceTests
 
         public List<string> SetKeys { get; } = new();
         public string? ThrowOnSetKey { get; set; }
+        public bool ThrowOnAppliedTrue { get; set; }
         public string? ThrowOnRemoveKey { get; set; }
 
         public object this[string key]
@@ -429,6 +496,16 @@ public class StandaloneTaskbarWidgetsServiceTests
                 SetKeys.Add(key);
                 if (string.Equals(key, ThrowOnSetKey, StringComparison.Ordinal))
                     throw new InvalidOperationException("Simulated settings failure.");
+                if (ThrowOnAppliedTrue &&
+                    string.Equals(
+                        key,
+                        StandaloneTaskbarWidgetsService.CapturedAppliedKey,
+                        StringComparison.Ordinal) &&
+                    value is true)
+                {
+                    throw new InvalidOperationException(
+                        "Simulated applied marker failure.");
+                }
                 _values[key] = value;
             }
         }
