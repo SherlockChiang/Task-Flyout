@@ -53,6 +53,12 @@ taskflyout::taskbar::HostControlAcknowledgement MapControllerResult(
             return HostControlAcknowledgement::StartRejected;
         case TaskbarHostControllerResult::StopRejected:
             return HostControlAcknowledgement::StopRejected;
+        case TaskbarHostControllerResult::MountReady:
+            return HostControlAcknowledgement::MountReady;
+        case TaskbarHostControllerResult::MountPending:
+            return HostControlAcknowledgement::MountPending;
+        case TaskbarHostControllerResult::StatusRejected:
+            return HostControlAcknowledgement::StatusRejected;
     }
     return HostControlAcknowledgement::Unknown;
 }
@@ -108,6 +114,9 @@ TaskFlyoutTaskbarHost_EntryHook(
                     } else if (request.command == HostControlCommand::Stop) {
                         result = taskflyout::taskbar::
                             StopTaskbarWeatherController();
+                    } else if (request.command == HostControlCommand::Status) {
+                        result = taskflyout::taskbar::
+                            QueryTaskbarWeatherControllerStatus();
                     } else {
                         handled = false;
                     }

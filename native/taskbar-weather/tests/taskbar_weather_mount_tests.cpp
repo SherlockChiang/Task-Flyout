@@ -75,6 +75,29 @@ int wmain() {
         !HasTaskbarMountCleanupObligations(cleanup),
         L"a later successful token revoke must release the retained lease");
 
+    TaskbarMountReadinessInput readiness{
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true};
+    passed &= Expect(
+        EvaluateTaskbarMountReadiness(readiness),
+        L"a live arranged owned button should be mount-ready");
+    readiness.ownedIdentityIntact = false;
+    passed &= Expect(
+        !EvaluateTaskbarMountReadiness(readiness),
+        L"a detached or replaced button must never remain mount-ready");
+    readiness.ownedIdentityIntact = true;
+    readiness.arrangedInsideRoot = false;
+    passed &= Expect(
+        !EvaluateTaskbarMountReadiness(readiness),
+        L"an unarranged button must remain pending");
+
     if (!passed) {
         return 1;
     }

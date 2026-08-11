@@ -53,6 +53,18 @@ struct TaskbarMountCleanupObligations {
     bool childPresent = false;
 };
 
+struct TaskbarMountReadinessInput {
+    bool mounted = false;
+    bool childPresent = false;
+    bool clickAttached = false;
+    bool ownerThread = false;
+    bool ownedIdentityIntact = false;
+    bool rootLoaded = false;
+    bool buttonLoaded = false;
+    bool visible = false;
+    bool arrangedInsideRoot = false;
+};
+
 TaskbarMountStatus EvaluateTaskbarMountGate(
     const TaskbarMountGateInput& input) noexcept;
 
@@ -62,6 +74,9 @@ TaskbarMountCleanupObligations EvaluateTaskbarMountRollback(
 
 bool HasTaskbarMountCleanupObligations(
     const TaskbarMountCleanupObligations& obligations) noexcept;
+
+bool EvaluateTaskbarMountReadiness(
+    const TaskbarMountReadinessInput& input) noexcept;
 
 // This state contains weak apartment-affine references. Create, update,
 // restore, and destroy it on the same TaskbarFrame XAML owner thread. It is
@@ -95,6 +110,11 @@ TaskbarMountStatus UpdateWeatherButton(
 
 TaskbarMountStatus RestoreWeatherButton(
     TaskbarWeatherMountState& state) noexcept;
+
+// Revalidates the exact app-owned object and its live layout. This must run on
+// the XAML owner thread; a historical mounted flag alone is never readiness.
+bool IsWeatherButtonMountReady(
+    const TaskbarWeatherMountState& state) noexcept;
 
 const wchar_t* TaskbarMountStatusName(
     TaskbarMountStatus status) noexcept;

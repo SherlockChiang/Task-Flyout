@@ -61,4 +61,7 @@ const wchar_t* HostControlDispatchStatusName(
 const wchar_t* HostControlAcknowledgementName(
     HostControlAcknowledgement acknowledgement) noexcept;
 
+const wchar_t* HostControlCommandName(
+    HostControlCommand command) noexcept;
+
 }  // namespace taskflyout::taskbar

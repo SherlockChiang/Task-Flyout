@@ -15,6 +15,7 @@ inline constexpr wchar_t kHostControlAcknowledgementMessageName[] =
 enum class HostControlCommand : std::uintptr_t {
     Start = 1,
     Stop = 2,
+    Status = 3,
 };
 
 enum class HostControlAcknowledgement : std::uint32_t {
@@ -25,6 +26,9 @@ enum class HostControlAcknowledgement : std::uint32_t {
     NotStarted = 4,
     StartRejected = 5,
     StopRejected = 6,
+    MountReady = 7,
+    MountPending = 8,
+    StatusRejected = 9,
 };
 
 struct HostControlRequestEnvelope {
@@ -62,6 +66,12 @@ constexpr bool IsHostControlAcknowledgementForCommand(
         return acknowledgement == HostControlAcknowledgement::Stopped ||
             acknowledgement == HostControlAcknowledgement::NotStarted ||
             acknowledgement == HostControlAcknowledgement::StopRejected;
+    }
+    if (command == HostControlCommand::Status) {
+        return acknowledgement == HostControlAcknowledgement::MountReady ||
+            acknowledgement == HostControlAcknowledgement::MountPending ||
+            acknowledgement == HostControlAcknowledgement::NotStarted ||
+            acknowledgement == HostControlAcknowledgement::StatusRejected;
     }
     return false;
 }

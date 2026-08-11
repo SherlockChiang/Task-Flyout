@@ -265,7 +265,8 @@ HostControlDispatchStatus EvaluateHostControlAcknowledgement(
         return HostControlDispatchStatus::AcknowledgementInvalid;
     }
     if (acknowledgement == HostControlAcknowledgement::StartRejected ||
-        acknowledgement == HostControlAcknowledgement::StopRejected) {
+        acknowledgement == HostControlAcknowledgement::StopRejected ||
+        acknowledgement == HostControlAcknowledgement::StatusRejected) {
         return HostControlDispatchStatus::ControllerRejected;
     }
     return HostControlDispatchStatus::Acknowledged;
@@ -277,7 +278,8 @@ HostControlDispatchResult DispatchHostControl(
     HostControlDispatchResult result;
     result.command = command;
     if (command != HostControlCommand::Start &&
-        command != HostControlCommand::Stop) {
+        command != HostControlCommand::Stop &&
+        command != HostControlCommand::Status) {
         result.status = HostControlDispatchStatus::InvalidCommand;
         result.detail = L"unsupported-control-command";
         return result;
@@ -491,6 +493,25 @@ const wchar_t* HostControlAcknowledgementName(
             return L"start-rejected";
         case HostControlAcknowledgement::StopRejected:
             return L"stop-rejected";
+        case HostControlAcknowledgement::MountReady:
+            return L"mount-ready";
+        case HostControlAcknowledgement::MountPending:
+            return L"mount-pending";
+        case HostControlAcknowledgement::StatusRejected:
+            return L"status-rejected";
+    }
+    return L"invalid";
+}
+
+const wchar_t* HostControlCommandName(
+    const HostControlCommand command) noexcept {
+    switch (command) {
+        case HostControlCommand::Start:
+            return L"start";
+        case HostControlCommand::Stop:
+            return L"stop";
+        case HostControlCommand::Status:
+            return L"status";
     }
     return L"invalid";
 }

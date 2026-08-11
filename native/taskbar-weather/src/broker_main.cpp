@@ -86,7 +86,8 @@ void PrintUsage() {
         L"Usage: TaskFlyout.TaskbarBroker.exe probe [--strict]\n"
         L"       TaskFlyout.TaskbarBroker.exe start [--host <path>]\n"
         L"       TaskFlyout.TaskbarBroker.exe stop [--host <path>]\n"
-        L"start/stop wait for a bounded host acknowledgement, then remove "
+        L"       TaskFlyout.TaskbarBroker.exe status [--host <path>]\n"
+        L"start/stop/status wait for a bounded host acknowledgement, then remove "
         L"the temporary hook.\n",
         stderr);
 }
@@ -104,9 +105,7 @@ int PrintControl(
         L"\"controllerStatus\":\"%ls\",\"probeStatus\":\"%ls\"}\n",
         taskflyout::taskbar::HostControlDispatchStatusName(result.status),
         EscapeJson(result.detail).c_str(),
-        command == taskflyout::taskbar::HostControlCommand::Start
-            ? L"start"
-            : L"stop",
+        taskflyout::taskbar::HostControlCommandName(command),
         result.processId,
         result.threadId,
         result.messageId,
@@ -152,6 +151,8 @@ int wmain(int argc, wchar_t** argv) {
         controlCommand = taskflyout::taskbar::HostControlCommand::Start;
     } else if (command == L"stop") {
         controlCommand = taskflyout::taskbar::HostControlCommand::Stop;
+    } else if (command == L"status") {
+        controlCommand = taskflyout::taskbar::HostControlCommand::Status;
     } else {
         PrintUsage();
         return 64;

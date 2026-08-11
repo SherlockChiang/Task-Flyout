@@ -616,6 +616,40 @@ TaskbarHostControllerResult StopTaskbarWeatherController() noexcept {
     return result;
 }
 
+TaskbarHostControllerResult QueryTaskbarWeatherControllerStatus() noexcept {
+    const TaskbarDetourSnapshot detour = GetTaskbarDetourSnapshot();
+    if (detour.state == TaskbarDetourState::Dormant ||
+        detour.state == TaskbarDetourState::Removed) {
+        return TaskbarHostControllerResult::NotStarted;
+    }
+    if (detour.state != TaskbarDetourState::Active ||
+        detour.bootstrapThreadId == 0 ||
+        detour.bootstrapThreadId != GetCurrentThreadId()) {
+        return TaskbarHostControllerResult::StatusRejected;
+    }
+
+    auto& runtime = Runtime();
+    for (auto& lease : runtime.leases) {
+        ResetExpiredLease(lease);
+        if (lease.occupied &&
+            IsWeatherButtonMountReady(lease.mount)) {
+            runtime.lastResult.store(
+                TaskbarHostControllerResult::MountReady,
+                std::memory_order_release);
+            return TaskbarHostControllerResult::MountReady;
+        }
+    }
+
+    // Starting the controller and publishing a weather snapshot both request
+    // layout, but a coalesced shell notification may not yield a frame callback.
+    // A bounded status poll can safely request another asynchronous pass.
+    RequestTaskbarRelayout();
+    runtime.lastResult.store(
+        TaskbarHostControllerResult::MountPending,
+        std::memory_order_release);
+    return TaskbarHostControllerResult::MountPending;
+}
+
 const wchar_t* TaskbarHostControllerResultName(
     const TaskbarHostControllerResult result) noexcept {
     switch (result) {
@@ -631,6 +665,12 @@ const wchar_t* TaskbarHostControllerResultName(
             return L"start-rejected";
         case TaskbarHostControllerResult::StopRejected:
             return L"stop-rejected";
+        case TaskbarHostControllerResult::MountReady:
+            return L"mount-ready";
+        case TaskbarHostControllerResult::MountPending:
+            return L"mount-pending";
+        case TaskbarHostControllerResult::StatusRejected:
+            return L"status-rejected";
     }
     return L"unknown";
 }

@@ -2,11 +2,15 @@
 
 #include <Windows.h>
 
+#include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.UI.Core.h>
 #include <winrt/Windows.UI.Xaml.Automation.h>
 #include <winrt/Windows.UI.Xaml.Controls.h>
 #include <winrt/Windows.UI.Xaml.Controls.Primitives.h>
+#include <winrt/Windows.UI.Xaml.Media.h>
+
+#include <cmath>
 
 namespace taskflyout::taskbar {
 namespace {
@@ -206,6 +210,19 @@ TaskbarMountCleanupObligations EvaluateTaskbarMountRollback(
 bool HasTaskbarMountCleanupObligations(
     const TaskbarMountCleanupObligations& obligations) noexcept {
     return obligations.clickAttached || obligations.childPresent;
+}
+
+bool EvaluateTaskbarMountReadiness(
+    const TaskbarMountReadinessInput& input) noexcept {
+    return input.mounted &&
+        input.childPresent &&
+        input.clickAttached &&
+        input.ownerThread &&
+        input.ownedIdentityIntact &&
+        input.rootLoaded &&
+        input.buttonLoaded &&
+        input.visible &&
+        input.arrangedInsideRoot;
 }
 
 TaskbarMountStatus MountWeatherButton(
@@ -494,6 +511,77 @@ TaskbarMountStatus RestoreWeatherButton(
     }
 
     return TaskbarMountStatus::RestoreFailed;
+}
+
+bool IsWeatherButtonMountReady(
+    const TaskbarWeatherMountState& state) noexcept {
+    TaskbarMountReadinessInput readiness;
+    readiness.mounted = state.mounted;
+    readiness.childPresent = state.childPresent;
+    readiness.clickAttached = state.clickAttached;
+    readiness.ownerThread = IsOnOwnerThread(state);
+    if (!readiness.ownerThread) {
+        return false;
+    }
+
+    try {
+        const Grid rootGrid = state.rootGrid.get();
+        const Button button = state.button.get();
+        const WeatherXamlView view{
+            state.viewRoot.get(),
+            state.icon.get(),
+            state.temperature.get(),
+            state.condition.get()};
+        readiness.ownedIdentityIntact =
+            IsOwnedButton(rootGrid, button, view.root) &&
+            ValidateWeatherXamlView(view);
+        readiness.rootLoaded = rootGrid && rootGrid.IsLoaded();
+        readiness.buttonLoaded = button && button.IsLoaded();
+        readiness.visible = button &&
+            button.Visibility() ==
+                winrt::Windows::UI::Xaml::Visibility::Visible &&
+            button.Opacity() > 0.0 &&
+            button.IsHitTestVisible();
+
+        if (readiness.ownedIdentityIntact &&
+            readiness.rootLoaded &&
+            readiness.buttonLoaded &&
+            readiness.visible) {
+            const double width = button.ActualWidth();
+            const double height = button.ActualHeight();
+            const double rootWidth = rootGrid.ActualWidth();
+            const double rootHeight = rootGrid.ActualHeight();
+            if (std::isfinite(width) && std::isfinite(height) &&
+                std::isfinite(rootWidth) && std::isfinite(rootHeight) &&
+                width > 0.0 && height > 0.0 &&
+                rootWidth > 0.0 && rootHeight > 0.0) {
+                const auto bounds = button.TransformToVisual(rootGrid).
+                    TransformBounds(winrt::Windows::Foundation::Rect{
+                        0.0f,
+                        0.0f,
+                        static_cast<float>(width),
+                        static_cast<float>(height)});
+                const double right =
+                    static_cast<double>(bounds.X) + bounds.Width;
+                const double bottom =
+                    static_cast<double>(bounds.Y) + bounds.Height;
+                readiness.arrangedInsideRoot =
+                    std::isfinite(bounds.X) &&
+                    std::isfinite(bounds.Y) &&
+                    std::isfinite(bounds.Width) &&
+                    std::isfinite(bounds.Height) &&
+                    bounds.Width > 0.0f &&
+                    bounds.Height > 0.0f &&
+                    bounds.X < rootWidth &&
+                    bounds.Y < rootHeight &&
+                    right > 0.0 &&
+                    bottom > 0.0;
+            }
+        }
+    } catch (...) {
+        return false;
+    }
+    return EvaluateTaskbarMountReadiness(readiness);
 }
 
 const wchar_t* TaskbarMountStatusName(

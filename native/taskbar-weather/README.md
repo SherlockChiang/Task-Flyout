@@ -9,7 +9,7 @@ WebView-free Windows 11 taskbar weather path.
 - `TaskFlyout.TaskbarHost.dll` is the narrowly scoped in-process Explorer host.
   It now contains a standard `Windows.UI.Xaml` weather view composed from a
   `Grid`, `Border`, `StackPanel`, and `TextBlock` controls. The exported
-  `WH_CALLWNDPROC` entry hook accepts only the private start/stop control
+  `WH_CALLWNDPROC` entry hook accepts only the private start/stop/status control
   message; without that message the host remains inert. The controller is
   default-off and starts the detour only on the taskbar owner thread.
 - The host also builds a reversible, append-only mount lease for a standard
@@ -37,6 +37,7 @@ After a supported probe, the broker can dispatch one explicit control command:
 
 ```powershell
 .\TaskFlyout.TaskbarBroker.exe start
+.\TaskFlyout.TaskbarBroker.exe status
 .\TaskFlyout.TaskbarBroker.exe stop
 ```
 
@@ -48,6 +49,13 @@ status back to that exact window; the broker waits at most one second after hook
 removal and reports `acknowledged`, `controller-rejected`, timeout, or malformed
 reply separately. No pointer is dereferenced across processes, and Explorer
 never waits on the broker.
+
+`status` is a fail-closed readiness query. It returns `mount-ready` only after
+the controller revalidates, on the taskbar XAML owner thread, that the exact
+owned Button is still a loaded, visible, arranged child of the live RootGrid
+with its click handler and view identity intact. Historical mount state,
+controller startup, and a merely appended but unarranged element report
+`mount-pending`; an inactive controller reports `not-started`.
 
 The initial allowlist is intentionally limited to the development profile:
 

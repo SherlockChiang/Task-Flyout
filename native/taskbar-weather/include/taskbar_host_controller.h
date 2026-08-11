@@ -36,6 +36,9 @@ enum class TaskbarHostControllerResult : std::uint32_t {
     NotStarted = 3,
     StartRejected = 4,
     StopRejected = 5,
+    MountReady = 6,
+    MountPending = 7,
+    StatusRejected = 8,
 };
 
 // These functions must be called from the primary taskbar owner thread. The
@@ -43,6 +46,7 @@ enum class TaskbarHostControllerResult : std::uint32_t {
 // private control message; loading the DLL alone remains inert.
 TaskbarHostControllerResult StartTaskbarWeatherController() noexcept;
 TaskbarHostControllerResult StopTaskbarWeatherController() noexcept;
+TaskbarHostControllerResult QueryTaskbarWeatherControllerStatus() noexcept;
 
 const wchar_t* TaskbarHostControllerResultName(
     TaskbarHostControllerResult result) noexcept;
