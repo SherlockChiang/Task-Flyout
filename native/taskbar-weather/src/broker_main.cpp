@@ -3,12 +3,20 @@
 
 #include <Windows.h>
 
+#include <fcntl.h>
+#include <io.h>
+
 #include <cstdint>
 #include <cstdio>
 #include <string>
 #include <string_view>
 
 namespace {
+
+bool ConfigureUtf8TextOutput() noexcept {
+    return _setmode(_fileno(stdout), _O_U8TEXT) != -1 &&
+        _setmode(_fileno(stderr), _O_U8TEXT) != -1;
+}
 
 std::wstring EscapeJson(std::wstring_view value) {
     std::wstring escaped;
@@ -115,6 +123,13 @@ int PrintControl(
 }  // namespace
 
 int wmain(int argc, wchar_t** argv) {
+    // The app consumes redirected broker output as strict UTF-8. Explicit CRT
+    // text modes keep non-ASCII install paths valid JSON on every system code
+    // page while preserving wide-character formatting for console diagnostics.
+    if (!ConfigureUtf8TextOutput()) {
+        return 70;
+    }
+
     if (argc < 2) {
         PrintUsage();
         return 64;

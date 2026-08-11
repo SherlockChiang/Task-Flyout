@@ -584,3 +584,13 @@ transport foundation for the standalone host.
 - Focused parser tests pass 39/39. Process launching, binary packaging,
   generation-safe lifecycle control, mount-ready signalling, and localized UI
   remain pending under M3-07.
+
+### 2026-08-11 Broker UTF-8 Pipe Output
+
+- The native broker now explicitly selects UTF-8 CRT text modes for stdout and
+  stderr before emitting JSON. Strict app-side decoding no longer depends on
+  the machine ANSI code page when a supported taskbar profile contains
+  non-ASCII paths or details.
+- Release x64 compilation, forbidden-import inspection, all 12 native tests,
+  and a redirected strict-UTF-8 `probe` smoke check pass. The probe remains
+  read-only and reports `taskbar-window-missing` in the build sandbox.
