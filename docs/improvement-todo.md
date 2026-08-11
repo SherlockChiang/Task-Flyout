@@ -767,3 +767,17 @@ transport foundation for the standalone host.
   WebView/network import inspection. The build used `-SkipProbe`; no host was
   loaded into Explorer. Managed bounded polling and fallback handoff remain the
   next M3-07 step.
+
+### 2026-08-11 Managed Mount-Status Contract
+
+- Extended the strict broker parser and bounded process client with the
+  additive `status` command. Only `mount-ready`, `mount-pending`, and
+  `not-started` are accepted for an acknowledged status response; cross-command
+  replies, unknown future states, wrong exit codes, and mismatched rejection
+  families fail closed.
+- `mount-ready` now has a distinct privacy-safe managed result and cannot be
+  produced by the older `started`/`already-started` acknowledgements. The client
+  still retains no native path, process identifier, or free-form detail.
+- Focused broker protocol/client tests pass 52/52. The coordinator does not yet
+  consume readiness in this slice, so the Task Flyout fallback remains visible
+  until the next small lifecycle commit.

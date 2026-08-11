@@ -87,6 +87,9 @@ internal interface IStandaloneTaskbarBrokerClient
 
     Task<StandaloneTaskbarBrokerResult> StopAsync(
         CancellationToken cancellationToken = default);
+
+    Task<StandaloneTaskbarBrokerResult> GetStatusAsync(
+        CancellationToken cancellationToken = default);
 }
 
 internal interface IStandaloneTaskbarBrokerProcessRunner
@@ -410,6 +413,12 @@ internal sealed class StandaloneTaskbarBrokerClient : IStandaloneTaskbarBrokerCl
             StandaloneTaskbarBrokerCommand.Stop,
             cancellationToken);
 
+    public Task<StandaloneTaskbarBrokerResult> GetStatusAsync(
+        CancellationToken cancellationToken = default)
+        => ExecuteAsync(
+            StandaloneTaskbarBrokerCommand.Status,
+            cancellationToken);
+
     private async Task<StandaloneTaskbarBrokerResult> ExecuteAsync(
         StandaloneTaskbarBrokerCommand? command,
         CancellationToken cancellationToken)
@@ -432,9 +441,16 @@ internal sealed class StandaloneTaskbarBrokerClient : IStandaloneTaskbarBrokerCl
         }
         else
         {
-            arguments.Add(command == StandaloneTaskbarBrokerCommand.Start
-                ? "start"
-                : "stop");
+            string commandName = command switch
+            {
+                StandaloneTaskbarBrokerCommand.Start => "start",
+                StandaloneTaskbarBrokerCommand.Stop => "stop",
+                StandaloneTaskbarBrokerCommand.Status => "status",
+                _ => string.Empty
+            };
+            if (commandName.Length == 0)
+                return new(StandaloneTaskbarBrokerResultKind.Failed);
+            arguments.Add(commandName);
             arguments.Add("--host");
             arguments.Add(paths.HostPath);
         }

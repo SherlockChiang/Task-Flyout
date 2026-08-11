@@ -85,6 +85,22 @@ public class StandaloneTaskbarBrokerProtocolTests
         }
     }
 
+    [Theory]
+    [InlineData("mount-ready", (int)StandaloneTaskbarBrokerResultKind.ControllerMountReady)]
+    [InlineData("mount-pending", (int)StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified)]
+    [InlineData("not-started", (int)StandaloneTaskbarBrokerResultKind.ControllerInactive)]
+    public void Status_accepts_only_bounded_mount_states(
+        string controllerStatus,
+        int expected)
+    {
+        var result = StandaloneTaskbarBrokerProtocol.ParseControl(
+            StandaloneTaskbarBrokerCommand.Status,
+            ControlJson("acknowledged", "status", controllerStatus),
+            0);
+
+        Assert.Equal((StandaloneTaskbarBrokerResultKind)expected, result.Kind);
+    }
+
     [Fact]
     public void Control_rejects_cross_command_and_wrong_controller_family()
     {
@@ -105,6 +121,12 @@ public class StandaloneTaskbarBrokerProtocolTests
             StandaloneTaskbarBrokerProtocol.ParseControl(
                 StandaloneTaskbarBrokerCommand.Stop,
                 ControlJson("acknowledged", "stop", "started"),
+                0).Kind);
+        Assert.Equal(
+            StandaloneTaskbarBrokerResultKind.InvalidResponse,
+            StandaloneTaskbarBrokerProtocol.ParseControl(
+                StandaloneTaskbarBrokerCommand.Status,
+                ControlJson("acknowledged", "status", "started"),
                 0).Kind);
     }
 
@@ -128,6 +150,12 @@ public class StandaloneTaskbarBrokerProtocolTests
             StandaloneTaskbarBrokerProtocol.ParseControl(
                 StandaloneTaskbarBrokerCommand.Start,
                 ControlJson("controller-rejected", "start", "stop-rejected"),
+                2).Kind);
+        Assert.Equal(
+            StandaloneTaskbarBrokerResultKind.Rejected,
+            StandaloneTaskbarBrokerProtocol.ParseControl(
+                StandaloneTaskbarBrokerCommand.Status,
+                ControlJson("controller-rejected", "status", "status-rejected"),
                 2).Kind);
     }
 

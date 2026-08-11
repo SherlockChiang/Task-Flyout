@@ -16,6 +16,7 @@ internal enum StandaloneTaskbarBrokerResultKind
     Unsupported,
     TemporarilyUnavailable,
     ControllerActiveUnverified,
+    ControllerMountReady,
     ControllerInactive,
     Rejected,
     Ambiguous,
@@ -28,7 +29,8 @@ internal enum StandaloneTaskbarBrokerResultKind
 internal enum StandaloneTaskbarBrokerCommand
 {
     Start,
-    Stop
+    Stop,
+    Status
 }
 
 internal readonly record struct StandaloneTaskbarBrokerResult(
@@ -90,7 +92,8 @@ internal static class StandaloneTaskbarBrokerProtocol
         int exitCode)
     {
         if (expectedCommand is not StandaloneTaskbarBrokerCommand.Start and
-            not StandaloneTaskbarBrokerCommand.Stop)
+            not StandaloneTaskbarBrokerCommand.Stop and
+            not StandaloneTaskbarBrokerCommand.Status)
         {
             return new(StandaloneTaskbarBrokerResultKind.Failed);
         }
@@ -104,10 +107,13 @@ internal static class StandaloneTaskbarBrokerProtocol
         if (!TryParseResponse(standardOutput, out var response))
             return new(StandaloneTaskbarBrokerResultKind.InvalidResponse);
 
-        string expectedCommandName = expectedCommand ==
-            StandaloneTaskbarBrokerCommand.Start
-            ? "start"
-            : "stop";
+        string expectedCommandName = expectedCommand switch
+        {
+            StandaloneTaskbarBrokerCommand.Start => "start",
+            StandaloneTaskbarBrokerCommand.Stop => "stop",
+            StandaloneTaskbarBrokerCommand.Status => "status",
+            _ => string.Empty
+        };
         if (!string.Equals(
                 response.Command,
                 expectedCommandName,
@@ -121,16 +127,28 @@ internal static class StandaloneTaskbarBrokerProtocol
             if (exitCode != 0)
                 return new(StandaloneTaskbarBrokerResultKind.Failed);
 
-            bool validControllerState = expectedCommand ==
+            StandaloneTaskbarBrokerResultKind? result = expectedCommand switch
+            {
                 StandaloneTaskbarBrokerCommand.Start
-                ? response.ControllerStatus is "started" or "already-started"
-                : response.ControllerStatus is "stopped" or "not-started";
-            if (!validControllerState)
-                return new(StandaloneTaskbarBrokerResultKind.InvalidResponse);
-
-            return new(expectedCommand == StandaloneTaskbarBrokerCommand.Start
-                ? StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified
-                : StandaloneTaskbarBrokerResultKind.ControllerInactive);
+                    when response.ControllerStatus is "started" or "already-started" =>
+                        StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified,
+                StandaloneTaskbarBrokerCommand.Stop
+                    when response.ControllerStatus is "stopped" or "not-started" =>
+                        StandaloneTaskbarBrokerResultKind.ControllerInactive,
+                StandaloneTaskbarBrokerCommand.Status
+                    when response.ControllerStatus == "mount-ready" =>
+                        StandaloneTaskbarBrokerResultKind.ControllerMountReady,
+                StandaloneTaskbarBrokerCommand.Status
+                    when response.ControllerStatus == "mount-pending" =>
+                        StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified,
+                StandaloneTaskbarBrokerCommand.Status
+                    when response.ControllerStatus == "not-started" =>
+                        StandaloneTaskbarBrokerResultKind.ControllerInactive,
+                _ => null
+            };
+            return result.HasValue
+                ? new(result.Value)
+                : new(StandaloneTaskbarBrokerResultKind.InvalidResponse);
         }
 
         if (string.Equals(
@@ -141,10 +159,13 @@ internal static class StandaloneTaskbarBrokerProtocol
             if (exitCode != 2)
                 return new(StandaloneTaskbarBrokerResultKind.Failed);
 
-            string expectedRejection = expectedCommand ==
-                StandaloneTaskbarBrokerCommand.Start
-                ? "start-rejected"
-                : "stop-rejected";
+            string expectedRejection = expectedCommand switch
+            {
+                StandaloneTaskbarBrokerCommand.Start => "start-rejected",
+                StandaloneTaskbarBrokerCommand.Stop => "stop-rejected",
+                StandaloneTaskbarBrokerCommand.Status => "status-rejected",
+                _ => string.Empty
+            };
             return string.Equals(
                     response.ControllerStatus,
                     expectedRejection,

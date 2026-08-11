@@ -158,6 +158,39 @@ public class StandaloneTaskbarBrokerClientTests
     }
 
     [Fact]
+    public async Task Status_passes_host_and_maps_live_mount_proof()
+    {
+        string directory = CreateBinaryDirectory();
+        var runner = new FakeRunner
+        {
+            Result = Completed(
+                0,
+                "{\"status\":\"acknowledged\",\"command\":\"status\",\"controllerStatus\":\"mount-ready\"}")
+        };
+        try
+        {
+            var result = await new StandaloneTaskbarBrokerClient(directory, runner)
+                .GetStatusAsync();
+
+            Assert.Equal(
+                StandaloneTaskbarBrokerResultKind.ControllerMountReady,
+                result.Kind);
+            Assert.Equal("status", runner.Arguments[0]);
+            Assert.Equal("--host", runner.Arguments[1]);
+            Assert.Equal(
+                Path.Combine(
+                    Path.GetFullPath(directory),
+                    StandaloneTaskbarBinaryLocator.HostFileName),
+                runner.Arguments[2]);
+            Assert.Equal(StandaloneTaskbarBrokerClient.ControlTimeout, runner.Timeout);
+        }
+        finally
+        {
+            DeleteTempDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task Timeout_is_temporary_for_probe_but_ambiguous_for_control()
     {
         string directory = CreateBinaryDirectory();

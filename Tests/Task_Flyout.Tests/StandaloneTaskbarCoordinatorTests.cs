@@ -354,6 +354,9 @@ public class StandaloneTaskbarCoordinatorTests
         public Func<CancellationToken, Task<StandaloneTaskbarBrokerResult>> Stop { get; init; } =
             _ => Result(StandaloneTaskbarBrokerResultKind.ControllerInactive);
 
+        public Func<CancellationToken, Task<StandaloneTaskbarBrokerResult>> Status { get; init; } =
+            _ => Result(StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified);
+
         public ConcurrentQueue<string> CallQueue { get; } = new();
 
         public string[] Calls => CallQueue.ToArray();
@@ -376,6 +379,10 @@ public class StandaloneTaskbarCoordinatorTests
         public Task<StandaloneTaskbarBrokerResult> StopAsync(
             CancellationToken cancellationToken = default)
             => InvokeAsync("stop", Stop, cancellationToken);
+
+        public Task<StandaloneTaskbarBrokerResult> GetStatusAsync(
+            CancellationToken cancellationToken = default)
+            => InvokeAsync("status", Status, cancellationToken);
 
         private async Task<StandaloneTaskbarBrokerResult> InvokeAsync(
             string name,
