@@ -20,8 +20,8 @@ namespace Task_Flyout.Services
         private WeatherCompanionSnapshot? _snapshot;
         private int _refreshSignalPending;
         private int _forceRefresh;
-        private bool _started;
-        private bool _enabled;
+        private volatile bool _started;
+        private volatile bool _enabled;
 
         public WeatherCompanionCoordinator(
             WeatherService weatherService,
@@ -94,7 +94,10 @@ namespace Task_Flyout.Services
 
             _refreshLoop = null;
             shutdown?.Dispose();
-            _refreshSignal.Dispose();
+            // A LocationUpdated callback can already have passed the volatile
+            // lifecycle check while shutdown is unsubscribing. Keeping this
+            // process-local semaphore undisposed lets that final Release finish
+            // harmlessly; it owns no native wait handle unless WaitHandle is used.
         }
 
         private void WeatherService_Changed(object? sender, EventArgs e)

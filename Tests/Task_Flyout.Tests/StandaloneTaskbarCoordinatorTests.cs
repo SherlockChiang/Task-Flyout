@@ -19,6 +19,7 @@ public class StandaloneTaskbarCoordinatorTests
         Assert.Equal(
             StandaloneTaskbarRuntimeState.ControllerActiveUnverified,
             coordinator.Status.State);
+        Assert.True(coordinator.RequiresStop);
         Assert.True(coordinator.Status.KeepTaskFlyoutFallback);
         Assert.Equal(
             new[]
@@ -46,6 +47,23 @@ public class StandaloneTaskbarCoordinatorTests
             coordinator.Status.State);
         Assert.True(coordinator.IsRequested);
         Assert.True(coordinator.Status.KeepTaskFlyoutFallback);
+    }
+
+    [Fact]
+    public async Task Adopted_cleanup_lease_runs_an_idempotent_stop_before_any_start()
+    {
+        var client = new FakeClient();
+        await using var coordinator = new StandaloneTaskbarCoordinator(
+            client,
+            TimeSpan.FromSeconds(1),
+            cleanupRequired: true);
+
+        Assert.True(coordinator.RequiresStop);
+        await coordinator.RefreshAsync();
+
+        Assert.Equal(new[] { "stop" }, client.Calls);
+        Assert.False(coordinator.RequiresStop);
+        Assert.Equal(StandaloneTaskbarRuntimeState.Disabled, coordinator.Status.State);
     }
 
     [Fact]
@@ -102,6 +120,7 @@ public class StandaloneTaskbarCoordinatorTests
         await Task.WhenAll(enable, disable).WaitAsync(TimeSpan.FromSeconds(2));
 
         Assert.Equal(new[] { "probe" }, client.Calls);
+        Assert.False(coordinator.RequiresStop);
         Assert.Equal(StandaloneTaskbarRuntimeState.Disabled, coordinator.Status.State);
     }
 
@@ -184,6 +203,7 @@ public class StandaloneTaskbarCoordinatorTests
         await coordinator.RefreshAsync();
 
         Assert.Equal(2, stopCount);
+        Assert.False(coordinator.RequiresStop);
         Assert.Equal(StandaloneTaskbarRuntimeState.Disabled, coordinator.Status.State);
     }
 

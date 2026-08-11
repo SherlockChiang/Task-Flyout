@@ -27,18 +27,29 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
         IStandaloneTaskbarBrokerClient? client = null)
         : this(
             client ?? new StandaloneTaskbarBrokerClient(),
-            ShutdownTimeout)
+            ShutdownTimeout,
+            cleanupRequired: false)
+    {
+    }
+
+    internal StandaloneTaskbarCoordinator(bool cleanupRequired)
+        : this(
+            new StandaloneTaskbarBrokerClient(),
+            ShutdownTimeout,
+            cleanupRequired)
     {
     }
 
     internal StandaloneTaskbarCoordinator(
         IStandaloneTaskbarBrokerClient client,
-        TimeSpan shutdownTimeout)
+        TimeSpan shutdownTimeout,
+        bool cleanupRequired = false)
     {
         if (shutdownTimeout <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(shutdownTimeout));
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _shutdownTimeout = shutdownTimeout;
+        _stopRequired = cleanupRequired;
     }
 
     public event Action<StandaloneTaskbarRuntimeStatus>? StatusChanged;
@@ -56,6 +67,14 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
         get
         {
             lock (_stateLock) return _desiredEnabled;
+        }
+    }
+
+    public bool RequiresStop
+    {
+        get
+        {
+            lock (_stateLock) return _stopRequired;
         }
     }
 

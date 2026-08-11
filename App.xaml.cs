@@ -35,6 +35,7 @@ namespace Task_Flyout
         private H.NotifyIcon.TaskbarIcon? _trayIcon;
         private Microsoft.UI.Dispatching.DispatcherQueueTimer? _weatherBarWatchdog;
         private Microsoft.UI.Dispatching.DispatcherQueueTimer? _nativeWidgetsVerificationTimer;
+        private Microsoft.UI.Dispatching.DispatcherQueueTimer? _taskbarRestartListenerRetryTimer;
         private H.NotifyIcon.Core.MessageWindow? _taskbarMessageWindow;
         private long _lastWeatherBarRecreationTimestamp;
         private int _nativeWidgetsVerificationAttempts;
@@ -43,6 +44,7 @@ namespace Task_Flyout
         private static readonly TimeSpan WeatherBarRecreationCooldown = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan NativeWidgetsVerificationInterval = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan NativeWidgetsBackgroundRetryInterval = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan TaskbarRestartListenerRetryInterval = TimeSpan.FromSeconds(2);
         private const int NativeWidgetsFastVerificationAttempts = 5;
         private UISettings _uiSettings = null!;
         private ResourceLoader _loader = new();
@@ -59,6 +61,11 @@ namespace Task_Flyout
         private bool _nativeWidgetsActivationFailed;
         private volatile bool _weatherCompanionBridgeEnabled;
         private WeatherCompanionCoordinator? _weatherCompanionCoordinator;
+        private StandaloneTaskbarCoordinator? _standaloneTaskbarCoordinator;
+        private Task? _standaloneTaskbarHandoffTask;
+        private bool _standaloneTaskbarSuppressed;
+        private bool _standaloneWidgetsHandoffPending;
+        private bool _standaloneWidgetsRemovalVerificationActive;
         private const string WeatherCompanionBridgeEnabledSettingKey = "WeatherCompanionBridgeEnabled";
         private string _weatherBarModeRuntimeDetail = string.Empty;
         private static readonly TimeSpan WindowsWidgetsAvailabilityCacheLifetime = TimeSpan.FromSeconds(30);
@@ -135,6 +142,10 @@ namespace Task_Flyout
             PerformanceDiagnostics.Initialize(performanceDiagnosticsEnabled);
             var startup = PerformanceDiagnostics.StartProcessSpanOnce("startup.tray", "startup", "tray_interactive", "process");
             MainDispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+            _standaloneTaskbarSuppressed = StandaloneTaskbarLaunchPolicy.IsSuppressed(
+                GetToastActivationArgument(args.Arguments),
+                Environment.GetEnvironmentVariable(
+                    StandaloneTaskbarLaunchPolicy.DisableEnvironmentVariable));
             Windows.System.MemoryManager.AppMemoryUsageIncreased += MemoryManager_AppMemoryUsageIncreased;
             ApplyConfiguredThemeToOpenWindows();
 
@@ -515,8 +526,10 @@ namespace Task_Flyout
 
         private void OnWeatherLocationUpdated(object? sender, EventArgs e)
         {
+            if (_isExiting) return;
             MainDispatcherQueue?.TryEnqueue(() =>
             {
+                if (_isExiting) return;
                 RefreshWeatherBar(forceRefresh: true);
                 _ = MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: true);
             });
@@ -548,7 +561,10 @@ namespace Task_Flyout
                 weatherBarEnabled,
                 WeatherService.IsEnabled,
                 requestedMode,
-                availability.IsAvailable);
+                availability.IsAvailable,
+                // Broker acknowledgement does not prove that the later taskbar
+                // layout callback mounted a visible XAML button yet.
+                standaloneTaskbarActive: false);
         }
 
         private WindowsWidgetsAvailability ProbeWindowsWidgetsAvailability(bool forceRefresh = false)
@@ -588,15 +604,148 @@ namespace Task_Flyout
 
         private void ApplyWeatherBarPresentation(bool forceProbe = false)
         {
+            if (_isExiting) return;
             try
             {
                 WeatherBarModeResolution resolution = ResolveWeatherBarMode(forceProbe);
                 var values = ApplicationData.Current.LocalSettings.Values;
                 WeatherBarMode requestedMode = WeatherBarModeSettings.Read(values);
-                UpdateWeatherCompanionBridge(values, requestedMode);
+                if (!resolution.ShouldUseWindowsWidgets)
+                {
+                    StopNativeWidgetsVerification();
+                    bool hadCapturedWidgetsEntry =
+                        WindowsWidgetsService.HasCapturedTaskbarEntry(values);
+                    if (_nativeWidgetsModeActive || hadCapturedWidgetsEntry)
+                    {
+                        bool restored = WindowsWidgetsService.TryRestoreTaskbarEntry(
+                            values,
+                            out string restoreDetail);
+                        _nativeWidgetsModeActive = !restored;
+                        _weatherBarModeRuntimeDetail = restoreDetail;
+                        if (!restored)
+                        {
+                            _standaloneWidgetsRemovalVerificationActive =
+                                requestedMode == WeatherBarMode.StandaloneTaskbar;
+                            StartNativeWidgetsVerification(resetBackoff: true);
+                        }
+                        else if (hadCapturedWidgetsEntry &&
+                                 requestedMode == WeatherBarMode.StandaloneTaskbar)
+                        {
+                            _standaloneWidgetsRemovalVerificationActive = true;
+                        }
+                    }
+                    _nativeWidgetsActivationFailed = false;
+                }
+
+                if (requestedMode == WeatherBarMode.StandaloneTaskbar &&
+                    (values["WeatherBarEnabled"] as bool? ?? false) &&
+                    WeatherService.IsEnabled)
+                {
+                    _standaloneWidgetsHandoffPending =
+                        ProbeWindowsWidgetsAvailability(forceRefresh: true)
+                            .NativeEntryPointPresent;
+                    if (_standaloneWidgetsHandoffPending)
+                    {
+                        _weatherBarModeRuntimeDetail =
+                            "standalone:windows-widgets-present";
+                        if (_standaloneWidgetsRemovalVerificationActive)
+                            StartNativeWidgetsVerification(resetBackoff: true);
+                    }
+                    else
+                    {
+                        _standaloneWidgetsRemovalVerificationActive = false;
+                    }
+                }
+                else
+                {
+                    _standaloneWidgetsHandoffPending = false;
+                    _standaloneWidgetsRemovalVerificationActive = false;
+                }
+
+                bool standaloneRequested = CanRequestStandaloneTaskbar(
+                    values,
+                    requestedMode);
+                bool adoptedCleanupLease =
+                    EnsureStandaloneCoordinatorForPersistedCleanup(values);
+                if (adoptedCleanupLease)
+                    standaloneRequested = false;
+
+                // Start the existing bounded weather pipe before asking Explorer
+                // to load the native controller. On disable, request stop first;
+                // UpdateWeatherCompanionBridge keeps the pipe alive while cleanup
+                // remains unacknowledged.
+                Task standaloneTransition;
+                bool standaloneTransitionWasIncomplete;
+                if (standaloneRequested)
+                {
+                    bool companionReady = UpdateWeatherCompanionBridge(
+                        values,
+                        requestedMode);
+                    standaloneRequested = companionReady;
+                    if (companionReady)
+                        StandaloneTaskbarCleanupSettings.MarkPending(values);
+                    standaloneTransition = SetStandaloneTaskbarEnabled(
+                        companionReady);
+                    standaloneTransitionWasIncomplete = !standaloneTransition.IsCompleted;
+                }
+                else
+                {
+                    if (adoptedCleanupLease)
+                    {
+                        // A stale Explorer host may still be polling this pipe.
+                        // Bring the pipe up before the cold-start idempotent stop.
+                        UpdateWeatherCompanionBridge(values, requestedMode);
+                        standaloneTransition =
+                            _standaloneTaskbarCoordinator!.RefreshAsync();
+                    }
+                    else
+                    {
+                        standaloneTransition = SetStandaloneTaskbarEnabled(false);
+                    }
+                    standaloneTransitionWasIncomplete = !standaloneTransition.IsCompleted;
+                    UpdateWeatherCompanionBridge(values, requestedMode);
+                }
+
+                bool standaloneCleanupPending =
+                    !standaloneTransition.IsCompleted ||
+                    (_standaloneTaskbarCoordinator?.RequiresStop ?? false);
+                if (!standaloneRequested && standaloneTransitionWasIncomplete)
+                {
+                    QueueWeatherPresentationAfterStandaloneTransition(
+                        standaloneTransition);
+                }
+                ClearStandaloneCleanupLeaseIfSafe(values);
+                if (standaloneRequested)
+                {
+                    _weatherBarModeRuntimeDetail =
+                        $"standalone:{_standaloneTaskbarCoordinator?.Status.DiagnosticKey ?? "starting"}";
+                }
 
                 if (resolution.ShouldUseWindowsWidgets)
                 {
+                    if (standaloneCleanupPending)
+                    {
+                        StopNativeWidgetsVerification();
+                        _nativeWidgetsActivationFailed = true;
+                        _weatherBarModeRuntimeDetail =
+                            $"standalone:{_standaloneTaskbarCoordinator?.Status.DiagnosticKey ?? "stopping"}";
+                        bool fallbackAllowed =
+                            (values["WeatherBarEnabled"] as bool? ?? false) &&
+                            WeatherService.IsEnabled;
+                        if (fallbackAllowed)
+                        {
+                            EnsureTaskFlyoutWeatherBar(force: true);
+                            SetWeatherBarRecoveryPolling(enabled: true);
+                        }
+                        else
+                        {
+                            DisposeWeatherBar();
+                            StopWeatherBarWatchdog();
+                            EnsureTaskbarRestartListener();
+                        }
+                        return;
+                    }
+
                     EnsureTaskbarRestartListener();
                     bool entryRequested = WindowsWidgetsService.TryEnableTaskbarEntry(values, out string detail);
                     _nativeWidgetsModeActive = entryRequested;
@@ -623,17 +772,6 @@ namespace Task_Flyout
                     return;
                 }
 
-                StopNativeWidgetsVerification();
-                if (_nativeWidgetsModeActive || WindowsWidgetsService.HasCapturedTaskbarEntry(values))
-                {
-                    bool restored = WindowsWidgetsService.TryRestoreTaskbarEntry(values, out string detail);
-                    _nativeWidgetsModeActive = !restored;
-                    _weatherBarModeRuntimeDetail = detail;
-                    if (!restored)
-                        StartNativeWidgetsVerification(resetBackoff: true);
-                }
-                _nativeWidgetsActivationFailed = false;
-
                 if (resolution.ShouldRunTaskFlyoutBar)
                 {
                     EnsureTaskFlyoutWeatherBar();
@@ -642,6 +780,8 @@ namespace Task_Flyout
 
                 DisposeWeatherBar();
                 StopWeatherBarWatchdog();
+                if (standaloneCleanupPending)
+                    EnsureTaskbarRestartListener();
                 if (requestedMode == WeatherBarMode.WindowsWidgets &&
                     resolution.FallbackReason == WeatherBarFallbackReason.WindowsWidgetsUnavailable)
                 {
@@ -684,20 +824,155 @@ namespace Task_Flyout
             EnsureTaskbarRestartListener();
         }
 
-        private void UpdateWeatherCompanionBridge(
+        private Task SetStandaloneTaskbarEnabled(bool enabled)
+        {
+            if (_isExiting || _standaloneTaskbarSuppressed)
+                enabled = false;
+
+            if (_standaloneTaskbarCoordinator == null)
+            {
+                if (!enabled) return Task.CompletedTask;
+
+                var coordinator = new StandaloneTaskbarCoordinator();
+                coordinator.StatusChanged += StandaloneTaskbarCoordinator_StatusChanged;
+                _standaloneTaskbarCoordinator = coordinator;
+            }
+
+            if (enabled)
+                EnsureTaskbarRestartListener();
+            return _standaloneTaskbarCoordinator.SetEnabledAsync(enabled);
+        }
+
+        private bool EnsureStandaloneCoordinatorForPersistedCleanup(
+            System.Collections.Generic.IDictionary<string, object> values)
+        {
+            if (_standaloneTaskbarSuppressed ||
+                _standaloneTaskbarCoordinator != null ||
+                !StandaloneTaskbarCleanupSettings.IsPending(values))
+            {
+                return false;
+            }
+
+            var coordinator = new StandaloneTaskbarCoordinator(
+                cleanupRequired: true);
+            coordinator.StatusChanged += StandaloneTaskbarCoordinator_StatusChanged;
+            _standaloneTaskbarCoordinator = coordinator;
+            EnsureTaskbarRestartListener();
+            return true;
+        }
+
+        private void ClearStandaloneCleanupLeaseIfSafe(
+            System.Collections.Generic.IDictionary<string, object> values)
+        {
+            StandaloneTaskbarCoordinator? coordinator =
+                _standaloneTaskbarCoordinator;
+            if (coordinator != null &&
+                !coordinator.IsRequested &&
+                !coordinator.RequiresStop)
+            {
+                try { StandaloneTaskbarCleanupSettings.Clear(values); }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"Clearing standalone taskbar cleanup lease failed: {ex.Message}");
+                }
+            }
+        }
+
+        private bool CanRequestStandaloneTaskbar(
+            System.Collections.Generic.IDictionary<string, object> values,
+            WeatherBarMode requestedMode)
+            => !_standaloneTaskbarSuppressed &&
+               requestedMode == WeatherBarMode.StandaloneTaskbar &&
+               (values["WeatherBarEnabled"] as bool? ?? false) &&
+               WeatherService.IsEnabled &&
+               !(_standaloneTaskbarCoordinator is
+                    { IsRequested: false, RequiresStop: true }) &&
+               !_nativeWidgetsModeActive &&
+               !WindowsWidgetsService.HasCapturedTaskbarEntry(values) &&
+               !_standaloneWidgetsHandoffPending;
+
+        private void StandaloneTaskbarCoordinator_StatusChanged(
+            StandaloneTaskbarRuntimeStatus status)
+        {
+            MainDispatcherQueue?.TryEnqueue(() =>
+            {
+                if (_isExiting) return;
+                StandaloneTaskbarCoordinator? coordinator =
+                    _standaloneTaskbarCoordinator;
+                if (coordinator == null || coordinator.Status != status)
+                    return;
+
+                ClearStandaloneCleanupLeaseIfSafe(
+                    ApplicationData.Current.LocalSettings.Values);
+                _weatherBarModeRuntimeDetail =
+                    $"standalone:{status.DiagnosticKey}";
+                WeatherBarMode requestedMode = WeatherBarModeSettings.Read(
+                    ApplicationData.Current.LocalSettings.Values);
+                if (requestedMode != WeatherBarMode.StandaloneTaskbar)
+                    ApplyWeatherBarPresentation();
+            });
+        }
+
+        private void QueueWeatherPresentationAfterStandaloneTransition(
+            Task transition)
+        {
+            if (ReferenceEquals(_standaloneTaskbarHandoffTask, transition))
+                return;
+
+            _standaloneTaskbarHandoffTask = transition;
+            _ = ReapplyWeatherPresentationAfterStandaloneTransitionAsync(
+                transition);
+        }
+
+        private async Task ReapplyWeatherPresentationAfterStandaloneTransitionAsync(
+            Task transition)
+        {
+            try { await transition.ConfigureAwait(false); }
+            catch { }
+
+            MainDispatcherQueue?.TryEnqueue(() =>
+            {
+                if (_isExiting ||
+                    !ReferenceEquals(_standaloneTaskbarHandoffTask, transition))
+                {
+                    return;
+                }
+
+                _standaloneTaskbarHandoffTask = null;
+                ClearStandaloneCleanupLeaseIfSafe(
+                    ApplicationData.Current.LocalSettings.Values);
+                ApplyWeatherBarPresentation();
+            });
+        }
+
+        private bool UpdateWeatherCompanionBridge(
             System.Collections.Generic.IDictionary<string, object> values,
             WeatherBarMode requestedMode)
         {
-            bool enabled =
+            if (_isExiting)
+                return _weatherCompanionBridgeEnabled;
+
+            bool weatherBarEnabled =
+                values["WeatherBarEnabled"] as bool? ?? false;
+            bool standaloneRequested = CanRequestStandaloneTaskbar(
+                values,
+                requestedMode);
+            bool standaloneCleanupPending =
+                _standaloneTaskbarCoordinator?.RequiresStop ?? false;
+            bool windowsWidgetsBridgeRequested =
                 (values[WeatherCompanionBridgeEnabledSettingKey] as bool? ?? false) &&
-                (values["WeatherBarEnabled"] as bool? ?? false) &&
                 requestedMode == WeatherBarMode.WindowsWidgets;
+            bool enabled = standaloneCleanupPending ||
+                (weatherBarEnabled &&
+                 WeatherService.IsEnabled &&
+                 (standaloneRequested || windowsWidgetsBridgeRequested));
             _weatherCompanionBridgeEnabled = enabled;
 
             if (!enabled)
             {
                 _weatherCompanionCoordinator?.SetEnabled(false);
-                return;
+                return false;
             }
 
             try
@@ -710,6 +985,7 @@ namespace Task_Flyout
                     _weatherCompanionCoordinator.Start();
                 }
                 _weatherCompanionCoordinator.SetEnabled(true);
+                return true;
             }
             catch (Exception ex)
             {
@@ -717,6 +993,7 @@ namespace Task_Flyout
                 _weatherCompanionCoordinator = null;
                 _weatherBarModeRuntimeDetail = "Weather companion bridge unavailable.";
                 System.Diagnostics.Debug.WriteLine($"Weather companion bridge failed to start: {ex.Message}");
+                return false;
             }
         }
 
@@ -765,6 +1042,7 @@ namespace Task_Flyout
             _nativeWidgetsVerificationTimer.Interval = NativeWidgetsVerificationInterval;
             _nativeWidgetsVerificationTimer.Tick += (_, _) => VerifyNativeWidgetsEntry();
             _nativeWidgetsVerificationTimer.Start();
+            EnsureTaskbarRestartListener();
         }
 
         private void StopNativeWidgetsVerification()
@@ -772,6 +1050,7 @@ namespace Task_Flyout
             _nativeWidgetsVerificationTimer?.Stop();
             _nativeWidgetsVerificationTimer = null;
             _nativeWidgetsVerificationAttempts = 0;
+            ReconcileTaskbarRestartListener();
         }
 
         private void VerifyNativeWidgetsEntry()
@@ -785,6 +1064,44 @@ namespace Task_Flyout
             var values = ApplicationData.Current.LocalSettings.Values;
             bool enabled = values["WeatherBarEnabled"] as bool? ?? false;
             WeatherBarMode requestedMode = WeatherBarModeSettings.Read(values);
+            if (enabled &&
+                WeatherService.IsEnabled &&
+                requestedMode == WeatherBarMode.StandaloneTaskbar)
+            {
+                if (WindowsWidgetsService.HasCapturedTaskbarEntry(values))
+                {
+                    bool restored = WindowsWidgetsService.TryRestoreTaskbarEntry(
+                        values,
+                        out string restoreDetail);
+                    _nativeWidgetsModeActive = !restored;
+                    _weatherBarModeRuntimeDetail = restoreDetail;
+                    if (!restored)
+                    {
+                        _standaloneWidgetsRemovalVerificationActive = true;
+                        AdvanceNativeWidgetsVerificationBackoff();
+                        return;
+                    }
+                    _standaloneWidgetsRemovalVerificationActive = true;
+                }
+
+                _standaloneWidgetsHandoffPending =
+                    ProbeWindowsWidgetsAvailability(forceRefresh: true)
+                        .NativeEntryPointPresent;
+                if (_standaloneWidgetsHandoffPending &&
+                    _standaloneWidgetsRemovalVerificationActive)
+                {
+                    _weatherBarModeRuntimeDetail =
+                        "standalone:waiting-for-windows-widgets-removal";
+                    AdvanceNativeWidgetsVerificationBackoff();
+                    return;
+                }
+
+                _standaloneWidgetsRemovalVerificationActive = false;
+                StopNativeWidgetsVerification();
+                ApplyWeatherBarPresentation(forceProbe: true);
+                return;
+            }
+
             if (!enabled || requestedMode != WeatherBarMode.WindowsWidgets)
             {
                 if (WindowsWidgetsService.HasCapturedTaskbarEntry(values))
@@ -802,6 +1119,8 @@ namespace Task_Flyout
                 }
 
                 StopNativeWidgetsVerification();
+                if (requestedMode == WeatherBarMode.StandaloneTaskbar)
+                    ApplyWeatherBarPresentation(forceProbe: true);
                 return;
             }
 
@@ -869,32 +1188,124 @@ namespace Task_Flyout
         // the dead/missing bar and rebuilds a fresh one once the taskbar is back.
         private void StartWeatherBarWatchdog()
         {
+            if (_weatherBarWatchdog == null)
+            {
+                _weatherBarWatchdog = MainDispatcherQueue.CreateTimer();
+                _weatherBarWatchdog.Interval = NormalWeatherBarWatchdogInterval;
+                _weatherBarWatchdog.Tick += (_, _) => CheckWeatherBarAlive();
+                _weatherBarWatchdog.Start();
+            }
             EnsureTaskbarRestartListener();
-            if (_weatherBarWatchdog != null) return;
-
-            _weatherBarWatchdog = MainDispatcherQueue.CreateTimer();
-            _weatherBarWatchdog.Interval = NormalWeatherBarWatchdogInterval;
-            _weatherBarWatchdog.Tick += (_, _) => CheckWeatherBarAlive();
-            _weatherBarWatchdog.Start();
         }
 
         private void EnsureTaskbarRestartListener()
         {
-            if (_taskbarMessageWindow != null) return;
+            if (_isExiting) return;
+            if (_taskbarMessageWindow != null)
+            {
+                StopTaskbarRestartListenerRetry();
+                return;
+            }
 
             try
             {
                 H.NotifyIcon.Core.MessageWindow? messageWindow = _trayIcon?.TrayIcon.MessageWindow;
-                if (messageWindow == null) return;
+                if (messageWindow == null)
+                {
+                    StartTaskbarRestartListenerRetry();
+                    return;
+                }
 
                 messageWindow.TaskbarCreated += TaskbarMessageWindow_TaskbarCreated;
                 _taskbarMessageWindow = messageWindow;
+                StopTaskbarRestartListenerRetry();
             }
             catch (Exception ex)
             {
                 _taskbarMessageWindow = null;
+                StartTaskbarRestartListenerRetry();
                 System.Diagnostics.Debug.WriteLine($"Taskbar restart listener failed: {ex.Message}");
             }
+        }
+
+        private bool ShouldKeepTaskbarRestartListener()
+        {
+            if (_isExiting) return false;
+            if (_weatherBarWatchdog != null ||
+                _nativeWidgetsVerificationTimer != null ||
+                _nativeWidgetsModeActive)
+            {
+                return true;
+            }
+
+            StandaloneTaskbarCoordinator? coordinator =
+                _standaloneTaskbarCoordinator;
+            if (coordinator != null &&
+                (coordinator.IsRequested || coordinator.RequiresStop))
+            {
+                return true;
+            }
+
+            try
+            {
+                var values = ApplicationData.Current.LocalSettings.Values;
+                bool enabled = values["WeatherBarEnabled"] as bool? ?? false;
+                WeatherBarMode mode = WeatherBarModeSettings.Read(values);
+                return enabled && mode is
+                    WeatherBarMode.WindowsWidgets or
+                    WeatherBarMode.StandaloneTaskbar;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void ReconcileTaskbarRestartListener()
+        {
+            if (ShouldKeepTaskbarRestartListener())
+            {
+                EnsureTaskbarRestartListener();
+                return;
+            }
+
+            StopTaskbarRestartListenerRetry();
+            if (_taskbarMessageWindow != null)
+            {
+                _taskbarMessageWindow.TaskbarCreated -=
+                    TaskbarMessageWindow_TaskbarCreated;
+                _taskbarMessageWindow = null;
+            }
+        }
+
+        private void StartTaskbarRestartListenerRetry()
+        {
+            if (_isExiting ||
+                _taskbarRestartListenerRetryTimer != null ||
+                !ShouldKeepTaskbarRestartListener())
+            {
+                return;
+            }
+
+            _taskbarRestartListenerRetryTimer = MainDispatcherQueue.CreateTimer();
+            _taskbarRestartListenerRetryTimer.Interval =
+                TaskbarRestartListenerRetryInterval;
+            _taskbarRestartListenerRetryTimer.Tick += (_, _) =>
+            {
+                if (!ShouldKeepTaskbarRestartListener())
+                {
+                    ReconcileTaskbarRestartListener();
+                    return;
+                }
+                EnsureTaskbarRestartListener();
+            };
+            _taskbarRestartListenerRetryTimer.Start();
+        }
+
+        private void StopTaskbarRestartListenerRetry()
+        {
+            _taskbarRestartListenerRetryTimer?.Stop();
+            _taskbarRestartListenerRetryTimer = null;
         }
 
         private void TaskbarMessageWindow_TaskbarCreated(object? sender, EventArgs e)
@@ -904,6 +1315,26 @@ namespace Task_Flyout
                 if (_isExiting) return;
 
                 WeatherBarModeResolution resolution = ResolveWeatherBarMode(forceProbe: true);
+                StandaloneTaskbarCoordinator? standaloneCoordinator =
+                    _standaloneTaskbarCoordinator;
+                WeatherBarMode requestedMode = WeatherBarModeSettings.Read(
+                    ApplicationData.Current.LocalSettings.Values);
+                if (requestedMode == WeatherBarMode.StandaloneTaskbar &&
+                    standaloneCoordinator == null)
+                {
+                    // Taskbar recreation is an explicit recovery opportunity for
+                    // an earlier pipe/binary launch failure, not an automatic loop.
+                    ApplyWeatherBarPresentation(forceProbe: true);
+                    return;
+                }
+
+                if (standaloneCoordinator != null &&
+                    (standaloneCoordinator.IsRequested || standaloneCoordinator.RequiresStop))
+                {
+                    Task recovery = standaloneCoordinator.RefreshAsync();
+                    QueueWeatherPresentationAfterStandaloneTransition(recovery);
+                }
+
                 if (resolution.ShouldUseWindowsWidgets)
                 {
                     ApplyWeatherBarPresentation(forceProbe: true);
@@ -1099,6 +1530,15 @@ namespace Task_Flyout
         internal static string GetWeatherBarModeRuntimeDetail()
             => Current is App app ? app._weatherBarModeRuntimeDetail : string.Empty;
 
+        internal static StandaloneTaskbarRuntimeStatus GetStandaloneTaskbarRuntimeStatus()
+            => Current is App app && app._standaloneTaskbarCoordinator != null
+                ? app._standaloneTaskbarCoordinator.Status
+                : new StandaloneTaskbarRuntimeStatus(
+                    StandaloneTaskbarRuntimeState.Disabled);
+
+        internal static bool IsWeatherCompanionBridgeActive()
+            => Current is App app && app._weatherCompanionBridgeEnabled;
+
         internal static void SetWeatherBarMode(WeatherBarMode mode)
         {
             WeatherBarModeSettings.Write(
@@ -1186,12 +1626,7 @@ namespace Task_Flyout
             _weatherBarWatchdog?.Stop();
             _weatherBarWatchdog = null;
             _lastWeatherBarRecreationTimestamp = 0;
-
-            if (_taskbarMessageWindow != null)
-            {
-                _taskbarMessageWindow.TaskbarCreated -= TaskbarMessageWindow_TaskbarCreated;
-                _taskbarMessageWindow = null;
-            }
+            ReconcileTaskbarRestartListener();
         }
 
         public static void RefreshWeatherBar(bool forceRefresh = false)
@@ -1199,6 +1634,7 @@ namespace Task_Flyout
             MainDispatcherQueue.TryEnqueue(async () =>
             {
                 if (Current is not App app) return;
+                if (app._isExiting) return;
                 app.UpdateWeatherCompanionBridge(
                     ApplicationData.Current.LocalSettings.Values,
                     WeatherBarModeSettings.Read(ApplicationData.Current.LocalSettings.Values));
@@ -1284,7 +1720,7 @@ namespace Task_Flyout
             catch { }
         }
 
-        private bool _isExiting;
+        private volatile bool _isExiting;
 
         // Public entry point so the main window's close-to-exit path can terminate the app.
         // Pass the window currently being closed so we don't re-enter its Close().
@@ -1298,6 +1734,42 @@ namespace Task_Flyout
         {
             if (_isExiting) return;
             _isExiting = true;
+            WeatherService.LocationUpdated -= OnWeatherLocationUpdated;
+
+            StandaloneTaskbarCoordinator? standaloneTaskbar =
+                _standaloneTaskbarCoordinator;
+            _standaloneTaskbarCoordinator = null;
+            _standaloneTaskbarHandoffTask = null;
+            if (standaloneTaskbar != null)
+            {
+                standaloneTaskbar.StatusChanged -=
+                    StandaloneTaskbarCoordinator_StatusChanged;
+                try
+                {
+                    await standaloneTaskbar.DisposeAsync().AsTask().WaitAsync(
+                        StandaloneTaskbarCoordinator.ShutdownTimeout +
+                        TimeSpan.FromSeconds(1));
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"Standalone taskbar shutdown failed: {ex.Message}");
+                }
+
+                if (!standaloneTaskbar.RequiresStop)
+                {
+                    try
+                    {
+                        StandaloneTaskbarCleanupSettings.Clear(
+                            ApplicationData.Current.LocalSettings.Values);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"Clearing standalone taskbar cleanup lease during exit failed: {ex.Message}");
+                    }
+                }
+            }
 
             WeatherCompanionCoordinator? weatherCompanion = _weatherCompanionCoordinator;
             _weatherCompanionCoordinator = null;
