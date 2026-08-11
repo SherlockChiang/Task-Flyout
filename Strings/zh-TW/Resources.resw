@@ -1409,10 +1409,26 @@
   <data name="WeatherPage_WeatherBarDesc" xml:space="preserve">
     <value>在任務欄上顯示浮動天氣條（替代 Win11 小組件天氣）</value>
   </data>
+  <data name="WeatherPage_StandaloneTaskbar.Header" xml:space="preserve"><value>實驗性：純 XAML Task Flyout 天氣按鈕</value></data>
+  <data name="WeatherPage_StandaloneTaskbar.OnContent" xml:space="preserve"><value>開啟</value></data>
+  <data name="WeatherPage_StandaloneTaskbar.OffContent" xml:space="preserve"><value>關閉</value></data>
+  <data name="WeatherPage_StandaloneStatus_Off" xml:space="preserve"><value>目前未選擇實驗性的純 XAML Task Flyout 按鈕。開啟後將離開 Windows 管理的 Widgets 模式；Explorer 中不載入 WebView 或網路程式碼。</value></data>
+  <data name="WeatherPage_StandaloneStatus_WeatherBarDisabled" xml:space="preserve"><value>請先開啟工作列天氣列，再使用實驗性按鈕。</value></data>
+  <data name="WeatherPage_StandaloneStatus_WeatherProviderDisabled" xml:space="preserve"><value>請先開啟 Task Flyout 天氣；原生按鈕依賴由應用程式管理的天氣提供者。</value></data>
+  <data name="WeatherPage_StandaloneStatus_Preparing" xml:space="preserve"><value>正在準備原生按鈕並移除 Windows Widgets 入口。Task Flyout 自繪天氣列將繼續作為回退。</value></data>
+  <data name="WeatherPage_StandaloneStatus_ActiveUnverified" xml:space="preserve"><value>原生控制器已確認啟動，但尚未證明按鈕可見，因此繼續保留 Task Flyout 自繪天氣列作為回退。</value></data>
+  <data name="WeatherPage_StandaloneStatus_BinaryMissing" xml:space="preserve"><value>應用程式旁缺少獨立原生元件。Task Flyout 自繪天氣列將繼續作為回退。</value></data>
+  <data name="WeatherPage_StandaloneStatus_Unsupported" xml:space="preserve"><value>目前 Windows 工作列版本不在精確相容設定中，未嘗試修改 Explorer。</value></data>
+  <data name="WeatherPage_StandaloneStatus_TemporarilyUnavailable" xml:space="preserve"><value>Explorer 或工作列暫時無法使用。Task Flyout 自繪天氣列將繼續作為回退。</value></data>
+  <data name="WeatherPage_StandaloneStatus_WidgetsConflict" xml:space="preserve"><value>Windows Widgets 設定已變更，或復原快照存在歧義。請先關閉此選項以釋放復原狀態，再重新嘗試。</value></data>
+  <data name="WeatherPage_StandaloneStatus_ControlSuppressed" xml:space="preserve"><value>本次安全啟動已停用獨立工作列控制，未修改 Explorer 或工作列設定。</value></data>
+  <data name="WeatherPage_StandaloneStatus_Stopping" xml:space="preserve"><value>正在停止原生控制器，隨後才會還原 Windows Widgets 設定。</value></data>
+  <data name="WeatherPage_StandaloneStatus_Failed" xml:space="preserve"><value>原生控制器要求失敗或遭到拒絕。Task Flyout 自繪天氣列將繼續作為回退。</value></data>
+  <data name="WeatherPage_StandaloneStatus_Fallback" xml:space="preserve"><value>獨立按鈕尚未啟用。Task Flyout 自繪天氣列將繼續作為回退。</value></data>
   <data name="WeatherPage_NativeWidgets.Header" xml:space="preserve"><value>使用 Windows 管理的 Widgets 工作列入口</value></data>
   <data name="WeatherPage_NativeWidgets.OnContent" xml:space="preserve"><value>開啟</value></data>
   <data name="WeatherPage_NativeWidgets.OffContent" xml:space="preserve"><value>關閉</value></data>
-  <data name="WeatherPage_NativeWidgetsModeDesc" xml:space="preserve"><value>關閉：使用 Task Flyout 自繪天氣列。開啟：使用 Windows 管理的 Widgets 動態內容；不會把 Task Flyout 天氣資料注入 Explorer。</value></data>
+  <data name="WeatherPage_NativeWidgetsModeDesc" xml:space="preserve"><value>關閉：不使用 Windows 管理的 Widgets。開啟：使用 Windows 管理的 Widgets 動態內容；不會把 Task Flyout 天氣資料注入 Explorer。</value></data>
   <data name="WeatherPage_NativeWidgetsAvailable" xml:space="preserve"><value>這是 Windows 管理的動態 Widgets 內容，不是 Task Flyout 天氣注入。Windows 可能輪播股票、體育和新聞公告。若希望工作列主要顯示天氣，請開啟「Widgets &gt; 設定 &gt; 通知」，關閉工作列公告（也可按需關閉徽章）。</value></data>
   <data name="WeatherPage_NativeWidgetsWaiting" xml:space="preserve"><value>已要求 Windows Widgets；在 Explorer 建立原生工作列入口之前，將繼續顯示 Task Flyout 自繪天氣列。</value></data>
   <data name="WeatherPage_NativeWidgetsUnavailable" xml:space="preserve"><value>Windows 原生 Widgets 目前不可用（{0}）。將繼續使用 Task Flyout 自繪天氣列。</value></data>
@@ -1956,7 +1972,10 @@ DPI：{3}
 回退原因：{8}</value></data>
   <data name="SettingsPage_WeatherBarModeDiagnosticsFormat" xml:space="preserve"><value>要求模式：{0}
 原生 Widgets：{1}；入口：{2}
-模式詳情：{3}</value></data>
+模式詳情：{3}
+獨立控制器：{4}；已要求：{5}；待清理：{6}
+伴隨管道已啟用：{7}
+Widgets 抑制：就緒 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="WeatherPage_IconPackError" xml:space="preserve"><value>圖示包操作失敗：{0}</value></data>
   <data name="MailPage_ImapDisplayName.PlaceholderText" xml:space="preserve"><value>工作信箱</value></data>
   <data name="MailPage_BtnGoogleAccount.Text" xml:space="preserve"><value>Google OAuth</value></data>

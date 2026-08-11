@@ -218,13 +218,29 @@ namespace Task_Flyout.Views
             var mode = App.GetWeatherBarMode();
             var native = App.GetWindowsWidgetsAvailability();
             var runtimeDetail = App.GetWeatherBarModeRuntimeDetail();
+            StandaloneTaskbarDiagnostics standalone =
+                App.GetStandaloneTaskbarDiagnostics();
+            string snapshotState = !standalone.WidgetsSnapshotCaptured
+                ? "none"
+                : !standalone.WidgetsSnapshotValid
+                    ? "invalid"
+                    : standalone.WidgetsSnapshotApplied
+                        ? "applied"
+                        : "prepared";
             WeatherBarDiagnosticsText.Text += "\n" + string.Format(
                 _loader.GetStringOrDefault("SettingsPage_WeatherBarModeDiagnosticsFormat")
-                    ?? "Requested mode: {0}\nNative Widgets: {1}; entry point: {2}\nMode detail: {3}",
+                    ?? "Requested mode: {0}\nNative Widgets: {1}; entry point: {2}\nMode detail: {3}\nStandalone controller: {4}; requested: {5}; cleanup pending: {6}\nCompanion pipe active: {7}\nWidgets suppression: ready {8}; snapshot {9}; notification pending {10}",
                 mode,
                 native.Reason,
                 native.NativeEntryPointPresent,
-                string.IsNullOrWhiteSpace(runtimeDetail) ? unavailable : runtimeDetail);
+                string.IsNullOrWhiteSpace(runtimeDetail) ? unavailable : runtimeDetail,
+                standalone.RuntimeStatus.DiagnosticKey,
+                standalone.ControllerRequested,
+                standalone.ControllerCleanupPending,
+                standalone.CompanionPipeActive,
+                standalone.WidgetsSuppressionReady,
+                snapshotState,
+                standalone.WidgetsNotificationPending);
         }
 
         private async void ReattachTaskbarButton_Click(object sender, RoutedEventArgs e)

@@ -24,6 +24,7 @@ namespace Task_Flyout.Views
         private long _weatherLoadGeneration;
         private CancellationTokenSource? _citySearchCts;
         private int _citySearchGeneration;
+        private bool _isUpdatingTaskbarMode;
 
         private readonly string[] _commonFonts = new[]
         {
@@ -58,9 +59,15 @@ namespace Task_Flyout.Views
         {
             WeatherBarMode mode = App.GetWeatherBarMode();
             WindowsWidgetsAvailability availability = App.GetWindowsWidgetsAvailability();
-            OpenWidgetsStoreButton.Visibility = availability.Reason == WindowsWidgetsAvailabilityReason.WebExperiencePackMissing
+            OpenWidgetsStoreButton.Visibility =
+                mode == WeatherBarMode.WindowsWidgets &&
+                availability.Reason == WindowsWidgetsAvailabilityReason.WebExperiencePackMissing
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+            OpenWidgetsSettingsButton.Visibility =
+                mode == WeatherBarMode.WindowsWidgets
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
             OpenWidgetsBoardButton.Visibility = mode == WeatherBarMode.WindowsWidgets && availability.IsAvailable
                 ? Visibility.Visible
                 : Visibility.Collapsed;
@@ -95,8 +102,79 @@ namespace Task_Flyout.Views
 
             NativeWidgetsStatusText.Text = GetSafeString(
                 "WeatherPage_NativeWidgetsModeDesc",
-                "Off: use the Task Flyout weather bar. On: use Windows-managed Widgets content; this does not inject Task Flyout weather data into Explorer.");
+                "Off: do not use Windows-managed Widgets. On: use Windows-managed Widgets content; this does not inject Task Flyout weather data into Explorer.");
         }
+
+        private void UpdateTaskbarModeStatus()
+        {
+            WeatherBarMode mode = App.GetWeatherBarMode();
+            _isUpdatingTaskbarMode = true;
+            try
+            {
+                NativeWidgetsToggle.IsOn =
+                    mode == WeatherBarMode.WindowsWidgets;
+                StandaloneTaskbarToggle.IsOn =
+                    mode == WeatherBarMode.StandaloneTaskbar;
+            }
+            finally
+            {
+                _isUpdatingTaskbarMode = false;
+            }
+
+            UpdateNativeWidgetsStatus();
+            UpdateStandaloneTaskbarStatus(mode);
+        }
+
+        private void UpdateStandaloneTaskbarStatus(WeatherBarMode mode)
+        {
+            StandaloneTaskbarDiagnostics diagnostics =
+                App.GetStandaloneTaskbarDiagnostics();
+            StandaloneTaskbarUiStatusKind kind =
+                StandaloneTaskbarUiStatusPolicy.Resolve(
+                    mode == WeatherBarMode.StandaloneTaskbar,
+                    WeatherBarToggle.IsOn,
+                    _weatherService?.IsEnabled == true,
+                    diagnostics.RuntimeStatus.State,
+                    diagnostics.CompanionPipeActive,
+                    App.GetWeatherBarModeRuntimeDetail());
+            string fallback = kind switch
+            {
+                StandaloneTaskbarUiStatusKind.Off =>
+                    "Off: the experimental pure-XAML Task Flyout button is not selected. Turning it on switches away from Windows-managed Widgets; Explorer receives no WebView or network code.",
+                StandaloneTaskbarUiStatusKind.WeatherBarDisabled =>
+                    "Turn on the taskbar weather bar to use the experimental button.",
+                StandaloneTaskbarUiStatusKind.WeatherProviderDisabled =>
+                    "Turn on Task Flyout weather first; the native button depends on the app-owned weather provider.",
+                StandaloneTaskbarUiStatusKind.Preparing =>
+                    "Preparing the native button and removing the Windows Widgets entry. The Task Flyout bar remains the fallback.",
+                StandaloneTaskbarUiStatusKind.ActiveUnverified =>
+                    "The native controller acknowledged startup. Visibility is not yet proven, so the Task Flyout bar remains the fallback.",
+                StandaloneTaskbarUiStatusKind.BinaryMissing =>
+                    "The standalone native binaries are not available beside the app. The Task Flyout bar remains the fallback.",
+                StandaloneTaskbarUiStatusKind.Unsupported =>
+                    "This Windows taskbar build is not in the exact native compatibility profile. No Explorer change was attempted.",
+                StandaloneTaskbarUiStatusKind.TemporarilyUnavailable =>
+                    "Explorer or its taskbar is temporarily unavailable. The Task Flyout bar remains the fallback.",
+                StandaloneTaskbarUiStatusKind.WidgetsConflict =>
+                    "The Windows Widgets setting changed or its recovery snapshot is ambiguous. Turn this option off to release recovery state before retrying.",
+                StandaloneTaskbarUiStatusKind.ControlSuppressed =>
+                    "Standalone taskbar control is disabled for this safety launch. No Explorer or taskbar-setting change was attempted.",
+                StandaloneTaskbarUiStatusKind.Stopping =>
+                    "Stopping the native controller before restoring the Windows Widgets setting.",
+                StandaloneTaskbarUiStatusKind.Failed =>
+                    "The native controller request failed or was rejected. The Task Flyout bar remains the fallback.",
+                _ =>
+                    "The standalone button is not active. The Task Flyout bar remains the fallback."
+            };
+            StandaloneTaskbarStatusText.Text = GetSafeString(
+                $"WeatherPage_StandaloneStatus_{kind}",
+                fallback);
+        }
+
+        private void App_WeatherBarModeStatusChanged(
+            object? sender,
+            EventArgs e)
+            => DispatcherQueue.TryEnqueue(UpdateTaskbarModeStatus);
 
         private string GetNativeWidgetsUnavailableReason(WindowsWidgetsAvailabilityReason reason)
         {
@@ -134,8 +212,11 @@ namespace Task_Flyout.Views
             bool weatherBarEnabled = Windows.Storage.ApplicationData.Current.LocalSettings.Values["WeatherBarEnabled"] as bool? ?? false;
             WeatherBarToggle.IsOn = weatherBarEnabled;
             WeatherBarDesc.Text = GetSafeString("WeatherPage_WeatherBarDesc", "Show a floating weather bar on the taskbar.");
-            NativeWidgetsToggle.IsOn = App.GetWeatherBarMode() == WeatherBarMode.WindowsWidgets;
-            UpdateNativeWidgetsStatus();
+            App.WeatherBarModeStatusChanged -=
+                App_WeatherBarModeStatusChanged;
+            App.WeatherBarModeStatusChanged +=
+                App_WeatherBarModeStatusChanged;
+            UpdateTaskbarModeStatus();
 
             // Source ComboBox
             string src = _weatherService.WeatherSource;
@@ -856,26 +937,64 @@ namespace Task_Flyout.Views
             {
                 WeatherBarToggle.IsOn = false;
             }
+            UpdateTaskbarModeStatus();
         }
 
         private void WeatherBarToggle_Toggled(object sender, RoutedEventArgs e)
         {
             if (_isInitializing) return;
             App.ToggleWeatherBar(WeatherBarToggle.IsOn);
-            UpdateNativeWidgetsStatus();
+            UpdateTaskbarModeStatus();
         }
 
         private void NativeWidgetsToggle_Toggled(object sender, RoutedEventArgs e)
         {
-            if (_isInitializing) return;
+            if (_isInitializing || _isUpdatingTaskbarMode) return;
             if (sender is ToggleSwitch toggle)
             {
-                App.SetWeatherBarMode(toggle.IsOn
+                WeatherBarMode current = App.GetWeatherBarMode();
+                SetTaskbarMode(toggle.IsOn
                     ? WeatherBarMode.WindowsWidgets
-                    : WeatherBarMode.TaskFlyout);
-                UpdateNativeWidgetsStatus();
-                DispatcherQueue.TryEnqueue(UpdateNativeWidgetsStatus);
+                    : current == WeatherBarMode.WindowsWidgets
+                        ? WeatherBarMode.TaskFlyout
+                        : current);
             }
+        }
+
+        private void StandaloneTaskbarToggle_Toggled(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (_isInitializing || _isUpdatingTaskbarMode) return;
+            if (sender is ToggleSwitch toggle)
+            {
+                WeatherBarMode current = App.GetWeatherBarMode();
+                SetTaskbarMode(toggle.IsOn
+                    ? WeatherBarMode.StandaloneTaskbar
+                    : current == WeatherBarMode.StandaloneTaskbar
+                        ? WeatherBarMode.TaskFlyout
+                        : current);
+            }
+        }
+
+        private void SetTaskbarMode(WeatherBarMode mode)
+        {
+            _isUpdatingTaskbarMode = true;
+            try
+            {
+                NativeWidgetsToggle.IsOn =
+                    mode == WeatherBarMode.WindowsWidgets;
+                StandaloneTaskbarToggle.IsOn =
+                    mode == WeatherBarMode.StandaloneTaskbar;
+            }
+            finally
+            {
+                _isUpdatingTaskbarMode = false;
+            }
+
+            App.SetWeatherBarMode(mode);
+            UpdateTaskbarModeStatus();
+            DispatcherQueue.TryEnqueue(UpdateTaskbarModeStatus);
         }
 
         private async void OpenWidgetsSettingsButton_Click(object sender, RoutedEventArgs e)
@@ -1093,6 +1212,8 @@ namespace Task_Flyout.Views
 
         private void WeatherPage_Unloaded(object sender, RoutedEventArgs e)
         {
+            App.WeatherBarModeStatusChanged -=
+                App_WeatherBarModeStatusChanged;
             _citySearchGeneration++;
             _citySearchCts?.Cancel();
             _citySearchCts = null;

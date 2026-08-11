@@ -51,6 +51,7 @@
     <Compile Include="..\..\Services\WindowsWidgetsService.cs" Link="Source\WindowsWidgetsService.cs" />
     <Compile Include="..\..\Services\StandaloneTaskbarWidgetsService.cs" Link="Source\StandaloneTaskbarWidgetsService.cs" />
     <Compile Include="..\..\Services\StandaloneTaskbarWidgetsLifecyclePolicy.cs" Link="Source\StandaloneTaskbarWidgetsLifecyclePolicy.cs" />
+    <Compile Include="..\..\Services\StandaloneTaskbarUiStatusPolicy.cs" Link="Source\StandaloneTaskbarUiStatusPolicy.cs" />
     <Compile Include="..\..\Services\WeatherBarRecoveryPolicy.cs" Link="Source\WeatherBarRecoveryPolicy.cs" />
     <Compile Include="..\..\Services\StandaloneTaskbarBrokerProtocol.cs" Link="Source\StandaloneTaskbarBrokerProtocol.cs" />
     <Compile Include="..\..\Services\StandaloneTaskbarBrokerClient.cs" Link="Source\StandaloneTaskbarBrokerClient.cs" />

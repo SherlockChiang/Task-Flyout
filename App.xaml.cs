@@ -76,6 +76,7 @@ namespace Task_Flyout
         public static MainWindow? MyMainWindow { get; private set; }
         public static WeatherBarWindow? MyWeatherBar { get; private set; }
         public static Microsoft.UI.Dispatching.DispatcherQueue MainDispatcherQueue { get; private set; } = null!;
+        internal static event EventHandler? WeatherBarModeStatusChanged;
         public SyncManager SyncManager { get; } = new SyncManager();
         public NotificationService NotificationService { get; private set; } = null!;
         public WeatherService WeatherService { get; } = new WeatherService();
@@ -856,6 +857,10 @@ namespace Task_Flyout
                     StopWeatherBarWatchdog();
                 }
             }
+            finally
+            {
+                NotifyWeatherBarModeStatusChanged();
+            }
         }
 
         private void CompleteNativeWidgetsActivation(string detail)
@@ -1054,6 +1059,7 @@ namespace Task_Flyout
                     ApplicationData.Current.LocalSettings.Values);
                 _weatherBarModeRuntimeDetail =
                     $"standalone:{status.DiagnosticKey}";
+                NotifyWeatherBarModeStatusChanged();
                 WeatherBarMode requestedMode = WeatherBarModeSettings.Read(
                     ApplicationData.Current.LocalSettings.Values);
                 if (requestedMode != WeatherBarMode.StandaloneTaskbar)
@@ -1689,6 +1695,57 @@ namespace Task_Flyout
         internal static string GetWeatherBarModeRuntimeDetail()
             => Current is App app ? app._weatherBarModeRuntimeDetail : string.Empty;
 
+        internal static StandaloneTaskbarDiagnostics GetStandaloneTaskbarDiagnostics()
+        {
+            var values = ApplicationData.Current.LocalSettings.Values;
+            bool captured =
+                StandaloneTaskbarWidgetsService.HasCapturedTaskbarEntry(values);
+            bool applied = false;
+            bool snapshotValid = captured &&
+                StandaloneTaskbarWidgetsService.TryReadCapturedTaskbarEntry(
+                    values,
+                    out _,
+                    out applied);
+
+            if (Current is not App app)
+            {
+                return new StandaloneTaskbarDiagnostics(
+                    new StandaloneTaskbarRuntimeStatus(
+                        StandaloneTaskbarRuntimeState.Disabled),
+                    ControllerRequested: false,
+                    ControllerCleanupPending:
+                        StandaloneTaskbarCleanupSettings.IsPending(values),
+                    CompanionPipeActive: false,
+                    WidgetsSuppressionReady: false,
+                    WidgetsSnapshotCaptured: captured,
+                    WidgetsSnapshotValid: snapshotValid,
+                    WidgetsSnapshotApplied: applied,
+                    WidgetsNotificationPending:
+                        StandaloneTaskbarWidgetsService.IsNotificationPending(values),
+                    NativeWidgetsEntryPresent: false);
+            }
+
+            StandaloneTaskbarCoordinator? coordinator =
+                app._standaloneTaskbarCoordinator;
+            return new StandaloneTaskbarDiagnostics(
+                coordinator?.Status ?? new StandaloneTaskbarRuntimeStatus(
+                    StandaloneTaskbarRuntimeState.Disabled),
+                ControllerRequested: coordinator?.IsRequested ?? false,
+                ControllerCleanupPending:
+                    (coordinator?.RequiresStop ?? false) ||
+                    StandaloneTaskbarCleanupSettings.IsPending(values),
+                CompanionPipeActive: app._weatherCompanionBridgeEnabled,
+                WidgetsSuppressionReady:
+                    app._standaloneWidgetsSuppressionReady,
+                WidgetsSnapshotCaptured: captured,
+                WidgetsSnapshotValid: snapshotValid,
+                WidgetsSnapshotApplied: applied,
+                WidgetsNotificationPending:
+                    StandaloneTaskbarWidgetsService.IsNotificationPending(values),
+                NativeWidgetsEntryPresent:
+                    app.ProbeWindowsWidgetsAvailability().NativeEntryPointPresent);
+        }
+
         internal static StandaloneTaskbarRuntimeStatus GetStandaloneTaskbarRuntimeStatus()
             => Current is App app && app._standaloneTaskbarCoordinator != null
                 ? app._standaloneTaskbarCoordinator.Status
@@ -1697,6 +1754,22 @@ namespace Task_Flyout
 
         internal static bool IsWeatherCompanionBridgeActive()
             => Current is App app && app._weatherCompanionBridgeEnabled;
+
+        private static void NotifyWeatherBarModeStatusChanged()
+        {
+            EventHandler? handlers = WeatherBarModeStatusChanged;
+            if (handlers == null) return;
+
+            foreach (EventHandler handler in handlers.GetInvocationList())
+            {
+                try { handler(Current, EventArgs.Empty); }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"Weather bar status subscriber failed: {ex.Message}");
+                }
+            }
+        }
 
         internal static void SetWeatherBarMode(WeatherBarMode mode)
         {
