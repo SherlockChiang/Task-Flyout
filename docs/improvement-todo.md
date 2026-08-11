@@ -143,7 +143,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M3-05 | IN PROGRESS | Architecture/Security | Replace the Windhawk runtime dependency with a standalone per-user taskbar broker and Explorer host. | The x64 broker and host build without Windhawk or WebView libraries; exact OS and `Taskbar.View.dll` fingerprints gate all private ABI use; unsupported systems fail closed before Explorer memory or XAML is changed. | `feat(taskbar): scaffold standalone weather host` |
 | M3-06 | IN PROGRESS | UI/Compatibility | Inject an independent pure-XAML weather button into the Windows 11 taskbar. | The host uses standard `Windows.UI.Xaml` controls and taskbar theme resources, does not require the Windows Widgets entry, reserves a bounded left-side slot, and restores the original XAML tree on disable or unload. | `feat(taskbar): add pure xaml weather view`, `feat(taskbar): inject native xaml weather button` |
 | M3-07 | IN PROGRESS | Integration/UI | Connect the standalone host to Task Flyout weather, activation, settings, and diagnostics. | The existing bounded per-user IPC supplies sanitized immutable snapshots; click opens Task Flyout Weather; a localized experimental switch and privacy-safe diagnostics expose active, unsupported, fallback, and recovery states. | `feat(taskbar): consume weather snapshot pipe`, `feat(taskbar): activate weather button`, `feat(taskbar): acknowledge host control`, `feat(weatherbar): add standalone mode policy`, `feat(taskbar): parse standalone broker responses`, `fix(taskbar): emit broker output as utf8`, `feat(taskbar): add bounded broker client`, `feat(taskbar): define standalone lifecycle states`, `feat(taskbar): coordinate standalone lifecycle`, `feat(taskbar): wire standalone app lifecycle`, `feat(taskbar): own widgets suppression safely`, `feat(taskbar): suppress native widgets for standalone`, `feat(weatherbar): expose standalone taskbar controls` |
-| M3-08 | TODO | Verification/Distribution | Validate and package the standalone taskbar component. | Compile/import checks prove the native binaries have no WebView dependency; a disposable Explorer session covers enable/disable, crash recovery, DPI, auto-hide, theme, multi-monitor, Explorer restart, unsupported binaries, signed packaging, and rollback before default exposure. | `test(taskbar): validate standalone weather injection` |
+| M3-08 | IN PROGRESS | Verification/Distribution | Validate and package the standalone taskbar component. | Compile/import checks prove the native binaries have no WebView dependency; a disposable Explorer session covers enable/disable, crash recovery, DPI, auto-hide, theme, multi-monitor, Explorer restart, unsupported binaries, signed packaging, and rollback before default exposure. | `build(taskbar): stage standalone native artifacts`, `test(taskbar): validate standalone weather injection` |
 
 M3-05 through M3-08 supersede the Windhawk runtime/package work in M3-03.
 M3-03 remains as historical POC scope and must not be installed or enabled. The
@@ -728,3 +728,23 @@ transport foundation for the standalone host.
   matrix and full suite pass 1078/1078; the Debug x64 WinUI build has zero
   warnings/errors. Native artifact packaging/signing, mount-ready proof, and
   disposable Explorer-session validation remain pending under M3-07/M3-08.
+
+### 2026-08-11 Standalone Native Artifact Staging and Sideload Signing
+
+- Added an x64 MSBuild target that builds the broker and Explorer host in an
+  isolated Ninja intermediate directory, runs the existing native test/import
+  checks, and copies both binaries next to Debug/Release app output and publish
+  artifacts. `BuildStandaloneTaskbarNative=false` remains an explicit opt-out
+  for environments that only need managed tests; the target always passes
+  `-SkipProbe`, so compilation never injects or loads Explorer code.
+- Added an opt-in native PE signing step for explicit `SideloadOnly` builds.
+  It selects the existing current-user certificate matching the manifest (or
+  the supplied package thumbprint), signs both PE files with SHA-256, and
+  verifies each signature before MSIX packaging. No certificate or private key
+  is stored in the repository.
+- A Release SideloadOnly package was produced and checked read-only: the MSIX
+  signature is valid, both embedded native entries match their staged hashes,
+  and the broker/host outputs carry the existing local signing certificate.
+  No package was installed and no Explorer process was started. The isolated
+  native matrix remains 12/12; mount-ready proof and disposable-session
+  validation remain pending.
