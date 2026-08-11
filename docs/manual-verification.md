@@ -99,6 +99,27 @@ Use this checklist for flows that require real Windows credentials, DPAPI, Passw
 9. Turn off Task Flyout's own weather provider while native mode remains selected and confirm Windows Widgets stays enabled; its weather data is independent of Task Flyout's provider.
 10. Allow a finance, sports, or news announcement to rotate onto the native entry and confirm Settings identifies it as Windows-managed content rather than claiming Task Flyout injection. Use the new button, open Widgets Settings > Notifications, turn off taskbar announcements, and confirm the entry returns to weather; optionally turn off notification badges as well.
 
+## Experimental Standalone Taskbar Weather
+
+Run these checks only in a disposable Windows user profile or VM. The standalone
+Host uses a temporary thread hook to load code into Explorer, and the first safe
+lifecycle deliberately keeps the Host module pinned until that Explorer process
+exits.
+
+1. Build the isolated Release native matrix and confirm all tests/import checks pass. Sign `TaskFlyout.TaskbarBroker.exe` and `TaskFlyout.TaskbarHost.dll` with the same existing package certificate; do not copy a certificate or private key into the repository.
+2. Run `scripts\test-standalone-taskbar-weather.ps1 -DescribeOnly`. Confirm it reports that Explorer will be mutated, no package will be installed, Explorer will not be restarted automatically, and every attempted start has up to three bounded stop attempts.
+3. Disable the packaged app's standalone mode and confirm no controller is active, then snapshot the VM/profile. Record the Explorer PID, Windows build, loaded `Taskbar.View.dll` timestamp/size/checksum, original `TaskbarDa` value and registry kind, display topology, DPI, taskbar alignment, auto-hide, and light/dark theme. The harness requires a `not-started` baseline and will not adopt an existing controller.
+4. Run the harness only after reviewing its exact-profile probe, using both `-AllowExplorerInjection` and `-DisposableSessionConfirmation TASK_FLYOUT_DISPOSABLE_EXPLORER_SESSION`. Keep signature verification enabled; optionally pass `-ExpectedSignerThumbprint "YOUR_THUMBPRINT"`. Use `-AllowUnsignedDevelopmentBuild` only for an isolated throwaway build and never combine it with an expected signer.
+5. Confirm the harness reaches `mount-ready`, holds it for the requested interval, receives `stopped` or `not-started` cleanup, and then receives `not-started` from a final status query. Force one rejected/ambiguous start in a test build and confirm the `finally` path still attempts idempotent stop. The harness must never install a package, change `TaskbarDa`, kill Explorer, or restart it.
+6. Start the signed packaged app with weather data available, enable the experimental standalone mode, and confirm the Task Flyout fallback remains visible until an authenticated native ready report arrives. The independent pure-XAML weather button must occupy the bounded left taskbar slot and show only Task Flyout weather—not finance, sports, news, a WebView, a white rectangle, or an independent HWND.
+7. Verify native taskbar hover/pressed/focus/high-contrast visuals and keyboard accessibility. Click the button repeatedly and confirm requests coalesce, Explorer's UI thread remains responsive, and Task Flyout opens directly to Weather.
+8. Rebuild the taskbar tree by changing alignment/theme and by toggling auto-hide. When the owned Button detaches, confirm authenticated lost or the 12-second lease timeout restores the fallback; a later higher-generation ready report may hide it again only after the lost report is accepted.
+9. Repeat at 100%, 125%, 150%, and 200% DPI, with primary and secondary taskbars, display disconnect/reconnect, and light/dark/high-contrast themes. Confirm bounded width, no overlap, one owned Button per frame, and no cross-thread XAML access or stale secondary-taskbar lease.
+10. Restart Explorer manually inside the disposable session. Confirm old PID/nonce/generation reports are rejected, fallback returns, suppression/start recovery targets only the new Explorer, and the new Button must prove mount readiness before handoff.
+11. Run an intentionally mismatched local profile and confirm probe/start fail before installing the detour or changing XAML. Also stop the app pipe or pause owner-thread proofs and confirm readiness expires fail-closed instead of replaying stale ready.
+12. Disable standalone mode and exit the app. Confirm stop acknowledgement precedes exact owned `TaskbarDa` restoration, later user/policy changes are preserved, the custom Button is removed, click tokens are revoked, and fallback behavior returns. If cleanup is ambiguous, run the Broker `stop` command manually or restart only the disposable Explorer session.
+13. Restart the disposable Explorer once more to release the deliberately pinned Host module, then compare Explorer crashes, handle count, taskbar responsiveness, registry state, and app diagnostics with the baseline before accepting M3-07/M3-08.
+
 ## Experimental Windhawk Weather Companion
 
 Run these checks only in a disposable Explorer session after the compile-only

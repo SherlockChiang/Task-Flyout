@@ -41,6 +41,20 @@ After a supported probe, the broker can dispatch one explicit control command:
 .\TaskFlyout.TaskbarBroker.exe stop
 ```
 
+These commands mutate the current Explorer process. Run them only in a
+disposable Explorer session. The repository harness requires two explicit
+opt-ins, validates matching Authenticode signatures by default, polls bounded
+mount status, and attempts idempotent stop after every attempted start. Its safe
+description path does not launch the Broker:
+
+```powershell
+.\scripts\test-standalone-taskbar-weather.ps1 -DescribeOnly
+```
+
+See `docs/manual-verification.md` for the runtime matrix and the full opt-in
+invocation. The harness never installs a package, changes `TaskbarDa`, kills
+Explorer, or restarts it.
+
 Each command revalidates the taskbar owner and PE profile, installs a temporary
 thread-specific `WH_CALLWNDPROC` hook, sends the registered control message, and
 removes the hook before exiting. The request carries a per-dispatch nonce and a
