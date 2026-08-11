@@ -628,3 +628,25 @@ transport foundation for the standalone host.
   build has zero warnings/errors. Generation-safe lifecycle coordination, App
   wiring, mount-ready signalling, native artifact packaging, and localized
   settings remain pending under M3-07.
+
+### 2026-08-11 Generation-Safe Standalone Coordinator
+
+- Added a pure app-side coordinator that serializes strict probe, start, and
+  stop operations while generation tokens suppress stale results during rapid
+  mode changes. Cancelling during probe never starts the controller; once a
+  start call has begun, disable and shutdown retain an idempotent stop
+  obligation until `ControllerInactive` is explicitly acknowledged.
+- Repeating the same desired state reuses the current task instead of creating
+  a process retry loop. `RefreshAsync` is the sole explicit recovery path for
+  Explorer recreation or a user-requested retry, and controller acknowledgement
+  still leaves the Task Flyout bar visible because it is not mount-ready proof.
+- Final shutdown cancels an in-flight generation, attempts serialized cleanup,
+  and has a hard bound even if a test client ignores cancellation. Status
+  callbacks are privacy-safe, exception-isolated, generation-ordered, and are
+  suppressed during disposal; the later App subscriber must marshal them to the
+  UI dispatcher.
+- All 14 focused coordinator tests and the full 1023/1023 .NET suite pass; the
+  Debug x64 app build has zero warnings/errors. Tests use only a fake broker
+  client, so no Explorer injection was attempted. App lifecycle wiring,
+  mount-ready signalling, native artifact packaging, and localized settings
+  remain pending under M3-07.

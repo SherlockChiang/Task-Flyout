@@ -53,6 +53,7 @@
     <Compile Include="..\..\Services\StandaloneTaskbarBrokerProtocol.cs" Link="Source\StandaloneTaskbarBrokerProtocol.cs" />
     <Compile Include="..\..\Services\StandaloneTaskbarBrokerClient.cs" Link="Source\StandaloneTaskbarBrokerClient.cs" />
     <Compile Include="..\..\Services\StandaloneTaskbarLifecyclePolicy.cs" Link="Source\StandaloneTaskbarLifecyclePolicy.cs" />
+    <Compile Include="..\..\Services\StandaloneTaskbarCoordinator.cs" Link="Source\StandaloneTaskbarCoordinator.cs" />
     <Compile Include="..\..\Services\ComposeDraftCoordinator.cs" Link="Source\ComposeDraftCoordinator.cs" />
     <Compile Include="..\..\Services\MailAttachmentPolicy.cs" Link="Source\MailAttachmentPolicy.cs" />
     <Compile Include="..\..\Services\RssFetchPolicy.cs" Link="Source\RssFetchPolicy.cs" />
