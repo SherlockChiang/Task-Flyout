@@ -20,7 +20,9 @@ internal enum StandaloneTaskbarBrokerResultKind
     Rejected,
     Ambiguous,
     Failed,
-    InvalidResponse
+    InvalidResponse,
+    TimedOut,
+    Cancelled
 }
 
 internal enum StandaloneTaskbarBrokerCommand

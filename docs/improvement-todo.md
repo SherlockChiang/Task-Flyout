@@ -594,3 +594,17 @@ transport foundation for the standalone host.
 - Release x64 compilation, forbidden-import inspection, all 12 native tests,
   and a redirected strict-UTF-8 `probe` smoke check pass. The probe remains
   read-only and reports `taskbar-window-missing` in the build sandbox.
+
+### 2026-08-11 Bounded Broker Process Client
+
+- Added an app-side client that resolves only the adjacent broker and host
+  binaries, passes arguments through `ProcessStartInfo.ArgumentList`, disables
+  shell execution/windows, and uses strict UTF-8 output handling.
+- stdout and stderr are read concurrently with a 32 KiB per-stream cap; excess
+  output is drained and rejected. Probe calls have a three-second bound, start
+  and stop calls a ten-second bound, and timeout/cancellation kills the entire
+  child process tree before bounded cleanup.
+- A fake-runner test seam covers binary absence, argument construction,
+  acknowledgement semantics, timeout ambiguity, cancellation, output failure,
+  and launch failure. Full .NET tests pass 1004/1004 and the Debug x64 app
+  build has zero warnings/errors. The client is not yet called by App startup.
