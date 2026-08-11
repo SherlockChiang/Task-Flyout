@@ -568,3 +568,19 @@ transport foundation for the standalone host.
 - The native Release build, forbidden-import inspection, and all 12 tests pass;
   the read-only probe still reports `taskbar-window-missing`, so no Explorer
   injection was attempted.
+
+### 2026-08-11 Broker Response Contract
+
+- Added a bounded, strict JSON parser for the standalone broker's `probe`,
+  `start`, and `stop` responses. Command/result families, acknowledgement
+  values, exit codes, duplicate fields, trailing JSON, field types, and known
+  probe/control statuses are checked before a result is accepted.
+- The app-side result surface intentionally drops native paths, process/thread
+  IDs, message IDs, and free-form detail text. It distinguishes unsupported,
+  temporarily unavailable, rejected, ambiguous, invalid-response, and failed
+  states; a successful start is named `ControllerActiveUnverified` because the
+  current native acknowledgement does not prove that a weather button is
+  visible yet.
+- Focused parser tests pass 39/39. Process launching, binary packaging,
+  generation-safe lifecycle control, mount-ready signalling, and localized UI
+  remain pending under M3-07.
