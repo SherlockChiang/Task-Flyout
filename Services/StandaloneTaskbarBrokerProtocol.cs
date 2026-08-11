@@ -33,8 +33,16 @@ internal enum StandaloneTaskbarBrokerCommand
     Status
 }
 
+internal readonly record struct StandaloneTaskbarControllerIdentity(
+    uint ProcessId,
+    uint ControlNonce)
+{
+    public bool IsValid => ProcessId != 0 && ControlNonce != 0;
+}
+
 internal readonly record struct StandaloneTaskbarBrokerResult(
-    StandaloneTaskbarBrokerResultKind Kind);
+    StandaloneTaskbarBrokerResultKind Kind,
+    StandaloneTaskbarControllerIdentity? ControllerIdentity = null);
 
 /// <summary>
 /// Parses the one-line JSON contract emitted by TaskFlyout.TaskbarBroker.exe.
@@ -146,9 +154,22 @@ internal static class StandaloneTaskbarBrokerProtocol
                         StandaloneTaskbarBrokerResultKind.ControllerInactive,
                 _ => null
             };
-            return result.HasValue
-                ? new(result.Value)
-                : new(StandaloneTaskbarBrokerResultKind.InvalidResponse);
+            if (!result.HasValue)
+                return new(StandaloneTaskbarBrokerResultKind.InvalidResponse);
+
+            StandaloneTaskbarControllerIdentity? identity = null;
+            if (expectedCommand == StandaloneTaskbarBrokerCommand.Start &&
+                result.Value == StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified &&
+                response.ProcessId is uint processId &&
+                response.ControlNonce is uint controlNonce)
+            {
+                var candidate = new StandaloneTaskbarControllerIdentity(
+                    processId,
+                    controlNonce);
+                if (candidate.IsValid)
+                    identity = candidate;
+            }
+            return new(result.Value, identity);
         }
 
         if (string.Equals(
@@ -265,10 +286,14 @@ internal static class StandaloneTaskbarBrokerProtocol
         string? command = null;
         string? controllerStatus = null;
         string? probeStatus = null;
+        uint? processId = null;
+        uint? controlNonce = null;
         bool sawStatus = false;
         bool sawCommand = false;
         bool sawControllerStatus = false;
         bool sawProbeStatus = false;
+        bool sawProcessId = false;
+        bool sawControlNonce = false;
 
         while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
         {
@@ -279,6 +304,8 @@ internal static class StandaloneTaskbarBrokerProtocol
             bool isCommand = reader.ValueTextEquals("command"u8);
             bool isControllerStatus = reader.ValueTextEquals("controllerStatus"u8);
             bool isProbeStatus = reader.ValueTextEquals("probeStatus"u8);
+            bool isProcessId = reader.ValueTextEquals("processId"u8);
+            bool isControlNonce = reader.ValueTextEquals("controlNonce"u8);
 
             if (!reader.Read())
                 return false;
@@ -317,6 +344,25 @@ internal static class StandaloneTaskbarBrokerProtocol
                     probeStatus = value;
                 }
             }
+            else if (isProcessId || isControlNonce)
+            {
+                if (reader.TokenType != JsonTokenType.Number ||
+                    !reader.TryGetUInt32(out uint value))
+                    return false;
+
+                if (isProcessId)
+                {
+                    if (sawProcessId) return false;
+                    sawProcessId = true;
+                    processId = value;
+                }
+                else
+                {
+                    if (sawControlNonce) return false;
+                    sawControlNonce = true;
+                    controlNonce = value;
+                }
+            }
             else
             {
                 reader.Skip();
@@ -328,7 +374,13 @@ internal static class StandaloneTaskbarBrokerProtocol
         if (!sawStatus || string.IsNullOrEmpty(status))
             return false;
 
-        response = new ParsedResponse(status, command, controllerStatus, probeStatus);
+        response = new ParsedResponse(
+            status,
+            command,
+            controllerStatus,
+            probeStatus,
+            processId,
+            controlNonce);
         return true;
     }
 
@@ -378,5 +430,7 @@ internal static class StandaloneTaskbarBrokerProtocol
         string Status,
         string? Command,
         string? ControllerStatus,
-        string? ProbeStatus);
+        string? ProbeStatus,
+        uint? ProcessId,
+        uint? ControlNonce);
 }

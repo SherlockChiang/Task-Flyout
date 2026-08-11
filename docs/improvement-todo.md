@@ -142,7 +142,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M3-04 | IN PROGRESS | Integration | Feed Task Flyout weather and activation into the native-shell companion. | A versioned, length-bounded per-user channel performs no blocking I/O on Explorer's UI thread; stale/unavailable app state fails open; native-shell click activation opens Task Flyout Weather; shutdown, reconnect, and Explorer restart leave no callbacks or handles behind. | `feat(weatherbar): define companion IPC protocol`, `feat(weatherbar): host companion weather snapshots`, `feat(windhawk): bridge weather snapshots`, `feat(windhawk): activate Task Flyout weather` |
 | M3-05 | IN PROGRESS | Architecture/Security | Replace the Windhawk runtime dependency with a standalone per-user taskbar broker and Explorer host. | The x64 broker and host build without Windhawk or WebView libraries; exact OS and `Taskbar.View.dll` fingerprints gate all private ABI use; unsupported systems fail closed before Explorer memory or XAML is changed. | `feat(taskbar): scaffold standalone weather host` |
 | M3-06 | IN PROGRESS | UI/Compatibility | Inject an independent pure-XAML weather button into the Windows 11 taskbar. | The host uses standard `Windows.UI.Xaml` controls and taskbar theme resources, does not require the Windows Widgets entry, reserves a bounded left-side slot, and restores the original XAML tree on disable or unload. | `feat(taskbar): add pure xaml weather view`, `feat(taskbar): inject native xaml weather button` |
-| M3-07 | IN PROGRESS | Integration/UI | Connect the standalone host to Task Flyout weather, activation, settings, and diagnostics. | The existing bounded per-user IPC supplies sanitized immutable snapshots; click opens Task Flyout Weather; a localized experimental switch and privacy-safe diagnostics expose active, unsupported, fallback, and recovery states. | `feat(taskbar): consume weather snapshot pipe`, `feat(taskbar): activate weather button`, `feat(taskbar): acknowledge host control`, `feat(weatherbar): add standalone mode policy`, `feat(taskbar): parse standalone broker responses`, `fix(taskbar): emit broker output as utf8`, `feat(taskbar): add bounded broker client`, `feat(taskbar): define standalone lifecycle states`, `feat(taskbar): coordinate standalone lifecycle`, `feat(taskbar): wire standalone app lifecycle`, `feat(taskbar): own widgets suppression safely`, `feat(taskbar): suppress native widgets for standalone`, `feat(weatherbar): expose standalone taskbar controls`, `feat(taskbar): expose mount readiness`, `feat(taskbar): parse mount status responses`, `feat(taskbar): hand off fallback after mount proof` |
+| M3-07 | IN PROGRESS | Integration/UI | Connect the standalone host to Task Flyout weather, activation, settings, and diagnostics. | The existing bounded per-user IPC supplies sanitized immutable snapshots; click opens Task Flyout Weather; a localized experimental switch and privacy-safe diagnostics expose active, unsupported, fallback, and recovery states. | `feat(taskbar): consume weather snapshot pipe`, `feat(taskbar): activate weather button`, `feat(taskbar): acknowledge host control`, `feat(weatherbar): add standalone mode policy`, `feat(taskbar): parse standalone broker responses`, `fix(taskbar): emit broker output as utf8`, `feat(taskbar): add bounded broker client`, `feat(taskbar): define standalone lifecycle states`, `feat(taskbar): coordinate standalone lifecycle`, `feat(taskbar): wire standalone app lifecycle`, `feat(taskbar): own widgets suppression safely`, `feat(taskbar): suppress native widgets for standalone`, `feat(weatherbar): expose standalone taskbar controls`, `feat(taskbar): expose mount readiness`, `feat(taskbar): parse mount status responses`, `feat(taskbar): hand off fallback after mount proof`, `feat(taskbar): authenticate mount lease reports` |
 | M3-08 | IN PROGRESS | Verification/Distribution | Validate and package the standalone taskbar component. | Compile/import checks prove the native binaries have no WebView dependency; a disposable Explorer session covers enable/disable, crash recovery, DPI, auto-hide, theme, multi-monitor, Explorer restart, unsupported binaries, signed packaging, and rollback before default exposure. | `build(taskbar): stage standalone native artifacts`, `test(taskbar): validate standalone weather injection` |
 
 M3-05 through M3-08 supersede the Windhawk runtime/package work in M3-03.
@@ -808,3 +808,27 @@ transport foundation for the standalone host.
   low-overhead readiness-lease renewal path; `TaskbarCreated` and explicit
   refresh already revoke/recheck proof, but disposable validation must cover
   non-restart tree rebuilds before M3-07/M3-08 can be marked done.
+
+### 2026-08-11 Authenticated Managed Mount Lease
+
+- Extended the existing current-user/current-session weather pipe with a
+  bounded `report-mount-readiness` request. The pipe server obtains the real
+  client process identifier from the kernel; it never trusts a JSON-supplied
+  identity.
+- A controller start acknowledgement may now retain only the taskbar Explorer
+  process identifier and the per-dispatch control nonce as an internal lease
+  identity. Paths, thread identifiers, free-form native detail, and that
+  identity remain absent from UI diagnostics.
+- Ready/lost reports must match the current Explorer identity and carry a
+  non-zero, monotonic mount generation. Old Explorer processes, old controller
+  generations, reordered state changes, and ordinary same-user pipe clients
+  cannot renew the current lease.
+- Confirmed readiness now has a 12-second fail-closed lease. Authenticated
+  ready heartbeats renew it; lost reports or missed heartbeats restore the Task
+  Flyout fallback, and disable/refresh revokes the identity before old reports
+  can arrive.
+- Focused protocol/server/coordinator coverage and the complete .NET suite pass
+  1102/1102. The Debug x64 app build succeeds with zero warnings/errors. This
+  slice deliberately leaves fallback visible with the existing native binary;
+  the next commit must emit the control nonce and live ready/lost reports from
+  the persistent Host worker without starting another Broker process.

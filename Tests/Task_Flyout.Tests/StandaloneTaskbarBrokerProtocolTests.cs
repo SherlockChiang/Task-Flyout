@@ -66,7 +66,25 @@ public class StandaloneTaskbarBrokerProtocolTests
             Assert.Equal(
                 StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified,
                 result.Kind);
+            Assert.Equal(
+                new StandaloneTaskbarControllerIdentity(1, 5),
+                result.ControllerIdentity);
         }
+    }
+
+    [Fact]
+    public void Older_start_acknowledgement_remains_unverified_without_a_lease_identity()
+    {
+        var result = StandaloneTaskbarBrokerProtocol.ParseControl(
+            StandaloneTaskbarBrokerCommand.Start,
+            "{\"status\":\"acknowledged\",\"command\":\"start\"," +
+            "\"processId\":1,\"controllerStatus\":\"started\"}",
+            0);
+
+        Assert.Equal(
+            StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified,
+            result.Kind);
+        Assert.Null(result.ControllerIdentity);
     }
 
     [Fact]
@@ -277,6 +295,14 @@ public class StandaloneTaskbarBrokerProtocolTests
                 StandaloneTaskbarBrokerCommand.Start,
                 "{\"status\":\"acknowledged\",\"command\":\"start\",\"command\":\"start\",\"controllerStatus\":\"started\"}",
                 0).Kind);
+        Assert.Equal(
+            StandaloneTaskbarBrokerResultKind.InvalidResponse,
+            StandaloneTaskbarBrokerProtocol.ParseControl(
+                StandaloneTaskbarBrokerCommand.Start,
+                "{\"status\":\"acknowledged\",\"command\":\"start\"," +
+                "\"controllerStatus\":\"started\",\"processId\":1," +
+                "\"controlNonce\":5,\"controlNonce\":5}",
+                0).Kind);
     }
 
     [Fact]
@@ -344,5 +370,5 @@ public class StandaloneTaskbarBrokerProtocolTests
         string command,
         string controllerStatus,
         string probeStatus = "supported")
-        => $"{{\"status\":\"{status}\",\"detail\":\"internal\",\"command\":\"{command}\",\"processId\":1,\"threadId\":2,\"messageId\":3,\"acknowledgementMessageId\":4,\"controllerStatus\":\"{controllerStatus}\",\"probeStatus\":\"{probeStatus}\"}}";
+        => $"{{\"status\":\"{status}\",\"detail\":\"internal\",\"command\":\"{command}\",\"processId\":1,\"controlNonce\":5,\"threadId\":2,\"messageId\":3,\"acknowledgementMessageId\":4,\"controllerStatus\":\"{controllerStatus}\",\"probeStatus\":\"{probeStatus}\"}}";
 }

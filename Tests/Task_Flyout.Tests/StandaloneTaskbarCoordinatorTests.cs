@@ -5,6 +5,9 @@ namespace Task_Flyout.Tests;
 
 public class StandaloneTaskbarCoordinatorTests
 {
+    private const uint ControllerProcessId = 4242;
+    private const uint ControllerNonce = 0xA17E52C3u;
+
     [Fact]
     public async Task Enable_probes_then_starts_without_claiming_mount_ready()
     {
@@ -57,6 +60,105 @@ public class StandaloneTaskbarCoordinatorTests
                 StandaloneTaskbarRuntimeState.MountReady
             },
             states);
+    }
+
+    [Fact]
+    public async Task Mount_proof_without_a_controller_identity_keeps_fallback()
+    {
+        var client = new FakeClient
+        {
+            Start = _ => Result(
+                StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified),
+            Status = _ => Result(
+                StandaloneTaskbarBrokerResultKind.ControllerMountReady)
+        };
+        await using var coordinator = new StandaloneTaskbarCoordinator(client);
+
+        await coordinator.SetEnabledAsync(true);
+
+        Assert.Equal(
+            StandaloneTaskbarRuntimeState.ControllerActiveUnverified,
+            coordinator.Status.State);
+        Assert.True(coordinator.Status.KeepTaskFlyoutFallback);
+    }
+
+    [Fact]
+    public async Task Authenticated_reports_move_pending_ready_lost_and_ready()
+    {
+        await using var coordinator = new StandaloneTaskbarCoordinator(
+            new FakeClient(),
+            TimeSpan.FromSeconds(1),
+            mountReadyPollInterval: TimeSpan.Zero,
+            mountReadyMaxAttempts: 1);
+        await coordinator.SetEnabledAsync(true);
+
+        Assert.True(coordinator.ReportMountReadiness(Report(1, ready: true)));
+        Assert.Equal(StandaloneTaskbarRuntimeState.MountReady, coordinator.Status.State);
+
+        Assert.True(coordinator.ReportMountReadiness(Report(2, ready: false)));
+        Assert.Equal(
+            StandaloneTaskbarRuntimeState.ControllerActiveUnverified,
+            coordinator.Status.State);
+
+        Assert.True(coordinator.ReportMountReadiness(Report(3, ready: true)));
+        Assert.Equal(StandaloneTaskbarRuntimeState.MountReady, coordinator.Status.State);
+    }
+
+    [Fact]
+    public async Task Forged_or_stale_mount_reports_cannot_renew_the_lease()
+    {
+        await using var coordinator = new StandaloneTaskbarCoordinator(
+            new FakeClient(),
+            TimeSpan.FromSeconds(1),
+            mountReadyPollInterval: TimeSpan.Zero,
+            mountReadyMaxAttempts: 1);
+        await coordinator.SetEnabledAsync(true);
+
+        Assert.False(coordinator.ReportMountReadiness(
+            Report(1, ready: true) with { ClientProcessId = 9999 }));
+        Assert.False(coordinator.ReportMountReadiness(
+            Report(1, ready: true) with { ControllerNonce = 1 }));
+        Assert.True(coordinator.ReportMountReadiness(Report(2, ready: true)));
+        Assert.False(coordinator.ReportMountReadiness(Report(1, ready: true)));
+        Assert.False(coordinator.ReportMountReadiness(Report(2, ready: false)));
+        Assert.Equal(StandaloneTaskbarRuntimeState.MountReady, coordinator.Status.State);
+    }
+
+    [Fact]
+    public async Task Missing_heartbeat_expires_ready_and_restores_fallback()
+    {
+        await using var coordinator = new StandaloneTaskbarCoordinator(
+            new FakeClient(),
+            TimeSpan.FromSeconds(1),
+            mountReadyPollInterval: TimeSpan.Zero,
+            mountReadyMaxAttempts: 1,
+            mountLeaseTimeout: TimeSpan.FromMilliseconds(40));
+        await coordinator.SetEnabledAsync(true);
+        Assert.True(coordinator.ReportMountReadiness(Report(1, ready: true)));
+
+        await WaitUntilAsync(
+            () => coordinator.Status.State ==
+                StandaloneTaskbarRuntimeState.ControllerActiveUnverified,
+            TimeSpan.FromSeconds(1));
+
+        Assert.True(coordinator.Status.KeepTaskFlyoutFallback);
+    }
+
+    [Fact]
+    public async Task Disable_revokes_identity_before_old_reports_arrive()
+    {
+        await using var coordinator = new StandaloneTaskbarCoordinator(
+            new FakeClient(),
+            TimeSpan.FromSeconds(1),
+            mountReadyPollInterval: TimeSpan.Zero,
+            mountReadyMaxAttempts: 1);
+        await coordinator.SetEnabledAsync(true);
+        Assert.True(coordinator.ReportMountReadiness(Report(1, ready: true)));
+
+        await coordinator.SetEnabledAsync(false);
+
+        Assert.False(coordinator.ReportMountReadiness(Report(2, ready: true)));
+        Assert.Equal(StandaloneTaskbarRuntimeState.Disabled, coordinator.Status.State);
     }
 
     [Fact]
@@ -437,6 +539,24 @@ public class StandaloneTaskbarCoordinatorTests
         StandaloneTaskbarBrokerResultKind kind)
         => Task.FromResult(new StandaloneTaskbarBrokerResult(kind));
 
+    private static Task<StandaloneTaskbarBrokerResult> ControllerResult()
+        => Task.FromResult(new StandaloneTaskbarBrokerResult(
+            StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified,
+            new StandaloneTaskbarControllerIdentity(
+                ControllerProcessId,
+                ControllerNonce)));
+
+    private static WeatherCompanionMountReadinessReport Report(
+        ulong generation,
+        bool ready)
+        => new(
+            ControllerProcessId,
+            ControllerNonce,
+            generation,
+            ready
+                ? WeatherCompanionMountState.Ready
+                : WeatherCompanionMountState.Lost);
+
     private static async Task WaitUntilAsync(
         Func<bool> predicate,
         TimeSpan timeout)
@@ -453,7 +573,7 @@ public class StandaloneTaskbarCoordinatorTests
             _ => Result(StandaloneTaskbarBrokerResultKind.ProbeSupported);
 
         public Func<CancellationToken, Task<StandaloneTaskbarBrokerResult>> Start { get; init; } =
-            _ => Result(StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified);
+            _ => ControllerResult();
 
         public Func<CancellationToken, Task<StandaloneTaskbarBrokerResult>> Stop { get; init; } =
             _ => Result(StandaloneTaskbarBrokerResultKind.ControllerInactive);

@@ -3,12 +3,17 @@ using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Win32.SafeHandles;
 
 namespace Task_Flyout.Services
 {
+    internal readonly record struct WeatherCompanionClientContext(
+        uint ProcessId);
+
     internal static class WeatherCompanionFraming
     {
         private const int HeaderBytes = sizeof(uint);
@@ -81,7 +86,7 @@ namespace Task_Flyout.Services
         private static readonly TimeSpan DefaultRetryDelay = TimeSpan.FromSeconds(1);
 
         private readonly object _lifecycleLock = new();
-        private readonly Func<WeatherCompanionRequest, CancellationToken, ValueTask<byte[]>> _requestHandler;
+        private readonly Func<WeatherCompanionRequest, WeatherCompanionClientContext, CancellationToken, ValueTask<byte[]>> _requestHandler;
         private readonly TimeSpan _operationTimeout;
         private readonly TimeSpan _retryDelay;
         private CancellationTokenSource? _shutdown;
@@ -91,6 +96,21 @@ namespace Task_Flyout.Services
 
         public WeatherCompanionServer(
             Func<WeatherCompanionRequest, CancellationToken, ValueTask<byte[]>> requestHandler,
+            string? pipeName = null,
+            TimeSpan? operationTimeout = null,
+            TimeSpan? retryDelay = null)
+            : this(
+                (request, _, cancellationToken) =>
+                    requestHandler(request, cancellationToken),
+                pipeName,
+                operationTimeout,
+                retryDelay)
+        {
+            ArgumentNullException.ThrowIfNull(requestHandler);
+        }
+
+        internal WeatherCompanionServer(
+            Func<WeatherCompanionRequest, WeatherCompanionClientContext, CancellationToken, ValueTask<byte[]>> requestHandler,
             string? pipeName = null,
             TimeSpan? operationTimeout = null,
             TimeSpan? retryDelay = null)
@@ -294,7 +314,12 @@ namespace Task_Flyout.Services
                 byte[] response;
                 try
                 {
-                    response = await _requestHandler(request, timeout.Token).ConfigureAwait(false);
+                    WeatherCompanionClientContext clientContext =
+                        GetClientContext(pipe);
+                    response = await _requestHandler(
+                        request,
+                        clientContext,
+                        timeout.Token).ConfigureAwait(false);
                     if (response.Length > WeatherCompanionProtocol.MaxResponseBytes)
                         throw new InvalidDataException("Weather companion handler response is too large.");
                 }
@@ -363,7 +388,32 @@ namespace Task_Flyout.Services
                 WeatherCompanionProtocolError.UnsupportedVersion => "unsupported-version",
                 WeatherCompanionProtocolError.MissingCommand => "missing-command",
                 WeatherCompanionProtocolError.UnsupportedCommand => "unsupported-command",
+                WeatherCompanionProtocolError.InvalidArguments => "invalid-arguments",
                 _ => "invalid-request"
             };
+
+        private static WeatherCompanionClientContext GetClientContext(
+            NamedPipeServerStream pipe)
+        {
+            try
+            {
+                return GetNamedPipeClientProcessId(
+                        pipe.SafePipeHandle,
+                        out uint processId)
+                    ? new WeatherCompanionClientContext(processId)
+                    : default;
+            }
+            catch (Exception ex) when (
+                ex is InvalidOperationException or ObjectDisposedException)
+            {
+                return default;
+            }
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetNamedPipeClientProcessId(
+            SafePipeHandle pipe,
+            out uint clientProcessId);
     }
 }

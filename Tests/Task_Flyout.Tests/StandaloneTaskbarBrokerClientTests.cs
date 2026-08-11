@@ -106,7 +106,9 @@ public class StandaloneTaskbarBrokerClientTests
         {
             Result = Completed(
                 0,
-                "{\"status\":\"acknowledged\",\"command\":\"start\",\"controllerStatus\":\"started\"}")
+                "{\"status\":\"acknowledged\",\"command\":\"start\"," +
+                "\"processId\":42,\"controlNonce\":17," +
+                "\"controllerStatus\":\"started\"}")
         };
         try
         {
@@ -117,6 +119,9 @@ public class StandaloneTaskbarBrokerClientTests
             Assert.Equal(
                 StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified,
                 result.Kind);
+            Assert.Equal(
+                new StandaloneTaskbarControllerIdentity(42, 17),
+                result.ControllerIdentity);
             Assert.Equal("start", runner.Arguments[0]);
             Assert.Equal("--host", runner.Arguments[1]);
             Assert.Equal(

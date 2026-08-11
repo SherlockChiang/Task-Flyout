@@ -9,7 +9,15 @@ namespace Task_Flyout.Services
     {
         Ping,
         GetSnapshot,
-        OpenWeather
+        OpenWeather,
+        ReportMountReadiness
+    }
+
+    internal enum WeatherCompanionMountState
+    {
+        None,
+        Ready,
+        Lost
     }
 
     internal enum WeatherCompanionProtocolError
@@ -21,7 +29,8 @@ namespace Task_Flyout.Services
         MissingVersion,
         UnsupportedVersion,
         MissingCommand,
-        UnsupportedCommand
+        UnsupportedCommand,
+        InvalidArguments
     }
 
     internal enum WeatherCompanionResponseStatus
@@ -35,7 +44,16 @@ namespace Task_Flyout.Services
 
     internal readonly record struct WeatherCompanionRequest(
         int Version,
-        WeatherCompanionCommand Command);
+        WeatherCompanionCommand Command,
+        uint ControllerNonce = 0,
+        ulong MountGeneration = 0,
+        WeatherCompanionMountState MountState = WeatherCompanionMountState.None);
+
+    internal readonly record struct WeatherCompanionMountReadinessReport(
+        uint ClientProcessId,
+        uint ControllerNonce,
+        ulong MountGeneration,
+        WeatherCompanionMountState MountState);
 
     internal readonly record struct WeatherCompanionSnapshot(
         string Icon,
@@ -80,8 +98,14 @@ namespace Task_Flyout.Services
 
             int? version = null;
             string? command = null;
+            uint? controllerNonce = null;
+            ulong? mountGeneration = null;
+            string? mountState = null;
             bool sawVersion = false;
             bool sawCommand = false;
+            bool sawControllerNonce = false;
+            bool sawMountGeneration = false;
+            bool sawMountState = false;
             try
             {
                 _ = StrictUtf8.GetCharCount(utf8);
@@ -104,6 +128,9 @@ namespace Task_Flyout.Services
 
                     bool isVersion = reader.ValueTextEquals("version"u8);
                     bool isCommand = reader.ValueTextEquals("command"u8);
+                    bool isControllerNonce = reader.ValueTextEquals("controllerNonce"u8);
+                    bool isMountGeneration = reader.ValueTextEquals("mountGeneration"u8);
+                    bool isMountState = reader.ValueTextEquals("mountState"u8);
                     if (!reader.Read()) throw new JsonException();
 
                     if (isVersion)
@@ -122,6 +149,32 @@ namespace Task_Flyout.Services
                             throw new JsonException();
                         sawCommand = true;
                         command = reader.GetString();
+                    }
+                    else if (isControllerNonce)
+                    {
+                        if (sawControllerNonce) throw new JsonException();
+                        if (reader.TokenType != JsonTokenType.Number ||
+                            !reader.TryGetUInt32(out uint parsedNonce))
+                            throw new JsonException();
+                        sawControllerNonce = true;
+                        controllerNonce = parsedNonce;
+                    }
+                    else if (isMountGeneration)
+                    {
+                        if (sawMountGeneration) throw new JsonException();
+                        if (reader.TokenType != JsonTokenType.Number ||
+                            !reader.TryGetUInt64(out ulong parsedGeneration))
+                            throw new JsonException();
+                        sawMountGeneration = true;
+                        mountGeneration = parsedGeneration;
+                    }
+                    else if (isMountState)
+                    {
+                        if (sawMountState) throw new JsonException();
+                        if (reader.TokenType != JsonTokenType.String)
+                            throw new JsonException();
+                        sawMountState = true;
+                        mountState = reader.GetString();
                     }
                     else
                     {
@@ -168,13 +221,49 @@ namespace Task_Flyout.Services
                 parsedCommand = WeatherCompanionCommand.GetSnapshot;
             else if (string.Equals(command, "open-weather", StringComparison.Ordinal))
                 parsedCommand = WeatherCompanionCommand.OpenWeather;
+            else if (string.Equals(command, "report-mount-readiness", StringComparison.Ordinal))
+                parsedCommand = WeatherCompanionCommand.ReportMountReadiness;
             else
             {
                 error = WeatherCompanionProtocolError.UnsupportedCommand;
                 return false;
             }
 
-            request = new WeatherCompanionRequest(version.Value, parsedCommand);
+            bool hasMountArguments = sawControllerNonce ||
+                sawMountGeneration || sawMountState;
+            if (parsedCommand != WeatherCompanionCommand.ReportMountReadiness)
+            {
+                if (hasMountArguments)
+                {
+                    error = WeatherCompanionProtocolError.InvalidArguments;
+                    return false;
+                }
+
+                request = new WeatherCompanionRequest(version.Value, parsedCommand);
+                error = WeatherCompanionProtocolError.None;
+                return true;
+            }
+
+            WeatherCompanionMountState parsedMountState = mountState switch
+            {
+                "ready" => WeatherCompanionMountState.Ready,
+                "lost" => WeatherCompanionMountState.Lost,
+                _ => WeatherCompanionMountState.None
+            };
+            if (!controllerNonce.HasValue || controllerNonce.Value == 0 ||
+                !mountGeneration.HasValue || mountGeneration.Value == 0 ||
+                parsedMountState == WeatherCompanionMountState.None)
+            {
+                error = WeatherCompanionProtocolError.InvalidArguments;
+                return false;
+            }
+
+            request = new WeatherCompanionRequest(
+                version.Value,
+                parsedCommand,
+                controllerNonce.Value,
+                mountGeneration.Value,
+                parsedMountState);
             error = WeatherCompanionProtocolError.None;
             return true;
         }

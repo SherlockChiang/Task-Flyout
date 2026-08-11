@@ -58,10 +58,12 @@ public class WeatherCompanionServerTests
     {
         string pipeName = $"TaskFlyout.Weather.Tests.{Guid.NewGuid():N}";
         WeatherCompanionCommand? received = null;
+        uint clientProcessId = 0;
         await using var server = new WeatherCompanionServer(
-            (request, _) =>
+            (request, clientContext, _) =>
             {
                 received = request.Command;
+                clientProcessId = clientContext.ProcessId;
                 return ValueTask.FromResult(WeatherCompanionProtocol.SerializeResponse(
                     WeatherCompanionResponseStatus.Ok,
                     detail: "ready"));
@@ -88,6 +90,7 @@ public class WeatherCompanionServerTests
         using JsonDocument document = JsonDocument.Parse(response);
         Assert.Equal("ok", document.RootElement.GetProperty("status").GetString());
         Assert.Equal(WeatherCompanionCommand.Ping, received);
+        Assert.Equal((uint)Environment.ProcessId, clientProcessId);
     }
 
     [Fact]

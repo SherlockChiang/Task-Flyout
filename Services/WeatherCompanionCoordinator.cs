@@ -12,6 +12,7 @@ namespace Task_Flyout.Services
 
         private readonly WeatherService _weatherService;
         private readonly Func<bool> _queueOpenWeather;
+        private readonly Func<WeatherCompanionMountReadinessReport, bool> _reportMountReadiness;
         private readonly object _snapshotLock = new();
         private readonly SemaphoreSlim _refreshSignal = new(0, 1);
         private WeatherCompanionServer? _server;
@@ -25,10 +26,12 @@ namespace Task_Flyout.Services
 
         public WeatherCompanionCoordinator(
             WeatherService weatherService,
-            Func<bool> queueOpenWeather)
+            Func<bool> queueOpenWeather,
+            Func<WeatherCompanionMountReadinessReport, bool>? reportMountReadiness = null)
         {
             _weatherService = weatherService ?? throw new ArgumentNullException(nameof(weatherService));
             _queueOpenWeather = queueOpenWeather ?? throw new ArgumentNullException(nameof(queueOpenWeather));
+            _reportMountReadiness = reportMountReadiness ?? (_ => false);
         }
 
         public void Start()
@@ -212,6 +215,7 @@ namespace Task_Flyout.Services
 
         private ValueTask<byte[]> HandleRequestAsync(
             WeatherCompanionRequest request,
+            WeatherCompanionClientContext clientContext,
             CancellationToken cancellationToken)
         {
             if (!_enabled)
@@ -229,6 +233,8 @@ namespace Task_Flyout.Services
                         detail: "ready")),
                 WeatherCompanionCommand.GetSnapshot => GetSnapshotResponse(),
                 WeatherCompanionCommand.OpenWeather => OpenWeatherResponse(),
+                WeatherCompanionCommand.ReportMountReadiness =>
+                    ReportMountReadinessResponse(request, clientContext),
                 _ => ValueTask.FromResult(WeatherCompanionProtocol.SerializeResponse(
                     WeatherCompanionResponseStatus.InvalidRequest,
                     detail: "unsupported-command"))
@@ -264,5 +270,23 @@ namespace Task_Flyout.Services
                 : WeatherCompanionProtocol.SerializeResponse(
                     WeatherCompanionResponseStatus.Unavailable,
                     detail: "app-closing"));
+
+        private ValueTask<byte[]> ReportMountReadinessResponse(
+            WeatherCompanionRequest request,
+            WeatherCompanionClientContext clientContext)
+        {
+            var report = new WeatherCompanionMountReadinessReport(
+                clientContext.ProcessId,
+                request.ControllerNonce,
+                request.MountGeneration,
+                request.MountState);
+            return ValueTask.FromResult(_reportMountReadiness(report)
+                ? WeatherCompanionProtocol.SerializeResponse(
+                    WeatherCompanionResponseStatus.Ok,
+                    detail: "mount-report-accepted")
+                : WeatherCompanionProtocol.SerializeResponse(
+                    WeatherCompanionResponseStatus.Unavailable,
+                    detail: "mount-report-rejected"));
+        }
     }
 }

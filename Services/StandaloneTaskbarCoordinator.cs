@@ -9,11 +9,14 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
     public static readonly TimeSpan ShutdownTimeout = TimeSpan.FromSeconds(15);
     public static readonly TimeSpan MountReadyPollInterval =
         TimeSpan.FromMilliseconds(400);
+    public static readonly TimeSpan MountLeaseTimeout =
+        TimeSpan.FromSeconds(12);
     public const int MountReadyMaxAttempts = 5;
 
     private readonly IStandaloneTaskbarBrokerClient _client;
     private readonly TimeSpan _shutdownTimeout;
     private readonly TimeSpan _mountReadyPollInterval;
+    private readonly TimeSpan _mountLeaseTimeout;
     private readonly int _mountReadyMaxAttempts;
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly object _stateLock = new();
@@ -26,6 +29,10 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
     private long _generation;
     private bool _desiredEnabled;
     private bool _stopRequired;
+    private StandaloneTaskbarControllerIdentity? _controllerIdentity;
+    private ulong _lastMountGeneration;
+    private WeatherCompanionMountState _lastMountState;
+    private long _mountLeaseVersion;
     private bool _disposed;
 
     public StandaloneTaskbarCoordinator(
@@ -50,7 +57,8 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
         TimeSpan shutdownTimeout,
         bool cleanupRequired = false,
         TimeSpan? mountReadyPollInterval = null,
-        int mountReadyMaxAttempts = MountReadyMaxAttempts)
+        int mountReadyMaxAttempts = MountReadyMaxAttempts,
+        TimeSpan? mountLeaseTimeout = null)
     {
         if (shutdownTimeout <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(shutdownTimeout));
@@ -60,10 +68,14 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
             throw new ArgumentOutOfRangeException(nameof(mountReadyPollInterval));
         if (mountReadyMaxAttempts <= 0)
             throw new ArgumentOutOfRangeException(nameof(mountReadyMaxAttempts));
+        TimeSpan leaseTimeout = mountLeaseTimeout ?? MountLeaseTimeout;
+        if (leaseTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(mountLeaseTimeout));
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _shutdownTimeout = shutdownTimeout;
         _mountReadyPollInterval = pollInterval;
         _mountReadyMaxAttempts = mountReadyMaxAttempts;
+        _mountLeaseTimeout = leaseTimeout;
         _stopRequired = cleanupRequired;
     }
 
@@ -91,6 +103,73 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
         {
             lock (_stateLock) return _stopRequired;
         }
+    }
+
+    internal bool ReportMountReadiness(
+        WeatherCompanionMountReadinessReport report)
+    {
+        if (report.ClientProcessId == 0 ||
+            report.ControllerNonce == 0 ||
+            report.MountGeneration == 0 ||
+            report.MountState is not WeatherCompanionMountState.Ready and
+                not WeatherCompanionMountState.Lost)
+        {
+            return false;
+        }
+
+        long generation;
+        long leaseVersion;
+        StandaloneTaskbarRuntimeStatus? nextStatus = null;
+        lock (_stateLock)
+        {
+            if (_disposed || !_desiredEnabled ||
+                _controllerIdentity is not StandaloneTaskbarControllerIdentity identity ||
+                identity.ProcessId != report.ClientProcessId ||
+                identity.ControlNonce != report.ControllerNonce ||
+                _status.State is not StandaloneTaskbarRuntimeState.ControllerActiveUnverified and
+                    not StandaloneTaskbarRuntimeState.MountReady)
+            {
+                return false;
+            }
+
+            if (report.MountGeneration < _lastMountGeneration ||
+                (report.MountGeneration == _lastMountGeneration &&
+                 _lastMountState != WeatherCompanionMountState.None &&
+                 _lastMountState != report.MountState))
+            {
+                return false;
+            }
+
+            if (report.MountGeneration > _lastMountGeneration)
+            {
+                _lastMountGeneration = report.MountGeneration;
+                _lastMountState = report.MountState;
+            }
+            else if (_lastMountState == WeatherCompanionMountState.None)
+            {
+                _lastMountState = report.MountState;
+            }
+
+            generation = _generation;
+            leaseVersion = ++_mountLeaseVersion;
+            StandaloneTaskbarRuntimeState desiredState =
+                report.MountState == WeatherCompanionMountState.Ready
+                    ? StandaloneTaskbarRuntimeState.MountReady
+                    : StandaloneTaskbarRuntimeState.ControllerActiveUnverified;
+            if (_status.State != desiredState)
+                nextStatus = new StandaloneTaskbarRuntimeStatus(desiredState);
+        }
+
+        if (nextStatus.HasValue)
+        {
+            PublishMountLeaseIfCurrent(
+                generation,
+                leaseVersion,
+                nextStatus.Value);
+        }
+        if (report.MountState == WeatherCompanionMountState.Ready)
+            _ = ExpireMountLeaseAsync(generation, leaseVersion);
+        return true;
     }
 
     public Task SetEnabledAsync(bool enabled)
@@ -157,6 +236,10 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
     {
         _desiredEnabled = enabled;
         long generation = ++_generation;
+        _controllerIdentity = null;
+        _lastMountGeneration = 0;
+        _lastMountState = WeatherCompanionMountState.None;
+        _mountLeaseVersion++;
         CancellationTokenSource? previous = _generationCancellation;
         var generationCancellation = new CancellationTokenSource();
         _generationCancellation = generationCancellation;
@@ -305,6 +388,10 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
             return;
         }
 
+        SetControllerIdentityIfCurrent(
+            generation,
+            start.ControllerIdentity);
+
         await VerifyMountReadyAsync(
             generation,
             cancellationToken,
@@ -318,6 +405,9 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
     {
         for (int attempt = 0; attempt < _mountReadyMaxAttempts; attempt++)
         {
+            if (IsMountReadyCurrent(generation))
+                return;
+
             if (attempt != 0 && _mountReadyPollInterval > TimeSpan.Zero)
             {
                 await Task.Delay(
@@ -349,6 +439,21 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
             if (!IsCurrent(generation, enabled: true))
                 return;
 
+            if (status.Kind ==
+                StandaloneTaskbarBrokerResultKind.ControllerMountReady)
+            {
+                if (TryBeginInitialMountLease(generation, out long leaseVersion))
+                {
+                    PublishMountLeaseIfCurrent(
+                        generation,
+                        leaseVersion,
+                        new StandaloneTaskbarRuntimeStatus(
+                            StandaloneTaskbarRuntimeState.MountReady));
+                    _ = ExpireMountLeaseAsync(generation, leaseVersion);
+                }
+                return;
+            }
+
             StandaloneTaskbarRuntimeState mapped =
                 StandaloneTaskbarLifecyclePolicy.MapStatus(status.Kind);
             if (status.Kind ==
@@ -362,6 +467,7 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
                 return;
             }
 
+            ClearControllerIdentityIfCurrent(generation);
             PublishIfCurrent(
                 generation,
                 new StandaloneTaskbarRuntimeStatus(mapped),
@@ -465,6 +571,112 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
         }
     }
 
+    private void SetControllerIdentityIfCurrent(
+        long generation,
+        StandaloneTaskbarControllerIdentity? identity)
+    {
+        lock (_stateLock)
+        {
+            if (generation != _generation || !_desiredEnabled)
+                return;
+            _controllerIdentity = identity is { IsValid: true }
+                ? identity
+                : null;
+            _lastMountGeneration = 0;
+            _lastMountState = WeatherCompanionMountState.None;
+            _mountLeaseVersion++;
+        }
+    }
+
+    private void ClearControllerIdentityIfCurrent(long generation)
+    {
+        lock (_stateLock)
+        {
+            if (generation != _generation)
+                return;
+            _controllerIdentity = null;
+            _lastMountGeneration = 0;
+            _lastMountState = WeatherCompanionMountState.None;
+            _mountLeaseVersion++;
+        }
+    }
+
+    private bool IsMountReadyCurrent(long generation)
+    {
+        lock (_stateLock)
+        {
+            return generation == _generation &&
+                _desiredEnabled &&
+                _status.State == StandaloneTaskbarRuntimeState.MountReady;
+        }
+    }
+
+    private bool TryBeginInitialMountLease(
+        long generation,
+        out long leaseVersion)
+    {
+        lock (_stateLock)
+        {
+            if (generation != _generation || !_desiredEnabled ||
+                _controllerIdentity is not { IsValid: true })
+            {
+                leaseVersion = 0;
+                return false;
+            }
+
+            leaseVersion = ++_mountLeaseVersion;
+            return true;
+        }
+    }
+
+    private async Task ExpireMountLeaseAsync(
+        long generation,
+        long leaseVersion)
+    {
+        await Task.Delay(_mountLeaseTimeout).ConfigureAwait(false);
+
+        long expiryVersion;
+        lock (_stateLock)
+        {
+            if (generation != _generation || !_desiredEnabled ||
+                leaseVersion != _mountLeaseVersion ||
+                _status.State != StandaloneTaskbarRuntimeState.MountReady)
+            {
+                return;
+            }
+            expiryVersion = ++_mountLeaseVersion;
+        }
+
+        PublishMountLeaseIfCurrent(
+            generation,
+            expiryVersion,
+            new StandaloneTaskbarRuntimeStatus(
+                StandaloneTaskbarRuntimeState.ControllerActiveUnverified));
+    }
+
+    private void PublishMountLeaseIfCurrent(
+        long generation,
+        long leaseVersion,
+        StandaloneTaskbarRuntimeStatus status)
+    {
+        Action<StandaloneTaskbarRuntimeStatus>? handler;
+        lock (_stateLock)
+        {
+            if (generation != _generation || !_desiredEnabled ||
+                leaseVersion != _mountLeaseVersion ||
+                _controllerIdentity is not { IsValid: true })
+            {
+                return;
+            }
+            if (_status == status)
+                return;
+            _status = status;
+            handler = StatusChanged;
+        }
+
+        NotifySubscribers(generation, status, handler);
+    }
+
     private void PublishIfCurrent(
         long generation,
         StandaloneTaskbarRuntimeStatus status,
@@ -479,6 +691,14 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
             handler = notify ? StatusChanged : null;
         }
 
+        NotifySubscribers(generation, status, handler);
+    }
+
+    private void NotifySubscribers(
+        long generation,
+        StandaloneTaskbarRuntimeStatus status,
+        Action<StandaloneTaskbarRuntimeStatus>? handler)
+    {
         if (handler == null) return;
         lock (_notificationLock)
         {

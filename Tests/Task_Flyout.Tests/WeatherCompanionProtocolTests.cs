@@ -26,6 +26,50 @@ public class WeatherCompanionProtocolTests
     }
 
     [Theory]
+    [InlineData("ready", (int)WeatherCompanionMountState.Ready)]
+    [InlineData("lost", (int)WeatherCompanionMountState.Lost)]
+    public void Parses_bounded_mount_readiness_reports(
+        string state,
+        int expected)
+    {
+        byte[] json = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            version = 1,
+            command = "report-mount-readiness",
+            controllerNonce = 17u,
+            mountGeneration = 23ul,
+            mountState = state
+        });
+
+        Assert.True(WeatherCompanionProtocol.TryParseRequest(
+            json,
+            out var request,
+            out var error));
+        Assert.Equal(WeatherCompanionProtocolError.None, error);
+        Assert.Equal(
+            WeatherCompanionCommand.ReportMountReadiness,
+            request.Command);
+        Assert.Equal(17u, request.ControllerNonce);
+        Assert.Equal(23ul, request.MountGeneration);
+        Assert.Equal((WeatherCompanionMountState)expected, request.MountState);
+    }
+
+    [Theory]
+    [InlineData("{\"version\":1,\"command\":\"report-mount-readiness\"}")]
+    [InlineData("{\"version\":1,\"command\":\"report-mount-readiness\",\"controllerNonce\":0,\"mountGeneration\":1,\"mountState\":\"ready\"}")]
+    [InlineData("{\"version\":1,\"command\":\"report-mount-readiness\",\"controllerNonce\":1,\"mountGeneration\":0,\"mountState\":\"ready\"}")]
+    [InlineData("{\"version\":1,\"command\":\"report-mount-readiness\",\"controllerNonce\":1,\"mountGeneration\":1,\"mountState\":\"pending\"}")]
+    [InlineData("{\"version\":1,\"command\":\"ping\",\"controllerNonce\":1}")]
+    public void Rejects_missing_or_cross_command_mount_arguments(string json)
+    {
+        Assert.False(WeatherCompanionProtocol.TryParseRequest(
+            Encoding.UTF8.GetBytes(json),
+            out _,
+            out var error));
+        Assert.Equal(WeatherCompanionProtocolError.InvalidArguments, error);
+    }
+
+    [Theory]
     [InlineData("", (int)WeatherCompanionProtocolError.EmptyRequest)]
     [InlineData("{}", (int)WeatherCompanionProtocolError.MissingVersion)]
     [InlineData("{\"version\":1}", (int)WeatherCompanionProtocolError.MissingCommand)]

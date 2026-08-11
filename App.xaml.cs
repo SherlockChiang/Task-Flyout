@@ -1151,7 +1151,9 @@ namespace Task_Flyout
                 {
                     _weatherCompanionCoordinator = new WeatherCompanionCoordinator(
                         WeatherService,
-                        TryQueueWeatherOpen);
+                        TryQueueWeatherOpen,
+                        report => _standaloneTaskbarCoordinator
+                            ?.ReportMountReadiness(report) == true);
                     _weatherCompanionCoordinator.Start();
                 }
                 _weatherCompanionCoordinator.SetEnabled(true);
