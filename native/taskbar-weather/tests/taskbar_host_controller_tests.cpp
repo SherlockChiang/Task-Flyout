@@ -1,4 +1,5 @@
 #include "taskbar_host_controller.h"
+#include "taskbar_mount_readiness_state.h"
 
 #include <cstdio>
 
@@ -87,6 +88,85 @@ int wmain() {
             EvaluateTaskbarMountReportAction(false, false, false) ==
                 TaskbarMountReportAction::None,
         L"a pending lost report must win over a later ready proof");
+
+    TaskbarMountReadinessState readiness;
+    BeginTaskbarMountReadinessSession(readiness, 17u, 100u);
+    passed &= Expect(
+        RecordTaskbarMountReadinessObservation(readiness, true, 101u),
+        L"the first owner-thread ready proof should change session state");
+    const TaskbarMountReadinessSnapshot firstReady =
+        SnapshotTaskbarMountReadiness(readiness, 101u, 12u);
+    passed &= Expect(
+        firstReady.controllerNonce == 17u && firstReady.ready &&
+            !firstReady.pendingLost,
+        L"a fresh ready proof should retain its controller identity");
+
+    const bool repeatedReadyChanged =
+        RecordTaskbarMountReadinessObservation(readiness, true, 102u);
+    const TaskbarMountReadinessSnapshot renewedReady =
+        SnapshotTaskbarMountReadiness(readiness, 113u, 12u);
+    passed &= Expect(
+        !repeatedReadyChanged && renewedReady.ready &&
+            renewedReady.generation == firstReady.generation &&
+            renewedReady.proofSequence > firstReady.proofSequence,
+        L"a repeated owner-thread proof should renew ready without changing "
+        L"its mount generation");
+
+    const bool lostChanged =
+        RecordTaskbarMountReadinessObservation(readiness, false, 114u);
+    const bool laterReadyChanged =
+        RecordTaskbarMountReadinessObservation(readiness, true, 115u);
+    passed &= Expect(
+        lostChanged && laterReadyChanged,
+        L"a lost and later ready observation should both advance state");
+    const TaskbarMountReadinessSnapshot pendingLost =
+        SnapshotTaskbarMountReadiness(readiness, 115u, 12u);
+    passed &= Expect(
+        !pendingLost.ready && pendingLost.pendingLost &&
+            pendingLost.generation > firstReady.generation,
+        L"a pending lost report should hide the later ready generation");
+    const bool wrongControllerAcknowledged = AcknowledgeTaskbarMountLost(
+        readiness,
+        18u,
+        pendingLost.generation);
+    const bool lostStillPending =
+        SnapshotTaskbarMountReadiness(readiness, 115u, 12u).pendingLost;
+    passed &= Expect(
+        !wrongControllerAcknowledged && lostStillPending,
+        L"an acknowledgement from another controller cannot clear lost");
+    passed &= Expect(
+        AcknowledgeTaskbarMountLost(
+            readiness,
+            17u,
+            pendingLost.generation),
+        L"the exact controller and generation should acknowledge lost");
+    const TaskbarMountReadinessSnapshot recoveredReady =
+        SnapshotTaskbarMountReadiness(readiness, 115u, 12u);
+    passed &= Expect(
+        recoveredReady.ready && !recoveredReady.pendingLost &&
+            recoveredReady.generation > pendingLost.generation,
+        L"ready may be reported only after the lost latch is acknowledged");
+
+    BeginTaskbarMountReadinessSession(readiness, 23u, 200u);
+    RecordTaskbarMountReadinessObservation(readiness, true, 201u);
+    const TaskbarMountReadinessSnapshot stale =
+        SnapshotTaskbarMountReadiness(readiness, 214u, 12u);
+    passed &= Expect(
+        stale.controllerNonce == 23u && !stale.ready &&
+            stale.pendingLost,
+        L"an expired owner-thread proof should become a latched lost report");
+    BeginTaskbarMountReadinessSession(readiness, 24u, 215u);
+    const bool oldSessionAcknowledged = AcknowledgeTaskbarMountLost(
+        readiness,
+        23u,
+        stale.generation);
+    const TaskbarMountReadinessSnapshot newSession =
+        SnapshotTaskbarMountReadiness(readiness, 215u, 12u);
+    passed &= Expect(
+        !oldSessionAcknowledged && newSession.controllerNonce == 24u &&
+            !newSession.ready && !newSession.pendingLost &&
+            newSession.generation > stale.generation,
+        L"an old in-flight acknowledgement cannot mutate a new session");
 
     if (!passed) {
         return 1;

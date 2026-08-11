@@ -1,6 +1,7 @@
 #include "taskbar_host_controller.h"
 
 #include "taskbar_detour.h"
+#include "taskbar_mount_readiness_state.h"
 #include "taskbar_tree_profile.h"
 #include "weather_pipe_client.h"
 #include "weather_view_model.h"
@@ -51,29 +52,8 @@ SRWLOCK g_weatherActivationLock = SRWLOCK_INIT;
 std::atomic_bool g_weatherActivationPending{false};
 bool g_weatherActivationEnabled = false;
 SRWLOCK g_mountReadinessLock = SRWLOCK_INIT;
-std::uint32_t g_controllerNonce = 0;
-bool g_mountObservedReady = false;
-ULONGLONG g_mountObservedAtTicks = 0;
-std::uint64_t g_mountObservationGeneration = 1;
-std::uint64_t g_mountProofSequence = 1;
-bool g_mountLostPending = false;
-std::uint64_t g_mountPendingLostGeneration = 0;
+TaskbarMountReadinessState g_mountReadinessState{};
 HANDLE g_mountReadinessEvent = nullptr;
-
-struct MountReadinessSnapshot {
-    std::uint32_t controllerNonce = 0;
-    std::uint64_t generation = 1;
-    std::uint64_t proofSequence = 1;
-    bool ready = false;
-    bool pendingLost = false;
-};
-
-void AdvanceNonZeroSequence(std::uint64_t& sequence) noexcept {
-    ++sequence;
-    if (sequence == 0) {
-        sequence = 1;
-    }
-}
 
 void SignalMountReadinessWorkerLocked() noexcept {
     if (g_mountReadinessEvent) {
@@ -90,63 +70,33 @@ void SignalMountReadinessWorker() noexcept {
 void ResetMountReadinessSession(
     const std::uint32_t controllerNonce) noexcept {
     AcquireSRWLockExclusive(&g_mountReadinessLock);
-    g_controllerNonce = controllerNonce;
-    g_mountObservedReady = false;
-    g_mountObservedAtTicks = GetTickCount64();
-    AdvanceNonZeroSequence(g_mountObservationGeneration);
-    AdvanceNonZeroSequence(g_mountProofSequence);
-    g_mountLostPending = false;
-    g_mountPendingLostGeneration = 0;
+    BeginTaskbarMountReadinessSession(
+        g_mountReadinessState,
+        controllerNonce,
+        GetTickCount64());
     SignalMountReadinessWorkerLocked();
     ReleaseSRWLockExclusive(&g_mountReadinessLock);
 }
 
 void PublishMountReadinessObservation(const bool ready) noexcept {
     AcquireSRWLockExclusive(&g_mountReadinessLock);
-    const bool changed = g_mountObservedReady != ready;
-    g_mountObservedReady = ready;
-    g_mountObservedAtTicks = GetTickCount64();
-    AdvanceNonZeroSequence(g_mountProofSequence);
-    if (changed) {
-        AdvanceNonZeroSequence(g_mountObservationGeneration);
-        if (!ready) {
-            g_mountLostPending = true;
-            g_mountPendingLostGeneration =
-                g_mountObservationGeneration;
-        }
+    if (RecordTaskbarMountReadinessObservation(
+            g_mountReadinessState,
+            ready,
+            GetTickCount64())) {
         SignalMountReadinessWorkerLocked();
     }
     ReleaseSRWLockExclusive(&g_mountReadinessLock);
 }
 
-MountReadinessSnapshot CaptureMountReadinessObservation(
+TaskbarMountReadinessSnapshot CaptureMountReadinessObservation(
     const ULONGLONG nowTicks) noexcept {
     AcquireSRWLockExclusive(&g_mountReadinessLock);
-    if (g_mountObservedReady &&
-        !IsTaskbarMountObservationFresh(
-            true,
-            g_mountObservedAtTicks,
+    const TaskbarMountReadinessSnapshot snapshot =
+        SnapshotTaskbarMountReadiness(
+            g_mountReadinessState,
             nowTicks,
-            kMountObservationMaximumAgeMilliseconds)) {
-        g_mountObservedReady = false;
-        g_mountObservedAtTicks = nowTicks;
-        AdvanceNonZeroSequence(g_mountObservationGeneration);
-        g_mountLostPending = true;
-        g_mountPendingLostGeneration = g_mountObservationGeneration;
-    }
-    const MountReadinessSnapshot snapshot = g_mountLostPending
-        ? MountReadinessSnapshot{
-            g_controllerNonce,
-            g_mountPendingLostGeneration,
-            g_mountProofSequence,
-            false,
-            true}
-        : MountReadinessSnapshot{
-            g_controllerNonce,
-            g_mountObservationGeneration,
-            g_mountProofSequence,
-            g_mountObservedReady,
-            false};
+            kMountObservationMaximumAgeMilliseconds);
     ReleaseSRWLockExclusive(&g_mountReadinessLock);
     return snapshot;
 }
@@ -155,14 +105,12 @@ void AcknowledgePendingMountLost(
     const std::uint32_t controllerNonce,
     const std::uint64_t generation) noexcept {
     AcquireSRWLockExclusive(&g_mountReadinessLock);
-    if (g_controllerNonce == controllerNonce &&
-        g_mountLostPending &&
-        g_mountPendingLostGeneration == generation) {
-        g_mountLostPending = false;
-        g_mountPendingLostGeneration = 0;
-        if (g_mountObservedReady) {
-            SignalMountReadinessWorkerLocked();
-        }
+    if (AcknowledgeTaskbarMountLost(
+            g_mountReadinessState,
+            controllerNonce,
+            generation) &&
+        g_mountReadinessState.observedReady) {
+        SignalMountReadinessWorkerLocked();
     }
     ReleaseSRWLockExclusive(&g_mountReadinessLock);
 }
@@ -393,7 +341,7 @@ DWORD WINAPI WeatherPipeWorkerProc(void* parameter) {
         nowTicks = GetTickCount64();
         if (nextMountReportTicks == 0 ||
             nowTicks >= nextMountReportTicks) {
-            const MountReadinessSnapshot snapshot =
+            const TaskbarMountReadinessSnapshot snapshot =
                 CaptureMountReadinessObservation(nowTicks);
             const std::uint32_t controllerNonce =
                 snapshot.controllerNonce;
