@@ -608,3 +608,23 @@ transport foundation for the standalone host.
   acknowledgement semantics, timeout ambiguity, cancellation, output failure,
   and launch failure. Full .NET tests pass 1004/1004 and the Debug x64 app
   build has zero warnings/errors. The client is not yet called by App startup.
+
+### 2026-08-11 Standalone Lifecycle State Policy
+
+- Added fixed, privacy-safe runtime states for startup, controller
+  acknowledgement, shutdown, unsupported systems, missing binaries, transient
+  failures, rejection, ambiguous cleanup, recovery, invalid output, and
+  cancellation. UI diagnostics can localize these stable keys without exposing
+  native paths, process identifiers, or broker detail text.
+- A successful broker `start` maps only to `ControllerActiveUnverified`. The
+  current acknowledgement proves that the controller accepted the request, but
+  not that a later taskbar layout callback mounted a visible XAML button, so
+  every requested standalone state continues to keep the Task Flyout weather
+  bar as the safe fallback. The broker result no longer exposes a generic
+  `IsSuccessful` shortcut that could conflate command acceptance with a visible
+  native surface.
+- Focused tests cover the complete 12-result mapping matrix and all 13 unique
+  diagnostic keys; the full 1009/1009 .NET suite passes and the Debug x64 app
+  build has zero warnings/errors. Generation-safe lifecycle coordination, App
+  wiring, mount-ready signalling, native artifact packaging, and localized
+  settings remain pending under M3-07.

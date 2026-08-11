@@ -77,6 +77,18 @@ internal readonly record struct StandaloneTaskbarBrokerProcessResult(
     int ExitCode,
     string StandardOutput);
 
+internal interface IStandaloneTaskbarBrokerClient
+{
+    Task<StandaloneTaskbarBrokerResult> ProbeAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<StandaloneTaskbarBrokerResult> StartAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<StandaloneTaskbarBrokerResult> StopAsync(
+        CancellationToken cancellationToken = default);
+}
+
 internal interface IStandaloneTaskbarBrokerProcessRunner
 {
     Task<StandaloneTaskbarBrokerProcessResult> RunAsync(
@@ -357,7 +369,7 @@ internal sealed class StandaloneTaskbarBrokerProcessRunner :
         bool Failed);
 }
 
-internal sealed class StandaloneTaskbarBrokerClient
+internal sealed class StandaloneTaskbarBrokerClient : IStandaloneTaskbarBrokerClient
 {
     public static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(3);
     public static readonly TimeSpan ControlTimeout = TimeSpan.FromSeconds(10);

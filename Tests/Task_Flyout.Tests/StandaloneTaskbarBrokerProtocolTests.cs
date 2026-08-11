@@ -15,7 +15,6 @@ public class StandaloneTaskbarBrokerProtocolTests
         Assert.Equal(
             StandaloneTaskbarBrokerResultKind.ProbeSupported,
             result.Kind);
-        Assert.True(result.IsSuccessful);
     }
 
     [Theory]
@@ -37,7 +36,6 @@ public class StandaloneTaskbarBrokerProtocolTests
             2);
 
         Assert.Equal((StandaloneTaskbarBrokerResultKind)expected, result.Kind);
-        Assert.False(result.IsSuccessful);
     }
 
     [Fact]
@@ -68,7 +66,6 @@ public class StandaloneTaskbarBrokerProtocolTests
             Assert.Equal(
                 StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified,
                 result.Kind);
-            Assert.True(result.IsSuccessful);
         }
     }
 
@@ -85,7 +82,6 @@ public class StandaloneTaskbarBrokerProtocolTests
             Assert.Equal(
                 StandaloneTaskbarBrokerResultKind.ControllerInactive,
                 result.Kind);
-            Assert.True(result.IsSuccessful);
         }
     }
 

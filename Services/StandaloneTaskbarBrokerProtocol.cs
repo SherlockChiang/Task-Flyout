@@ -32,13 +32,7 @@ internal enum StandaloneTaskbarBrokerCommand
 }
 
 internal readonly record struct StandaloneTaskbarBrokerResult(
-    StandaloneTaskbarBrokerResultKind Kind)
-{
-    public bool IsSuccessful
-        => Kind is StandaloneTaskbarBrokerResultKind.ProbeSupported
-            or StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified
-            or StandaloneTaskbarBrokerResultKind.ControllerInactive;
-}
+    StandaloneTaskbarBrokerResultKind Kind);
 
 /// <summary>
 /// Parses the one-line JSON contract emitted by TaskFlyout.TaskbarBroker.exe.
