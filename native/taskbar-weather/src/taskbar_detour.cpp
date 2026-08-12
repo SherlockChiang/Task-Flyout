@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <limits>
 
 namespace taskflyout::taskbar {
 namespace {
@@ -27,6 +28,10 @@ std::atomic<TaskbarDetourResult> g_lastResult{
 HostCompatibility g_compatibility = HostCompatibility::Unknown;
 std::atomic<std::int32_t> g_lastMinHookStatus{
     static_cast<std::int32_t>(MH_UNKNOWN)};
+std::atomic<std::uint64_t> g_entrySequence{0};
+std::atomic<std::uint64_t> g_customCallbackSequence{0};
+std::atomic<TaskbarDetourCallbackSkipReason> g_lastSkipReason{
+    TaskbarDetourCallbackSkipReason::None};
 DWORD g_bootstrapThreadId = 0;
 bool g_hostPinned = false;
 bool g_minHookInitialized = false;
@@ -172,6 +177,22 @@ void RecordResult(TaskbarDetourResult result) noexcept {
     g_lastResult.store(result, std::memory_order_release);
 }
 
+void AdvanceSequence(std::atomic<std::uint64_t>& sequence) noexcept {
+    std::uint64_t current = sequence.load(std::memory_order_relaxed);
+    while (current != std::numeric_limits<std::uint64_t>::max() &&
+           !sequence.compare_exchange_weak(
+               current,
+               current + 1,
+               std::memory_order_release,
+               std::memory_order_relaxed)) {
+    }
+}
+
+void RecordSkipReason(
+    const TaskbarDetourCallbackSkipReason reason) noexcept {
+    g_lastSkipReason.store(reason, std::memory_order_release);
+}
+
 TaskbarDetourResult Quarantine(
     TaskbarDetourResult result,
     MH_STATUS status = MH_UNKNOWN) noexcept {
@@ -206,6 +227,7 @@ bool PinHostModule() noexcept {
 }
 
 void WINAPI TaskbarFrameLayoutDetour(void* taskbarFrame) {
+    AdvanceSequence(g_entrySequence);
     ActiveCallbackLease callbackLease;
     DetourDepthGuard depthGuard;
 
@@ -215,29 +237,57 @@ void WINAPI TaskbarFrameLayoutDetour(void* taskbarFrame) {
         original(taskbarFrame);
     }
 
-    if (g_state.load(std::memory_order_acquire) ==
-        TaskbarDetourState::Active) {
-        const TaskbarFrameLayoutCallback callback =
-            g_callback.load(std::memory_order_acquire);
-        CustomUpdateGuard updateGuard;
-        if (callback && updateGuard) {
-            ActiveCustomCallbackLease customCallbackLease;
-            CurrentTaskbarFrameGuard frameGuard(taskbarFrame);
-            if (g_state.load(std::memory_order_acquire) ==
-                    TaskbarDetourState::Active &&
-                callback == g_callback.load(std::memory_order_acquire)) {
-                try {
-                    callback(taskbarFrame);
-                } catch (...) {
-                    g_callback.store(nullptr, std::memory_order_release);
-                    g_state.store(TaskbarDetourState::Quarantined,
-                                  std::memory_order_release);
-                    RecordResult(TaskbarDetourResult::CallbackFailed);
-                }
-            }
-        }
+    const TaskbarDetourState state =
+        g_state.load(std::memory_order_acquire);
+    const TaskbarFrameLayoutCallback callback =
+        g_callback.load(std::memory_order_acquire);
+    TaskbarDetourCallbackSkipReason skipReason =
+        ClassifyTaskbarDetourCallbackSkip(
+            state,
+            callback != nullptr,
+            false,
+            true);
+    if (skipReason != TaskbarDetourCallbackSkipReason::None) {
+        RecordSkipReason(skipReason);
+        return;
     }
 
+    CustomUpdateGuard updateGuard;
+    if (!updateGuard) {
+        RecordSkipReason(ClassifyTaskbarDetourCallbackSkip(
+            state,
+            true,
+            true,
+            true));
+        return;
+    }
+
+    ActiveCustomCallbackLease customCallbackLease;
+    CurrentTaskbarFrameGuard frameGuard(taskbarFrame);
+    const bool recheckPassed =
+        g_state.load(std::memory_order_acquire) ==
+            TaskbarDetourState::Active &&
+        callback == g_callback.load(std::memory_order_acquire);
+    skipReason = ClassifyTaskbarDetourCallbackSkip(
+        state,
+        true,
+        false,
+        recheckPassed);
+    if (skipReason != TaskbarDetourCallbackSkipReason::None) {
+        RecordSkipReason(skipReason);
+        return;
+    }
+
+    AdvanceSequence(g_customCallbackSequence);
+    RecordSkipReason(TaskbarDetourCallbackSkipReason::None);
+    try {
+        callback(taskbarFrame);
+    } catch (...) {
+        g_callback.store(nullptr, std::memory_order_release);
+        g_state.store(TaskbarDetourState::Quarantined,
+                      std::memory_order_release);
+        RecordResult(TaskbarDetourResult::CallbackFailed);
+    }
 }
 
 bool DrainActiveCallbacks() noexcept {
@@ -391,6 +441,26 @@ TaskbarDetourStopAction PlanTaskbarDetourStop(
             return TaskbarDetourStopAction::Busy;
     }
     return TaskbarDetourStopAction::Busy;
+}
+
+TaskbarDetourCallbackSkipReason ClassifyTaskbarDetourCallbackSkip(
+    const TaskbarDetourState state,
+    const bool callbackAvailable,
+    const bool reentrant,
+    const bool recheckPassed) noexcept {
+    if (state != TaskbarDetourState::Active) {
+        return TaskbarDetourCallbackSkipReason::Inactive;
+    }
+    if (!callbackAvailable) {
+        return TaskbarDetourCallbackSkipReason::CallbackUnavailable;
+    }
+    if (reentrant) {
+        return TaskbarDetourCallbackSkipReason::Reentrant;
+    }
+    if (!recheckPassed) {
+        return TaskbarDetourCallbackSkipReason::RecheckRace;
+    }
+    return TaskbarDetourCallbackSkipReason::None;
 }
 
 TaskbarDetourResult StartTaskbarFrameDetour(
@@ -666,6 +736,12 @@ TaskbarDetourSnapshot GetTaskbarDetourSnapshot() noexcept {
         : static_cast<std::uint32_t>(activeCustomCallbacks);
     snapshot.bootstrapThreadId = g_bootstrapThreadId;
     snapshot.hostPinned = g_hostPinned;
+    snapshot.entrySequence =
+        g_entrySequence.load(std::memory_order_acquire);
+    snapshot.customCallbackSequence =
+        g_customCallbackSequence.load(std::memory_order_acquire);
+    snapshot.lastSkipReason =
+        g_lastSkipReason.load(std::memory_order_acquire);
     return snapshot;
 }
 

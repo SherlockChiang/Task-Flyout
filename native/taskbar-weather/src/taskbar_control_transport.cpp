@@ -534,6 +534,16 @@ const wchar_t* HostControlDiagnosticName(
             return L"mounted-not-ready";
         case HostControlDiagnostic::MountReady:
             return L"mount-ready";
+        case HostControlDiagnostic::DetourTargetNotObserved:
+            return L"detour-target-not-observed";
+        case HostControlDiagnostic::DetourInactive:
+            return L"detour-inactive";
+        case HostControlDiagnostic::CallbackUnavailable:
+            return L"callback-unavailable";
+        case HostControlDiagnostic::CallbackReentrant:
+            return L"callback-reentrant";
+        case HostControlDiagnostic::CallbackRecheckRace:
+            return L"callback-recheck-race";
     }
     return L"invalid";
 }

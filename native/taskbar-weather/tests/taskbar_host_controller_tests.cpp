@@ -1,4 +1,5 @@
 #include "taskbar_host_controller.h"
+#include "taskbar_detour.h"
 #include "taskbar_mount_readiness_state.h"
 
 #include <cstdio>
@@ -122,6 +123,41 @@ int wmain() {
             TaskbarMountStatusDiagnostic(TaskbarMountStatus::Mounted) ==
                 HostControlDiagnostic::MountedNotReady,
         L"mount outcomes should map only to bounded diagnostics");
+
+    TaskbarDetourSnapshot detour;
+    detour.entrySequence = 41u;
+    detour.customCallbackSequence = 17u;
+    passed &= Expect(
+        EvaluateAwaitingLayoutDiagnostic(detour, 41u, 17u) ==
+            HostControlDiagnostic::DetourTargetNotObserved,
+        L"an unchanged detour sequence should report an unobserved target");
+    detour.entrySequence = 42u;
+    detour.lastSkipReason = TaskbarDetourCallbackSkipReason::Inactive;
+    passed &= Expect(
+        EvaluateAwaitingLayoutDiagnostic(detour, 41u, 17u) ==
+            HostControlDiagnostic::DetourInactive,
+        L"an inactive detour skip should retain its fixed reason");
+    detour.lastSkipReason =
+        TaskbarDetourCallbackSkipReason::CallbackUnavailable;
+    passed &= Expect(
+        EvaluateAwaitingLayoutDiagnostic(detour, 41u, 17u) ==
+            HostControlDiagnostic::CallbackUnavailable,
+        L"a missing callback should retain its fixed reason");
+    detour.lastSkipReason = TaskbarDetourCallbackSkipReason::Reentrant;
+    passed &= Expect(
+        EvaluateAwaitingLayoutDiagnostic(detour, 41u, 17u) ==
+            HostControlDiagnostic::CallbackReentrant,
+        L"a reentrant callback skip should retain its fixed reason");
+    detour.lastSkipReason = TaskbarDetourCallbackSkipReason::RecheckRace;
+    passed &= Expect(
+        EvaluateAwaitingLayoutDiagnostic(detour, 41u, 17u) ==
+            HostControlDiagnostic::CallbackRecheckRace,
+        L"a callback recheck race should retain its fixed reason");
+    detour.customCallbackSequence = 18u;
+    passed &= Expect(
+        EvaluateAwaitingLayoutDiagnostic(detour, 41u, 17u) ==
+            HostControlDiagnostic::MountedNotReady,
+        L"an observed custom callback should leave initial-layout diagnosis");
 
     passed &= Expect(
         IsTaskbarMountObservationFresh(true, 100u, 112u, 12u),

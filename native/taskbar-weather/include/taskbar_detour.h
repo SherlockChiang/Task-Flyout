@@ -49,6 +49,14 @@ enum class TaskbarDetourStopAction : std::uint32_t {
     RestoreOnly = 4,
 };
 
+enum class TaskbarDetourCallbackSkipReason : std::uint32_t {
+    None = 0,
+    Inactive = 1,
+    CallbackUnavailable = 2,
+    Reentrant = 3,
+    RecheckRace = 4,
+};
+
 struct TaskbarDetourSnapshot {
     TaskbarDetourState state = TaskbarDetourState::Dormant;
     TaskbarDetourResult lastResult =
@@ -59,6 +67,10 @@ struct TaskbarDetourSnapshot {
     std::uint32_t activeCustomCallbacks = 0;
     DWORD bootstrapThreadId = 0;
     bool hostPinned = false;
+    std::uint64_t entrySequence = 0;
+    std::uint64_t customCallbackSequence = 0;
+    TaskbarDetourCallbackSkipReason lastSkipReason =
+        TaskbarDetourCallbackSkipReason::None;
 };
 
 // Implementations must validate that the TaskbarFrame dispatcher has thread
@@ -75,6 +87,12 @@ TaskbarDetourResult StopTaskbarFrameDetour(
 TaskbarDetourStopAction PlanTaskbarDetourStop(
     TaskbarDetourState state,
     bool onBootstrapThread) noexcept;
+
+TaskbarDetourCallbackSkipReason ClassifyTaskbarDetourCallbackSkip(
+    TaskbarDetourState state,
+    bool callbackAvailable,
+    bool reentrant,
+    bool recheckPassed) noexcept;
 
 TaskbarDetourSnapshot GetTaskbarDetourSnapshot() noexcept;
 

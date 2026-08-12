@@ -9,6 +9,8 @@
 
 namespace taskflyout::taskbar {
 
+struct TaskbarDetourSnapshot;
+
 enum class TaskbarHostFrameAction : std::uint32_t {
     NoChange = 0,
     MountOrUpdate = 1,
@@ -35,6 +37,11 @@ HostControlDiagnostic EvaluateTaskbarHostFrameDiagnostic(
 
 HostControlDiagnostic TaskbarMountStatusDiagnostic(
     TaskbarMountStatus status) noexcept;
+
+HostControlDiagnostic EvaluateAwaitingLayoutDiagnostic(
+    const TaskbarDetourSnapshot& detour,
+    std::uint64_t startEntrySequence,
+    std::uint64_t startCustomCallbackSequence) noexcept;
 
 enum class TaskbarHostControllerResult : std::uint32_t {
     Started = 0,

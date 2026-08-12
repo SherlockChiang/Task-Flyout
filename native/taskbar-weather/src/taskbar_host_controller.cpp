@@ -37,6 +37,8 @@ struct TaskbarHostRuntime {
         TaskbarHostControllerResult::NotStarted};
     std::atomic<HostControlDiagnostic> diagnostic{
         HostControlDiagnostic::None};
+    std::atomic<std::uint64_t> startEntrySequence{0};
+    std::atomic<std::uint64_t> startCustomCallbackSequence{0};
 };
 
 TaskbarHostRuntime& Runtime() {
@@ -47,6 +49,15 @@ TaskbarHostRuntime& Runtime() {
 void PublishControllerDiagnostic(
     const HostControlDiagnostic diagnostic) noexcept {
     Runtime().diagnostic.store(diagnostic, std::memory_order_release);
+}
+
+void PublishAwaitingLayoutIfNoDiagnostic() noexcept {
+    HostControlDiagnostic expected = HostControlDiagnostic::None;
+    (void)Runtime().diagnostic.compare_exchange_strong(
+        expected,
+        HostControlDiagnostic::AwaitingLayout,
+        std::memory_order_acq_rel,
+        std::memory_order_acquire);
 }
 
 HostControlDiagnostic LoadControllerDiagnostic() noexcept {
@@ -921,9 +932,34 @@ HostControlDiagnostic TaskbarMountStatusDiagnostic(
     return HostControlDiagnostic::MountedNotReady;
 }
 
+HostControlDiagnostic EvaluateAwaitingLayoutDiagnostic(
+    const TaskbarDetourSnapshot& detour,
+    const std::uint64_t startEntrySequence,
+    const std::uint64_t startCustomCallbackSequence) noexcept {
+    if (detour.entrySequence == startEntrySequence) {
+        return HostControlDiagnostic::DetourTargetNotObserved;
+    }
+    if (detour.customCallbackSequence != startCustomCallbackSequence) {
+        return HostControlDiagnostic::MountedNotReady;
+    }
+
+    switch (detour.lastSkipReason) {
+        case TaskbarDetourCallbackSkipReason::None:
+            return HostControlDiagnostic::MountedNotReady;
+        case TaskbarDetourCallbackSkipReason::Inactive:
+            return HostControlDiagnostic::DetourInactive;
+        case TaskbarDetourCallbackSkipReason::CallbackUnavailable:
+            return HostControlDiagnostic::CallbackUnavailable;
+        case TaskbarDetourCallbackSkipReason::Reentrant:
+            return HostControlDiagnostic::CallbackReentrant;
+        case TaskbarDetourCallbackSkipReason::RecheckRace:
+            return HostControlDiagnostic::CallbackRecheckRace;
+    }
+    return HostControlDiagnostic::MountedNotReady;
+}
+
 TaskbarHostControllerResult StartTaskbarWeatherController(
     const std::uint32_t controllerNonce) noexcept {
-    PublishControllerDiagnostic(HostControlDiagnostic::None);
     if (controllerNonce == 0) {
         Runtime().lastResult.store(
             TaskbarHostControllerResult::StartRejected,
@@ -935,6 +971,20 @@ TaskbarHostControllerResult StartTaskbarWeatherController(
     // state. Publish the new nonce only after both are known to be active, so
     // an in-flight worker can never pair it with the previous mount snapshot.
     ResetMountReadinessSession(0);
+    const TaskbarDetourSnapshot startBaseline = GetTaskbarDetourSnapshot();
+    if (startBaseline.state == TaskbarDetourState::Dormant ||
+        startBaseline.state == TaskbarDetourState::Removed) {
+        // A genuinely fresh install must not inherit a diagnostic from a
+        // previous rejected lifecycle. An already-active retry, however,
+        // keeps the concrete diagnosis produced by its live callback.
+        PublishControllerDiagnostic(HostControlDiagnostic::None);
+    }
+    Runtime().startEntrySequence.store(
+        startBaseline.entrySequence,
+        std::memory_order_release);
+    Runtime().startCustomCallbackSequence.store(
+        startBaseline.customCallbackSequence,
+        std::memory_order_release);
     const TaskbarDetourResult detourResult =
         StartTaskbarFrameDetour(&OnTaskbarFrameLayout);
     TaskbarHostControllerResult result = MapStartResult(detourResult);
@@ -954,8 +1004,11 @@ TaskbarHostControllerResult StartTaskbarWeatherController(
     if (result == TaskbarHostControllerResult::Started ||
         result == TaskbarHostControllerResult::AlreadyStarted) {
         ResetMountReadinessSession(controllerNonce);
-        PublishControllerDiagnostic(
-            HostControlDiagnostic::AwaitingLayout);
+        // A secondary taskbar thread can enter the process-wide detour while
+        // this primary owner-thread start is still completing. Preserve any
+        // concrete callback diagnostic it publishes instead of replacing it
+        // with the initial sentinel after the fact.
+        PublishAwaitingLayoutIfNoDiagnostic();
         SignalMountReadinessWorker();
         RequestTaskbarRelayout();
     }
@@ -1031,7 +1084,13 @@ QueryTaskbarWeatherControllerStatusSnapshot() noexcept {
     RequestTaskbarRelayout();
     SignalMountReadinessWorker();
     HostControlDiagnostic diagnostic = LoadControllerDiagnostic();
-    if (diagnostic == HostControlDiagnostic::None ||
+    if (diagnostic == HostControlDiagnostic::AwaitingLayout) {
+        diagnostic = EvaluateAwaitingLayoutDiagnostic(
+            detour,
+            runtime.startEntrySequence.load(std::memory_order_acquire),
+            runtime.startCustomCallbackSequence.load(
+                std::memory_order_acquire));
+    } else if (diagnostic == HostControlDiagnostic::None ||
         diagnostic == HostControlDiagnostic::MountReady) {
         diagnostic = HostControlDiagnostic::MountedNotReady;
         PublishControllerDiagnostic(diagnostic);

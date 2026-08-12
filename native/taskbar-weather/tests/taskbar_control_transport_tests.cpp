@@ -19,6 +19,19 @@ int wmain() {
     using namespace taskflyout::taskbar;
 
     bool passed = true;
+    passed &= Expect(
+        kHostApiVersion == 6u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::DetourTargetNotObserved) == 12u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::DetourInactive) == 13u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::CallbackUnavailable) == 14u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::CallbackReentrant) == 15u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::CallbackRecheckRace) == 16u,
+        L"host API and additive diagnostic values must remain protocol-stable");
     constexpr std::uint32_t nonce = 0xA17E52C3u;
     constexpr auto encodedStart = EncodeHostControlRequest(
         HostControlCommand::Start,
@@ -171,6 +184,20 @@ int wmain() {
                 L"mount-append-failed" &&
         std::wstring_view(HostControlDiagnosticName(
             HostControlDiagnostic::MountReady)) == L"mount-ready" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::DetourTargetNotObserved)) ==
+                L"detour-target-not-observed" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::DetourInactive)) == L"detour-inactive" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::CallbackUnavailable)) ==
+                L"callback-unavailable" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::CallbackReentrant)) ==
+                L"callback-reentrant" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::CallbackRecheckRace)) ==
+                L"callback-recheck-race" &&
         std::wstring_view(HostControlDiagnosticName(
             static_cast<HostControlDiagnostic>(0xFFFFFFFFu))) == L"invalid",
         L"controller diagnostic names should be stable and bounded");

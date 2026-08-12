@@ -957,3 +957,23 @@ transport foundation for the standalone host.
   `not-started` with diagnostic `none`. The Host remains pinned by design until
   Explorer exits, so any rebuilt diagnostic Host requires another fresh
   disposable Explorer restart before live use. M3-07/M3-08 remain in progress.
+
+### 2026-08-12 Bounded Detour Activity Telemetry
+
+- Host API version 6 adds only fixed, privacy-safe controller diagnostics for
+  an unobserved detour target, an inactive detour, an unavailable callback, a
+  reentrant callback, and a final callback-gate race. The Host records monotonic
+  saturating detour-entry and custom-callback sequences plus one fixed skip
+  reason; no pointer, XAML name, exception text, or free-form Explorer state is
+  exposed.
+- Start now captures its detour sequence baseline before installation and uses
+  compare/exchange for the initial `awaiting-layout` sentinel, so a concrete
+  callback diagnosis cannot be overwritten by a later startup write. A fresh
+  `Dormant`/`Removed` lifecycle clears stale diagnostics, while an
+  `AlreadyActive` retry preserves the current live diagnosis.
+- The API v6 Release build is isolated in
+  `.testbuild/native-taskbar-weather-v6` because Explorer still pins the prior
+  v5 Host path. Native tests pass 12/12 and the build script's WebView/browser/
+  network import gate passes for both Broker and Host. The new artifacts still
+  require current-user signing and a fresh disposable Explorer restart before
+  live diagnosis; M3-07/M3-08 remain in progress.

@@ -21,7 +21,59 @@ bool Expect(bool condition, const wchar_t* message) {
 }  // namespace
 
 int wmain() {
+    using taskflyout::taskbar::ClassifyTaskbarDetourCallbackSkip;
+    using taskflyout::taskbar::TaskbarDetourCallbackSkipReason;
+    using taskflyout::taskbar::TaskbarDetourState;
+
     bool passed = true;
+    passed &= Expect(
+        static_cast<std::uint32_t>(
+            TaskbarDetourCallbackSkipReason::None) == 0 &&
+            static_cast<std::uint32_t>(
+                TaskbarDetourCallbackSkipReason::Inactive) == 1 &&
+            static_cast<std::uint32_t>(
+                TaskbarDetourCallbackSkipReason::CallbackUnavailable) == 2 &&
+            static_cast<std::uint32_t>(
+                TaskbarDetourCallbackSkipReason::Reentrant) == 3 &&
+            static_cast<std::uint32_t>(
+                TaskbarDetourCallbackSkipReason::RecheckRace) == 4,
+        L"detour callback skip reasons must remain fixed POD values");
+    passed &= Expect(
+        ClassifyTaskbarDetourCallbackSkip(
+            TaskbarDetourState::Dormant,
+            false,
+            true,
+            false) == TaskbarDetourCallbackSkipReason::Inactive,
+        L"inactive detour must take precedence over later callback gates");
+    passed &= Expect(
+        ClassifyTaskbarDetourCallbackSkip(
+            TaskbarDetourState::Active,
+            false,
+            true,
+            false) ==
+            TaskbarDetourCallbackSkipReason::CallbackUnavailable,
+        L"missing callback must take precedence over reentrancy");
+    passed &= Expect(
+        ClassifyTaskbarDetourCallbackSkip(
+            TaskbarDetourState::Active,
+            true,
+            true,
+            false) == TaskbarDetourCallbackSkipReason::Reentrant,
+        L"reentrant callbacks must be classified before the final recheck");
+    passed &= Expect(
+        ClassifyTaskbarDetourCallbackSkip(
+            TaskbarDetourState::Active,
+            true,
+            false,
+            false) == TaskbarDetourCallbackSkipReason::RecheckRace,
+        L"a changed callback gate must be classified as a recheck race");
+    passed &= Expect(
+        ClassifyTaskbarDetourCallbackSkip(
+            TaskbarDetourState::Active,
+            true,
+            false,
+            true) == TaskbarDetourCallbackSkipReason::None,
+        L"a fully open callback gate must not report a skip");
     passed &= Expect(
         taskflyout::taskbar::PlanTaskbarDetourStop(
             taskflyout::taskbar::TaskbarDetourState::Quarantined,
@@ -43,6 +95,12 @@ int wmain() {
     passed &= Expect(
         initial.state == taskflyout::taskbar::TaskbarDetourState::Dormant,
         L"detour runtime should start dormant");
+    passed &= Expect(
+        initial.entrySequence == 0 &&
+            initial.customCallbackSequence == 0 &&
+            initial.lastSkipReason ==
+                TaskbarDetourCallbackSkipReason::None,
+        L"detour callback telemetry should start empty");
     passed &= Expect(
         taskflyout::taskbar::StartTaskbarFrameDetour(nullptr) ==
             taskflyout::taskbar::TaskbarDetourResult::InvalidCallback,

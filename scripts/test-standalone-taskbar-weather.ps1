@@ -46,7 +46,12 @@ $knownControllerDiagnostics = @(
     'mount-append-failed',
     'mount-restore-failed',
     'mounted-not-ready',
-    'mount-ready')
+    'mount-ready',
+    'detour-target-not-observed',
+    'detour-inactive',
+    'callback-unavailable',
+    'callback-reentrant',
+    'callback-recheck-race')
 
 if ($DescribeOnly) {
     [pscustomobject]@{

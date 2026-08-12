@@ -119,15 +119,22 @@ public class StandaloneTaskbarBrokerProtocolTests
         Assert.Equal((StandaloneTaskbarBrokerResultKind)expected, result.Kind);
     }
 
-    [Fact]
-    public void Additive_controller_diagnostic_preserves_older_parser_behavior()
+    [Theory]
+    [InlineData("tree-profile-mismatch")]
+    [InlineData("detour-target-not-observed")]
+    [InlineData("detour-inactive")]
+    [InlineData("callback-unavailable")]
+    [InlineData("callback-reentrant")]
+    [InlineData("callback-recheck-race")]
+    public void Additive_controller_diagnostic_preserves_older_parser_behavior(
+        string controllerDiagnostic)
     {
         var result = StandaloneTaskbarBrokerProtocol.ParseControl(
             StandaloneTaskbarBrokerCommand.Status,
             ControlJson("acknowledged", "status", "mount-pending")
                 .Replace(
                     "\"probeStatus\"",
-                    "\"controllerDiagnostic\":\"tree-profile-mismatch\"," +
+                    $"\"controllerDiagnostic\":\"{controllerDiagnostic}\"," +
                     "\"probeStatus\"",
                     StringComparison.Ordinal),
             0);
