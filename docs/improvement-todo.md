@@ -143,7 +143,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M3-05 | IN PROGRESS | Architecture/Security | Replace the Windhawk runtime dependency with a standalone per-user taskbar broker and Explorer host. | The x64 broker and host build without Windhawk or WebView libraries; exact OS and `Taskbar.View.dll` fingerprints gate all private ABI use; unsupported systems fail closed before Explorer memory or XAML is changed. | `feat(taskbar): scaffold standalone weather host` |
 | M3-06 | IN PROGRESS | UI/Compatibility | Inject an independent pure-XAML weather button into the Windows 11 taskbar. | The host uses standard `Windows.UI.Xaml` controls and taskbar theme resources, does not require the Windows Widgets entry, reserves a bounded left-side slot, and restores the original XAML tree on disable or unload. | `feat(taskbar): add pure xaml weather view`, `feat(taskbar): inject native xaml weather button` |
 | M3-07 | IN PROGRESS | Integration/UI | Connect the standalone host to Task Flyout weather, activation, settings, and diagnostics. | The existing bounded per-user IPC supplies sanitized immutable snapshots; click opens Task Flyout Weather; a localized experimental switch and privacy-safe diagnostics expose active, unsupported, fallback, and recovery states. | `feat(taskbar): consume weather snapshot pipe`, `feat(taskbar): activate weather button`, `feat(taskbar): acknowledge host control`, `feat(weatherbar): add standalone mode policy`, `feat(taskbar): parse standalone broker responses`, `fix(taskbar): emit broker output as utf8`, `feat(taskbar): add bounded broker client`, `feat(taskbar): define standalone lifecycle states`, `feat(taskbar): coordinate standalone lifecycle`, `feat(taskbar): wire standalone app lifecycle`, `feat(taskbar): own widgets suppression safely`, `feat(taskbar): suppress native widgets for standalone`, `feat(weatherbar): expose standalone taskbar controls`, `feat(taskbar): expose mount readiness`, `feat(taskbar): parse mount status responses`, `feat(taskbar): hand off fallback after mount proof`, `feat(taskbar): authenticate mount lease reports`, `feat(taskbar): renew mount readiness lease`, `refactor(taskbar): isolate mount readiness state`, `test(taskbar): cover mount lease reducer edges`, `diagnostics(taskbar): expose mount pending reasons` |
-| M3-08 | IN PROGRESS | Verification/Distribution | Validate and package the standalone taskbar component. | Compile/import checks prove the native binaries have no WebView dependency; a disposable Explorer session covers enable/disable, crash recovery, DPI, auto-hide, theme, multi-monitor, Explorer restart, unsupported binaries, signed packaging, and rollback before default exposure. | `build(taskbar): stage standalone native artifacts`, `test(taskbar): gate disposable explorer validation`, `test(taskbar): validate standalone weather injection` |
+| M3-08 | IN PROGRESS | Verification/Distribution | Validate and package the standalone taskbar component. | Compile/import checks prove the native binaries have no WebView dependency; a disposable Explorer session covers enable/disable, crash recovery, DPI, auto-hide, theme, multi-monitor, Explorer restart, unsupported binaries, signed packaging, and rollback before default exposure. | `build(taskbar): stage standalone native artifacts`, `test(taskbar): gate disposable explorer validation`, `test(taskbar): validate standalone weather injection`, `build(taskbar): recover missing local signing key` |
 
 M3-05 through M3-08 supersede the Windhawk runtime/package work in M3-03.
 M3-03 remains as historical POC scope and must not be installed or enabled. The
@@ -917,5 +917,21 @@ transport foundation for the standalone host.
   network imports absent. The complete .NET suite passes 1104/1104, the Debug
   x64 app build has zero warnings/errors, and both PowerShell implementations
   pass the harness's non-mutating path. The newly built API v5 binaries still
-  require signing with the existing certificate and a fresh disposable
+  require signing with a usable current-user certificate and a fresh disposable
   Explorer restart before live diagnosis; M3-07/M3-08 remain in progress.
+
+### 2026-08-12 Local Signing Key Recovery
+
+- Native signing now verifies that a matching certificate's RSA private key is
+  actually accessible instead of trusting the store's `HasPrivateKey` marker.
+  A broken or foreign-profile key association therefore remains fail-closed.
+- The default behavior still refuses to replace a missing key. An explicit
+  `-CreateAndTrustCertificateIfMissing` switch creates a new non-exportable
+  code-signing certificate with the unchanged manifest Publisher and trusts it
+  only in the current user's `TrustedPeople` and `Root` stores. It cannot be
+  combined with a requested thumbprint, because a new key can never reproduce
+  an old certificate thumbprint.
+- PowerShell 7 and Windows PowerShell parse the script and reject the conflicting
+  switch combination before reading binaries or changing a certificate store.
+  Actual certificate creation and API v5 binary signing remain an explicit
+  interactive-user action before disposable Explorer validation resumes.
