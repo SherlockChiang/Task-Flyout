@@ -214,7 +214,7 @@ AcknowledgementWaitStatus WaitForControlAcknowledgement(
     const HWND window,
     const UINT messageId,
     const std::uint32_t nonce,
-    HostControlAcknowledgement& acknowledgement,
+    HostControlAcknowledgementEnvelope& acknowledgement,
     DWORD& waitError) noexcept {
     const ULONGLONG deadline =
         GetTickCount64() + kAcknowledgementTimeoutMilliseconds;
@@ -229,8 +229,8 @@ AcknowledgementWaitStatus WaitForControlAcknowledgement(
             if (static_cast<std::uint32_t>(message.wParam) != nonce) {
                 continue;
             }
-            acknowledgement = static_cast<HostControlAcknowledgement>(
-                static_cast<std::uint32_t>(message.lParam));
+            acknowledgement = DecodeHostControlAcknowledgement(
+                static_cast<std::uintptr_t>(message.lParam));
             return AcknowledgementWaitStatus::Received;
         }
 
@@ -400,12 +400,13 @@ HostControlDispatchResult DispatchHostControl(
     }
 
     DWORD acknowledgementWaitError = ERROR_SUCCESS;
+    HostControlAcknowledgementEnvelope acknowledgement;
     const AcknowledgementWaitStatus acknowledgementWait =
         WaitForControlAcknowledgement(
             acknowledgementWindow.get(),
             acknowledgementMessage,
             nonce,
-            result.acknowledgement,
+            acknowledgement,
             acknowledgementWaitError);
     if (acknowledgementWait == AcknowledgementWaitStatus::TimedOut) {
         result.status = HostControlDispatchStatus::AcknowledgementTimedOut;
@@ -420,6 +421,8 @@ HostControlDispatchResult DispatchHostControl(
             acknowledgementWaitError);
         return result;
     }
+    result.acknowledgement = acknowledgement.acknowledgement;
+    result.diagnostic = acknowledgement.diagnostic;
     result.status = EvaluateHostControlAcknowledgement(
         command,
         result.acknowledgement);
@@ -500,6 +503,37 @@ const wchar_t* HostControlAcknowledgementName(
             return L"mount-pending";
         case HostControlAcknowledgement::StatusRejected:
             return L"status-rejected";
+    }
+    return L"invalid";
+}
+
+const wchar_t* HostControlDiagnosticName(
+    const HostControlDiagnostic diagnostic) noexcept {
+    switch (diagnostic) {
+        case HostControlDiagnostic::None:
+            return L"none";
+        case HostControlDiagnostic::AwaitingLayout:
+            return L"awaiting-layout";
+        case HostControlDiagnostic::BridgeUnresolved:
+            return L"bridge-unresolved";
+        case HostControlDiagnostic::TreeProfileMismatch:
+            return L"tree-profile-mismatch";
+        case HostControlDiagnostic::LeaseUnavailable:
+            return L"lease-unavailable";
+        case HostControlDiagnostic::SlotStructureConflict:
+            return L"slot-structure-conflict";
+        case HostControlDiagnostic::SlotGeometryConflict:
+            return L"slot-geometry-conflict";
+        case HostControlDiagnostic::MountViewFailed:
+            return L"mount-view-failed";
+        case HostControlDiagnostic::MountAppendFailed:
+            return L"mount-append-failed";
+        case HostControlDiagnostic::MountRestoreFailed:
+            return L"mount-restore-failed";
+        case HostControlDiagnostic::MountedNotReady:
+            return L"mounted-not-ready";
+        case HostControlDiagnostic::MountReady:
+            return L"mount-ready";
     }
     return L"invalid";
 }

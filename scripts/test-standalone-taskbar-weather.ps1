@@ -34,6 +34,19 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $requiredConfirmation = 'TASK_FLYOUT_DISPOSABLE_EXPLORER_SESSION'
+$knownControllerDiagnostics = @(
+    'none',
+    'awaiting-layout',
+    'bridge-unresolved',
+    'tree-profile-mismatch',
+    'lease-unavailable',
+    'slot-structure-conflict',
+    'slot-geometry-conflict',
+    'mount-view-failed',
+    'mount-append-failed',
+    'mount-restore-failed',
+    'mounted-not-ready',
+    'mount-ready')
 
 if ($DescribeOnly) {
     [pscustomobject]@{
@@ -181,7 +194,8 @@ function Assert-ControlResult {
         'status',
         'command',
         'processId',
-        'controllerStatus')
+        'controllerStatus',
+        'controllerDiagnostic')
     if ($Result.ExitCode -ne 0 -or
         $Result.Payload.status -cne 'acknowledged' -or
         $Result.Payload.command -cne $Command) {
@@ -190,6 +204,10 @@ function Assert-ControlResult {
     if ($AllowedControllerStatus -notcontains
         [string]$Result.Payload.controllerStatus) {
         throw "Broker '$Command' returned an unexpected controller state."
+    }
+    if ($knownControllerDiagnostics -cnotcontains
+        [string]$Result.Payload.controllerDiagnostic) {
+        throw "Broker '$Command' returned an unknown controller diagnostic."
     }
     if ($ExpectedProcessId -ne 0 -and
         [uint32]$Result.Payload.processId -ne $ExpectedProcessId) {
@@ -285,10 +303,13 @@ try {
     $readyDeadline = [DateTimeOffset]::UtcNow.AddSeconds(
         $ReadyTimeoutSeconds)
     $mountReady = $false
+    $lastControllerDiagnostic = 'unknown'
     do {
         $status = Invoke-VerifiedStatus `
             -ExpectedProcessId $explorerProcessId `
             -AllowedControllerStatus @('mount-ready', 'mount-pending')
+        $lastControllerDiagnostic =
+            [string]$status.Payload.controllerDiagnostic
         if ($status.Payload.controllerStatus -ceq 'mount-ready') {
             $mountReady = $true
             break
@@ -296,7 +317,10 @@ try {
         Start-Sleep -Milliseconds 500
     } while ([DateTimeOffset]::UtcNow -lt $readyDeadline)
     if (-not $mountReady) {
-        throw "The native weather button did not become mount-ready in $ReadyTimeoutSeconds seconds."
+        throw (
+            "The native weather button did not become mount-ready in " +
+            "$ReadyTimeoutSeconds seconds. Last controller diagnostic: " +
+            "$lastControllerDiagnostic.")
     }
 
     if ($ReadyHoldSeconds -gt 0) {

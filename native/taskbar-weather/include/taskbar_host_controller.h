@@ -1,6 +1,7 @@
 #pragma once
 
 #include "taskbar_frame_bridge.h"
+#include "taskbar_host_contract.h"
 #include "taskbar_slot_probe.h"
 #include "taskbar_weather_mount.h"
 
@@ -29,6 +30,12 @@ struct TaskbarHostFrameDecisionInput {
 TaskbarHostFrameAction EvaluateTaskbarHostFrameAction(
     const TaskbarHostFrameDecisionInput& input) noexcept;
 
+HostControlDiagnostic EvaluateTaskbarHostFrameDiagnostic(
+    const TaskbarHostFrameDecisionInput& input) noexcept;
+
+HostControlDiagnostic TaskbarMountStatusDiagnostic(
+    TaskbarMountStatus status) noexcept;
+
 enum class TaskbarHostControllerResult : std::uint32_t {
     Started = 0,
     AlreadyStarted = 1,
@@ -41,6 +48,12 @@ enum class TaskbarHostControllerResult : std::uint32_t {
     StatusRejected = 8,
 };
 
+struct TaskbarHostControllerStatusSnapshot {
+    TaskbarHostControllerResult result =
+        TaskbarHostControllerResult::NotStarted;
+    HostControlDiagnostic diagnostic = HostControlDiagnostic::None;
+};
+
 // These functions must be called from the primary taskbar owner thread. The
 // controller is activated only by the exported WH_CALLWNDPROC entry hook's
 // private control message; loading the DLL alone remains inert.
@@ -48,6 +61,10 @@ TaskbarHostControllerResult StartTaskbarWeatherController(
     std::uint32_t controllerNonce) noexcept;
 TaskbarHostControllerResult StopTaskbarWeatherController() noexcept;
 TaskbarHostControllerResult QueryTaskbarWeatherControllerStatus() noexcept;
+TaskbarHostControllerStatusSnapshot
+QueryTaskbarWeatherControllerStatusSnapshot() noexcept;
+
+HostControlDiagnostic CurrentTaskbarWeatherControllerDiagnostic() noexcept;
 
 const wchar_t* TaskbarHostControllerResultName(
     TaskbarHostControllerResult result) noexcept;

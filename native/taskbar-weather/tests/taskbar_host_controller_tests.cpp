@@ -70,6 +70,59 @@ int wmain() {
             TaskbarHostFrameAction::NoChange,
         L"an unresolved private pointer cannot identify a lease to restore");
 
+    input = ValidDecision();
+    passed &= Expect(
+        EvaluateTaskbarHostFrameDiagnostic(input) ==
+            HostControlDiagnostic::MountedNotReady,
+        L"a validated frame should proceed to live mount readiness");
+    input.bridgeStatus = TaskbarFrameBridgeStatus::ProjectionFailed;
+    passed &= Expect(
+        EvaluateTaskbarHostFrameDiagnostic(input) ==
+            HostControlDiagnostic::BridgeUnresolved,
+        L"an unresolved bridge should have a fixed diagnostic");
+    input = ValidDecision();
+    input.treeStatus = TaskbarTreeProbeStatus::RootGridDuplicate;
+    passed &= Expect(
+        EvaluateTaskbarHostFrameDiagnostic(input) ==
+            HostControlDiagnostic::TreeProfileMismatch,
+        L"a changed tree profile should have a fixed diagnostic");
+    input = ValidDecision();
+    input.slotProbeStatus = TaskbarSlotProbeStatus::RootStructureMismatch;
+    passed &= Expect(
+        EvaluateTaskbarHostFrameDiagnostic(input) ==
+            HostControlDiagnostic::SlotStructureConflict,
+        L"a rejected slot structure should have a fixed diagnostic");
+    input = ValidDecision();
+    input.slotProbeStatus = TaskbarSlotProbeStatus::TreeNotReady;
+    passed &= Expect(
+        EvaluateTaskbarHostFrameDiagnostic(input) ==
+            HostControlDiagnostic::TreeProfileMismatch,
+        L"a slot probe without a current tree should retain the tree cause");
+    input = ValidDecision();
+    input.slotProbeStatus =
+        TaskbarSlotProbeStatus::RepeaterChildTransformInvalid;
+    passed &= Expect(
+        EvaluateTaskbarHostFrameDiagnostic(input) ==
+            HostControlDiagnostic::SlotGeometryConflict,
+        L"an invalid slot transform should retain the geometry cause");
+    input = ValidDecision();
+    input.geometryStatus = TaskbarSlotGeometryStatus::CandidateConflicted;
+    passed &= Expect(
+        EvaluateTaskbarHostFrameDiagnostic(input) ==
+            HostControlDiagnostic::SlotGeometryConflict,
+        L"a blocked slot geometry should have a fixed diagnostic");
+    passed &= Expect(
+        TaskbarMountStatusDiagnostic(
+            TaskbarMountStatus::ViewCreationFailed) ==
+                HostControlDiagnostic::MountViewFailed &&
+            TaskbarMountStatusDiagnostic(TaskbarMountStatus::AppendFailed) ==
+                HostControlDiagnostic::MountAppendFailed &&
+            TaskbarMountStatusDiagnostic(TaskbarMountStatus::RestoreFailed) ==
+                HostControlDiagnostic::MountRestoreFailed &&
+            TaskbarMountStatusDiagnostic(TaskbarMountStatus::Mounted) ==
+                HostControlDiagnostic::MountedNotReady,
+        L"mount outcomes should map only to bounded diagnostics");
+
     passed &= Expect(
         IsTaskbarMountObservationFresh(true, 100u, 112u, 12u),
         L"a ready observation remains fresh at the lease boundary");

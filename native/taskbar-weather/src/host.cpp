@@ -104,19 +104,28 @@ TaskFlyoutTaskbarHost_EntryHook(
                 if (request.nonce != 0 && acknowledgementMessage != 0 &&
                     IsSameSessionReplyWindow(acknowledgementWindow)) {
                     using taskflyout::taskbar::HostControlCommand;
+                    using taskflyout::taskbar::HostControlDiagnostic;
                     using taskflyout::taskbar::TaskbarHostControllerResult;
                     TaskbarHostControllerResult result =
                         TaskbarHostControllerResult::StartRejected;
+                    HostControlDiagnostic diagnostic =
+                        HostControlDiagnostic::None;
                     bool handled = true;
                     if (request.command == HostControlCommand::Start) {
                         result = taskflyout::taskbar::
                             StartTaskbarWeatherController(request.nonce);
+                        diagnostic = taskflyout::taskbar::
+                            CurrentTaskbarWeatherControllerDiagnostic();
                     } else if (request.command == HostControlCommand::Stop) {
                         result = taskflyout::taskbar::
                             StopTaskbarWeatherController();
+                        diagnostic = taskflyout::taskbar::
+                            CurrentTaskbarWeatherControllerDiagnostic();
                     } else if (request.command == HostControlCommand::Status) {
-                        result = taskflyout::taskbar::
-                            QueryTaskbarWeatherControllerStatus();
+                        const auto status = taskflyout::taskbar::
+                            QueryTaskbarWeatherControllerStatusSnapshot();
+                        result = status.result;
+                        diagnostic = status.diagnostic;
                     } else {
                         handled = false;
                     }
@@ -125,7 +134,11 @@ TaskFlyoutTaskbarHost_EntryHook(
                             acknowledgementWindow,
                             acknowledgementMessage,
                             static_cast<WPARAM>(request.nonce),
-                            static_cast<LPARAM>(MapControllerResult(result)));
+                            static_cast<LPARAM>(
+                                taskflyout::taskbar::
+                                    EncodeHostControlAcknowledgement(
+                                        MapControllerResult(result),
+                                        diagnostic)));
                     }
                 }
             }

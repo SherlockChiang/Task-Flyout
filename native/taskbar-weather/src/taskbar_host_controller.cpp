@@ -35,11 +35,22 @@ struct TaskbarHostRuntime {
     std::array<TaskbarFrameLease, kMaxTaskbarFrameLeases> leases{};
     std::atomic<TaskbarHostControllerResult> lastResult{
         TaskbarHostControllerResult::NotStarted};
+    std::atomic<HostControlDiagnostic> diagnostic{
+        HostControlDiagnostic::None};
 };
 
 TaskbarHostRuntime& Runtime() {
     static TaskbarHostRuntime runtime;
     return runtime;
+}
+
+void PublishControllerDiagnostic(
+    const HostControlDiagnostic diagnostic) noexcept {
+    Runtime().diagnostic.store(diagnostic, std::memory_order_release);
+}
+
+HostControlDiagnostic LoadControllerDiagnostic() noexcept {
+    return Runtime().diagnostic.load(std::memory_order_acquire);
 }
 
 SRWLOCK g_weatherModelLock = SRWLOCK_INIT;
@@ -674,8 +685,16 @@ bool RefreshCurrentMountReadiness() noexcept {
 }
 
 struct MountReadinessRefreshScope final {
+    HostControlDiagnostic pendingDiagnostic =
+        HostControlDiagnostic::MountedNotReady;
+    bool preservePendingDiagnostic = false;
+
     ~MountReadinessRefreshScope() {
-        (void)RefreshCurrentMountReadiness();
+        const bool ready = RefreshCurrentMountReadiness();
+        PublishControllerDiagnostic(
+            ready && !preservePendingDiagnostic
+                ? HostControlDiagnostic::MountReady
+                : pendingDiagnostic);
     }
 };
 
@@ -689,6 +708,8 @@ void WINAPI OnTaskbarFrameLayout(void* privateTaskbarFrame) {
         ResolveTaskbarFrameFromPrivateAbi(privateTaskbarFrame);
     if (bridge.status != TaskbarFrameBridgeStatus::Resolved) {
         PublishMountReadinessObservation(false);
+        PublishControllerDiagnostic(
+            HostControlDiagnostic::BridgeUnresolved);
         return;
     }
     MountReadinessRefreshScope readinessRefresh;
@@ -697,6 +718,8 @@ void WINAPI OnTaskbarFrameLayout(void* privateTaskbarFrame) {
         ProbeTaskbarFrameTree(bridge.frame);
     TaskbarFrameLease* lease = FindOrCreateLease(bridge.frame);
     if (!lease) {
+        readinessRefresh.pendingDiagnostic =
+            HostControlDiagnostic::LeaseUnavailable;
         return;
     }
 
@@ -717,12 +740,22 @@ void WINAPI OnTaskbarFrameLayout(void* privateTaskbarFrame) {
             slot.status,
             slot.geometry.status,
             lease->mount.mounted});
+    readinessRefresh.pendingDiagnostic =
+        EvaluateTaskbarHostFrameDiagnostic({
+            bridge.status,
+            profile.status,
+            slot.status,
+            slot.geometry.status,
+            lease->mount.mounted});
 
     if (action == TaskbarHostFrameAction::NoChange) {
         return;
     }
     if (action == TaskbarHostFrameAction::Restore) {
         if (!RestoreLease(*lease)) {
+            readinessRefresh.pendingDiagnostic =
+                HostControlDiagnostic::MountRestoreFailed;
+            readinessRefresh.preservePendingDiagnostic = true;
             ThrowCallbackFailure();
         }
         return;
@@ -734,6 +767,8 @@ void WINAPI OnTaskbarFrameLayout(void* privateTaskbarFrame) {
         slot,
         &QueueWeatherOpenRequest,
         lease->mount);
+    readinessRefresh.pendingDiagnostic =
+        TaskbarMountStatusDiagnostic(mountStatus);
     switch (mountStatus) {
         case TaskbarMountStatus::Mounted:
         case TaskbarMountStatus::AlreadyMounted:
@@ -751,6 +786,7 @@ void WINAPI OnTaskbarFrameLayout(void* privateTaskbarFrame) {
         case TaskbarMountStatus::InvalidState:
         case TaskbarMountStatus::RestoreFailed:
         case TaskbarMountStatus::RollbackFailed:
+            readinessRefresh.preservePendingDiagnostic = true;
             ThrowCallbackFailure();
             return;
     }
@@ -819,8 +855,75 @@ TaskbarHostFrameAction EvaluateTaskbarHostFrameAction(
         : TaskbarHostFrameAction::NoChange;
 }
 
+HostControlDiagnostic EvaluateTaskbarHostFrameDiagnostic(
+    const TaskbarHostFrameDecisionInput& input) noexcept {
+    if (input.bridgeStatus != TaskbarFrameBridgeStatus::Resolved) {
+        return HostControlDiagnostic::BridgeUnresolved;
+    }
+    if (input.treeStatus != TaskbarTreeProbeStatus::LandmarksMatched) {
+        return HostControlDiagnostic::TreeProfileMismatch;
+    }
+    switch (input.slotProbeStatus) {
+        case TaskbarSlotProbeStatus::SnapshotReady:
+            break;
+        case TaskbarSlotProbeStatus::TreeNotReady:
+        case TaskbarSlotProbeStatus::DispatcherUnavailable:
+        case TaskbarSlotProbeStatus::DispatcherThreadMismatch:
+        case TaskbarSlotProbeStatus::XamlTreeUnavailable:
+            return HostControlDiagnostic::TreeProfileMismatch;
+        case TaskbarSlotProbeStatus::WrongOwnerThread:
+            return HostControlDiagnostic::LeaseUnavailable;
+        case TaskbarSlotProbeStatus::RootChildCountOutOfBounds:
+        case TaskbarSlotProbeStatus::RootStructureMismatch:
+        case TaskbarSlotProbeStatus::RepeaterChildCountOutOfBounds:
+        case TaskbarSlotProbeStatus::RepeaterChildNotFrameworkElement:
+        case TaskbarSlotProbeStatus::RepeaterChildStateUnavailable:
+            return HostControlDiagnostic::SlotStructureConflict;
+        case TaskbarSlotProbeStatus::RepeaterChildGeometryInvalid:
+        case TaskbarSlotProbeStatus::RepeaterChildTransformUnavailable:
+        case TaskbarSlotProbeStatus::RepeaterChildTransformInvalid:
+        case TaskbarSlotProbeStatus::GeometryEvaluationFailed:
+            return HostControlDiagnostic::SlotGeometryConflict;
+    }
+    if (input.geometryStatus !=
+        TaskbarSlotGeometryStatus::CandidateAvailable) {
+        return HostControlDiagnostic::SlotGeometryConflict;
+    }
+    return HostControlDiagnostic::MountedNotReady;
+}
+
+HostControlDiagnostic TaskbarMountStatusDiagnostic(
+    const TaskbarMountStatus status) noexcept {
+    switch (status) {
+        case TaskbarMountStatus::Mounted:
+        case TaskbarMountStatus::AlreadyMounted:
+        case TaskbarMountStatus::Updated:
+        case TaskbarMountStatus::Restored:
+            return HostControlDiagnostic::MountedNotReady;
+        case TaskbarMountStatus::TreeNotReady:
+            return HostControlDiagnostic::TreeProfileMismatch;
+        case TaskbarMountStatus::StructureNotAllowlisted:
+            return HostControlDiagnostic::SlotStructureConflict;
+        case TaskbarMountStatus::LeftSlotUnavailable:
+        case TaskbarMountStatus::SlotGeometryInvalid:
+            return HostControlDiagnostic::SlotGeometryConflict;
+        case TaskbarMountStatus::ViewCreationFailed:
+            return HostControlDiagnostic::MountViewFailed;
+        case TaskbarMountStatus::AppendFailed:
+            return HostControlDiagnostic::MountAppendFailed;
+        case TaskbarMountStatus::WrongOwnerThread:
+        case TaskbarMountStatus::InvalidState:
+            return HostControlDiagnostic::LeaseUnavailable;
+        case TaskbarMountStatus::RestoreFailed:
+        case TaskbarMountStatus::RollbackFailed:
+            return HostControlDiagnostic::MountRestoreFailed;
+    }
+    return HostControlDiagnostic::MountedNotReady;
+}
+
 TaskbarHostControllerResult StartTaskbarWeatherController(
     const std::uint32_t controllerNonce) noexcept {
+    PublishControllerDiagnostic(HostControlDiagnostic::None);
     if (controllerNonce == 0) {
         Runtime().lastResult.store(
             TaskbarHostControllerResult::StartRejected,
@@ -839,13 +942,20 @@ TaskbarHostControllerResult StartTaskbarWeatherController(
          detourResult == TaskbarDetourResult::AlreadyActive) &&
         !StartWeatherPipeWorker()) {
         if (detourResult == TaskbarDetourResult::Installed) {
-            StopTaskbarFrameDetour(&RestoreAllTaskbarFrames);
+            const TaskbarDetourResult rollbackResult =
+                StopTaskbarFrameDetour(&RestoreAllTaskbarFrames);
+            if (rollbackResult == TaskbarDetourResult::RestoreFailed) {
+                PublishControllerDiagnostic(
+                    HostControlDiagnostic::MountRestoreFailed);
+            }
         }
         result = TaskbarHostControllerResult::StartRejected;
     }
     if (result == TaskbarHostControllerResult::Started ||
         result == TaskbarHostControllerResult::AlreadyStarted) {
         ResetMountReadinessSession(controllerNonce);
+        PublishControllerDiagnostic(
+            HostControlDiagnostic::AwaitingLayout);
         SignalMountReadinessWorker();
         RequestTaskbarRelayout();
     }
@@ -871,28 +981,48 @@ TaskbarHostControllerResult StopTaskbarWeatherController() noexcept {
         result = TaskbarHostControllerResult::StopRejected;
     }
     Runtime().lastResult.store(result, std::memory_order_release);
+    if (result == TaskbarHostControllerResult::Stopped ||
+        result == TaskbarHostControllerResult::NotStarted) {
+        PublishControllerDiagnostic(HostControlDiagnostic::None);
+    } else if (detourResult == TaskbarDetourResult::RestoreFailed) {
+        PublishControllerDiagnostic(
+            HostControlDiagnostic::MountRestoreFailed);
+    }
     return result;
 }
 
 TaskbarHostControllerResult QueryTaskbarWeatherControllerStatus() noexcept {
+    return QueryTaskbarWeatherControllerStatusSnapshot().result;
+}
+
+TaskbarHostControllerStatusSnapshot
+QueryTaskbarWeatherControllerStatusSnapshot() noexcept {
     const TaskbarDetourSnapshot detour = GetTaskbarDetourSnapshot();
     if (detour.state == TaskbarDetourState::Dormant ||
         detour.state == TaskbarDetourState::Removed) {
-        return TaskbarHostControllerResult::NotStarted;
+        PublishControllerDiagnostic(HostControlDiagnostic::None);
+        return {
+            TaskbarHostControllerResult::NotStarted,
+            HostControlDiagnostic::None};
     }
     if (detour.state != TaskbarDetourState::Active ||
         detour.bootstrapThreadId == 0 ||
         detour.bootstrapThreadId != GetCurrentThreadId()) {
-        return TaskbarHostControllerResult::StatusRejected;
+        return {
+            TaskbarHostControllerResult::StatusRejected,
+            LoadControllerDiagnostic()};
     }
 
     auto& runtime = Runtime();
     if (RefreshCurrentMountReadiness()) {
         SignalMountReadinessWorker();
+        PublishControllerDiagnostic(HostControlDiagnostic::MountReady);
         runtime.lastResult.store(
             TaskbarHostControllerResult::MountReady,
             std::memory_order_release);
-        return TaskbarHostControllerResult::MountReady;
+        return {
+            TaskbarHostControllerResult::MountReady,
+            HostControlDiagnostic::MountReady};
     }
 
     // Starting the controller and publishing a weather snapshot both request
@@ -900,10 +1030,20 @@ TaskbarHostControllerResult QueryTaskbarWeatherControllerStatus() noexcept {
     // A bounded status poll can safely request another asynchronous pass.
     RequestTaskbarRelayout();
     SignalMountReadinessWorker();
+    HostControlDiagnostic diagnostic = LoadControllerDiagnostic();
+    if (diagnostic == HostControlDiagnostic::None ||
+        diagnostic == HostControlDiagnostic::MountReady) {
+        diagnostic = HostControlDiagnostic::MountedNotReady;
+        PublishControllerDiagnostic(diagnostic);
+    }
     runtime.lastResult.store(
         TaskbarHostControllerResult::MountPending,
         std::memory_order_release);
-    return TaskbarHostControllerResult::MountPending;
+    return {TaskbarHostControllerResult::MountPending, diagnostic};
+}
+
+HostControlDiagnostic CurrentTaskbarWeatherControllerDiagnostic() noexcept {
+    return LoadControllerDiagnostic();
 }
 
 const wchar_t* TaskbarHostControllerResultName(

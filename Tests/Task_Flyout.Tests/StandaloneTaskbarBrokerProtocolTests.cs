@@ -120,6 +120,24 @@ public class StandaloneTaskbarBrokerProtocolTests
     }
 
     [Fact]
+    public void Additive_controller_diagnostic_preserves_older_parser_behavior()
+    {
+        var result = StandaloneTaskbarBrokerProtocol.ParseControl(
+            StandaloneTaskbarBrokerCommand.Status,
+            ControlJson("acknowledged", "status", "mount-pending")
+                .Replace(
+                    "\"probeStatus\"",
+                    "\"controllerDiagnostic\":\"tree-profile-mismatch\"," +
+                    "\"probeStatus\"",
+                    StringComparison.Ordinal),
+            0);
+
+        Assert.Equal(
+            StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified,
+            result.Kind);
+    }
+
+    [Fact]
     public void Control_rejects_cross_command_and_wrong_controller_family()
     {
         Assert.Equal(

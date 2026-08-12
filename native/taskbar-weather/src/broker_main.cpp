@@ -103,7 +103,9 @@ int PrintControl(
         L"\"command\":\"%ls\",\"processId\":%lu,\"threadId\":%lu,"
         L"\"messageId\":%u,\"acknowledgementMessageId\":%u,"
         L"\"controlNonce\":%u,"
-        L"\"controllerStatus\":\"%ls\",\"probeStatus\":\"%ls\"}\n",
+        L"\"controllerStatus\":\"%ls\","
+        L"\"controllerDiagnostic\":\"%ls\","
+        L"\"probeStatus\":\"%ls\"}\n",
         taskflyout::taskbar::HostControlDispatchStatusName(result.status),
         EscapeJson(result.detail).c_str(),
         taskflyout::taskbar::HostControlCommandName(command),
@@ -114,6 +116,7 @@ int PrintControl(
         result.controlNonce,
         taskflyout::taskbar::HostControlAcknowledgementName(
             result.acknowledgement),
+        taskflyout::taskbar::HostControlDiagnosticName(result.diagnostic),
         taskflyout::taskbar::ProbeStatusName(result.probeStatus));
     return result.status ==
         taskflyout::taskbar::HostControlDispatchStatus::Acknowledged

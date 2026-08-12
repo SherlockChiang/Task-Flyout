@@ -41,6 +41,7 @@ struct HostControlDispatchResult {
     std::uint32_t controlNonce = 0;
     HostControlAcknowledgement acknowledgement =
         HostControlAcknowledgement::Unknown;
+    HostControlDiagnostic diagnostic = HostControlDiagnostic::None;
     std::wstring detail;
 };
 
@@ -61,6 +62,9 @@ const wchar_t* HostControlDispatchStatusName(
 
 const wchar_t* HostControlAcknowledgementName(
     HostControlAcknowledgement acknowledgement) noexcept;
+
+const wchar_t* HostControlDiagnosticName(
+    HostControlDiagnostic diagnostic) noexcept;
 
 const wchar_t* HostControlCommandName(
     HostControlCommand command) noexcept;

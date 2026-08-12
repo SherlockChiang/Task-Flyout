@@ -36,6 +36,33 @@ int wmain() {
         decodedStatus.command == HostControlCommand::Status &&
             decodedStatus.nonce == nonce,
         L"the status envelope should preserve its command and nonce");
+    constexpr auto encodedAcknowledgement =
+        EncodeHostControlAcknowledgement(
+            HostControlAcknowledgement::MountPending,
+            HostControlDiagnostic::TreeProfileMismatch);
+    constexpr auto decodedAcknowledgement =
+        DecodeHostControlAcknowledgement(encodedAcknowledgement);
+    passed &= Expect(
+        decodedAcknowledgement.acknowledgement ==
+                HostControlAcknowledgement::MountPending &&
+            decodedAcknowledgement.diagnostic ==
+                HostControlDiagnostic::TreeProfileMismatch &&
+            static_cast<std::uint32_t>(encodedAcknowledgement) ==
+                static_cast<std::uint32_t>(
+                    HostControlAcknowledgement::MountPending),
+        L"the acknowledgement envelope should preserve its low result and "
+        L"high diagnostic words");
+    constexpr auto decodedUnknownDiagnostic =
+        DecodeHostControlAcknowledgement(
+            (static_cast<std::uintptr_t>(0xFFFFFFFFu) << 32u) |
+            static_cast<std::uintptr_t>(
+                HostControlAcknowledgement::MountPending));
+    passed &= Expect(
+        decodedUnknownDiagnostic.acknowledgement ==
+                HostControlAcknowledgement::MountPending &&
+            static_cast<std::uint32_t>(
+                decodedUnknownDiagnostic.diagnostic) == 0xFFFFFFFFu,
+        L"an unknown diagnostic must not corrupt the acknowledgement word");
     passed &= Expect(
         IsHostControlAcknowledgementForCommand(
             HostControlCommand::Start,
@@ -131,6 +158,22 @@ int wmain() {
         std::wstring_view(HostControlAcknowledgementName(
             HostControlAcknowledgement::MountReady)) == L"mount-ready",
         L"status command and mount acknowledgement names should be stable");
+    passed &= Expect(
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::None)) == L"none" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::AwaitingLayout)) == L"awaiting-layout" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::TreeProfileMismatch)) ==
+                L"tree-profile-mismatch" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::MountAppendFailed)) ==
+                L"mount-append-failed" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::MountReady)) == L"mount-ready" &&
+        std::wstring_view(HostControlDiagnosticName(
+            static_cast<HostControlDiagnostic>(0xFFFFFFFFu))) == L"invalid",
+        L"controller diagnostic names should be stable and bounded");
 
     if (!passed) {
         return 1;

@@ -6,7 +6,7 @@
 
 namespace taskflyout::taskbar {
 
-inline constexpr std::uint32_t kHostApiVersion = 4;
+inline constexpr std::uint32_t kHostApiVersion = 5;
 inline constexpr wchar_t kHostControlMessageName[] =
     L"TaskFlyout.TaskbarHost.Control.v2.{7C091D78-7BD5-4E99-B7BD-647E45F30CF6}";
 inline constexpr wchar_t kHostControlAcknowledgementMessageName[] =
@@ -31,6 +31,30 @@ enum class HostControlAcknowledgement : std::uint32_t {
     StatusRejected = 9,
 };
 
+// Fixed, privacy-safe controller state accompanying an acknowledgement. Keep
+// these values protocol-stable: they cross the Explorer/broker process
+// boundary and deliberately contain no pointers or private XAML details.
+enum class HostControlDiagnostic : std::uint32_t {
+    None = 0,
+    AwaitingLayout = 1,
+    BridgeUnresolved = 2,
+    TreeProfileMismatch = 3,
+    LeaseUnavailable = 4,
+    SlotStructureConflict = 5,
+    SlotGeometryConflict = 6,
+    MountViewFailed = 7,
+    MountAppendFailed = 8,
+    MountRestoreFailed = 9,
+    MountedNotReady = 10,
+    MountReady = 11,
+};
+
+struct HostControlAcknowledgementEnvelope {
+    HostControlAcknowledgement acknowledgement =
+        HostControlAcknowledgement::Unknown;
+    HostControlDiagnostic diagnostic = HostControlDiagnostic::None;
+};
+
 struct HostControlRequestEnvelope {
     HostControlCommand command = HostControlCommand::Start;
     std::uint32_t nonce = 0;
@@ -50,6 +74,20 @@ constexpr HostControlRequestEnvelope DecodeHostControlRequest(
     return {
         static_cast<HostControlCommand>(encoded & 0xFFFFFFFFu),
         static_cast<std::uint32_t>(encoded >> 32u)};
+}
+
+constexpr std::uintptr_t EncodeHostControlAcknowledgement(
+    const HostControlAcknowledgement acknowledgement,
+    const HostControlDiagnostic diagnostic) noexcept {
+    return (static_cast<std::uintptr_t>(diagnostic) << 32u) |
+        (static_cast<std::uintptr_t>(acknowledgement) & 0xFFFFFFFFu);
+}
+
+constexpr HostControlAcknowledgementEnvelope
+DecodeHostControlAcknowledgement(const std::uintptr_t encoded) noexcept {
+    return {
+        static_cast<HostControlAcknowledgement>(encoded & 0xFFFFFFFFu),
+        static_cast<HostControlDiagnostic>(encoded >> 32u)};
 }
 
 constexpr bool IsHostControlAcknowledgementForCommand(
