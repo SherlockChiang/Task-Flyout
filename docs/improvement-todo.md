@@ -981,3 +981,20 @@ transport foundation for the standalone host.
   harness's AST/`DescribeOnly` checks. The new artifacts still require
   current-user signing and a fresh disposable Explorer restart before live
   diagnosis; M3-07/M3-08 remain in progress.
+
+### 2026-08-12 Signed API v6 Detour Diagnosis
+
+- The interactive user signed both API v6 artifacts with certificate
+  `15303040F7CEECFDE9C023F15481D15C39CCDB46`, then restarted Explorer. The
+  signed Host therefore loaded into fresh Explorer process `50720` on taskbar
+  thread `25208`, rather than reusing the pinned v5 module.
+- The gated 20-second harness remained `mount-pending` and ended with
+  `detour-target-not-observed`. This proves the exact MinHook target did not
+  execute after controller installation; the earlier `awaiting-layout` result
+  was not a skipped-callback or startup-diagnostic race. Repeating or widening
+  `WM_SETTINGCHANGE` relayout hints is therefore not an evidence-backed fix.
+- The harness cleanup completed and an independent status returned
+  `not-started` with diagnostic `none` in the same Explorer process. The next
+  implementation step is a bounded, owner-thread bootstrap of the already-live
+  TaskbarFrame/XAML tree which fails closed unless it finds one exact supported
+  frame; M3-07/M3-08 remain in progress.
