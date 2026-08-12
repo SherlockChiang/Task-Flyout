@@ -971,9 +971,13 @@ transport foundation for the standalone host.
   callback diagnosis cannot be overwritten by a later startup write. A fresh
   `Dormant`/`Removed` lifecycle clears stale diagnostics, while an
   `AlreadyActive` retry preserves the current live diagnosis.
-- The API v6 Release build is isolated in
+- Commit `e503fbd` contains the API v6 diagnostic changes. The API v6 Release
+  build is isolated in
   `.testbuild/native-taskbar-weather-v6` because Explorer still pins the prior
   v5 Host path. Native tests pass 12/12 and the build script's WebView/browser/
-  network import gate passes for both Broker and Host. The new artifacts still
-  require current-user signing and a fresh disposable Explorer restart before
-  live diagnosis; M3-07/M3-08 remain in progress.
+  network import gate passes for both Broker and Host. Managed protocol tests
+  pass 49/49, the complete .NET suite passes 1109/1109, the Debug x64 app build
+  has zero warnings/errors, and PowerShell 7 plus Windows PowerShell pass the
+  harness's AST/`DescribeOnly` checks. The new artifacts still require
+  current-user signing and a fresh disposable Explorer restart before live
+  diagnosis; M3-07/M3-08 remain in progress.
