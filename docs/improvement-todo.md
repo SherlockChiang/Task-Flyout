@@ -939,3 +939,21 @@ transport foundation for the standalone host.
   both binaries with zero warnings and zero errors.
 - The next step is a fresh disposable Explorer restart followed by the gated
   probe/start/status/stop validation; M3-08 remains in progress.
+
+### 2026-08-12 Signed API v5 Disposable Explorer Diagnosis
+
+- After a fresh Explorer restart, strict probe accepted Windows build `26200`
+  and the allowlisted `Taskbar.View.dll` fingerprint in Explorer process
+  `12196` (taskbar thread `31500`). The newly signed API v5 Broker and Host
+  passed the harness's signer gate and controller start was acknowledged.
+- The bounded 20-second status poll remained `mount-pending` with the fixed
+  diagnostic `awaiting-layout`; no mount-ready lease or successful native XAML
+  mount was evidenced. This narrows the current evidence to the
+  owner-thread layout callback not having been observed by the controller. It
+  does not yet distinguish an uncalled detour target, a skipped custom callback,
+  or a startup diagnostic ordering race.
+- The harness's `finally` path acknowledged stop and its post-stop status check
+  returned `not-started`; an independent status confirmation also returned
+  `not-started` with diagnostic `none`. The Host remains pinned by design until
+  Explorer exits, so any rebuilt diagnostic Host requires another fresh
+  disposable Explorer restart before live use. M3-07/M3-08 remain in progress.
