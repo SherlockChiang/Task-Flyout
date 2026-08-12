@@ -916,9 +916,9 @@ transport foundation for the standalone host.
 - The isolated Native Release matrix passes 12/12 with forbidden WebView and
   network imports absent. The complete .NET suite passes 1104/1104, the Debug
   x64 app build has zero warnings/errors, and both PowerShell implementations
-  pass the harness's non-mutating path. The newly built API v5 binaries still
-  require signing with a usable current-user certificate and a fresh disposable
-  Explorer restart before live diagnosis; M3-07/M3-08 remain in progress.
+  pass the harness's non-mutating path. The API v5 Broker and Host are now
+  signed; a fresh disposable Explorer restart is still required before live
+  diagnosis, so M3-07/M3-08 remain in progress.
 
 ### 2026-08-12 Local Signing Key Recovery
 
@@ -933,5 +933,9 @@ transport foundation for the standalone host.
   an old certificate thumbprint.
 - PowerShell 7 and Windows PowerShell parse the script and reject the conflicting
   switch combination before reading binaries or changing a certificate store.
-  Actual certificate creation and API v5 binary signing remain an explicit
-  interactive-user action before disposable Explorer validation resumes.
+- On 2026-08-12, the interactive `vince` session created replacement
+  current-user certificate `15303040F7CEECFDE9C023F15481D15C39CCDB46` and
+  signed the API v5 Broker and Host. SignTool `/pa` verification completed for
+  both binaries with zero warnings and zero errors.
+- The next step is a fresh disposable Explorer restart followed by the gated
+  probe/start/status/stop validation; M3-08 remains in progress.
