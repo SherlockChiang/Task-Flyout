@@ -63,6 +63,186 @@ public class StandaloneTaskbarCoordinatorTests
     }
 
     [Fact]
+    public async Task Diagnostic_only_start_is_stopped_and_never_mounts()
+    {
+        var client = new FakeClient
+        {
+            Start = _ => Task.FromResult(new StandaloneTaskbarBrokerResult(
+                StandaloneTaskbarBrokerResultKind.ControllerDiagnosticOnly)),
+            Status = _ => Result(
+                StandaloneTaskbarBrokerResultKind.ControllerDiagnosticOnly)
+        };
+        await using var coordinator = new StandaloneTaskbarCoordinator(client);
+        var states = new List<StandaloneTaskbarRuntimeState>();
+        coordinator.StatusChanged += status =>
+        {
+            // A diagnostic result is terminal only after the synchronous
+            // cleanup attempt has resolved the controller lease.
+            if (status.State == StandaloneTaskbarRuntimeState.DiagnosticOnly)
+            {
+                Assert.False(coordinator.IsRequested);
+                Assert.False(coordinator.RequiresStop);
+            }
+            states.Add(status.State);
+        };
+
+        await coordinator.SetEnabledAsync(true);
+
+        Assert.Equal(new[] { "probe", "start", "stop" }, client.Calls);
+        Assert.Equal(
+            new[]
+            {
+                StandaloneTaskbarRuntimeState.Starting,
+                StandaloneTaskbarRuntimeState.DiagnosticOnly
+            },
+            states);
+        Assert.Equal(
+            StandaloneTaskbarRuntimeState.DiagnosticOnly,
+            coordinator.Status.State);
+        Assert.False(coordinator.IsRequested);
+        Assert.False(coordinator.Status.State ==
+            StandaloneTaskbarRuntimeState.MountReady);
+        Assert.True(coordinator.Status.KeepTaskFlyoutFallback);
+        Assert.True(coordinator.DiagnosticOnlyRejected);
+    }
+
+    [Fact]
+    public async Task Diagnostic_only_state_is_published_only_after_cleanup()
+    {
+        var stopEntered = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseStop = new TaskCompletionSource<StandaloneTaskbarBrokerResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new FakeClient
+        {
+            Start = _ => Result(
+                StandaloneTaskbarBrokerResultKind.ControllerDiagnosticOnly),
+            Stop = _ =>
+            {
+                stopEntered.TrySetResult(true);
+                return releaseStop.Task;
+            }
+        };
+        await using var coordinator = new StandaloneTaskbarCoordinator(client);
+        var states = new ConcurrentQueue<StandaloneTaskbarRuntimeState>();
+        coordinator.StatusChanged += status => states.Enqueue(status.State);
+
+        Task enable = coordinator.SetEnabledAsync(true);
+        await stopEntered.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(
+            StandaloneTaskbarRuntimeState.Starting,
+            coordinator.Status.State);
+        Assert.DoesNotContain(
+            StandaloneTaskbarRuntimeState.DiagnosticOnly,
+            states);
+
+        releaseStop.SetResult(new(
+            StandaloneTaskbarBrokerResultKind.ControllerInactive));
+        await enable.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(
+            new[]
+            {
+                StandaloneTaskbarRuntimeState.Starting,
+                StandaloneTaskbarRuntimeState.DiagnosticOnly
+            },
+            states);
+        Assert.False(coordinator.RequiresStop);
+    }
+
+    [Fact]
+    public async Task Delayed_diagnostic_status_is_stopped_before_fallback_state_is_published()
+    {
+        var client = new FakeClient
+        {
+            Status = _ => Result(
+                StandaloneTaskbarBrokerResultKind.ControllerDiagnosticOnly)
+        };
+        await using var coordinator = new StandaloneTaskbarCoordinator(client);
+        var states = new List<StandaloneTaskbarRuntimeState>();
+        coordinator.StatusChanged += status =>
+        {
+            if (status.State == StandaloneTaskbarRuntimeState.DiagnosticOnly)
+            {
+                Assert.False(coordinator.IsRequested);
+                Assert.False(coordinator.RequiresStop);
+            }
+            states.Add(status.State);
+        };
+
+        await coordinator.SetEnabledAsync(true);
+
+        Assert.Equal(new[] { "probe", "start", "status", "stop" }, client.Calls);
+        Assert.Equal(
+            new[]
+            {
+                StandaloneTaskbarRuntimeState.Starting,
+                StandaloneTaskbarRuntimeState.ControllerActiveUnverified,
+                StandaloneTaskbarRuntimeState.DiagnosticOnly
+            },
+            states);
+        Assert.Equal(
+            StandaloneTaskbarRuntimeState.DiagnosticOnly,
+            coordinator.Status.State);
+        Assert.True(coordinator.Status.KeepTaskFlyoutFallback);
+        Assert.True(coordinator.DiagnosticOnlyRejected);
+    }
+
+    [Fact]
+    public async Task Failed_diagnostic_cleanup_keeps_recovery_obligation()
+    {
+        var client = new FakeClient
+        {
+            Start = _ => Result(
+                StandaloneTaskbarBrokerResultKind.ControllerDiagnosticOnly),
+            Stop = _ => Result(StandaloneTaskbarBrokerResultKind.Ambiguous)
+        };
+        await using var coordinator = new StandaloneTaskbarCoordinator(client);
+
+        await coordinator.SetEnabledAsync(true);
+
+        Assert.Equal(new[] { "probe", "start", "stop" }, client.Calls);
+        Assert.Equal(
+            StandaloneTaskbarRuntimeState.Recovery,
+            coordinator.Status.State);
+        Assert.True(coordinator.RequiresStop);
+        Assert.False(coordinator.IsRequested);
+        Assert.True(coordinator.DiagnosticOnlyRejected);
+    }
+
+    [Fact]
+    public async Task Diagnostic_cleanup_is_bounded_when_client_ignores_cancellation()
+    {
+        var never = new TaskCompletionSource<StandaloneTaskbarBrokerResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new FakeClient
+        {
+            Start = _ => Result(
+                StandaloneTaskbarBrokerResultKind.ControllerDiagnosticOnly),
+            Stop = _ => never.Task
+        };
+        await using var coordinator = new StandaloneTaskbarCoordinator(
+            client,
+            TimeSpan.FromMilliseconds(50));
+
+        await coordinator.SetEnabledAsync(true)
+            .WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(
+            StandaloneTaskbarRuntimeState.Recovery,
+            coordinator.Status.State);
+        Assert.True(coordinator.RequiresStop);
+        Assert.True(coordinator.DiagnosticOnlyRejected);
+
+        never.TrySetResult(new(
+            StandaloneTaskbarBrokerResultKind.ControllerInactive));
+        await WaitUntilAsync(
+            () => client.ActiveCalls == 0,
+            TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
     public async Task Mount_proof_without_a_controller_identity_keeps_fallback()
     {
         var client = new FakeClient

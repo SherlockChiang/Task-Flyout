@@ -619,7 +619,8 @@ namespace Task_Flyout
                         _standaloneTaskbarSuppressed,
                         requestedMode,
                         values["WeatherBarEnabled"] as bool? ?? false,
-                        WeatherService.IsEnabled);
+                        WeatherService.IsEnabled,
+                        _standaloneTaskbarCoordinator?.DiagnosticOnlyRejected ?? false);
                 if (standaloneModeDesired &&
                     !_standaloneWidgetsRemovalVerificationActive)
                 {
@@ -1055,7 +1056,8 @@ namespace Task_Flyout
                WeatherService.IsEnabled &&
                _standaloneWidgetsSuppressionReady &&
                !(_standaloneTaskbarCoordinator is
-                    { IsRequested: false, RequiresStop: true }) &&
+                     { IsRequested: false, RequiresStop: true }) &&
+               !(_standaloneTaskbarCoordinator?.DiagnosticOnlyRejected ?? false) &&
                !_nativeWidgetsModeActive &&
                !WindowsWidgetsService.HasCapturedTaskbarEntry(values) &&
                !_standaloneWidgetsHandoffPending;
@@ -1240,9 +1242,10 @@ namespace Task_Flyout
             WeatherBarMode requestedMode = WeatherBarModeSettings.Read(values);
             if (StandaloneTaskbarWidgetsLifecyclePolicy.IsStandaloneDesired(
                     _standaloneTaskbarSuppressed,
-                    requestedMode,
-                    enabled,
-                    WeatherService.IsEnabled))
+                requestedMode,
+                enabled,
+                WeatherService.IsEnabled,
+                _standaloneTaskbarCoordinator?.DiagnosticOnlyRejected ?? false))
             {
                 AdvanceNativeWidgetsVerificationBackoff();
                 ApplyWeatherBarPresentation(forceProbe: true);

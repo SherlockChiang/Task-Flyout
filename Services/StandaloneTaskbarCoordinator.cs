@@ -29,6 +29,7 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
     private long _generation;
     private bool _desiredEnabled;
     private bool _stopRequired;
+    private bool _diagnosticOnlyRejected;
     private StandaloneTaskbarControllerIdentity? _controllerIdentity;
     private ulong _lastMountGeneration;
     private WeatherCompanionMountState _lastMountState;
@@ -102,6 +103,14 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
         get
         {
             lock (_stateLock) return _stopRequired;
+        }
+    }
+
+    public bool DiagnosticOnlyRejected
+    {
+        get
+        {
+            lock (_stateLock) return _diagnosticOnlyRejected;
         }
     }
 
@@ -235,6 +244,8 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
         bool isRecovery)
     {
         _desiredEnabled = enabled;
+        if (enabled && !isRecovery)
+            _diagnosticOnlyRejected = false;
         long generation = ++_generation;
         _controllerIdentity = null;
         _lastMountGeneration = 0;
@@ -377,6 +388,17 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
 
         StandaloneTaskbarRuntimeState startState =
             StandaloneTaskbarLifecyclePolicy.MapStart(start.Kind);
+        if (startState == StandaloneTaskbarRuntimeState.DiagnosticOnly)
+        {
+            // The v11 Host is diagnostic-only and has no managed mount
+            // lifecycle. Stop it before publishing a terminal state so the
+            // app never observes a diagnostic controller as active while its
+            // detour is still installed or its cleanup lease is unresolved.
+            await StopDiagnosticOnlyControllerAsync(
+                generation,
+                notifyStatus).ConfigureAwait(false);
+            return;
+        }
         PublishIfCurrent(
             generation,
             new StandaloneTaskbarRuntimeStatus(startState),
@@ -396,6 +418,50 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
             generation,
             cancellationToken,
             notifyStatus).ConfigureAwait(false);
+    }
+
+    private async Task StopDiagnosticOnlyControllerAsync(
+        long generation,
+        bool notifyStatus)
+    {
+        StandaloneTaskbarBrokerResult stop;
+        try
+        {
+            // A diagnostic-only Host must never remain active because the app
+            // does not have a mount lifecycle for it. Cleanup is deliberately
+            // independent of the start cancellation token, but still bounded
+            // if an alternate client ignores its own process timeout.
+            using var cleanupCancellation =
+                new CancellationTokenSource(_shutdownTimeout);
+            stop = await _client.StopAsync(cleanupCancellation.Token)
+                .WaitAsync(_shutdownTimeout).ConfigureAwait(false);
+        }
+        catch
+        {
+            stop = new(StandaloneTaskbarBrokerResultKind.Ambiguous);
+        }
+
+        Action<StandaloneTaskbarRuntimeStatus>? handler;
+        StandaloneTaskbarRuntimeStatus status =
+            stop.Kind == StandaloneTaskbarBrokerResultKind.ControllerInactive
+                ? new(StandaloneTaskbarRuntimeState.DiagnosticOnly)
+                : new(StandaloneTaskbarRuntimeState.Recovery);
+        lock (_stateLock)
+        {
+            if (generation != _generation)
+                return;
+            _desiredEnabled = false;
+            _diagnosticOnlyRejected = true;
+            _controllerIdentity = null;
+            _lastMountGeneration = 0;
+            _lastMountState = WeatherCompanionMountState.None;
+            _mountLeaseVersion++;
+            _stopRequired =
+                stop.Kind != StandaloneTaskbarBrokerResultKind.ControllerInactive;
+            _status = status;
+            handler = notifyStatus ? StatusChanged : null;
+        }
+        NotifySubscribers(generation, status, handler);
     }
 
     private async Task VerifyMountReadyAsync(
@@ -460,6 +526,17 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
                 StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified)
             {
                 continue;
+            }
+            if (mapped == StandaloneTaskbarRuntimeState.DiagnosticOnly)
+            {
+                // A diagnostic-only acknowledgement can arrive after start
+                // through the additive status channel. It has the same
+                // lifecycle contract as a diagnostic start result: the host
+                // must be stopped before the terminal state is published.
+                await StopDiagnosticOnlyControllerAsync(
+                    generation,
+                    notifyStatus).ConfigureAwait(false);
+                return;
             }
             if (mapped ==
                 StandaloneTaskbarRuntimeState.ControllerActiveUnverified)

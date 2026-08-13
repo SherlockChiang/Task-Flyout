@@ -6,8 +6,10 @@ internal static class StandaloneTaskbarWidgetsLifecyclePolicy
         bool launchSuppressed,
         WeatherBarMode requestedMode,
         bool weatherBarEnabled,
-        bool weatherProviderEnabled)
+        bool weatherProviderEnabled,
+        bool diagnosticOnlyRejected = false)
         => !launchSuppressed &&
+           !diagnosticOnlyRejected &&
            requestedMode == WeatherBarMode.StandaloneTaskbar &&
            weatherBarEnabled &&
            weatherProviderEnabled;

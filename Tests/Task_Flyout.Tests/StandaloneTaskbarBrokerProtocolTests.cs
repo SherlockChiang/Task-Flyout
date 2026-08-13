@@ -120,12 +120,6 @@ public class StandaloneTaskbarBrokerProtocolTests
     }
 
     [Theory]
-    [InlineData("tree-profile-mismatch")]
-    [InlineData("detour-target-not-observed")]
-    [InlineData("detour-inactive")]
-    [InlineData("callback-unavailable")]
-    [InlineData("callback-reentrant")]
-    [InlineData("callback-recheck-race")]
     [InlineData("bootstrap-window-invalid")]
     [InlineData("bootstrap-owner-thread-mismatch")]
     [InlineData("bootstrap-host-bounds-invalid")]
@@ -165,17 +159,51 @@ public class StandaloneTaskbarBrokerProtocolTests
     [InlineData("private-bridge-dispatcher-thread-mismatch")]
     [InlineData("private-bridge-tree-profile-mismatch")]
     [InlineData("private-bridge-validated")]
-    public void Additive_controller_diagnostic_preserves_older_parser_behavior(
-        string controllerDiagnostic)
+    public void Diagnostic_only_allowlist_never_claims_mountability(
+        string diagnostic)
+    {
+        string startOutput = WithControllerDiagnostic(
+            ControlJson("acknowledged", "start", "started"),
+            diagnostic);
+        string statusOutput = WithControllerDiagnostic(
+            ControlJson("acknowledged", "status", "mount-pending"),
+            diagnostic);
+
+        var start = StandaloneTaskbarBrokerProtocol.ParseControl(
+            StandaloneTaskbarBrokerCommand.Start,
+            startOutput,
+            0);
+        var status = StandaloneTaskbarBrokerProtocol.ParseControl(
+            StandaloneTaskbarBrokerCommand.Status,
+            statusOutput,
+            0);
+
+        Assert.Equal(
+            StandaloneTaskbarBrokerResultKind.ControllerDiagnosticOnly,
+            start.Kind);
+        Assert.Null(start.ControllerIdentity);
+        Assert.Equal(
+            StandaloneTaskbarBrokerResultKind.ControllerDiagnosticOnly,
+            status.Kind);
+    }
+
+    [Theory]
+    [InlineData("tree-profile-mismatch")]
+    [InlineData("detour-target-not-observed")]
+    [InlineData("detour-inactive")]
+    [InlineData("callback-unavailable")]
+    [InlineData("callback-reentrant")]
+    [InlineData("callback-recheck-race")]
+    [InlineData("bootstrap-future-value")]
+    [InlineData("private-bridge-future-value")]
+    public void Non_allowlisted_diagnostics_preserve_legacy_unverified_result(
+        string diagnostic)
     {
         var result = StandaloneTaskbarBrokerProtocol.ParseControl(
             StandaloneTaskbarBrokerCommand.Status,
-            ControlJson("acknowledged", "status", "mount-pending")
-                .Replace(
-                    "\"probeStatus\"",
-                    $"\"controllerDiagnostic\":\"{controllerDiagnostic}\"," +
-                    "\"probeStatus\"",
-                    StringComparison.Ordinal),
+            WithControllerDiagnostic(
+                ControlJson("acknowledged", "status", "mount-pending"),
+                diagnostic),
             0);
 
         Assert.Equal(
@@ -367,6 +395,15 @@ public class StandaloneTaskbarBrokerProtocolTests
                 "\"controllerStatus\":\"started\",\"processId\":1," +
                 "\"controlNonce\":5,\"controlNonce\":5}",
                 0).Kind);
+        Assert.Equal(
+            StandaloneTaskbarBrokerResultKind.InvalidResponse,
+            StandaloneTaskbarBrokerProtocol.ParseControl(
+                StandaloneTaskbarBrokerCommand.Start,
+                "{\"status\":\"acknowledged\",\"command\":\"start\"," +
+                "\"controllerStatus\":\"started\"," +
+                "\"controllerDiagnostic\":\"private-bridge-validated\"," +
+                "\"controllerDiagnostic\":\"private-bridge-validated\"}",
+                0).Kind);
     }
 
     [Fact]
@@ -382,6 +419,14 @@ public class StandaloneTaskbarBrokerProtocolTests
             StandaloneTaskbarBrokerProtocol.ParseControl(
                 StandaloneTaskbarBrokerCommand.Start,
                 "{\"status\":\"acknowledged\",\"command\":\"start\",\"controllerStatus\":42}",
+                0).Kind);
+        Assert.Equal(
+            StandaloneTaskbarBrokerResultKind.InvalidResponse,
+            StandaloneTaskbarBrokerProtocol.ParseControl(
+                StandaloneTaskbarBrokerCommand.Start,
+                "{\"status\":\"acknowledged\",\"command\":\"start\"," +
+                "\"controllerStatus\":\"started\"," +
+                "\"controllerDiagnostic\":42}",
                 0).Kind);
     }
 
@@ -435,4 +480,12 @@ public class StandaloneTaskbarBrokerProtocolTests
         string controllerStatus,
         string probeStatus = "supported")
         => $"{{\"status\":\"{status}\",\"detail\":\"internal\",\"command\":\"{command}\",\"processId\":1,\"controlNonce\":5,\"threadId\":2,\"messageId\":3,\"acknowledgementMessageId\":4,\"controllerStatus\":\"{controllerStatus}\",\"probeStatus\":\"{probeStatus}\"}}";
+
+    private static string WithControllerDiagnostic(
+        string output,
+        string diagnostic)
+        => output.Replace(
+            "\"probeStatus\"",
+            $"\"controllerDiagnostic\":\"{diagnostic}\",\"probeStatus\"",
+            StringComparison.Ordinal);
 }

@@ -75,6 +75,8 @@ internal static class StandaloneTaskbarUiStatusPolicy
                 StandaloneTaskbarUiStatusKind.ActiveUnverified,
             StandaloneTaskbarRuntimeState.MountReady =>
                 StandaloneTaskbarUiStatusKind.Active,
+            StandaloneTaskbarRuntimeState.DiagnosticOnly =>
+                StandaloneTaskbarUiStatusKind.Fallback,
             StandaloneTaskbarRuntimeState.BinaryMissing =>
                 StandaloneTaskbarUiStatusKind.BinaryMissing,
             StandaloneTaskbarRuntimeState.Unsupported =>

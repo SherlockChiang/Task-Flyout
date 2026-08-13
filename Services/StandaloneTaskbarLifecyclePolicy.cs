@@ -7,6 +7,7 @@ internal enum StandaloneTaskbarRuntimeState
     Disabled,
     Starting,
     ControllerActiveUnverified,
+    DiagnosticOnly,
     MountReady,
     Stopping,
     Inactive,
@@ -32,6 +33,7 @@ internal readonly record struct StandaloneTaskbarRuntimeStatus(
         StandaloneTaskbarRuntimeState.Disabled => "disabled",
         StandaloneTaskbarRuntimeState.Starting => "starting",
         StandaloneTaskbarRuntimeState.ControllerActiveUnverified => "controller-active-unverified",
+        StandaloneTaskbarRuntimeState.DiagnosticOnly => "diagnostic-only",
         StandaloneTaskbarRuntimeState.MountReady => "mount-ready",
         StandaloneTaskbarRuntimeState.Stopping => "stopping",
         StandaloneTaskbarRuntimeState.Inactive => "inactive",
@@ -75,6 +77,8 @@ internal static class StandaloneTaskbarLifecyclePolicy
         {
             StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified =>
                 StandaloneTaskbarRuntimeState.ControllerActiveUnverified,
+            StandaloneTaskbarBrokerResultKind.ControllerDiagnosticOnly =>
+                StandaloneTaskbarRuntimeState.DiagnosticOnly,
             StandaloneTaskbarBrokerResultKind.BinaryMissing =>
                 StandaloneTaskbarRuntimeState.BinaryMissing,
             StandaloneTaskbarBrokerResultKind.Unsupported =>
@@ -128,6 +132,8 @@ internal static class StandaloneTaskbarLifecyclePolicy
             StandaloneTaskbarBrokerResultKind.Ambiguous or
             StandaloneTaskbarBrokerResultKind.TimedOut =>
                 StandaloneTaskbarRuntimeState.ControllerActiveUnverified,
+            StandaloneTaskbarBrokerResultKind.ControllerDiagnosticOnly =>
+                StandaloneTaskbarRuntimeState.DiagnosticOnly,
             StandaloneTaskbarBrokerResultKind.BinaryMissing =>
                 StandaloneTaskbarRuntimeState.BinaryMissing,
             StandaloneTaskbarBrokerResultKind.Unsupported =>

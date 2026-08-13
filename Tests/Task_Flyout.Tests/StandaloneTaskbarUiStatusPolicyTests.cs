@@ -10,6 +10,7 @@ public class StandaloneTaskbarUiStatusPolicyTests
     [InlineData(true, true, false, "ControllerActiveUnverified", false, null, "WeatherProviderDisabled")]
     [InlineData(true, true, true, "Starting", true, null, "Preparing")]
     [InlineData(true, true, true, "ControllerActiveUnverified", true, null, "ActiveUnverified")]
+    [InlineData(true, true, true, "DiagnosticOnly", false, null, "Fallback")]
     [InlineData(true, true, true, "MountReady", true, null, "Active")]
     [InlineData(true, true, true, "BinaryMissing", false, null, "BinaryMissing")]
     [InlineData(true, true, true, "Unsupported", false, null, "Unsupported")]

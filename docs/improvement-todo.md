@@ -1315,3 +1315,22 @@ transport foundation for the standalone host.
   justified shell-owned layout request; it must not invoke the private method
   directly, broaden the ABI allowlist, or enable mounting. M3-07/M3-08 remain
   in progress.
+
+### 2026-08-13 Diagnostic-Only App Lifecycle Guard
+
+- The managed broker protocol now reads the additive fixed
+  `controllerDiagnostic` property and recognizes the exact API v6-v11
+  `bootstrap-*`, `root-bootstrap-validated`, and `private-bridge-*` allowlist as
+  diagnostic-only. Unknown future prefixes retain the older unverified behavior
+  instead of silently expanding this security boundary.
+- A diagnostic-only acknowledgement can arrive from either start or a later
+  status query. In both cases the coordinator performs a bounded idempotent stop
+  before publishing the terminal fallback state, clears the controller identity
+  and mount lease, restores the cleanup decision atomically, and blocks an
+  automatic repeat start. If cleanup is ambiguous or exceeds its bound, the
+  state remains recovery with the cleanup obligation preserved.
+- This prevents an API v11 diagnostic Host from being mistaken for a mountable
+  weather controller, leaving its detour active, or retaining Windows Widgets
+  suppression while the app waits for mount readiness that v11 cannot produce.
+  The Task Flyout fallback remains visible. The managed suite passes 1157/1157
+  and the Debug x64 app build completes with zero warnings and zero errors.

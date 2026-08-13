@@ -24,6 +24,16 @@ public class StandaloneTaskbarWidgetsLifecyclePolicyTests
                 weatherBarEnabled,
                 providerEnabled));
 
+    [Fact]
+    public void Diagnostic_only_rejection_blocks_repeated_standalone_request()
+        => Assert.False(
+            StandaloneTaskbarWidgetsLifecyclePolicy.IsStandaloneDesired(
+                launchSuppressed: false,
+                requestedMode: WeatherBarMode.StandaloneTaskbar,
+                weatherBarEnabled: true,
+                weatherProviderEnabled: true,
+                diagnosticOnlyRejected: true));
+
     [Theory]
     [InlineData(false, false, false, true)]
     [InlineData(true, false, false, false)]

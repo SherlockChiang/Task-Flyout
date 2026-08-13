@@ -16,6 +16,7 @@ internal enum StandaloneTaskbarBrokerResultKind
     Unsupported,
     TemporarilyUnavailable,
     ControllerActiveUnverified,
+    ControllerDiagnosticOnly,
     ControllerMountReady,
     ControllerInactive,
     Rejected,
@@ -135,8 +136,14 @@ internal static class StandaloneTaskbarBrokerProtocol
             if (exitCode != 0)
                 return new(StandaloneTaskbarBrokerResultKind.Failed);
 
+            bool diagnosticOnly = IsDiagnosticOnlyControllerDiagnostic(
+                response.ControllerDiagnostic);
             StandaloneTaskbarBrokerResultKind? result = expectedCommand switch
             {
+                StandaloneTaskbarBrokerCommand.Start
+                    when (response.ControllerStatus is
+                        "started" or "already-started") && diagnosticOnly =>
+                        StandaloneTaskbarBrokerResultKind.ControllerDiagnosticOnly,
                 StandaloneTaskbarBrokerCommand.Start
                     when response.ControllerStatus is "started" or "already-started" =>
                         StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified,
@@ -146,6 +153,10 @@ internal static class StandaloneTaskbarBrokerProtocol
                 StandaloneTaskbarBrokerCommand.Status
                     when response.ControllerStatus == "mount-ready" =>
                         StandaloneTaskbarBrokerResultKind.ControllerMountReady,
+                StandaloneTaskbarBrokerCommand.Status
+                    when response.ControllerStatus == "mount-pending" &&
+                         diagnosticOnly =>
+                        StandaloneTaskbarBrokerResultKind.ControllerDiagnosticOnly,
                 StandaloneTaskbarBrokerCommand.Status
                     when response.ControllerStatus == "mount-pending" =>
                         StandaloneTaskbarBrokerResultKind.ControllerActiveUnverified,
@@ -285,12 +296,14 @@ internal static class StandaloneTaskbarBrokerProtocol
         string? status = null;
         string? command = null;
         string? controllerStatus = null;
+        string? controllerDiagnostic = null;
         string? probeStatus = null;
         uint? processId = null;
         uint? controlNonce = null;
         bool sawStatus = false;
         bool sawCommand = false;
         bool sawControllerStatus = false;
+        bool sawControllerDiagnostic = false;
         bool sawProbeStatus = false;
         bool sawProcessId = false;
         bool sawControlNonce = false;
@@ -303,6 +316,8 @@ internal static class StandaloneTaskbarBrokerProtocol
             bool isStatus = reader.ValueTextEquals("status"u8);
             bool isCommand = reader.ValueTextEquals("command"u8);
             bool isControllerStatus = reader.ValueTextEquals("controllerStatus"u8);
+            bool isControllerDiagnostic =
+                reader.ValueTextEquals("controllerDiagnostic"u8);
             bool isProbeStatus = reader.ValueTextEquals("probeStatus"u8);
             bool isProcessId = reader.ValueTextEquals("processId"u8);
             bool isControlNonce = reader.ValueTextEquals("controlNonce"u8);
@@ -310,7 +325,8 @@ internal static class StandaloneTaskbarBrokerProtocol
             if (!reader.Read())
                 return false;
 
-            if (isStatus || isCommand || isControllerStatus || isProbeStatus)
+            if (isStatus || isCommand || isControllerStatus ||
+                isControllerDiagnostic || isProbeStatus)
             {
                 if (reader.TokenType != JsonTokenType.String)
                     return false;
@@ -336,6 +352,12 @@ internal static class StandaloneTaskbarBrokerProtocol
                     if (sawControllerStatus) return false;
                     sawControllerStatus = true;
                     controllerStatus = value;
+                }
+                else if (isControllerDiagnostic)
+                {
+                    if (sawControllerDiagnostic) return false;
+                    sawControllerDiagnostic = true;
+                    controllerDiagnostic = value;
                 }
                 else
                 {
@@ -378,6 +400,7 @@ internal static class StandaloneTaskbarBrokerProtocol
             status,
             command,
             controllerStatus,
+            controllerDiagnostic,
             probeStatus,
             processId,
             controlNonce);
@@ -419,6 +442,49 @@ internal static class StandaloneTaskbarBrokerProtocol
             or "acknowledgement-wait-failed"
             or "acknowledgement-invalid";
 
+    private static bool IsDiagnosticOnlyControllerDiagnostic(
+        string? diagnostic)
+        => diagnostic is
+            "bootstrap-window-invalid" or
+            "bootstrap-owner-thread-mismatch" or
+            "bootstrap-host-bounds-invalid" or
+            "bootstrap-query-failed" or
+            "bootstrap-enumeration-overflow" or
+            "bootstrap-frame-not-observed" or
+            "bootstrap-frame-ambiguous" or
+            "bootstrap-tree-profile-mismatch" or
+            "bootstrap-frame-validated" or
+            "bootstrap-host-query-failed" or
+            "bootstrap-enumeration-failed" or
+            "bootstrap-class-inspection-failed" or
+            "bootstrap-identity-projection-failed" or
+            "bootstrap-tree-probe-unavailable" or
+            "bootstrap-root-unavailable" or
+            "bootstrap-root-query-failed" or
+            "bootstrap-root-not-associated-with-taskbar" or
+            "bootstrap-root-frame-not-observed" or
+            "bootstrap-root-frame-ambiguous" or
+            "bootstrap-root-tree-profile-mismatch" or
+            "root-bootstrap-validated" or
+            "bootstrap-root-enumeration-overflow" or
+            "private-bridge-awaiting-callback" or
+            "private-bridge-null-object" or
+            "private-bridge-compatibility-rejected" or
+            "private-bridge-detour-inactive" or
+            "private-bridge-callback-scope-inactive" or
+            "private-bridge-owner-thread-mismatch" or
+            "private-bridge-inspectable-slot-unreadable" or
+            "private-bridge-inspectable-pointer-null" or
+            "private-bridge-inspectable-object-unreadable" or
+            "private-bridge-inspectable-vtable-unreadable" or
+            "private-bridge-inspectable-method-invalid" or
+            "private-bridge-projection-failed" or
+            "private-bridge-frame-type-mismatch" or
+            "private-bridge-dispatcher-unavailable" or
+            "private-bridge-dispatcher-thread-mismatch" or
+            "private-bridge-tree-profile-mismatch" or
+            "private-bridge-validated";
+
     private static bool IsAmbiguousControlStatus(string? status)
         => status is "message-dispatch-failed"
             or "hook-remove-failed"
@@ -430,6 +496,7 @@ internal static class StandaloneTaskbarBrokerProtocol
         string Status,
         string? Command,
         string? ControllerStatus,
+        string? ControllerDiagnostic,
         string? ProbeStatus,
         uint? ProcessId,
         uint? ControlNonce);
