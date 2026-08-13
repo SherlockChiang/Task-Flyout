@@ -117,6 +117,31 @@ int wmain() {
         L"a unique frame must still pass the complete tree profile");
 
     input = ValidInput();
+    input.treeProfileStatus = TaskbarTreeProbeStatus::XamlTreeUnavailable;
+    passed &= Expect(
+        EvaluateTaskbarFrameBootstrapPolicy(input) ==
+            TaskbarFrameBootstrapStatus::TreeProbeUnavailable,
+        L"an unavailable tree probe must remain distinct from profile drift");
+
+    passed &= Expect(
+        TaskbarFrameBootstrapFailureStatus(
+            TaskbarFrameBootstrapFailureStage::HostQuery) ==
+                TaskbarFrameBootstrapStatus::HostQueryFailed &&
+            TaskbarFrameBootstrapFailureStatus(
+                TaskbarFrameBootstrapFailureStage::Enumeration) ==
+                TaskbarFrameBootstrapStatus::EnumerationFailed &&
+            TaskbarFrameBootstrapFailureStatus(
+                TaskbarFrameBootstrapFailureStage::ClassInspection) ==
+                TaskbarFrameBootstrapStatus::ClassInspectionFailed &&
+            TaskbarFrameBootstrapFailureStatus(
+                TaskbarFrameBootstrapFailureStage::IdentityProjection) ==
+                TaskbarFrameBootstrapStatus::IdentityProjectionFailed &&
+            TaskbarFrameBootstrapFailureStatus(
+                TaskbarFrameBootstrapFailureStage::Unknown) ==
+                TaskbarFrameBootstrapStatus::QueryFailed,
+        L"each observable exception boundary must map to one fixed status");
+
+    input = ValidInput();
     passed &= Expect(
         EvaluateTaskbarFrameBootstrapPolicy(input) ==
             TaskbarFrameBootstrapStatus::FrameValidated,
@@ -124,7 +149,22 @@ int wmain() {
     passed &= Expect(
         std::wstring_view(TaskbarFrameBootstrapStatusName(
             TaskbarFrameBootstrapStatus::EnumerationOverflow)) ==
-            L"enumeration-overflow",
+            L"enumeration-overflow" &&
+            std::wstring_view(TaskbarFrameBootstrapStatusName(
+                TaskbarFrameBootstrapStatus::HostQueryFailed)) ==
+                L"host-query-failed" &&
+            std::wstring_view(TaskbarFrameBootstrapStatusName(
+                TaskbarFrameBootstrapStatus::EnumerationFailed)) ==
+                L"enumeration-failed" &&
+            std::wstring_view(TaskbarFrameBootstrapStatusName(
+                TaskbarFrameBootstrapStatus::ClassInspectionFailed)) ==
+                L"class-inspection-failed" &&
+            std::wstring_view(TaskbarFrameBootstrapStatusName(
+                TaskbarFrameBootstrapStatus::IdentityProjectionFailed)) ==
+                L"identity-projection-failed" &&
+            std::wstring_view(TaskbarFrameBootstrapStatusName(
+                TaskbarFrameBootstrapStatus::TreeProbeUnavailable)) ==
+                L"tree-probe-unavailable",
         L"bootstrap failures should remain diagnosable");
     passed &= Expect(
         kMaxTaskbarFrameBootstrapElements == 1024,

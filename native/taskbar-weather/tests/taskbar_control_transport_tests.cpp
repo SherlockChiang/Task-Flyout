@@ -20,7 +20,7 @@ int wmain() {
 
     bool passed = true;
     passed &= Expect(
-        kHostApiVersion == 7u &&
+        kHostApiVersion == 8u &&
             static_cast<std::uint32_t>(
                 HostControlDiagnostic::DetourTargetNotObserved) == 12u &&
             static_cast<std::uint32_t>(
@@ -51,7 +51,19 @@ int wmain() {
                 HostControlDiagnostic::BootstrapTreeProfileMismatch) ==
                 24u &&
             static_cast<std::uint32_t>(
-                HostControlDiagnostic::BootstrapFrameValidated) == 25u,
+                HostControlDiagnostic::BootstrapFrameValidated) == 25u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapHostQueryFailed) == 26u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapEnumerationFailed) == 27u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapClassInspectionFailed) ==
+                28u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapIdentityProjectionFailed) ==
+                29u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapTreeProbeUnavailable) == 30u,
         L"host API and additive diagnostic values must remain protocol-stable");
     constexpr std::uint32_t nonce = 0xA17E52C3u;
     constexpr auto encodedStart = EncodeHostControlRequest(
@@ -246,6 +258,21 @@ int wmain() {
         std::wstring_view(HostControlDiagnosticName(
             HostControlDiagnostic::BootstrapFrameValidated)) ==
                 L"bootstrap-frame-validated" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::BootstrapHostQueryFailed)) ==
+                L"bootstrap-host-query-failed" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::BootstrapEnumerationFailed)) ==
+                L"bootstrap-enumeration-failed" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::BootstrapClassInspectionFailed)) ==
+                L"bootstrap-class-inspection-failed" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::BootstrapIdentityProjectionFailed)) ==
+                L"bootstrap-identity-projection-failed" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::BootstrapTreeProbeUnavailable)) ==
+                L"bootstrap-tree-probe-unavailable" &&
         std::wstring_view(HostControlDiagnosticName(
             static_cast<HostControlDiagnostic>(0xFFFFFFFFu))) == L"invalid",
         L"controller diagnostic names should be stable and bounded");

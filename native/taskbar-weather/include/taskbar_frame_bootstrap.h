@@ -19,6 +19,19 @@ enum class TaskbarFrameBootstrapStatus : std::uint32_t {
     FrameAmbiguous = 6,
     TreeProfileMismatch = 7,
     FrameValidated = 8,
+    HostQueryFailed = 9,
+    EnumerationFailed = 10,
+    ClassInspectionFailed = 11,
+    IdentityProjectionFailed = 12,
+    TreeProbeUnavailable = 13,
+};
+
+enum class TaskbarFrameBootstrapFailureStage : std::uint32_t {
+    Unknown = 0,
+    HostQuery = 1,
+    Enumeration = 2,
+    ClassInspection = 3,
+    IdentityProjection = 4,
 };
 
 inline constexpr std::size_t kMaxTaskbarFrameBootstrapElements = 1024;
@@ -41,6 +54,9 @@ struct TaskbarFrameBootstrapPolicyInput {
 
 TaskbarFrameBootstrapStatus EvaluateTaskbarFrameBootstrapPolicy(
     const TaskbarFrameBootstrapPolicyInput& input) noexcept;
+
+TaskbarFrameBootstrapStatus TaskbarFrameBootstrapFailureStatus(
+    TaskbarFrameBootstrapFailureStage stage) noexcept;
 
 // This probe must run synchronously on the Shell_TrayWnd owner thread. It does
 // not initialize a COM apartment and retains no XAML reference after return.

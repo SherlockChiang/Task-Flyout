@@ -135,6 +135,11 @@ public class StandaloneTaskbarBrokerProtocolTests
     [InlineData("bootstrap-frame-ambiguous")]
     [InlineData("bootstrap-tree-profile-mismatch")]
     [InlineData("bootstrap-frame-validated")]
+    [InlineData("bootstrap-host-query-failed")]
+    [InlineData("bootstrap-enumeration-failed")]
+    [InlineData("bootstrap-class-inspection-failed")]
+    [InlineData("bootstrap-identity-projection-failed")]
+    [InlineData("bootstrap-tree-probe-unavailable")]
     public void Additive_controller_diagnostic_preserves_older_parser_behavior(
         string controllerDiagnostic)
     {

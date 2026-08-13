@@ -562,6 +562,16 @@ const wchar_t* HostControlDiagnosticName(
             return L"bootstrap-tree-profile-mismatch";
         case HostControlDiagnostic::BootstrapFrameValidated:
             return L"bootstrap-frame-validated";
+        case HostControlDiagnostic::BootstrapHostQueryFailed:
+            return L"bootstrap-host-query-failed";
+        case HostControlDiagnostic::BootstrapEnumerationFailed:
+            return L"bootstrap-enumeration-failed";
+        case HostControlDiagnostic::BootstrapClassInspectionFailed:
+            return L"bootstrap-class-inspection-failed";
+        case HostControlDiagnostic::BootstrapIdentityProjectionFailed:
+            return L"bootstrap-identity-projection-failed";
+        case HostControlDiagnostic::BootstrapTreeProbeUnavailable:
+            return L"bootstrap-tree-probe-unavailable";
     }
     return L"invalid";
 }

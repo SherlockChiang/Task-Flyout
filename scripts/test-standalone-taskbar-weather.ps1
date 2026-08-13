@@ -60,7 +60,12 @@ $knownControllerDiagnostics = @(
     'bootstrap-frame-not-observed',
     'bootstrap-frame-ambiguous',
     'bootstrap-tree-profile-mismatch',
-    'bootstrap-frame-validated')
+    'bootstrap-frame-validated',
+    'bootstrap-host-query-failed',
+    'bootstrap-enumeration-failed',
+    'bootstrap-class-inspection-failed',
+    'bootstrap-identity-projection-failed',
+    'bootstrap-tree-probe-unavailable')
 $bootstrapControllerDiagnostics = @(
     'bootstrap-window-invalid',
     'bootstrap-owner-thread-mismatch',
@@ -70,7 +75,12 @@ $bootstrapControllerDiagnostics = @(
     'bootstrap-frame-not-observed',
     'bootstrap-frame-ambiguous',
     'bootstrap-tree-profile-mismatch',
-    'bootstrap-frame-validated')
+    'bootstrap-frame-validated',
+    'bootstrap-host-query-failed',
+    'bootstrap-enumeration-failed',
+    'bootstrap-class-inspection-failed',
+    'bootstrap-identity-projection-failed',
+    'bootstrap-tree-probe-unavailable')
 
 if ($DescribeOnly) {
     [pscustomobject]@{

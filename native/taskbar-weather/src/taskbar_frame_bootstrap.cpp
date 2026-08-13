@@ -19,6 +19,8 @@ namespace {
 
 using winrt::Windows::Foundation::IUnknown;
 using winrt::Windows::Foundation::Rect;
+using winrt::Windows::Foundation::Collections::IIterable;
+using winrt::Windows::Foundation::Collections::IIterator;
 using winrt::Windows::UI::Xaml::UIElement;
 using winrt::Windows::UI::Xaml::Media::VisualTreeHelper;
 
@@ -109,11 +111,31 @@ TaskbarFrameBootstrapStatus EvaluateTaskbarFrameBootstrapPolicy(
     if (input.uniqueFrameCount > 1) {
         return TaskbarFrameBootstrapStatus::FrameAmbiguous;
     }
-    if (input.treeProfileStatus !=
-        TaskbarTreeProbeStatus::LandmarksMatched) {
+    if (input.treeProfileStatus ==
+        TaskbarTreeProbeStatus::XamlTreeUnavailable) {
+        return TaskbarFrameBootstrapStatus::TreeProbeUnavailable;
+    }
+    if (input.treeProfileStatus != TaskbarTreeProbeStatus::LandmarksMatched) {
         return TaskbarFrameBootstrapStatus::TreeProfileMismatch;
     }
     return TaskbarFrameBootstrapStatus::FrameValidated;
+}
+
+TaskbarFrameBootstrapStatus TaskbarFrameBootstrapFailureStatus(
+    const TaskbarFrameBootstrapFailureStage stage) noexcept {
+    switch (stage) {
+        case TaskbarFrameBootstrapFailureStage::HostQuery:
+            return TaskbarFrameBootstrapStatus::HostQueryFailed;
+        case TaskbarFrameBootstrapFailureStage::Enumeration:
+            return TaskbarFrameBootstrapStatus::EnumerationFailed;
+        case TaskbarFrameBootstrapFailureStage::ClassInspection:
+            return TaskbarFrameBootstrapStatus::ClassInspectionFailed;
+        case TaskbarFrameBootstrapFailureStage::IdentityProjection:
+            return TaskbarFrameBootstrapStatus::IdentityProjectionFailed;
+        case TaskbarFrameBootstrapFailureStage::Unknown:
+            return TaskbarFrameBootstrapStatus::QueryFailed;
+    }
+    return TaskbarFrameBootstrapStatus::QueryFailed;
 }
 
 TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
@@ -152,12 +174,26 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
     // probe deliberately does not call init_apartment and returns no XAML
     // object to its caller.
     try {
-        const auto elements =
+        IIterable<UIElement> elements{nullptr};
+        try {
+            elements =
             VisualTreeHelper::FindElementsInHostCoordinates(
                 hostBounds,
                 UIElement{nullptr},
                 true);
-        const auto iterator = elements.First();
+        } catch (...) {
+            return TaskbarFrameBootstrapFailureStatus(
+                TaskbarFrameBootstrapFailureStage::HostQuery);
+        }
+        input.querySucceeded = true;
+
+        IIterator<UIElement> iterator{nullptr};
+        try {
+            iterator = elements.First();
+        } catch (...) {
+            return TaskbarFrameBootstrapFailureStatus(
+                TaskbarFrameBootstrapFailureStage::Enumeration);
+        }
         std::array<IUnknown, kMaxTaskbarFrameBootstrapElements>
             frameIdentities{};
         UIElement uniqueFrame{nullptr};
@@ -166,7 +202,13 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
         const ULONGLONG enumerationStarted = GetTickCount64();
 
         for (;;) {
-            const bool hasCurrent = iterator.HasCurrent();
+            bool hasCurrent = false;
+            try {
+                hasCurrent = iterator.HasCurrent();
+            } catch (...) {
+                return TaskbarFrameBootstrapFailureStatus(
+                    TaskbarFrameBootstrapFailureStage::Enumeration);
+            }
             if (GetTickCount64() - enumerationStarted >=
                 kEnumerationBudgetMilliseconds) {
                 input.enumerationOverflow = true;
@@ -180,11 +222,31 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
                 break;
             }
 
-            const UIElement element = iterator.Current();
+            UIElement element{nullptr};
+            try {
+                element = iterator.Current();
+            } catch (...) {
+                return TaskbarFrameBootstrapFailureStatus(
+                    TaskbarFrameBootstrapFailureStage::Enumeration);
+            }
             ++enumeratedCount;
-            if (element &&
-                winrt::get_class_name(element) == kTaskbarFrameClass) {
-                const IUnknown identity = element.as<IUnknown>();
+            winrt::hstring className;
+            if (element) {
+                try {
+                    className = winrt::get_class_name(element);
+                } catch (...) {
+                    return TaskbarFrameBootstrapFailureStatus(
+                        TaskbarFrameBootstrapFailureStage::ClassInspection);
+                }
+            }
+            if (className == kTaskbarFrameClass) {
+                IUnknown identity{nullptr};
+                try {
+                    identity = element.as<IUnknown>();
+                } catch (...) {
+                    return TaskbarFrameBootstrapFailureStatus(
+                        TaskbarFrameBootstrapFailureStage::IdentityProjection);
+                }
                 const void* const identityAddress = winrt::get_abi(identity);
                 bool alreadyObserved = false;
                 for (std::size_t index = 0;
@@ -208,7 +270,12 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
                     }
                 }
             }
-            iterator.MoveNext();
+            try {
+                iterator.MoveNext();
+            } catch (...) {
+                return TaskbarFrameBootstrapFailureStatus(
+                    TaskbarFrameBootstrapFailureStage::Enumeration);
+            }
             if (GetTickCount64() - enumerationStarted >=
                 kEnumerationBudgetMilliseconds) {
                 input.enumerationOverflow = true;
@@ -216,7 +283,6 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
             }
         }
 
-        input.querySucceeded = true;
         input.uniqueFrameCount =
             static_cast<std::uint32_t>(uniqueFrameCount);
         if (!input.enumerationOverflow && uniqueFrameCount == 1) {
@@ -225,11 +291,8 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
             input.treeProfileStatus = profile.status;
         }
     } catch (...) {
-        input.querySucceeded = false;
-        input.enumerationOverflow = false;
-        input.uniqueFrameCount = 0;
-        input.treeProfileStatus =
-            TaskbarTreeProbeStatus::XamlTreeUnavailable;
+        return TaskbarFrameBootstrapFailureStatus(
+            TaskbarFrameBootstrapFailureStage::Unknown);
     }
 
     return EvaluateTaskbarFrameBootstrapPolicy(input);
@@ -256,6 +319,16 @@ const wchar_t* TaskbarFrameBootstrapStatusName(
             return L"tree-profile-mismatch";
         case TaskbarFrameBootstrapStatus::FrameValidated:
             return L"frame-validated";
+        case TaskbarFrameBootstrapStatus::HostQueryFailed:
+            return L"host-query-failed";
+        case TaskbarFrameBootstrapStatus::EnumerationFailed:
+            return L"enumeration-failed";
+        case TaskbarFrameBootstrapStatus::ClassInspectionFailed:
+            return L"class-inspection-failed";
+        case TaskbarFrameBootstrapStatus::IdentityProjectionFailed:
+            return L"identity-projection-failed";
+        case TaskbarFrameBootstrapStatus::TreeProbeUnavailable:
+            return L"tree-probe-unavailable";
     }
     return L"unknown";
 }

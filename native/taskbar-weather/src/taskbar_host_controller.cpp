@@ -1003,6 +1003,16 @@ HostControlDiagnostic TaskbarFrameBootstrapDiagnostic(
             return HostControlDiagnostic::BootstrapTreeProfileMismatch;
         case TaskbarFrameBootstrapStatus::FrameValidated:
             return HostControlDiagnostic::BootstrapFrameValidated;
+        case TaskbarFrameBootstrapStatus::HostQueryFailed:
+            return HostControlDiagnostic::BootstrapHostQueryFailed;
+        case TaskbarFrameBootstrapStatus::EnumerationFailed:
+            return HostControlDiagnostic::BootstrapEnumerationFailed;
+        case TaskbarFrameBootstrapStatus::ClassInspectionFailed:
+            return HostControlDiagnostic::BootstrapClassInspectionFailed;
+        case TaskbarFrameBootstrapStatus::IdentityProjectionFailed:
+            return HostControlDiagnostic::BootstrapIdentityProjectionFailed;
+        case TaskbarFrameBootstrapStatus::TreeProbeUnavailable:
+            return HostControlDiagnostic::BootstrapTreeProbeUnavailable;
     }
     return HostControlDiagnostic::BootstrapQueryFailed;
 }

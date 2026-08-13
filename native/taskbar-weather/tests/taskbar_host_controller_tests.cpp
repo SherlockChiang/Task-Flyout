@@ -151,7 +151,22 @@ int wmain() {
                 HostControlDiagnostic::BootstrapTreeProfileMismatch &&
             TaskbarFrameBootstrapDiagnostic(
                 TaskbarFrameBootstrapStatus::FrameValidated) ==
-                HostControlDiagnostic::BootstrapFrameValidated,
+                HostControlDiagnostic::BootstrapFrameValidated &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::HostQueryFailed) ==
+                HostControlDiagnostic::BootstrapHostQueryFailed &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::EnumerationFailed) ==
+                HostControlDiagnostic::BootstrapEnumerationFailed &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::ClassInspectionFailed) ==
+                HostControlDiagnostic::BootstrapClassInspectionFailed &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::IdentityProjectionFailed) ==
+                HostControlDiagnostic::BootstrapIdentityProjectionFailed &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::TreeProbeUnavailable) ==
+                HostControlDiagnostic::BootstrapTreeProbeUnavailable,
         L"bootstrap outcomes should map only to additive fixed diagnostics");
 
     passed &= Expect(
