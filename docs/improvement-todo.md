@@ -1134,5 +1134,8 @@ transport foundation for the standalone host.
   zero dimensions, and non-finite dimensions. Native 13/13, complete .NET
   1123/1123, Debug x64 (0 warnings/errors), and both PowerShell parser/
   `DescribeOnly` paths remain green. The v9 output is isolated in
-  `.testbuild/native-taskbar-weather-v9` and has not been signed or loaded yet;
-  M3-07/M3-08 remain in progress.
+  `.testbuild/native-taskbar-weather-v9`. Both v9 binaries are now signed with
+  current-user certificate `15303040F7CEECFDE9C023F15481D15C39CCDB46` and
+  SignTool verified each with zero warnings/errors; the current Explorer still
+  pins the previous Host, so load v9 only after another disposable Explorer
+  restart. M3-07/M3-08 remain in progress.
