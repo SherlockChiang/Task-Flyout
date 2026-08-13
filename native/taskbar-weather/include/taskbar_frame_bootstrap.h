@@ -52,11 +52,22 @@ struct TaskbarFrameBootstrapPolicyInput {
         TaskbarTreeProbeStatus::XamlTreeUnavailable;
 };
 
+struct TaskbarFrameBootstrapPointInput {
+    double x = 0.0;
+    double y = 0.0;
+    double width = 0.0;
+    double height = 0.0;
+};
+
 TaskbarFrameBootstrapStatus EvaluateTaskbarFrameBootstrapPolicy(
     const TaskbarFrameBootstrapPolicyInput& input) noexcept;
 
 TaskbarFrameBootstrapStatus TaskbarFrameBootstrapFailureStatus(
     TaskbarFrameBootstrapFailureStage stage) noexcept;
+
+bool TrySelectTaskbarFrameBootstrapPoint(
+    const TaskbarFrameBootstrapPointInput& input,
+    winrt::Windows::Foundation::Point& point) noexcept;
 
 // This probe must run synchronously on the Shell_TrayWnd owner thread. It does
 // not initialize a COM apartment and retains no XAML reference after return.

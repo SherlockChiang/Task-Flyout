@@ -1,6 +1,7 @@
 #include "taskbar_frame_bootstrap.h"
 
 #include <cstdio>
+#include <cmath>
 #include <limits>
 #include <string_view>
 
@@ -169,6 +170,31 @@ int wmain() {
     passed &= Expect(
         kMaxTaskbarFrameBootstrapElements == 1024,
         L"the public enumeration budget must remain fixed and bounded");
+
+    winrt::Windows::Foundation::Point point{};
+    passed &= Expect(
+        TrySelectTaskbarFrameBootstrapPoint(
+            {0.0, 0.0, 1920.0, 48.0},
+            point) &&
+            point.X == 960.0f && point.Y == 24.0f,
+        L"the bootstrap query should use one deterministic host center point");
+    passed &= Expect(
+        TrySelectTaskbarFrameBootstrapPoint(
+            {-12.0, 4.0, 20.0, 10.0},
+            point) &&
+            point.X == -2.0f && point.Y == 9.0f,
+        L"the point policy should preserve finite translated host origins");
+    passed &= Expect(
+        !TrySelectTaskbarFrameBootstrapPoint(
+            {0.0, 0.0, 0.0, 48.0},
+            point) &&
+            !TrySelectTaskbarFrameBootstrapPoint(
+                {0.0,
+                 0.0,
+                 std::numeric_limits<double>::infinity(),
+                 48.0},
+                point),
+        L"invalid point geometry must fail before invoking public XAML APIs");
 
     if (!passed) {
         return 1;

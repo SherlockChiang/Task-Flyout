@@ -18,6 +18,7 @@ namespace taskflyout::taskbar {
 namespace {
 
 using winrt::Windows::Foundation::IUnknown;
+using winrt::Windows::Foundation::Point;
 using winrt::Windows::Foundation::Rect;
 using winrt::Windows::Foundation::Collections::IIterable;
 using winrt::Windows::Foundation::Collections::IIterator;
@@ -138,6 +139,32 @@ TaskbarFrameBootstrapStatus TaskbarFrameBootstrapFailureStatus(
     return TaskbarFrameBootstrapStatus::QueryFailed;
 }
 
+bool TrySelectTaskbarFrameBootstrapPoint(
+    const TaskbarFrameBootstrapPointInput& input,
+    Point& point) noexcept {
+    point = {};
+    if (!std::isfinite(input.x) || !std::isfinite(input.y) ||
+        !std::isfinite(input.width) || !std::isfinite(input.height) ||
+        input.width <= 0.0 || input.height <= 0.0) {
+        return false;
+    }
+
+    const double centerX = input.x + input.width / 2.0;
+    const double centerY = input.y + input.height / 2.0;
+    if (!std::isfinite(centerX) || !std::isfinite(centerY) ||
+        centerX < -static_cast<double>(std::numeric_limits<float>::max()) ||
+        centerX > static_cast<double>(std::numeric_limits<float>::max()) ||
+        centerY < -static_cast<double>(std::numeric_limits<float>::max()) ||
+        centerY > static_cast<double>(std::numeric_limits<float>::max())) {
+        return false;
+    }
+
+    point = Point{
+        static_cast<float>(centerX),
+        static_cast<float>(centerY)};
+    return std::isfinite(point.X) && std::isfinite(point.Y);
+}
+
 TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
     HWND taskbarWindow) noexcept {
     TaskbarFrameBootstrapPolicyInput input;
@@ -169,6 +196,13 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
     if (status == TaskbarFrameBootstrapStatus::HostBoundsInvalid) {
         return status;
     }
+    Point hostPoint{};
+    input.hostBoundsValid = TrySelectTaskbarFrameBootstrapPoint(
+        {hostBounds.X, hostBounds.Y, hostBounds.Width, hostBounds.Height},
+        hostPoint);
+    if (!input.hostBoundsValid) {
+        return TaskbarFrameBootstrapStatus::HostBoundsInvalid;
+    }
 
     // Every projected object below is scoped to this owner-thread block. The
     // probe deliberately does not call init_apartment and returns no XAML
@@ -178,7 +212,7 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
         try {
             elements =
             VisualTreeHelper::FindElementsInHostCoordinates(
-                hostBounds,
+                hostPoint,
                 UIElement{nullptr},
                 true);
         } catch (...) {
