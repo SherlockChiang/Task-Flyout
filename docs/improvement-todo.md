@@ -1334,3 +1334,22 @@ transport foundation for the standalone host.
   suppression while the app waits for mount readiness that v11 cannot produce.
   The Task Flyout fallback remains visible. The managed suite passes 1157/1157
   and the Debug x64 app build completes with zero warnings and zero errors.
+
+### 2026-08-14 Maintenance Checkpoint Archived
+
+- Commit `abe66fa` archives the managed diagnostic-only lifecycle guard. It
+  covers both immediate start acknowledgements and delayed status diagnostics,
+  with bounded cleanup, fail-closed fallback, and no automatic retry loop.
+- Commit `48bc91c` archives the native callback safety guard. Secondary
+  taskbar-thread callbacks are ignored before they can consume the one-shot
+  bridge result, and the read-only callback no longer uses `noexcept` across the
+  detour exception boundary. The v11 native suite remains 13/13.
+- The next PDB experiment was intentionally paused at this checkpoint. The
+  existing DIA helper could validate the full PDB identity but did not enumerate
+  symbols through its global `findChildren` query; no new RVA/profile was
+  accepted or added. The only recorded candidate remains the offline note from
+  the existing symbol tooling: `TaskbarFrame::OnTaskbarLayoutChildBoundsPending`
+  at RVA `0x001DFE40`, which is unvalidated and must not be hooked or loaded.
+- Working-tree changes in `Package.appxmanifest` and
+  `windhawk/task-flyout-weather-companion.wh.cpp` remain user-owned and are not
+  included in the maintenance commits.
