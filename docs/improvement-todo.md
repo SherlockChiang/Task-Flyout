@@ -1089,5 +1089,7 @@ transport foundation for the standalone host.
   13/13, managed protocol tests pass 63/63, the complete .NET suite passes
   1123/1123, the Debug x64 app build has zero warnings/errors, and PowerShell 7
   plus Windows PowerShell pass AST and `DescribeOnly` validation. The current
-  Explorer still pins the API v7 Host, so v8 must be signed and loaded only
-  after another disposable Explorer restart. M3-07/M3-08 remain in progress.
+  Explorer still pins the API v7 Host. Both v8 binaries are now signed with
+  current-user certificate `15303040F7CEECFDE9C023F15481D15C39CCDB46` and
+  SignTool verified each with zero warnings/errors; load them only after another
+  disposable Explorer restart. M3-07/M3-08 remain in progress.
