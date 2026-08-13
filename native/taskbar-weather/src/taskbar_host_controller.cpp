@@ -845,9 +845,21 @@ void WINAPI OnTaskbarFrameLayout(void* privateTaskbarFrame) {
     }
 }
 
-void WINAPI OnTaskbarFrameLayoutReadOnly(void* privateTaskbarFrame) noexcept {
+void WINAPI OnTaskbarFrameLayoutReadOnly(void* privateTaskbarFrame) {
     // Resolve and profile only while the detour supplies the exact TLS lifetime
-    // token. All apartment-affine references die before this callback returns.
+    // token. A process-wide hook can also observe a secondary taskbar thread;
+    // that observation is not evidence about the primary TaskbarFrame bridge and
+    // must not consume the one-shot diagnostic latch. The bridge resolver keeps
+    // the same owner-thread gate, but filter here before publishing any result.
+    const TaskbarDetourSnapshot detour = GetTaskbarDetourSnapshot();
+    if (detour.bootstrapThreadId == 0 ||
+        detour.bootstrapThreadId != GetCurrentThreadId()) {
+        return;
+    }
+
+    // All apartment-affine references die before this callback returns. Any C++
+    // exception that escapes a future probe is intentionally handled by the
+    // detour's outer callback boundary, which quarantines the hook.
     const TaskbarFrameBridgeResult bridge =
         ResolveTaskbarFrameFromPrivateAbi(privateTaskbarFrame);
     TaskbarTreeProbeStatus treeStatus =
