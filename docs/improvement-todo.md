@@ -1289,3 +1289,29 @@ transport foundation for the standalone host.
   only the disposable Explorer session before running the signed v11 harness;
   the harness itself will not restart Explorer or synthesize a relayout.
   M3-07/M3-08 remain in progress.
+
+### 2026-08-13 Signed API v11 Natural-Callback Diagnosis
+
+- After restarting the disposable Explorer, the strict profile probe accepted
+  Windows build `26200`, Explorer process `14536`, and primary taskbar thread
+  `53556`. Module inspection confirmed that the new process loaded the signed
+  v11 Host from `.testbuild/native-taskbar-weather-v11`, not the previously
+  pinned v10 binary.
+- The signed harness started from a `not-started` baseline and remained at
+  `private-bridge-awaiting-callback` for the full bounded 15-second window. No
+  natural call to the allowlisted
+  `TaskbarFrame::OnTaskbarLayoutChildBoundsChanged` target was observed, and
+  the controller intentionally did not request relayout or call the private
+  target synthetically.
+- The harness failed closed and completed its `finally` cleanup. An independent
+  status acknowledgement returned `not-started` with diagnostic `none`; the
+  independent strict probe still returned `supported`, and Explorer process
+  `14536` remained responsive.
+- This result does not reject the guarded private-object bridge because the
+  bridge callback never ran. It does show that the current low-frequency layout
+  target cannot serve as a deterministic diagnostic bootstrap on an idle
+  taskbar. The next experiment must identify an exact-profile, owner-thread
+  callback that naturally supplies the same private object, or a separately
+  justified shell-owned layout request; it must not invoke the private method
+  directly, broaden the ABI allowlist, or enable mounting. M3-07/M3-08 remain
+  in progress.
