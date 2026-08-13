@@ -1037,9 +1037,12 @@ transport foundation for the standalone host.
   zero-padded copy is rejected by DIA. No symbol-derived private RVA or unsafe
   synthetic `TaskbarFrame` call was accepted from that artifact. The public
   bootstrap is therefore the next evidence-gathering step.
-- The API v7 binaries are not yet signed or loaded. Sign both with current-user
-  certificate `15303040F7CEECFDE9C023F15481D15C39CCDB46`, restart the disposable
-  Explorer once to release its pinned v6 Host, then run the gated harness. If
-  the result is `bootstrap-frame-not-observed`, investigate the XAML island host
-  coordinate assumption before changing private detours or sending more layout
-  notifications. M3-07/M3-08 remain in progress.
+- Both API v7 binaries are signed with current-user certificate
+  `15303040F7CEECFDE9C023F15481D15C39CCDB46`; SignTool verified both with zero
+  warnings and zero errors. A read-only strict probe accepted Windows build
+  `26200` and the allowlisted `Taskbar.View.dll` fingerprint in Explorer process
+  `16420` on taskbar thread `20172`. The v7 Host has not been loaded yet:
+  restart the disposable Explorer once to release its pinned v6 Host, then run
+  the gated harness. If the result is `bootstrap-frame-not-observed`, investigate
+  the XAML island host coordinate assumption before changing private detours or
+  sending more layout notifications. M3-07/M3-08 remain in progress.
