@@ -14,7 +14,7 @@ param(
     [string]$BinaryDirectory,
 
     [ValidateRange(1, 120)]
-    [int]$ReadyTimeoutSeconds = 20,
+    [int]$ReadyTimeoutSeconds = 15,
 
     [ValidateRange(0, 120)]
     [int]$ReadyHoldSeconds = 15,
@@ -73,7 +73,24 @@ $knownControllerDiagnostics = @(
     'bootstrap-root-frame-ambiguous',
     'bootstrap-root-tree-profile-mismatch',
     'root-bootstrap-validated',
-    'bootstrap-root-enumeration-overflow')
+    'bootstrap-root-enumeration-overflow',
+    'private-bridge-awaiting-callback',
+    'private-bridge-null-object',
+    'private-bridge-compatibility-rejected',
+    'private-bridge-detour-inactive',
+    'private-bridge-callback-scope-inactive',
+    'private-bridge-owner-thread-mismatch',
+    'private-bridge-inspectable-slot-unreadable',
+    'private-bridge-inspectable-pointer-null',
+    'private-bridge-inspectable-object-unreadable',
+    'private-bridge-inspectable-vtable-unreadable',
+    'private-bridge-inspectable-method-invalid',
+    'private-bridge-projection-failed',
+    'private-bridge-frame-type-mismatch',
+    'private-bridge-dispatcher-unavailable',
+    'private-bridge-dispatcher-thread-mismatch',
+    'private-bridge-tree-profile-mismatch',
+    'private-bridge-validated')
 $bootstrapControllerDiagnostics = @(
     'bootstrap-window-invalid',
     'bootstrap-owner-thread-mismatch',
@@ -97,13 +114,30 @@ $bootstrapControllerDiagnostics = @(
     'bootstrap-root-tree-profile-mismatch',
     'root-bootstrap-validated',
     'bootstrap-root-enumeration-overflow')
+$privateBridgeControllerDiagnostics = @(
+    'private-bridge-null-object',
+    'private-bridge-compatibility-rejected',
+    'private-bridge-detour-inactive',
+    'private-bridge-callback-scope-inactive',
+    'private-bridge-owner-thread-mismatch',
+    'private-bridge-inspectable-slot-unreadable',
+    'private-bridge-inspectable-pointer-null',
+    'private-bridge-inspectable-object-unreadable',
+    'private-bridge-inspectable-vtable-unreadable',
+    'private-bridge-inspectable-method-invalid',
+    'private-bridge-projection-failed',
+    'private-bridge-frame-type-mismatch',
+    'private-bridge-dispatcher-unavailable',
+    'private-bridge-dispatcher-thread-mismatch',
+    'private-bridge-tree-profile-mismatch',
+    'private-bridge-validated')
 
 if ($DescribeOnly) {
     [pscustomobject]@{
         MutatesExplorer = $true
         InstallsPackage = $false
         RestartsExplorer = $false
-        Commands = 'probe --strict; start; bootstrap result or bounded mount status; stop; status'
+        Commands = 'probe --strict; start; bounded natural private bridge callback or mount status; stop; status'
         Cleanup = 'Up to three bounded stop attempts run after every attempted start.'
         RequiredConfirmation = $requiredConfirmation
     } | Format-List
@@ -333,6 +367,7 @@ $cleanupRequired = $false
 $testFailure = $null
 $cleanupFailure = $null
 $bootstrapValidated = $false
+$privateBridgeValidated = $false
 try {
     # Set this before invoking start: a timeout or malformed reply is ambiguous
     # and must still take the idempotent stop path.
@@ -352,7 +387,39 @@ try {
     }
 
     $startDiagnostic = [string]$start.Payload.controllerDiagnostic
-    if ($bootstrapControllerDiagnostics -ccontains $startDiagnostic) {
+    if ($startDiagnostic -ceq 'private-bridge-awaiting-callback' -or
+        $privateBridgeControllerDiagnostics -ccontains $startDiagnostic) {
+        # The Host intentionally does not synthesize a layout pass. Polling
+        # only observes a callback caused by normal taskbar activity.
+        $bridgeDeadline = [DateTimeOffset]::UtcNow.AddSeconds(
+            $ReadyTimeoutSeconds)
+        $bridgeDiagnostic = $startDiagnostic
+        while ($bridgeDiagnostic -ceq
+            'private-bridge-awaiting-callback' -and
+            [DateTimeOffset]::UtcNow -lt $bridgeDeadline) {
+            Start-Sleep -Milliseconds 500
+            $bridgeStatus = Invoke-VerifiedStatus `
+                -ExpectedProcessId $explorerProcessId `
+                -AllowedControllerStatus @('mount-pending')
+            $bridgeDiagnostic =
+                [string]$bridgeStatus.Payload.controllerDiagnostic
+        }
+        if ($bridgeDiagnostic -ceq 'private-bridge-awaiting-callback') {
+            throw (
+                'No natural TaskbarFrame layout callback arrived within ' +
+                "$ReadyTimeoutSeconds seconds. No relayout was requested.")
+        }
+        if ($privateBridgeControllerDiagnostics -cnotcontains
+            $bridgeDiagnostic) {
+            throw 'The private TaskbarFrame bridge returned an invalid diagnostic.'
+        }
+        if ($bridgeDiagnostic -cne 'private-bridge-validated') {
+            throw (
+                'The private TaskbarFrame bridge failed closed. ' +
+                "Controller diagnostic: $bridgeDiagnostic.")
+        }
+        $privateBridgeValidated = $true
+    } elseif ($bootstrapControllerDiagnostics -ccontains $startDiagnostic) {
         $bootstrapStatus = Invoke-VerifiedStatus `
             -ExpectedProcessId $explorerProcessId `
             -AllowedControllerStatus @('mount-pending')
@@ -444,7 +511,12 @@ if (-not [string]::IsNullOrEmpty($testFailure)) {
     throw $testFailure
 }
 
-if ($bootstrapValidated) {
+if ($privateBridgeValidated) {
+    Write-Host (
+        'Standalone taskbar controller validated the guarded private ' +
+        'TaskbarFrame bridge in one natural read-only callback and stopped ' +
+        'cleanly.') -ForegroundColor Green
+} elseif ($bootstrapValidated) {
     Write-Host (
         'Standalone taskbar controller validated one live TaskbarFrame ' +
         'through the read-only public-root bootstrap and stopped cleanly.') `
