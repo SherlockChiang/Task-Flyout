@@ -1185,6 +1185,21 @@ transport foundation for the standalone host.
 - Native policy/control tests and the managed protocol allowlist cover the
   additive values. Release output is isolated in
   `.testbuild/native-taskbar-weather-v10`; the full Native suite is green
-  (13/13). A live Explorer injection has not been attempted for v10 yet; the
-  signed binaries must be produced and a disposable Explorer restarted before
-  any runtime check. M3-07/M3-08 remain in progress.
+  (13/13). A live Explorer injection has not been attempted for v10 yet; a
+  disposable Explorer must be restarted before any runtime check. M3-07/M3-08
+  remain in progress.
+
+### 2026-08-13 Signed API v10 Artifacts
+
+- The isolated v10 Broker and Host are signed with the existing current-user
+  code-signing certificate
+  `15303040F7CEECFDE9C023F15481D15C39CCDB46`. SignTool verified both chains
+  with zero warnings and zero errors; neither file is timestamped.
+- Signed SHA-256 hashes are
+  `29BFC7E16C8ECB2FBEBC0E2DD2F4232C47BAB2EDC6DC51207A5D86377BCAE99B`
+  for `TaskFlyout.TaskbarBroker.exe` and
+  `87DB30CE1A5F7D922C4D281FC925688FF3EC92B99A6AB75D85675CBF32B4BD5D`
+  for `TaskFlyout.TaskbarHost.dll`.
+- The current Explorer may still pin the API v9 Host. Restart only the
+  disposable Explorer session before running the v10 harness; do not load the
+  new Host into the current process. M3-07/M3-08 remain in progress.
