@@ -6,7 +6,7 @@
 
 namespace taskflyout::taskbar {
 
-inline constexpr std::uint32_t kHostApiVersion = 6;
+inline constexpr std::uint32_t kHostApiVersion = 7;
 inline constexpr wchar_t kHostControlMessageName[] =
     L"TaskFlyout.TaskbarHost.Control.v2.{7C091D78-7BD5-4E99-B7BD-647E45F30CF6}";
 inline constexpr wchar_t kHostControlAcknowledgementMessageName[] =
@@ -52,6 +52,15 @@ enum class HostControlDiagnostic : std::uint32_t {
     CallbackUnavailable = 14,
     CallbackReentrant = 15,
     CallbackRecheckRace = 16,
+    BootstrapWindowInvalid = 17,
+    BootstrapOwnerThreadMismatch = 18,
+    BootstrapHostBoundsInvalid = 19,
+    BootstrapQueryFailed = 20,
+    BootstrapEnumerationOverflow = 21,
+    BootstrapFrameNotObserved = 22,
+    BootstrapFrameAmbiguous = 23,
+    BootstrapTreeProfileMismatch = 24,
+    BootstrapFrameValidated = 25,
 };
 
 struct HostControlAcknowledgementEnvelope {

@@ -24,6 +24,10 @@ constexpr DWORD kWeatherPipePollIntervalMilliseconds = 15000;
 constexpr DWORD kMountReadinessReportIntervalMilliseconds = 5000;
 constexpr ULONGLONG kMountObservationMaximumAgeMilliseconds = 12000;
 constexpr DWORD kWeatherPipeStopWaitMilliseconds = 2000;
+// API v7 is deliberately diagnostic-only. It proves that the already-live
+// primary TaskbarFrame can be found through public XAML APIs before that frame
+// is ever handed to the existing mount path.
+constexpr bool kReadOnlyBootstrapProbe = true;
 
 struct TaskbarFrameLease {
     winrt::weak_ref<winrt::Windows::UI::Xaml::FrameworkElement> frame;
@@ -36,6 +40,8 @@ struct TaskbarHostRuntime {
     std::atomic<TaskbarHostControllerResult> lastResult{
         TaskbarHostControllerResult::NotStarted};
     std::atomic<HostControlDiagnostic> diagnostic{
+        HostControlDiagnostic::None};
+    std::atomic<HostControlDiagnostic> bootstrapDiagnostic{
         HostControlDiagnostic::None};
     std::atomic<std::uint64_t> startEntrySequence{0};
     std::atomic<std::uint64_t> startCustomCallbackSequence{0};
@@ -62,6 +68,17 @@ void PublishAwaitingLayoutIfNoDiagnostic() noexcept {
 
 HostControlDiagnostic LoadControllerDiagnostic() noexcept {
     return Runtime().diagnostic.load(std::memory_order_acquire);
+}
+
+void PublishBootstrapDiagnostic(
+    const HostControlDiagnostic diagnostic) noexcept {
+    Runtime().bootstrapDiagnostic.store(
+        diagnostic,
+        std::memory_order_release);
+}
+
+HostControlDiagnostic LoadBootstrapDiagnostic() noexcept {
+    return Runtime().bootstrapDiagnostic.load(std::memory_order_acquire);
 }
 
 SRWLOCK g_weatherModelLock = SRWLOCK_INIT;
@@ -803,6 +820,13 @@ void WINAPI OnTaskbarFrameLayout(void* privateTaskbarFrame) {
     }
 }
 
+void WINAPI OnTaskbarFrameLayoutReadOnly(void*) noexcept {
+    // Keep the exact detour observable without dereferencing the private
+    // object or mutating the XAML tree. API v7 promotes the separately stored
+    // public bootstrap result over this callback's telemetry.
+    PublishMountReadinessObservation(false);
+}
+
 bool WINAPI RestoreAllTaskbarFrames() {
     auto& runtime = Runtime();
     bool restored = true;
@@ -958,8 +982,50 @@ HostControlDiagnostic EvaluateAwaitingLayoutDiagnostic(
     return HostControlDiagnostic::MountedNotReady;
 }
 
+HostControlDiagnostic TaskbarFrameBootstrapDiagnostic(
+    const TaskbarFrameBootstrapStatus status) noexcept {
+    switch (status) {
+        case TaskbarFrameBootstrapStatus::WindowInvalid:
+            return HostControlDiagnostic::BootstrapWindowInvalid;
+        case TaskbarFrameBootstrapStatus::WrongOwnerThread:
+            return HostControlDiagnostic::BootstrapOwnerThreadMismatch;
+        case TaskbarFrameBootstrapStatus::HostBoundsInvalid:
+            return HostControlDiagnostic::BootstrapHostBoundsInvalid;
+        case TaskbarFrameBootstrapStatus::QueryFailed:
+            return HostControlDiagnostic::BootstrapQueryFailed;
+        case TaskbarFrameBootstrapStatus::EnumerationOverflow:
+            return HostControlDiagnostic::BootstrapEnumerationOverflow;
+        case TaskbarFrameBootstrapStatus::FrameNotObserved:
+            return HostControlDiagnostic::BootstrapFrameNotObserved;
+        case TaskbarFrameBootstrapStatus::FrameAmbiguous:
+            return HostControlDiagnostic::BootstrapFrameAmbiguous;
+        case TaskbarFrameBootstrapStatus::TreeProfileMismatch:
+            return HostControlDiagnostic::BootstrapTreeProfileMismatch;
+        case TaskbarFrameBootstrapStatus::FrameValidated:
+            return HostControlDiagnostic::BootstrapFrameValidated;
+    }
+    return HostControlDiagnostic::BootstrapQueryFailed;
+}
+
+HostControlDiagnostic SelectTaskbarHostReportedDiagnostic(
+    const bool readOnlyBootstrapProbe,
+    const TaskbarHostControllerResult result,
+    const HostControlDiagnostic controllerDiagnostic,
+    const HostControlDiagnostic bootstrapDiagnostic) noexcept {
+    const bool bootstrapLifecycle =
+        readOnlyBootstrapProbe &&
+        (result == TaskbarHostControllerResult::Started ||
+         result == TaskbarHostControllerResult::AlreadyStarted ||
+         result == TaskbarHostControllerResult::MountPending);
+    return bootstrapLifecycle &&
+            bootstrapDiagnostic != HostControlDiagnostic::None
+        ? bootstrapDiagnostic
+        : controllerDiagnostic;
+}
+
 TaskbarHostControllerResult StartTaskbarWeatherController(
-    const std::uint32_t controllerNonce) noexcept {
+    const std::uint32_t controllerNonce,
+    const HWND taskbarWindow) noexcept {
     if (controllerNonce == 0) {
         Runtime().lastResult.store(
             TaskbarHostControllerResult::StartRejected,
@@ -978,6 +1044,7 @@ TaskbarHostControllerResult StartTaskbarWeatherController(
         // previous rejected lifecycle. An already-active retry, however,
         // keeps the concrete diagnosis produced by its live callback.
         PublishControllerDiagnostic(HostControlDiagnostic::None);
+        PublishBootstrapDiagnostic(HostControlDiagnostic::None);
     }
     Runtime().startEntrySequence.store(
         startBaseline.entrySequence,
@@ -985,12 +1052,14 @@ TaskbarHostControllerResult StartTaskbarWeatherController(
     Runtime().startCustomCallbackSequence.store(
         startBaseline.customCallbackSequence,
         std::memory_order_release);
-    const TaskbarDetourResult detourResult =
-        StartTaskbarFrameDetour(&OnTaskbarFrameLayout);
+    const TaskbarDetourResult detourResult = StartTaskbarFrameDetour(
+        kReadOnlyBootstrapProbe
+            ? &OnTaskbarFrameLayoutReadOnly
+            : &OnTaskbarFrameLayout);
     TaskbarHostControllerResult result = MapStartResult(detourResult);
     if ((detourResult == TaskbarDetourResult::Installed ||
          detourResult == TaskbarDetourResult::AlreadyActive) &&
-        !StartWeatherPipeWorker()) {
+        !kReadOnlyBootstrapProbe && !StartWeatherPipeWorker()) {
         if (detourResult == TaskbarDetourResult::Installed) {
             const TaskbarDetourResult rollbackResult =
                 StopTaskbarFrameDetour(&RestoreAllTaskbarFrames);
@@ -1004,13 +1073,21 @@ TaskbarHostControllerResult StartTaskbarWeatherController(
     if (result == TaskbarHostControllerResult::Started ||
         result == TaskbarHostControllerResult::AlreadyStarted) {
         ResetMountReadinessSession(controllerNonce);
-        // A secondary taskbar thread can enter the process-wide detour while
-        // this primary owner-thread start is still completing. Preserve any
-        // concrete callback diagnostic it publishes instead of replacing it
-        // with the initial sentinel after the fact.
-        PublishAwaitingLayoutIfNoDiagnostic();
-        SignalMountReadinessWorker();
-        RequestTaskbarRelayout();
+        if (detourResult == TaskbarDetourResult::Installed) {
+            const TaskbarFrameBootstrapStatus bootstrap =
+                ProbeTaskbarFrameBootstrap(taskbarWindow);
+            PublishBootstrapDiagnostic(
+                TaskbarFrameBootstrapDiagnostic(bootstrap));
+        }
+        if (!kReadOnlyBootstrapProbe) {
+            // A secondary taskbar thread can enter the process-wide detour
+            // while this primary owner-thread start is still completing.
+            // Preserve any concrete callback diagnostic it publishes instead
+            // of replacing it with the initial sentinel after the fact.
+            PublishAwaitingLayoutIfNoDiagnostic();
+            SignalMountReadinessWorker();
+            RequestTaskbarRelayout();
+        }
     }
     Runtime().lastResult.store(result, std::memory_order_release);
     return result;
@@ -1037,6 +1114,7 @@ TaskbarHostControllerResult StopTaskbarWeatherController() noexcept {
     if (result == TaskbarHostControllerResult::Stopped ||
         result == TaskbarHostControllerResult::NotStarted) {
         PublishControllerDiagnostic(HostControlDiagnostic::None);
+        PublishBootstrapDiagnostic(HostControlDiagnostic::None);
     } else if (detourResult == TaskbarDetourResult::RestoreFailed) {
         PublishControllerDiagnostic(
             HostControlDiagnostic::MountRestoreFailed);
@@ -1054,6 +1132,7 @@ QueryTaskbarWeatherControllerStatusSnapshot() noexcept {
     if (detour.state == TaskbarDetourState::Dormant ||
         detour.state == TaskbarDetourState::Removed) {
         PublishControllerDiagnostic(HostControlDiagnostic::None);
+        PublishBootstrapDiagnostic(HostControlDiagnostic::None);
         return {
             TaskbarHostControllerResult::NotStarted,
             HostControlDiagnostic::None};
@@ -1061,12 +1140,26 @@ QueryTaskbarWeatherControllerStatusSnapshot() noexcept {
     if (detour.state != TaskbarDetourState::Active ||
         detour.bootstrapThreadId == 0 ||
         detour.bootstrapThreadId != GetCurrentThreadId()) {
+        Runtime().lastResult.store(
+            TaskbarHostControllerResult::StatusRejected,
+            std::memory_order_release);
         return {
             TaskbarHostControllerResult::StatusRejected,
             LoadControllerDiagnostic()};
     }
 
     auto& runtime = Runtime();
+    if (kReadOnlyBootstrapProbe) {
+        HostControlDiagnostic diagnostic = LoadBootstrapDiagnostic();
+        if (diagnostic == HostControlDiagnostic::None) {
+            diagnostic = HostControlDiagnostic::BootstrapQueryFailed;
+            PublishBootstrapDiagnostic(diagnostic);
+        }
+        runtime.lastResult.store(
+            TaskbarHostControllerResult::MountPending,
+            std::memory_order_release);
+        return {TaskbarHostControllerResult::MountPending, diagnostic};
+    }
     if (RefreshCurrentMountReadiness()) {
         SignalMountReadinessWorker();
         PublishControllerDiagnostic(HostControlDiagnostic::MountReady);
@@ -1102,7 +1195,12 @@ QueryTaskbarWeatherControllerStatusSnapshot() noexcept {
 }
 
 HostControlDiagnostic CurrentTaskbarWeatherControllerDiagnostic() noexcept {
-    return LoadControllerDiagnostic();
+    auto& runtime = Runtime();
+    return SelectTaskbarHostReportedDiagnostic(
+        kReadOnlyBootstrapProbe,
+        runtime.lastResult.load(std::memory_order_acquire),
+        LoadControllerDiagnostic(),
+        LoadBootstrapDiagnostic());
 }
 
 const wchar_t* TaskbarHostControllerResultName(

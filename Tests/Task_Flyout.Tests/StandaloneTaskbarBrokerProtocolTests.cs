@@ -126,6 +126,15 @@ public class StandaloneTaskbarBrokerProtocolTests
     [InlineData("callback-unavailable")]
     [InlineData("callback-reentrant")]
     [InlineData("callback-recheck-race")]
+    [InlineData("bootstrap-window-invalid")]
+    [InlineData("bootstrap-owner-thread-mismatch")]
+    [InlineData("bootstrap-host-bounds-invalid")]
+    [InlineData("bootstrap-query-failed")]
+    [InlineData("bootstrap-enumeration-overflow")]
+    [InlineData("bootstrap-frame-not-observed")]
+    [InlineData("bootstrap-frame-ambiguous")]
+    [InlineData("bootstrap-tree-profile-mismatch")]
+    [InlineData("bootstrap-frame-validated")]
     public void Additive_controller_diagnostic_preserves_older_parser_behavior(
         string controllerDiagnostic)
     {

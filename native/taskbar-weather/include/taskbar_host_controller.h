@@ -1,6 +1,7 @@
 #pragma once
 
 #include "taskbar_frame_bridge.h"
+#include "taskbar_frame_bootstrap.h"
 #include "taskbar_host_contract.h"
 #include "taskbar_slot_probe.h"
 #include "taskbar_weather_mount.h"
@@ -43,6 +44,9 @@ HostControlDiagnostic EvaluateAwaitingLayoutDiagnostic(
     std::uint64_t startEntrySequence,
     std::uint64_t startCustomCallbackSequence) noexcept;
 
+HostControlDiagnostic TaskbarFrameBootstrapDiagnostic(
+    TaskbarFrameBootstrapStatus status) noexcept;
+
 enum class TaskbarHostControllerResult : std::uint32_t {
     Started = 0,
     AlreadyStarted = 1,
@@ -55,6 +59,12 @@ enum class TaskbarHostControllerResult : std::uint32_t {
     StatusRejected = 8,
 };
 
+HostControlDiagnostic SelectTaskbarHostReportedDiagnostic(
+    bool readOnlyBootstrapProbe,
+    TaskbarHostControllerResult result,
+    HostControlDiagnostic controllerDiagnostic,
+    HostControlDiagnostic bootstrapDiagnostic) noexcept;
+
 struct TaskbarHostControllerStatusSnapshot {
     TaskbarHostControllerResult result =
         TaskbarHostControllerResult::NotStarted;
@@ -65,7 +75,8 @@ struct TaskbarHostControllerStatusSnapshot {
 // controller is activated only by the exported WH_CALLWNDPROC entry hook's
 // private control message; loading the DLL alone remains inert.
 TaskbarHostControllerResult StartTaskbarWeatherController(
-    std::uint32_t controllerNonce) noexcept;
+    std::uint32_t controllerNonce,
+    HWND taskbarWindow) noexcept;
 TaskbarHostControllerResult StopTaskbarWeatherController() noexcept;
 TaskbarHostControllerResult QueryTaskbarWeatherControllerStatus() noexcept;
 TaskbarHostControllerStatusSnapshot

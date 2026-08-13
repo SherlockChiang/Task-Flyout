@@ -70,6 +70,18 @@ target_include_directories(taskbar_weather_tree_profile PUBLIC include)
 target_compile_definitions(taskbar_weather_tree_profile PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_tree_profile PUBLIC runtimeobject)
 
+add_library(taskbar_weather_frame_bootstrap STATIC
+    src/taskbar_frame_bootstrap.cpp
+)
+target_include_directories(taskbar_weather_frame_bootstrap PUBLIC include)
+target_compile_definitions(taskbar_weather_frame_bootstrap PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_frame_bootstrap PUBLIC
+    taskbar_weather_tree_profile
+    runtimeobject
+    user32
+    windowsapp
+)
+
 add_library(taskbar_weather_slot_geometry STATIC
     src/taskbar_slot_geometry.cpp
 )
@@ -134,6 +146,7 @@ add_library(taskbar_weather_host_controller STATIC
 target_include_directories(taskbar_weather_host_controller PUBLIC include)
 target_compile_definitions(taskbar_weather_host_controller PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_host_controller PUBLIC
+    taskbar_weather_frame_bootstrap
     taskbar_weather_frame_bridge
     taskbar_weather_slot_probe
     taskbar_weather_mount
@@ -209,6 +222,13 @@ target_include_directories(taskbar_weather_tree_profile_tests PRIVATE include)
 target_compile_definitions(taskbar_weather_tree_profile_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(taskbar_weather_tree_profile_tests PRIVATE taskbar_weather_tree_profile)
 
+add_executable(taskbar_weather_frame_bootstrap_tests
+    tests/taskbar_frame_bootstrap_tests.cpp
+)
+target_include_directories(taskbar_weather_frame_bootstrap_tests PRIVATE include)
+target_compile_definitions(taskbar_weather_frame_bootstrap_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(taskbar_weather_frame_bootstrap_tests PRIVATE taskbar_weather_frame_bootstrap)
+
 add_executable(taskbar_weather_mount_tests
     tests/taskbar_weather_mount_tests.cpp
 )
@@ -270,6 +290,7 @@ foreach(target
         taskbar_weather_view_model
         taskbar_weather_pipe_client
         taskbar_weather_tree_profile
+        taskbar_weather_frame_bootstrap
         taskbar_weather_slot_geometry
         taskbar_weather_slot_probe
         taskbar_weather_mount
@@ -283,6 +304,7 @@ foreach(target
         taskbar_weather_view_model_tests
         taskbar_weather_detour_tests
         taskbar_weather_tree_profile_tests
+        taskbar_weather_frame_bootstrap_tests
         taskbar_weather_mount_tests
         taskbar_weather_slot_geometry_tests
         taskbar_weather_frame_bridge_tests
@@ -325,6 +347,10 @@ add_test(
 add_test(
     NAME taskbar_weather_tree_profile_tests
     COMMAND taskbar_weather_tree_profile_tests
+)
+add_test(
+    NAME taskbar_weather_frame_bootstrap_tests
+    COMMAND taskbar_weather_frame_bootstrap_tests
 )
 add_test(
     NAME taskbar_weather_mount_tests

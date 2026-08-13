@@ -20,7 +20,7 @@ int wmain() {
 
     bool passed = true;
     passed &= Expect(
-        kHostApiVersion == 6u &&
+        kHostApiVersion == 7u &&
             static_cast<std::uint32_t>(
                 HostControlDiagnostic::DetourTargetNotObserved) == 12u &&
             static_cast<std::uint32_t>(
@@ -30,7 +30,28 @@ int wmain() {
             static_cast<std::uint32_t>(
                 HostControlDiagnostic::CallbackReentrant) == 15u &&
             static_cast<std::uint32_t>(
-                HostControlDiagnostic::CallbackRecheckRace) == 16u,
+                HostControlDiagnostic::CallbackRecheckRace) == 16u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapWindowInvalid) == 17u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapOwnerThreadMismatch) ==
+                18u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapHostBoundsInvalid) == 19u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapQueryFailed) == 20u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapEnumerationOverflow) ==
+                21u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapFrameNotObserved) == 22u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapFrameAmbiguous) == 23u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapTreeProfileMismatch) ==
+                24u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapFrameValidated) == 25u,
         L"host API and additive diagnostic values must remain protocol-stable");
     constexpr std::uint32_t nonce = 0xA17E52C3u;
     constexpr auto encodedStart = EncodeHostControlRequest(
@@ -198,6 +219,33 @@ int wmain() {
         std::wstring_view(HostControlDiagnosticName(
             HostControlDiagnostic::CallbackRecheckRace)) ==
                 L"callback-recheck-race" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::BootstrapWindowInvalid)) ==
+                L"bootstrap-window-invalid" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::BootstrapOwnerThreadMismatch)) ==
+                L"bootstrap-owner-thread-mismatch" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::BootstrapHostBoundsInvalid)) ==
+                L"bootstrap-host-bounds-invalid" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::BootstrapQueryFailed)) ==
+                L"bootstrap-query-failed" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::BootstrapEnumerationOverflow)) ==
+                L"bootstrap-enumeration-overflow" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::BootstrapFrameNotObserved)) ==
+                L"bootstrap-frame-not-observed" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::BootstrapFrameAmbiguous)) ==
+                L"bootstrap-frame-ambiguous" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::BootstrapTreeProfileMismatch)) ==
+                L"bootstrap-tree-profile-mismatch" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::BootstrapFrameValidated)) ==
+                L"bootstrap-frame-validated" &&
         std::wstring_view(HostControlDiagnosticName(
             static_cast<HostControlDiagnostic>(0xFFFFFFFFu))) == L"invalid",
         L"controller diagnostic names should be stable and bounded");

@@ -51,14 +51,33 @@ $knownControllerDiagnostics = @(
     'detour-inactive',
     'callback-unavailable',
     'callback-reentrant',
-    'callback-recheck-race')
+    'callback-recheck-race',
+    'bootstrap-window-invalid',
+    'bootstrap-owner-thread-mismatch',
+    'bootstrap-host-bounds-invalid',
+    'bootstrap-query-failed',
+    'bootstrap-enumeration-overflow',
+    'bootstrap-frame-not-observed',
+    'bootstrap-frame-ambiguous',
+    'bootstrap-tree-profile-mismatch',
+    'bootstrap-frame-validated')
+$bootstrapControllerDiagnostics = @(
+    'bootstrap-window-invalid',
+    'bootstrap-owner-thread-mismatch',
+    'bootstrap-host-bounds-invalid',
+    'bootstrap-query-failed',
+    'bootstrap-enumeration-overflow',
+    'bootstrap-frame-not-observed',
+    'bootstrap-frame-ambiguous',
+    'bootstrap-tree-profile-mismatch',
+    'bootstrap-frame-validated')
 
 if ($DescribeOnly) {
     [pscustomobject]@{
         MutatesExplorer = $true
         InstallsPackage = $false
         RestartsExplorer = $false
-        Commands = 'probe --strict; start; bounded status polling; stop; status'
+        Commands = 'probe --strict; start; bootstrap result or bounded mount status; stop; status'
         Cleanup = 'Up to three bounded stop attempts run after every attempted start.'
         RequiredConfirmation = $requiredConfirmation
     } | Format-List
@@ -287,6 +306,7 @@ $null = Invoke-VerifiedStatus `
 $cleanupRequired = $false
 $testFailure = $null
 $cleanupFailure = $null
+$bootstrapValidated = $false
 try {
     # Set this before invoking start: a timeout or malformed reply is ambiguous
     # and must still take the idempotent stop path.
@@ -305,42 +325,63 @@ try {
         throw 'The acknowledged controller start did not return a control nonce.'
     }
 
-    $readyDeadline = [DateTimeOffset]::UtcNow.AddSeconds(
-        $ReadyTimeoutSeconds)
-    $mountReady = $false
-    $lastControllerDiagnostic = 'unknown'
-    do {
-        $status = Invoke-VerifiedStatus `
+    $startDiagnostic = [string]$start.Payload.controllerDiagnostic
+    if ($bootstrapControllerDiagnostics -ccontains $startDiagnostic) {
+        $bootstrapStatus = Invoke-VerifiedStatus `
             -ExpectedProcessId $explorerProcessId `
-            -AllowedControllerStatus @('mount-ready', 'mount-pending')
-        $lastControllerDiagnostic =
-            [string]$status.Payload.controllerDiagnostic
-        if ($status.Payload.controllerStatus -ceq 'mount-ready') {
-            $mountReady = $true
-            break
+            -AllowedControllerStatus @('mount-pending')
+        $bootstrapDiagnostic =
+            [string]$bootstrapStatus.Payload.controllerDiagnostic
+        if ($bootstrapControllerDiagnostics -cnotcontains
+            $bootstrapDiagnostic -or
+            $bootstrapDiagnostic -cne $startDiagnostic) {
+            throw 'The read-only bootstrap result was not stable across status.'
         }
-        Start-Sleep -Milliseconds 500
-    } while ([DateTimeOffset]::UtcNow -lt $readyDeadline)
-    if (-not $mountReady) {
-        throw (
-            "The native weather button did not become mount-ready in " +
-            "$ReadyTimeoutSeconds seconds. Last controller diagnostic: " +
-            "$lastControllerDiagnostic.")
-    }
-
-    if ($ReadyHoldSeconds -gt 0) {
-        $holdDeadline = [DateTimeOffset]::UtcNow.AddSeconds($ReadyHoldSeconds)
+        if ($bootstrapDiagnostic -cne 'bootstrap-frame-validated') {
+            throw (
+                'The read-only TaskbarFrame bootstrap failed closed. ' +
+                "Controller diagnostic: $bootstrapDiagnostic.")
+        }
+        $bootstrapValidated = $true
+    } else {
+        $readyDeadline = [DateTimeOffset]::UtcNow.AddSeconds(
+            $ReadyTimeoutSeconds)
+        $mountReady = $false
+        $lastControllerDiagnostic = 'unknown'
         do {
-            $remaining = [Math]::Ceiling(
-                ($holdDeadline - [DateTimeOffset]::UtcNow).TotalSeconds)
-            if ($remaining -le 0) {
+            $status = Invoke-VerifiedStatus `
+                -ExpectedProcessId $explorerProcessId `
+                -AllowedControllerStatus @('mount-ready', 'mount-pending')
+            $lastControllerDiagnostic =
+                [string]$status.Payload.controllerDiagnostic
+            if ($status.Payload.controllerStatus -ceq 'mount-ready') {
+                $mountReady = $true
                 break
             }
-            Start-Sleep -Seconds ([Math]::Min(5, [int]$remaining))
-            Invoke-VerifiedStatus `
-                -ExpectedProcessId $explorerProcessId `
-                -AllowedControllerStatus @('mount-ready') | Out-Null
-        } while ([DateTimeOffset]::UtcNow -lt $holdDeadline)
+            Start-Sleep -Milliseconds 500
+        } while ([DateTimeOffset]::UtcNow -lt $readyDeadline)
+        if (-not $mountReady) {
+            throw (
+                "The native weather button did not become mount-ready in " +
+                "$ReadyTimeoutSeconds seconds. Last controller diagnostic: " +
+                "$lastControllerDiagnostic.")
+        }
+
+        if ($ReadyHoldSeconds -gt 0) {
+            $holdDeadline = [DateTimeOffset]::UtcNow.AddSeconds(
+                $ReadyHoldSeconds)
+            do {
+                $remaining = [Math]::Ceiling(
+                    ($holdDeadline - [DateTimeOffset]::UtcNow).TotalSeconds)
+                if ($remaining -le 0) {
+                    break
+                }
+                Start-Sleep -Seconds ([Math]::Min(5, [int]$remaining))
+                Invoke-VerifiedStatus `
+                    -ExpectedProcessId $explorerProcessId `
+                    -AllowedControllerStatus @('mount-ready') | Out-Null
+            } while ([DateTimeOffset]::UtcNow -lt $holdDeadline)
+        }
     }
 } catch {
     $testFailure = $_.Exception.Message
@@ -377,6 +418,14 @@ if (-not [string]::IsNullOrEmpty($testFailure)) {
     throw $testFailure
 }
 
-Write-Host (
-    'Standalone taskbar controller reached mount-ready, remained ready for ' +
-    "$ReadyHoldSeconds seconds, and stopped cleanly.") -ForegroundColor Green
+if ($bootstrapValidated) {
+    Write-Host (
+        'Standalone taskbar controller validated one live TaskbarFrame ' +
+        'through the read-only bootstrap and stopped cleanly.') `
+        -ForegroundColor Green
+} else {
+    Write-Host (
+        'Standalone taskbar controller reached mount-ready, remained ready ' +
+        "for $ReadyHoldSeconds seconds, and stopped cleanly.") `
+        -ForegroundColor Green
+}

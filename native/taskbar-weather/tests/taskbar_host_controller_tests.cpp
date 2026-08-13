@@ -124,6 +124,79 @@ int wmain() {
                 HostControlDiagnostic::MountedNotReady,
         L"mount outcomes should map only to bounded diagnostics");
 
+    passed &= Expect(
+        TaskbarFrameBootstrapDiagnostic(
+            TaskbarFrameBootstrapStatus::WindowInvalid) ==
+                HostControlDiagnostic::BootstrapWindowInvalid &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::WrongOwnerThread) ==
+                HostControlDiagnostic::BootstrapOwnerThreadMismatch &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::HostBoundsInvalid) ==
+                HostControlDiagnostic::BootstrapHostBoundsInvalid &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::QueryFailed) ==
+                HostControlDiagnostic::BootstrapQueryFailed &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::EnumerationOverflow) ==
+                HostControlDiagnostic::BootstrapEnumerationOverflow &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::FrameNotObserved) ==
+                HostControlDiagnostic::BootstrapFrameNotObserved &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::FrameAmbiguous) ==
+                HostControlDiagnostic::BootstrapFrameAmbiguous &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::TreeProfileMismatch) ==
+                HostControlDiagnostic::BootstrapTreeProfileMismatch &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::FrameValidated) ==
+                HostControlDiagnostic::BootstrapFrameValidated,
+        L"bootstrap outcomes should map only to additive fixed diagnostics");
+
+    passed &= Expect(
+        SelectTaskbarHostReportedDiagnostic(
+            true,
+            TaskbarHostControllerResult::Started,
+            HostControlDiagnostic::None,
+            HostControlDiagnostic::BootstrapFrameValidated) ==
+                HostControlDiagnostic::BootstrapFrameValidated &&
+            SelectTaskbarHostReportedDiagnostic(
+                true,
+                TaskbarHostControllerResult::MountPending,
+                HostControlDiagnostic::MountedNotReady,
+                HostControlDiagnostic::BootstrapFrameNotObserved) ==
+                HostControlDiagnostic::BootstrapFrameNotObserved,
+        L"an active read-only lifecycle should report its bootstrap result");
+    passed &= Expect(
+        SelectTaskbarHostReportedDiagnostic(
+            true,
+            TaskbarHostControllerResult::StopRejected,
+            HostControlDiagnostic::MountRestoreFailed,
+            HostControlDiagnostic::BootstrapFrameValidated) ==
+                HostControlDiagnostic::MountRestoreFailed &&
+            SelectTaskbarHostReportedDiagnostic(
+                true,
+                TaskbarHostControllerResult::StatusRejected,
+                HostControlDiagnostic::MountRestoreFailed,
+                HostControlDiagnostic::BootstrapFrameNotObserved) ==
+                HostControlDiagnostic::MountRestoreFailed &&
+            SelectTaskbarHostReportedDiagnostic(
+                true,
+                TaskbarHostControllerResult::StartRejected,
+                HostControlDiagnostic::None,
+                HostControlDiagnostic::BootstrapFrameValidated) ==
+                HostControlDiagnostic::None,
+        L"rejected lifecycle results must not expose a stale bootstrap result");
+    passed &= Expect(
+        SelectTaskbarHostReportedDiagnostic(
+            false,
+            TaskbarHostControllerResult::MountPending,
+            HostControlDiagnostic::MountedNotReady,
+            HostControlDiagnostic::BootstrapFrameValidated) ==
+                HostControlDiagnostic::MountedNotReady,
+        L"normal mount mode must ignore a retained read-only bootstrap result");
+
     TaskbarDetourSnapshot detour;
     detour.entrySequence = 41u;
     detour.customCallbackSequence = 17u;

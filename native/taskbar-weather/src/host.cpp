@@ -113,7 +113,9 @@ TaskFlyoutTaskbarHost_EntryHook(
                     bool handled = true;
                     if (request.command == HostControlCommand::Start) {
                         result = taskflyout::taskbar::
-                            StartTaskbarWeatherController(request.nonce);
+                            StartTaskbarWeatherController(
+                                request.nonce,
+                                message->hwnd);
                         diagnostic = taskflyout::taskbar::
                             CurrentTaskbarWeatherControllerDiagnostic();
                     } else if (request.command == HostControlCommand::Stop) {
