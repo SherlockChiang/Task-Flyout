@@ -998,3 +998,48 @@ transport foundation for the standalone host.
   implementation step is a bounded, owner-thread bootstrap of the already-live
   TaskbarFrame/XAML tree which fails closed unless it finds one exact supported
   frame; M3-07/M3-08 remain in progress.
+
+### 2026-08-13 Read-Only TaskbarFrame Bootstrap
+
+- Commit `11ca45e` advances the native Host protocol to API version 7 and adds
+  a diagnostic-only bootstrap for the already-live primary taskbar XAML tree.
+  The actual `Shell_TrayWnd` from the control hook must belong to the current
+  Explorer process and current owner thread before the public
+  `VisualTreeHelper::FindElementsInHostCoordinates` query is allowed to run.
+- The query converts the taskbar client bounds to DIPs, examines at most 1024
+  projected elements with a 250 ms cooperative enumeration budget, accepts
+  only the exact `Taskbar.TaskbarFrame` runtime class, deduplicates candidates
+  by controlling `IUnknown` identity, and requires exactly one candidate to
+  pass the existing dispatcher/XamlRoot/geometry/tree-landmark profile. All
+  projected references die synchronously on the owner thread; exceptions,
+  overflow, absence, ambiguity, and profile drift each fail closed with a
+  fixed `bootstrap-*` diagnostic.
+- This checkpoint cannot mutate Explorer XAML: it does not start the pipe
+  worker, create a weather view, acquire a lease, append a child, or request a
+  relayout. The installed detour uses a read-only callback that does not
+  dereference its private frame argument. Bootstrap telemetry is stored
+  separately and wins only during a successful active read-only lifecycle, so
+  rejected Start/Stop/Status and cleanup faults cannot be hidden by a stale
+  probe result.
+- The disposable-session harness treats every `bootstrap-*` result as an
+  immediate terminal observation. It accepts only a stable
+  `bootstrap-frame-validated`, fails closed on the other eight reasons, and
+  always proceeds through bounded stop plus a final `not-started` check instead
+  of polling for a mount that v7 intentionally cannot produce.
+- The isolated Release build in
+  `.testbuild/native-taskbar-weather-v7` passes 13/13 native tests and both
+  binaries pass the WebView/browser/network import gate. Managed protocol tests
+  pass 58/58, the complete .NET suite passes 1118/1118, the Debug x64 app build
+  has zero warnings/errors, and PowerShell 7 plus Windows PowerShell pass the
+  harness AST and `DescribeOnly` paths.
+- The downloaded `Taskbar.View.pdb` remains incomplete: its MSF header declares
+  49,680,384 bytes while the available file is only 13,254,656 bytes, and a
+  zero-padded copy is rejected by DIA. No symbol-derived private RVA or unsafe
+  synthetic `TaskbarFrame` call was accepted from that artifact. The public
+  bootstrap is therefore the next evidence-gathering step.
+- The API v7 binaries are not yet signed or loaded. Sign both with current-user
+  certificate `15303040F7CEECFDE9C023F15481D15C39CCDB46`, restart the disposable
+  Explorer once to release its pinned v6 Host, then run the gated harness. If
+  the result is `bootstrap-frame-not-observed`, investigate the XAML island host
+  coordinate assumption before changing private detours or sending more layout
+  notifications. M3-07/M3-08 remain in progress.
