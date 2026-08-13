@@ -1139,3 +1139,23 @@ transport foundation for the standalone host.
   SignTool verified each with zero warnings/errors; the current Explorer still
   pins the previous Host, so load v9 only after another disposable Explorer
   restart. M3-07/M3-08 remain in progress.
+
+### 2026-08-13 Signed API v9 Host-Query Diagnosis
+
+- After a fresh Explorer restart, the signed API v9 center-point bootstrap
+  returned the stable fixed diagnostic `bootstrap-host-query-failed` within the
+  control acknowledgement window. This removes the v8 full-rectangle workload
+  as the immediate cause of the API failure: the public
+  `FindElementsInHostCoordinates` host query itself rejects or cannot resolve
+  the current taskbar XAML context when called with `subtree = null`.
+- The harness failed closed and completed its bounded cleanup. Explorer process
+  `49468` on primary taskbar thread `50096` remained responsive; an independent
+  strict probe still matched the allowlisted profile and an independent status
+  returned `not-started` with diagnostic `none`.
+- Further coordinate shrinking is not evidence-backed. The next read-only slice
+  should determine whether a public owner-thread XAML root can be acquired
+  (for example `Window::Current().Content()` in a Window-hosted tree) and pass
+  that exact `UIElement` as the query subtree. If no unique public root is
+  available, the public-host-query bootstrap path must remain unsupported
+  rather than reconstructing or guessing a private object. M3-07/M3-08 remain
+  in progress.
