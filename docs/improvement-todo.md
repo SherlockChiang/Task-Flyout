@@ -1159,3 +1159,32 @@ transport foundation for the standalone host.
   available, the public-host-query bootstrap path must remain unsupported
   rather than reconstructing or guessing a private object. M3-07/M3-08 remain
   in progress.
+
+### 2026-08-13 API v10 Public-Root Bootstrap
+
+- Commit `19441c3` advances the diagnostic-only Host protocol to API version 10
+  and makes the next route independent from the failed null-subtree query.
+  On the validated taskbar owner thread it reads the public
+  `Windows.UI.Xaml.Window::Current()` and `Content()` objects only; it never
+  creates a `Window`, initializes a XAML island, attaches a source, sets
+  `Content`, or keeps a XAML reference after the synchronous probe returns.
+- The public root is accepted only when its `CoreWindow` interop HWND equals
+  the exact `Shell_TrayWnd` supplied by the control hook. The root is then
+  passed as the explicit `VisualTreeHelper::FindElementsInHostCoordinates`
+  subtree at the deterministic taskbar center point. The existing bounded
+  1024-element/250-ms budget, exact `Taskbar.TaskbarFrame` class, controlling
+  identity deduplication, and complete tree profile remain in force.
+- New fixed diagnostics are appended after historical values 0–30:
+  `bootstrap-root-unavailable`, `bootstrap-root-query-failed`,
+  `bootstrap-root-not-associated-with-taskbar`,
+  `bootstrap-root-frame-not-observed`, `bootstrap-root-frame-ambiguous`,
+  `bootstrap-root-tree-profile-mismatch`, `root-bootstrap-validated`, and
+  `bootstrap-root-enumeration-overflow`. Only the validated value can pass
+  the disposable harness; all other outcomes remain fail-closed and do not
+  start the weather worker or mount a view.
+- Native policy/control tests and the managed protocol allowlist cover the
+  additive values. Release output is isolated in
+  `.testbuild/native-taskbar-weather-v10`; the full Native suite is green
+  (13/13). A live Explorer injection has not been attempted for v10 yet; the
+  signed binaries must be produced and a disposable Explorer restarted before
+  any runtime check. M3-07/M3-08 remain in progress.

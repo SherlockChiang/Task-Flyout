@@ -55,13 +55,15 @@ See `docs/manual-verification.md` for the runtime matrix and the full opt-in
 invocation. The harness never installs a package, changes `TaskbarDa`, kills
 Explorer, or restarts it.
 
-Host API versions 7–9 are diagnostic-only bootstrap checkpoints. On a fresh
-start,
-the taskbar owner thread calls the public
-`VisualTreeHelper::FindElementsInHostCoordinates` API at the center point of
-the primary `Shell_TrayWnd` client bounds. The query examines at most 1024
-projected elements within a 250 ms cooperative enumeration budget, deduplicates
-exact `Taskbar.TaskbarFrame` candidates by controlling `IUnknown` identity, and
+Host API version 10 is a diagnostic-only public-root bootstrap checkpoint. On
+a fresh start, the taskbar owner thread first reads `Window::Current()` and its
+`Content()` without creating or attaching a XAML island. Its `CoreWindow`
+interop handle must be the exact primary `Shell_TrayWnd`; otherwise the route
+fails closed. The validated root is then passed as the explicit subtree to the
+public `VisualTreeHelper::FindElementsInHostCoordinates` API at the center point
+of the taskbar client bounds. The query examines at most 1024 projected
+elements within a 250 ms cooperative enumeration budget, deduplicates exact
+`Taskbar.TaskbarFrame` candidates by controlling `IUnknown` identity, and
 accepts only one frame that passes the complete existing tree profile. All
 WinRT references are released synchronously on that owner thread.
 
@@ -69,9 +71,12 @@ These checkpoints deliberately do not start the weather-pipe worker, create
 a XAML view, acquire a mount lease, append a child, or request relayout. Its
 detour callback is read-only and never dereferences the private frame pointer.
 `status` therefore remains `mount-pending` and carries one stable
-`bootstrap-*` diagnostic; only `bootstrap-frame-validated` is a successful
-probe. The validation harness recognizes that result as an immediate terminal
-condition and still runs its normal stop/final-status cleanup.
+`bootstrap-*` diagnostic; only `root-bootstrap-validated` is a successful
+public-root probe. Missing root, root query failure, wrong HWND association,
+frame absence/ambiguity, bounded enumeration overflow, and tree-profile drift
+are reported as separate fixed values. The validation harness recognizes the
+validated result as an immediate terminal condition and still runs its normal
+stop/final-status cleanup.
 
 Each command revalidates the taskbar owner and PE profile, installs a temporary
 thread-specific `WH_CALLWNDPROC` hook, sends the registered control message, and
@@ -84,7 +89,7 @@ bind later pipe reports to the exact Explorer process and controller generation.
 No pointer is dereferenced across processes, and Explorer never waits on the
 broker.
 
-Outside the v7–v9 diagnostic-only checkpoint, `status` is a fail-closed readiness
+Outside the v10 diagnostic-only checkpoint, `status` is a fail-closed readiness
 query. It returns `mount-ready` only after
 the controller revalidates, on the taskbar XAML owner thread, that the exact
 owned Button is still a loaded, visible, arranged child of the live RootGrid
