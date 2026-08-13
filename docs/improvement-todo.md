@@ -1067,3 +1067,27 @@ transport foundation for the standalone host.
   into fixed privacy-safe stages. No HRESULT, pointer, class instance data, or
   exception text should cross the process boundary. M3-07/M3-08 remain in
   progress.
+
+### 2026-08-13 Bootstrap Failure Stage Telemetry
+
+- Commit `ebfd6c0` advances the Host protocol to API version 8 while preserving
+  every API v7 diagnostic value. It appends fixed results for host-coordinate
+  query failure, iterator failure, runtime-class inspection failure,
+  controlling-`IUnknown` projection failure, and an unavailable final tree
+  probe; the older `bootstrap-query-failed` remains the unknown fallback.
+- The stage names describe only the code boundary where failure was observed.
+  They do not expose or infer an HRESULT, pointer, exception text, runtime
+  instance, candidate count, or private class data. C++/WinRT lazy evaluation
+  can still surface an underlying query failure during iterator traversal.
+- The live bootstrap keeps the API v7 safety boundary: exact taskbar window,
+  current process/thread, bounded DIP rectangle, at most 1024 elements, 250 ms
+  cooperative enumeration budget, exact class name, controlling identity
+  deduplication, one full tree probe, synchronous owner-thread destruction, and
+  no weather worker, view, mount lease, append, or relayout request.
+- The isolated Release output is
+  `.testbuild/native-taskbar-weather-v8`. Native tests and import gates pass
+  13/13, managed protocol tests pass 63/63, the complete .NET suite passes
+  1123/1123, the Debug x64 app build has zero warnings/errors, and PowerShell 7
+  plus Windows PowerShell pass AST and `DescribeOnly` validation. The current
+  Explorer still pins the API v7 Host, so v8 must be signed and loaded only
+  after another disposable Explorer restart. M3-07/M3-08 remain in progress.
