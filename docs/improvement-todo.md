@@ -1093,3 +1093,25 @@ transport foundation for the standalone host.
   current-user certificate `15303040F7CEECFDE9C023F15481D15C39CCDB46` and
   SignTool verified each with zero warnings/errors; load them only after another
   disposable Explorer restart. M3-07/M3-08 remain in progress.
+
+### 2026-08-13 Signed API v8 Query Timeout Diagnosis
+
+- After another Explorer restart, the signed API v8 Host was dispatched to the
+  fresh primary taskbar owner. Start did not acknowledge within the Broker's
+  bounded reply window, so no stage diagnostic was accepted. The same full
+  `Shell_TrayWnd` client-rectangle query used by v7 can therefore block inside
+  the public XAML query boundary long enough that cooperative post-call and
+  enumeration budgets cannot protect the owner thread.
+- The harness entered its ambiguous-start cleanup path and did not report a
+  cleanup failure. After the delayed owner-thread work drained, an independent
+  strict probe identified the supported primary taskbar in Explorer process
+  `42396` on thread `42380`; an independent status acknowledgement returned
+  `not-started` with diagnostic `none`. The taskbar Explorer remained
+  responsive. Other Explorer processes were present and were not treated as
+  the primary taskbar owner.
+- A full-host rectangle is no longer an acceptable bootstrap input. The next
+  slice should query a single bounded host-coordinate point (or the smallest
+  practical rectangle) and keep the existing exact class/identity/tree gates.
+  The diagnostic-only lifecycle should also avoid installing the private
+  layout detour if Host pinning and Start/Status/Stop state can be preserved
+  safely without it. M3-07/M3-08 remain in progress.
