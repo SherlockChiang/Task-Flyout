@@ -1273,3 +1273,19 @@ transport foundation for the standalone host.
   `DescribeOnly` gates. The native import gate remains free of WebView, browser,
   and network dependencies. Signing and a fresh disposable Explorer runtime
   diagnosis remain pending; M3-07/M3-08 stay in progress.
+
+### 2026-08-13 Signed API v11 Artifacts
+
+- The isolated v11 Broker and Host are signed with the existing current-user
+  code-signing certificate
+  `15303040F7CEECFDE9C023F15481D15C39CCDB46`. SignTool verified both chains
+  with zero warnings and zero errors; neither file is timestamped.
+- Signed SHA-256 hashes are
+  `7C09AC3137558CFF792BE07FA30F5284545CE378EBD6A6189C02DC75BBFB48D5`
+  for `TaskFlyout.TaskbarBroker.exe` and
+  `136F649ECE0BBC3CE2D616E87F0522E6864F98DAAE77D1CD92D9FD7A60F32CF7`
+  for `TaskFlyout.TaskbarHost.dll`.
+- The current Explorer may still pin the previously loaded v10 Host. Restart
+  only the disposable Explorer session before running the signed v11 harness;
+  the harness itself will not restart Explorer or synthesize a relayout.
+  M3-07/M3-08 remain in progress.
