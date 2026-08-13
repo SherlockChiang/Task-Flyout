@@ -1115,3 +1115,24 @@ transport foundation for the standalone host.
   The diagnostic-only lifecycle should also avoid installing the private
   layout detour if Host pinning and Start/Status/Stop state can be preserved
   safely without it. M3-07/M3-08 remain in progress.
+
+### 2026-08-13 Center-Point Bootstrap Query
+
+- Commit `519e880` advances the Host protocol to API version 9 and replaces the
+  v7/v8 full-client-rectangle `FindElementsInHostCoordinates` input with one
+  deterministic center point derived from the validated taskbar client bounds.
+  The public query still uses `subtree = null` and `includeAllElements = true`,
+  then applies the same exact `Taskbar.TaskbarFrame`, controlling-identity,
+  bounded-enumeration, and complete-tree-profile gates.
+- The change is evidence-driven: API v7 produced a fixed
+  `bootstrap-query-failed`, while API v8's stage split showed the synchronous
+  query could outlive the Broker acknowledgement window. A center point is the
+  smallest practical host-coordinate probe that may still hit the frame without
+  asking the XAML runtime to process the entire taskbar rectangle. The timeout
+  remains fail-closed if the runtime still blocks.
+- Pure policy tests cover finite center-point conversion, translated origins,
+  zero dimensions, and non-finite dimensions. Native 13/13, complete .NET
+  1123/1123, Debug x64 (0 warnings/errors), and both PowerShell parser/
+  `DescribeOnly` paths remain green. The v9 output is isolated in
+  `.testbuild/native-taskbar-weather-v9` and has not been signed or loaded yet;
+  M3-07/M3-08 remain in progress.
