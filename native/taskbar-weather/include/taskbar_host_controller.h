@@ -47,6 +47,13 @@ HostControlDiagnostic EvaluateAwaitingLayoutDiagnostic(
 HostControlDiagnostic TaskbarFrameBootstrapDiagnostic(
     TaskbarFrameBootstrapStatus status) noexcept;
 
+HostControlDiagnostic PrivateTaskbarFrameBridgeDiagnostic(
+    TaskbarFrameBridgeStatus bridgeStatus,
+    TaskbarTreeProbeStatus treeStatus) noexcept;
+
+bool IsPrivateTaskbarFrameBridgeTerminalDiagnostic(
+    HostControlDiagnostic diagnostic) noexcept;
+
 enum class TaskbarHostControllerResult : std::uint32_t {
     Started = 0,
     AlreadyStarted = 1,

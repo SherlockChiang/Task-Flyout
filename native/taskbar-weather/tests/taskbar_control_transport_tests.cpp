@@ -20,7 +20,7 @@ int wmain() {
 
     bool passed = true;
     passed &= Expect(
-        kHostApiVersion == 10u &&
+        kHostApiVersion == 11u &&
             static_cast<std::uint32_t>(
                 HostControlDiagnostic::DetourTargetNotObserved) == 12u &&
             static_cast<std::uint32_t>(
@@ -82,7 +82,52 @@ int wmain() {
                 HostControlDiagnostic::BootstrapRootValidated) == 37u &&
             static_cast<std::uint32_t>(
                 HostControlDiagnostic::BootstrapRootEnumerationOverflow) ==
-                38u,
+                38u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::PrivateBridgeAwaitingCallback) == 39u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::PrivateBridgeNullObject) == 40u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::PrivateBridgeCompatibilityRejected) ==
+                41u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::PrivateBridgeDetourInactive) == 42u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::PrivateBridgeCallbackScopeInactive) ==
+                43u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::PrivateBridgeOwnerThreadMismatch) ==
+                44u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::
+                    PrivateBridgeInspectableSlotUnreadable) == 45u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::PrivateBridgeInspectablePointerNull) ==
+                46u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::
+                    PrivateBridgeInspectableObjectUnreadable) == 47u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::
+                    PrivateBridgeInspectableVtableUnreadable) == 48u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::
+                    PrivateBridgeInspectableMethodInvalid) == 49u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::PrivateBridgeProjectionFailed) == 50u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::PrivateBridgeFrameTypeMismatch) == 51u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::PrivateBridgeDispatcherUnavailable) ==
+                52u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::
+                    PrivateBridgeDispatcherThreadMismatch) == 53u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::PrivateBridgeTreeProfileMismatch) ==
+                54u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::PrivateBridgeValidated) == 55u,
         L"host API and additive diagnostic values must remain protocol-stable");
     constexpr std::uint32_t nonce = 0xA17E52C3u;
     constexpr auto encodedStart = EncodeHostControlRequest(
@@ -292,6 +337,18 @@ int wmain() {
         std::wstring_view(HostControlDiagnosticName(
             HostControlDiagnostic::BootstrapTreeProbeUnavailable)) ==
                 L"bootstrap-tree-probe-unavailable" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::PrivateBridgeAwaitingCallback)) ==
+                L"private-bridge-awaiting-callback" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::PrivateBridgeInspectableSlotUnreadable)) ==
+                L"private-bridge-inspectable-slot-unreadable" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::PrivateBridgeTreeProfileMismatch)) ==
+                L"private-bridge-tree-profile-mismatch" &&
+        std::wstring_view(HostControlDiagnosticName(
+            HostControlDiagnostic::PrivateBridgeValidated)) ==
+                L"private-bridge-validated" &&
         std::wstring_view(HostControlDiagnosticName(
             static_cast<HostControlDiagnostic>(0xFFFFFFFFu))) == L"invalid",
         L"controller diagnostic names should be stable and bounded");

@@ -148,6 +148,23 @@ public class StandaloneTaskbarBrokerProtocolTests
     [InlineData("bootstrap-root-tree-profile-mismatch")]
     [InlineData("root-bootstrap-validated")]
     [InlineData("bootstrap-root-enumeration-overflow")]
+    [InlineData("private-bridge-awaiting-callback")]
+    [InlineData("private-bridge-null-object")]
+    [InlineData("private-bridge-compatibility-rejected")]
+    [InlineData("private-bridge-detour-inactive")]
+    [InlineData("private-bridge-callback-scope-inactive")]
+    [InlineData("private-bridge-owner-thread-mismatch")]
+    [InlineData("private-bridge-inspectable-slot-unreadable")]
+    [InlineData("private-bridge-inspectable-pointer-null")]
+    [InlineData("private-bridge-inspectable-object-unreadable")]
+    [InlineData("private-bridge-inspectable-vtable-unreadable")]
+    [InlineData("private-bridge-inspectable-method-invalid")]
+    [InlineData("private-bridge-projection-failed")]
+    [InlineData("private-bridge-frame-type-mismatch")]
+    [InlineData("private-bridge-dispatcher-unavailable")]
+    [InlineData("private-bridge-dispatcher-thread-mismatch")]
+    [InlineData("private-bridge-tree-profile-mismatch")]
+    [InlineData("private-bridge-validated")]
     public void Additive_controller_diagnostic_preserves_older_parser_behavior(
         string controllerDiagnostic)
     {

@@ -194,6 +194,89 @@ int wmain() {
         L"bootstrap outcomes should map only to additive fixed diagnostics");
 
     passed &= Expect(
+        PrivateTaskbarFrameBridgeDiagnostic(
+            TaskbarFrameBridgeStatus::NullPrivateObject,
+            TaskbarTreeProbeStatus::XamlTreeUnavailable) ==
+                HostControlDiagnostic::PrivateBridgeNullObject &&
+            PrivateTaskbarFrameBridgeDiagnostic(
+                TaskbarFrameBridgeStatus::CompatibilityRejected,
+                TaskbarTreeProbeStatus::XamlTreeUnavailable) ==
+                HostControlDiagnostic::PrivateBridgeCompatibilityRejected &&
+            PrivateTaskbarFrameBridgeDiagnostic(
+                TaskbarFrameBridgeStatus::DetourInactive,
+                TaskbarTreeProbeStatus::XamlTreeUnavailable) ==
+                HostControlDiagnostic::PrivateBridgeDetourInactive &&
+            PrivateTaskbarFrameBridgeDiagnostic(
+                TaskbarFrameBridgeStatus::CallbackScopeInactive,
+                TaskbarTreeProbeStatus::XamlTreeUnavailable) ==
+                HostControlDiagnostic::PrivateBridgeCallbackScopeInactive &&
+            PrivateTaskbarFrameBridgeDiagnostic(
+                TaskbarFrameBridgeStatus::WrongOwnerThread,
+                TaskbarTreeProbeStatus::XamlTreeUnavailable) ==
+                HostControlDiagnostic::PrivateBridgeOwnerThreadMismatch &&
+            PrivateTaskbarFrameBridgeDiagnostic(
+                TaskbarFrameBridgeStatus::InspectableSlotUnreadable,
+                TaskbarTreeProbeStatus::XamlTreeUnavailable) ==
+                HostControlDiagnostic::
+                    PrivateBridgeInspectableSlotUnreadable &&
+            PrivateTaskbarFrameBridgeDiagnostic(
+                TaskbarFrameBridgeStatus::InspectablePointerNull,
+                TaskbarTreeProbeStatus::XamlTreeUnavailable) ==
+                HostControlDiagnostic::PrivateBridgeInspectablePointerNull &&
+            PrivateTaskbarFrameBridgeDiagnostic(
+                TaskbarFrameBridgeStatus::InspectableObjectUnreadable,
+                TaskbarTreeProbeStatus::XamlTreeUnavailable) ==
+                HostControlDiagnostic::
+                    PrivateBridgeInspectableObjectUnreadable &&
+            PrivateTaskbarFrameBridgeDiagnostic(
+                TaskbarFrameBridgeStatus::InspectableVtableUnreadable,
+                TaskbarTreeProbeStatus::XamlTreeUnavailable) ==
+                HostControlDiagnostic::
+                    PrivateBridgeInspectableVtableUnreadable &&
+            PrivateTaskbarFrameBridgeDiagnostic(
+                TaskbarFrameBridgeStatus::InspectableMethodInvalid,
+                TaskbarTreeProbeStatus::XamlTreeUnavailable) ==
+                HostControlDiagnostic::PrivateBridgeInspectableMethodInvalid &&
+            PrivateTaskbarFrameBridgeDiagnostic(
+                TaskbarFrameBridgeStatus::ProjectionFailed,
+                TaskbarTreeProbeStatus::XamlTreeUnavailable) ==
+                HostControlDiagnostic::PrivateBridgeProjectionFailed &&
+            PrivateTaskbarFrameBridgeDiagnostic(
+                TaskbarFrameBridgeStatus::FrameTypeMismatch,
+                TaskbarTreeProbeStatus::XamlTreeUnavailable) ==
+                HostControlDiagnostic::PrivateBridgeFrameTypeMismatch &&
+            PrivateTaskbarFrameBridgeDiagnostic(
+                TaskbarFrameBridgeStatus::DispatcherUnavailable,
+                TaskbarTreeProbeStatus::XamlTreeUnavailable) ==
+                HostControlDiagnostic::PrivateBridgeDispatcherUnavailable &&
+            PrivateTaskbarFrameBridgeDiagnostic(
+                TaskbarFrameBridgeStatus::DispatcherThreadMismatch,
+                TaskbarTreeProbeStatus::XamlTreeUnavailable) ==
+                HostControlDiagnostic::
+                    PrivateBridgeDispatcherThreadMismatch,
+        L"private bridge failures should retain their exact bounded stage");
+    passed &= Expect(
+        PrivateTaskbarFrameBridgeDiagnostic(
+            TaskbarFrameBridgeStatus::Resolved,
+            TaskbarTreeProbeStatus::RootGridDuplicate) ==
+                HostControlDiagnostic::PrivateBridgeTreeProfileMismatch &&
+            PrivateTaskbarFrameBridgeDiagnostic(
+                TaskbarFrameBridgeStatus::Resolved,
+                TaskbarTreeProbeStatus::LandmarksMatched) ==
+                HostControlDiagnostic::PrivateBridgeValidated,
+        L"a resolved private bridge still requires the complete tree profile");
+    passed &= Expect(
+        IsPrivateTaskbarFrameBridgeTerminalDiagnostic(
+            HostControlDiagnostic::PrivateBridgeNullObject) &&
+            IsPrivateTaskbarFrameBridgeTerminalDiagnostic(
+                HostControlDiagnostic::PrivateBridgeValidated) &&
+            !IsPrivateTaskbarFrameBridgeTerminalDiagnostic(
+                HostControlDiagnostic::PrivateBridgeAwaitingCallback) &&
+            !IsPrivateTaskbarFrameBridgeTerminalDiagnostic(
+                HostControlDiagnostic::BootstrapRootEnumerationOverflow),
+        L"only the appended private bridge result range should be terminal");
+
+    passed &= Expect(
         SelectTaskbarHostReportedDiagnostic(
             true,
             TaskbarHostControllerResult::Started,

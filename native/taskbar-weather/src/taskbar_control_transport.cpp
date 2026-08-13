@@ -588,6 +588,40 @@ const wchar_t* HostControlDiagnosticName(
             return L"root-bootstrap-validated";
         case HostControlDiagnostic::BootstrapRootEnumerationOverflow:
             return L"bootstrap-root-enumeration-overflow";
+        case HostControlDiagnostic::PrivateBridgeAwaitingCallback:
+            return L"private-bridge-awaiting-callback";
+        case HostControlDiagnostic::PrivateBridgeNullObject:
+            return L"private-bridge-null-object";
+        case HostControlDiagnostic::PrivateBridgeCompatibilityRejected:
+            return L"private-bridge-compatibility-rejected";
+        case HostControlDiagnostic::PrivateBridgeDetourInactive:
+            return L"private-bridge-detour-inactive";
+        case HostControlDiagnostic::PrivateBridgeCallbackScopeInactive:
+            return L"private-bridge-callback-scope-inactive";
+        case HostControlDiagnostic::PrivateBridgeOwnerThreadMismatch:
+            return L"private-bridge-owner-thread-mismatch";
+        case HostControlDiagnostic::PrivateBridgeInspectableSlotUnreadable:
+            return L"private-bridge-inspectable-slot-unreadable";
+        case HostControlDiagnostic::PrivateBridgeInspectablePointerNull:
+            return L"private-bridge-inspectable-pointer-null";
+        case HostControlDiagnostic::PrivateBridgeInspectableObjectUnreadable:
+            return L"private-bridge-inspectable-object-unreadable";
+        case HostControlDiagnostic::PrivateBridgeInspectableVtableUnreadable:
+            return L"private-bridge-inspectable-vtable-unreadable";
+        case HostControlDiagnostic::PrivateBridgeInspectableMethodInvalid:
+            return L"private-bridge-inspectable-method-invalid";
+        case HostControlDiagnostic::PrivateBridgeProjectionFailed:
+            return L"private-bridge-projection-failed";
+        case HostControlDiagnostic::PrivateBridgeFrameTypeMismatch:
+            return L"private-bridge-frame-type-mismatch";
+        case HostControlDiagnostic::PrivateBridgeDispatcherUnavailable:
+            return L"private-bridge-dispatcher-unavailable";
+        case HostControlDiagnostic::PrivateBridgeDispatcherThreadMismatch:
+            return L"private-bridge-dispatcher-thread-mismatch";
+        case HostControlDiagnostic::PrivateBridgeTreeProfileMismatch:
+            return L"private-bridge-tree-profile-mismatch";
+        case HostControlDiagnostic::PrivateBridgeValidated:
+            return L"private-bridge-validated";
     }
     return L"invalid";
 }

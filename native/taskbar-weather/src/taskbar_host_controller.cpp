@@ -24,10 +24,10 @@ constexpr DWORD kWeatherPipePollIntervalMilliseconds = 15000;
 constexpr DWORD kMountReadinessReportIntervalMilliseconds = 5000;
 constexpr ULONGLONG kMountObservationMaximumAgeMilliseconds = 12000;
 constexpr DWORD kWeatherPipeStopWaitMilliseconds = 2000;
-// API v10 is deliberately diagnostic-only. It tests whether the already-live
-// primary TaskbarFrame can be found through public XAML APIs before that frame
-// is ever handed to the existing mount path.
-constexpr bool kReadOnlyBootstrapProbe = true;
+// API v11 is deliberately diagnostic-only. It validates the existing guarded
+// private TaskbarFrame bridge only inside a naturally occurring detour callback
+// before that frame is ever handed to the existing mount path.
+constexpr bool kPrivateBridgeDiagnosticProbe = true;
 
 struct TaskbarFrameLease {
     winrt::weak_ref<winrt::Windows::UI::Xaml::FrameworkElement> frame;
@@ -64,6 +64,31 @@ void PublishAwaitingLayoutIfNoDiagnostic() noexcept {
         HostControlDiagnostic::AwaitingLayout,
         std::memory_order_acq_rel,
         std::memory_order_acquire);
+}
+
+void PublishPrivateBridgeAwaitingIfNoDiagnostic() noexcept {
+    HostControlDiagnostic expected = HostControlDiagnostic::None;
+    (void)Runtime().diagnostic.compare_exchange_strong(
+        expected,
+        HostControlDiagnostic::PrivateBridgeAwaitingCallback,
+        std::memory_order_acq_rel,
+        std::memory_order_acquire);
+}
+
+void PublishPrivateBridgeDiagnosticIfPending(
+    const HostControlDiagnostic diagnostic) noexcept {
+    HostControlDiagnostic current =
+        Runtime().diagnostic.load(std::memory_order_acquire);
+    while (current == HostControlDiagnostic::None ||
+           current == HostControlDiagnostic::PrivateBridgeAwaitingCallback) {
+        if (Runtime().diagnostic.compare_exchange_weak(
+                current,
+                diagnostic,
+                std::memory_order_acq_rel,
+                std::memory_order_acquire)) {
+            return;
+        }
+    }
 }
 
 HostControlDiagnostic LoadControllerDiagnostic() noexcept {
@@ -820,10 +845,20 @@ void WINAPI OnTaskbarFrameLayout(void* privateTaskbarFrame) {
     }
 }
 
-void WINAPI OnTaskbarFrameLayoutReadOnly(void*) noexcept {
-    // Keep the exact detour observable without dereferencing the private
-    // object or mutating the XAML tree. API v10 promotes the separately stored
-    // public bootstrap result over this callback's telemetry.
+void WINAPI OnTaskbarFrameLayoutReadOnly(void* privateTaskbarFrame) noexcept {
+    // Resolve and profile only while the detour supplies the exact TLS lifetime
+    // token. All apartment-affine references die before this callback returns.
+    const TaskbarFrameBridgeResult bridge =
+        ResolveTaskbarFrameFromPrivateAbi(privateTaskbarFrame);
+    TaskbarTreeProbeStatus treeStatus =
+        TaskbarTreeProbeStatus::XamlTreeUnavailable;
+    if (bridge.status == TaskbarFrameBridgeStatus::Resolved) {
+        const TaskbarTreeProfile profile =
+            ProbeTaskbarFrameTree(bridge.frame);
+        treeStatus = profile.status;
+    }
+    PublishPrivateBridgeDiagnosticIfPending(
+        PrivateTaskbarFrameBridgeDiagnostic(bridge.status, treeStatus));
     PublishMountReadinessObservation(false);
 }
 
@@ -1035,6 +1070,56 @@ HostControlDiagnostic TaskbarFrameBootstrapDiagnostic(
     return HostControlDiagnostic::BootstrapQueryFailed;
 }
 
+HostControlDiagnostic PrivateTaskbarFrameBridgeDiagnostic(
+    const TaskbarFrameBridgeStatus bridgeStatus,
+    const TaskbarTreeProbeStatus treeStatus) noexcept {
+    switch (bridgeStatus) {
+        case TaskbarFrameBridgeStatus::Resolved:
+            return treeStatus == TaskbarTreeProbeStatus::LandmarksMatched
+                ? HostControlDiagnostic::PrivateBridgeValidated
+                : HostControlDiagnostic::PrivateBridgeTreeProfileMismatch;
+        case TaskbarFrameBridgeStatus::NullPrivateObject:
+            return HostControlDiagnostic::PrivateBridgeNullObject;
+        case TaskbarFrameBridgeStatus::CompatibilityRejected:
+            return HostControlDiagnostic::PrivateBridgeCompatibilityRejected;
+        case TaskbarFrameBridgeStatus::DetourInactive:
+            return HostControlDiagnostic::PrivateBridgeDetourInactive;
+        case TaskbarFrameBridgeStatus::CallbackScopeInactive:
+            return HostControlDiagnostic::PrivateBridgeCallbackScopeInactive;
+        case TaskbarFrameBridgeStatus::WrongOwnerThread:
+            return HostControlDiagnostic::PrivateBridgeOwnerThreadMismatch;
+        case TaskbarFrameBridgeStatus::InspectableSlotUnreadable:
+            return HostControlDiagnostic::
+                PrivateBridgeInspectableSlotUnreadable;
+        case TaskbarFrameBridgeStatus::InspectablePointerNull:
+            return HostControlDiagnostic::PrivateBridgeInspectablePointerNull;
+        case TaskbarFrameBridgeStatus::InspectableObjectUnreadable:
+            return HostControlDiagnostic::
+                PrivateBridgeInspectableObjectUnreadable;
+        case TaskbarFrameBridgeStatus::InspectableVtableUnreadable:
+            return HostControlDiagnostic::
+                PrivateBridgeInspectableVtableUnreadable;
+        case TaskbarFrameBridgeStatus::InspectableMethodInvalid:
+            return HostControlDiagnostic::PrivateBridgeInspectableMethodInvalid;
+        case TaskbarFrameBridgeStatus::ProjectionFailed:
+            return HostControlDiagnostic::PrivateBridgeProjectionFailed;
+        case TaskbarFrameBridgeStatus::FrameTypeMismatch:
+            return HostControlDiagnostic::PrivateBridgeFrameTypeMismatch;
+        case TaskbarFrameBridgeStatus::DispatcherUnavailable:
+            return HostControlDiagnostic::PrivateBridgeDispatcherUnavailable;
+        case TaskbarFrameBridgeStatus::DispatcherThreadMismatch:
+            return HostControlDiagnostic::
+                PrivateBridgeDispatcherThreadMismatch;
+    }
+    return HostControlDiagnostic::PrivateBridgeProjectionFailed;
+}
+
+bool IsPrivateTaskbarFrameBridgeTerminalDiagnostic(
+    const HostControlDiagnostic diagnostic) noexcept {
+    return diagnostic >= HostControlDiagnostic::PrivateBridgeNullObject &&
+        diagnostic <= HostControlDiagnostic::PrivateBridgeValidated;
+}
+
 HostControlDiagnostic SelectTaskbarHostReportedDiagnostic(
     const bool readOnlyBootstrapProbe,
     const TaskbarHostControllerResult result,
@@ -1080,14 +1165,24 @@ TaskbarHostControllerResult StartTaskbarWeatherController(
     Runtime().startCustomCallbackSequence.store(
         startBaseline.customCallbackSequence,
         std::memory_order_release);
+    if (kPrivateBridgeDiagnosticProbe) {
+        // Publish the sentinel before enabling the hook. A natural callback may
+        // run immediately after MH_EnableHook and must be able to replace it.
+        PublishPrivateBridgeAwaitingIfNoDiagnostic();
+    }
     const TaskbarDetourResult detourResult = StartTaskbarFrameDetour(
-        kReadOnlyBootstrapProbe
+        kPrivateBridgeDiagnosticProbe
             ? &OnTaskbarFrameLayoutReadOnly
             : &OnTaskbarFrameLayout);
     TaskbarHostControllerResult result = MapStartResult(detourResult);
+    if (result != TaskbarHostControllerResult::Started &&
+        result != TaskbarHostControllerResult::AlreadyStarted &&
+        kPrivateBridgeDiagnosticProbe) {
+        PublishControllerDiagnostic(HostControlDiagnostic::None);
+    }
     if ((detourResult == TaskbarDetourResult::Installed ||
          detourResult == TaskbarDetourResult::AlreadyActive) &&
-        !kReadOnlyBootstrapProbe && !StartWeatherPipeWorker()) {
+        !kPrivateBridgeDiagnosticProbe && !StartWeatherPipeWorker()) {
         if (detourResult == TaskbarDetourResult::Installed) {
             const TaskbarDetourResult rollbackResult =
                 StopTaskbarFrameDetour(&RestoreAllTaskbarFrames);
@@ -1101,13 +1196,14 @@ TaskbarHostControllerResult StartTaskbarWeatherController(
     if (result == TaskbarHostControllerResult::Started ||
         result == TaskbarHostControllerResult::AlreadyStarted) {
         ResetMountReadinessSession(controllerNonce);
-        if (detourResult == TaskbarDetourResult::Installed) {
+        if (!kPrivateBridgeDiagnosticProbe &&
+            detourResult == TaskbarDetourResult::Installed) {
             const TaskbarFrameBootstrapStatus bootstrap =
                 ProbeTaskbarFrameBootstrap(taskbarWindow);
             PublishBootstrapDiagnostic(
                 TaskbarFrameBootstrapDiagnostic(bootstrap));
         }
-        if (!kReadOnlyBootstrapProbe) {
+        if (!kPrivateBridgeDiagnosticProbe) {
             // A secondary taskbar thread can enter the process-wide detour
             // while this primary owner-thread start is still completing.
             // Preserve any concrete callback diagnostic it publishes instead
@@ -1177,11 +1273,18 @@ QueryTaskbarWeatherControllerStatusSnapshot() noexcept {
     }
 
     auto& runtime = Runtime();
-    if (kReadOnlyBootstrapProbe) {
-        HostControlDiagnostic diagnostic = LoadBootstrapDiagnostic();
-        if (diagnostic == HostControlDiagnostic::None) {
-            diagnostic = HostControlDiagnostic::BootstrapRootQueryFailed;
-            PublishBootstrapDiagnostic(diagnostic);
+    if (kPrivateBridgeDiagnosticProbe) {
+        HostControlDiagnostic diagnostic = LoadControllerDiagnostic();
+        if (diagnostic == HostControlDiagnostic::None ||
+            diagnostic == HostControlDiagnostic::AwaitingLayout) {
+            PublishPrivateBridgeAwaitingIfNoDiagnostic();
+            diagnostic = LoadControllerDiagnostic();
+        }
+        if (diagnostic !=
+                HostControlDiagnostic::PrivateBridgeAwaitingCallback &&
+            !IsPrivateTaskbarFrameBridgeTerminalDiagnostic(diagnostic)) {
+            diagnostic = HostControlDiagnostic::PrivateBridgeProjectionFailed;
+            PublishControllerDiagnostic(diagnostic);
         }
         runtime.lastResult.store(
             TaskbarHostControllerResult::MountPending,
@@ -1225,7 +1328,7 @@ QueryTaskbarWeatherControllerStatusSnapshot() noexcept {
 HostControlDiagnostic CurrentTaskbarWeatherControllerDiagnostic() noexcept {
     auto& runtime = Runtime();
     return SelectTaskbarHostReportedDiagnostic(
-        kReadOnlyBootstrapProbe,
+        false,
         runtime.lastResult.load(std::memory_order_acquire),
         LoadControllerDiagnostic(),
         LoadBootstrapDiagnostic());
