@@ -1046,3 +1046,24 @@ transport foundation for the standalone host.
   the gated harness. If the result is `bootstrap-frame-not-observed`, investigate
   the XAML island host coordinate assumption before changing private detours or
   sending more layout notifications. M3-07/M3-08 remain in progress.
+
+### 2026-08-13 Signed API v7 Bootstrap Diagnosis
+
+- After the disposable Explorer restart, the signed API v7 Host loaded into
+  fresh Explorer process `19900` on primary taskbar thread `32724`. The strict
+  PE/profile probe remained supported and the harness's signer gate passed.
+- The read-only public-XAML bootstrap returned the stable fixed diagnostic
+  `bootstrap-query-failed`. This rules out accepting a unique validated frame;
+  the current coarse result means an exception occurred during public query,
+  iterator traversal, candidate projection/identity, or the final tree probe.
+  It does not justify enabling the existing mount path.
+- The harness failed closed and its `finally` cleanup completed. An independent
+  strict probe still reported the same supported Explorer profile, Explorer
+  remained responsive, and an independent status command returned
+  `not-started` with diagnostic `none`.
+- The next diagnostic slice should preserve the same read-only behavior while
+  separating public-query acquisition, iterator creation/traversal, candidate
+  identity projection, runtime-class inspection, and tree-profile exceptions
+  into fixed privacy-safe stages. No HRESULT, pointer, class instance data, or
+  exception text should cross the process boundary. M3-07/M3-08 remain in
+  progress.
