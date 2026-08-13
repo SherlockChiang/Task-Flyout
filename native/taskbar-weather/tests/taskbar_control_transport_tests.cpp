@@ -20,7 +20,7 @@ int wmain() {
 
     bool passed = true;
     passed &= Expect(
-        kHostApiVersion == 9u &&
+        kHostApiVersion == 10u &&
             static_cast<std::uint32_t>(
                 HostControlDiagnostic::DetourTargetNotObserved) == 12u &&
             static_cast<std::uint32_t>(
@@ -63,7 +63,26 @@ int wmain() {
                 HostControlDiagnostic::BootstrapIdentityProjectionFailed) ==
                 29u &&
             static_cast<std::uint32_t>(
-                HostControlDiagnostic::BootstrapTreeProbeUnavailable) == 30u,
+                HostControlDiagnostic::BootstrapTreeProbeUnavailable) == 30u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapRootUnavailable) == 31u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapRootQueryFailed) == 32u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapRootNotAssociatedWithTaskbar) ==
+                33u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapRootFrameNotObserved) == 34u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapRootFrameAmbiguous) == 35u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapRootTreeProfileMismatch) ==
+                36u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapRootValidated) == 37u &&
+            static_cast<std::uint32_t>(
+                HostControlDiagnostic::BootstrapRootEnumerationOverflow) ==
+                38u,
         L"host API and additive diagnostic values must remain protocol-stable");
     constexpr std::uint32_t nonce = 0xA17E52C3u;
     constexpr auto encodedStart = EncodeHostControlRequest(

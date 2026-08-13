@@ -65,7 +65,15 @@ $knownControllerDiagnostics = @(
     'bootstrap-enumeration-failed',
     'bootstrap-class-inspection-failed',
     'bootstrap-identity-projection-failed',
-    'bootstrap-tree-probe-unavailable')
+    'bootstrap-tree-probe-unavailable',
+    'bootstrap-root-unavailable',
+    'bootstrap-root-query-failed',
+    'bootstrap-root-not-associated-with-taskbar',
+    'bootstrap-root-frame-not-observed',
+    'bootstrap-root-frame-ambiguous',
+    'bootstrap-root-tree-profile-mismatch',
+    'root-bootstrap-validated',
+    'bootstrap-root-enumeration-overflow')
 $bootstrapControllerDiagnostics = @(
     'bootstrap-window-invalid',
     'bootstrap-owner-thread-mismatch',
@@ -80,7 +88,15 @@ $bootstrapControllerDiagnostics = @(
     'bootstrap-enumeration-failed',
     'bootstrap-class-inspection-failed',
     'bootstrap-identity-projection-failed',
-    'bootstrap-tree-probe-unavailable')
+    'bootstrap-tree-probe-unavailable',
+    'bootstrap-root-unavailable',
+    'bootstrap-root-query-failed',
+    'bootstrap-root-not-associated-with-taskbar',
+    'bootstrap-root-frame-not-observed',
+    'bootstrap-root-frame-ambiguous',
+    'bootstrap-root-tree-profile-mismatch',
+    'root-bootstrap-validated',
+    'bootstrap-root-enumeration-overflow')
 
 if ($DescribeOnly) {
     [pscustomobject]@{
@@ -347,9 +363,9 @@ try {
             $bootstrapDiagnostic -cne $startDiagnostic) {
             throw 'The read-only bootstrap result was not stable across status.'
         }
-        if ($bootstrapDiagnostic -cne 'bootstrap-frame-validated') {
+        if ($bootstrapDiagnostic -cne 'root-bootstrap-validated') {
             throw (
-                'The read-only TaskbarFrame bootstrap failed closed. ' +
+                'The read-only public-root TaskbarFrame bootstrap failed closed. ' +
                 "Controller diagnostic: $bootstrapDiagnostic.")
         }
         $bootstrapValidated = $true
@@ -431,7 +447,7 @@ if (-not [string]::IsNullOrEmpty($testFailure)) {
 if ($bootstrapValidated) {
     Write-Host (
         'Standalone taskbar controller validated one live TaskbarFrame ' +
-        'through the read-only bootstrap and stopped cleanly.') `
+        'through the read-only public-root bootstrap and stopped cleanly.') `
         -ForegroundColor Green
 } else {
     Write-Host (

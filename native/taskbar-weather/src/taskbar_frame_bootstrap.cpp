@@ -1,6 +1,7 @@
 #include "taskbar_frame_bootstrap.h"
 
 #include <Windows.h>
+#include <CoreWindow.h>
 
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -23,6 +24,7 @@ using winrt::Windows::Foundation::Rect;
 using winrt::Windows::Foundation::Collections::IIterable;
 using winrt::Windows::Foundation::Collections::IIterator;
 using winrt::Windows::UI::Xaml::UIElement;
+using winrt::Windows::UI::Xaml::Window;
 using winrt::Windows::UI::Xaml::Media::VisualTreeHelper;
 
 constexpr wchar_t kTaskbarWindowClass[] = L"Shell_TrayWnd";
@@ -84,6 +86,41 @@ bool TryGetHostBoundsInDips(HWND window, Rect& bounds) noexcept {
     return std::isfinite(bounds.X) && std::isfinite(bounds.Y) &&
            std::isfinite(bounds.Width) && std::isfinite(bounds.Height) &&
            bounds.Width > 0.0f && bounds.Height > 0.0f;
+}
+
+bool TryGetCurrentWindowRoot(
+    HWND taskbarWindow,
+    UIElement& root,
+    bool& associationKnown,
+    bool& associatedWithTaskbar) noexcept {
+    root = nullptr;
+    associationKnown = false;
+    associatedWithTaskbar = false;
+    const Window currentWindow = Window::Current();
+    if (!currentWindow) {
+        return false;
+    }
+
+    root = currentWindow.Content();
+    if (!root) {
+        return false;
+    }
+
+    const auto coreWindow = currentWindow.CoreWindow();
+    if (!coreWindow) {
+        return true;
+    }
+    const auto interop = coreWindow.try_as<ICoreWindowInterop>();
+    if (!interop) {
+        return true;
+    }
+    HWND publicRootWindow = nullptr;
+    if (FAILED(interop->get_WindowHandle(&publicRootWindow))) {
+        return true;
+    }
+    associationKnown = true;
+    associatedWithTaskbar = publicRootWindow == taskbarWindow;
+    return true;
 }
 
 }  // namespace
@@ -165,12 +202,55 @@ bool TrySelectTaskbarFrameBootstrapPoint(
     return std::isfinite(point.X) && std::isfinite(point.Y);
 }
 
+TaskbarFrameBootstrapStatus EvaluateTaskbarPublicRootBootstrapPolicy(
+    const TaskbarPublicRootBootstrapPolicyInput& input) noexcept {
+    if (!input.windowExists || !input.windowClassMatches ||
+        !input.windowProcessMatches) {
+        return TaskbarFrameBootstrapStatus::WindowInvalid;
+    }
+    if (!input.ownerThreadMatches) {
+        return TaskbarFrameBootstrapStatus::WrongOwnerThread;
+    }
+    if (!input.hostBoundsValid) {
+        return TaskbarFrameBootstrapStatus::HostBoundsInvalid;
+    }
+    if (!input.rootLookupSucceeded) {
+        return TaskbarFrameBootstrapStatus::RootQueryFailed;
+    }
+    if (!input.publicRootAvailable) {
+        return TaskbarFrameBootstrapStatus::RootUnavailable;
+    }
+    if (!input.publicRootAssociationKnown) {
+        return TaskbarFrameBootstrapStatus::RootQueryFailed;
+    }
+    if (!input.publicRootAssociatedWithTaskbar) {
+        return TaskbarFrameBootstrapStatus::RootNotAssociatedWithTaskbar;
+    }
+    if (!input.subtreeQuerySucceeded) {
+        return TaskbarFrameBootstrapStatus::RootQueryFailed;
+    }
+    if (input.enumerationOverflow) {
+        return TaskbarFrameBootstrapStatus::RootEnumerationOverflow;
+    }
+    if (input.uniqueFrameCount == 0) {
+        return TaskbarFrameBootstrapStatus::RootFrameNotObserved;
+    }
+    if (input.uniqueFrameCount > 1) {
+        return TaskbarFrameBootstrapStatus::RootFrameAmbiguous;
+    }
+    if (input.treeProfileStatus !=
+        TaskbarTreeProbeStatus::LandmarksMatched) {
+        return TaskbarFrameBootstrapStatus::RootTreeProfileMismatch;
+    }
+    return TaskbarFrameBootstrapStatus::RootBootstrapValidated;
+}
+
 TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
     HWND taskbarWindow) noexcept {
-    TaskbarFrameBootstrapPolicyInput input;
+    TaskbarPublicRootBootstrapPolicyInput input;
     input.windowExists = taskbarWindow && IsWindow(taskbarWindow) != FALSE;
     if (!input.windowExists) {
-        return EvaluateTaskbarFrameBootstrapPolicy(input);
+        return EvaluateTaskbarPublicRootBootstrapPolicy(input);
     }
 
     input.windowClassMatches =
@@ -183,7 +263,7 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
     input.ownerThreadMatches = ownerThreadId != 0 &&
         ownerThreadId == GetCurrentThreadId();
     TaskbarFrameBootstrapStatus status =
-        EvaluateTaskbarFrameBootstrapPolicy(input);
+        EvaluateTaskbarPublicRootBootstrapPolicy(input);
     if (status == TaskbarFrameBootstrapStatus::WindowInvalid ||
         status == TaskbarFrameBootstrapStatus::WrongOwnerThread) {
         return status;
@@ -192,7 +272,7 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
     Rect hostBounds{};
     input.hostBoundsValid =
         TryGetHostBoundsInDips(taskbarWindow, hostBounds);
-    status = EvaluateTaskbarFrameBootstrapPolicy(input);
+    status = EvaluateTaskbarPublicRootBootstrapPolicy(input);
     if (status == TaskbarFrameBootstrapStatus::HostBoundsInvalid) {
         return status;
     }
@@ -205,28 +285,43 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
     }
 
     // Every projected object below is scoped to this owner-thread block. The
-    // probe deliberately does not call init_apartment and returns no XAML
-    // object to its caller.
+    // probe does not create or initialize a XAML Window, call init_apartment,
+    // mutate Content, or retain any XAML reference after return.
     try {
+        UIElement publicRoot{nullptr};
+        try {
+            input.publicRootAvailable = TryGetCurrentWindowRoot(
+                taskbarWindow,
+                publicRoot,
+                input.publicRootAssociationKnown,
+                input.publicRootAssociatedWithTaskbar);
+            input.rootLookupSucceeded = true;
+        } catch (...) {
+            return TaskbarFrameBootstrapStatus::RootQueryFailed;
+        }
+        status = EvaluateTaskbarPublicRootBootstrapPolicy(input);
+        if (status == TaskbarFrameBootstrapStatus::RootUnavailable ||
+            status == TaskbarFrameBootstrapStatus::
+                RootNotAssociatedWithTaskbar) {
+            return status;
+        }
+
         IIterable<UIElement> elements{nullptr};
         try {
-            elements =
-            VisualTreeHelper::FindElementsInHostCoordinates(
+            elements = VisualTreeHelper::FindElementsInHostCoordinates(
                 hostPoint,
-                UIElement{nullptr},
+                publicRoot,
                 true);
+            input.subtreeQuerySucceeded = true;
         } catch (...) {
-            return TaskbarFrameBootstrapFailureStatus(
-                TaskbarFrameBootstrapFailureStage::HostQuery);
+            return TaskbarFrameBootstrapStatus::RootQueryFailed;
         }
-        input.querySucceeded = true;
 
         IIterator<UIElement> iterator{nullptr};
         try {
             iterator = elements.First();
         } catch (...) {
-            return TaskbarFrameBootstrapFailureStatus(
-                TaskbarFrameBootstrapFailureStage::Enumeration);
+            return TaskbarFrameBootstrapStatus::RootQueryFailed;
         }
         std::array<IUnknown, kMaxTaskbarFrameBootstrapElements>
             frameIdentities{};
@@ -240,19 +335,16 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
             try {
                 hasCurrent = iterator.HasCurrent();
             } catch (...) {
-                return TaskbarFrameBootstrapFailureStatus(
-                    TaskbarFrameBootstrapFailureStage::Enumeration);
+                return TaskbarFrameBootstrapStatus::RootQueryFailed;
             }
             if (GetTickCount64() - enumerationStarted >=
-                kEnumerationBudgetMilliseconds) {
+                    kEnumerationBudgetMilliseconds ||
+                enumeratedCount >=
+                    kMaxTaskbarFrameBootstrapElements) {
                 input.enumerationOverflow = true;
                 break;
             }
             if (!hasCurrent) {
-                break;
-            }
-            if (enumeratedCount >= kMaxTaskbarFrameBootstrapElements) {
-                input.enumerationOverflow = true;
                 break;
             }
 
@@ -260,27 +352,12 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
             try {
                 element = iterator.Current();
             } catch (...) {
-                return TaskbarFrameBootstrapFailureStatus(
-                    TaskbarFrameBootstrapFailureStage::Enumeration);
+                return TaskbarFrameBootstrapStatus::RootQueryFailed;
             }
             ++enumeratedCount;
-            winrt::hstring className;
-            if (element) {
-                try {
-                    className = winrt::get_class_name(element);
-                } catch (...) {
-                    return TaskbarFrameBootstrapFailureStatus(
-                        TaskbarFrameBootstrapFailureStage::ClassInspection);
-                }
-            }
-            if (className == kTaskbarFrameClass) {
-                IUnknown identity{nullptr};
-                try {
-                    identity = element.as<IUnknown>();
-                } catch (...) {
-                    return TaskbarFrameBootstrapFailureStatus(
-                        TaskbarFrameBootstrapFailureStage::IdentityProjection);
-                }
+            if (element &&
+                winrt::get_class_name(element) == kTaskbarFrameClass) {
+                const IUnknown identity = element.as<IUnknown>();
                 const void* const identityAddress = winrt::get_abi(identity);
                 bool alreadyObserved = false;
                 for (std::size_t index = 0;
@@ -293,27 +370,19 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
                     }
                 }
                 if (!alreadyObserved) {
-                    if (uniqueFrameCount >= frameIdentities.size()) {
-                        input.enumerationOverflow = true;
-                        break;
-                    }
-                    frameIdentities[uniqueFrameCount] = identity;
-                    ++uniqueFrameCount;
+                    frameIdentities[uniqueFrameCount++] = identity;
                     if (uniqueFrameCount == 1) {
                         uniqueFrame = element;
+                    }
+                    if (uniqueFrameCount > 1) {
+                        break;
                     }
                 }
             }
             try {
                 iterator.MoveNext();
             } catch (...) {
-                return TaskbarFrameBootstrapFailureStatus(
-                    TaskbarFrameBootstrapFailureStage::Enumeration);
-            }
-            if (GetTickCount64() - enumerationStarted >=
-                kEnumerationBudgetMilliseconds) {
-                input.enumerationOverflow = true;
-                break;
+                return TaskbarFrameBootstrapStatus::RootQueryFailed;
             }
         }
 
@@ -325,11 +394,10 @@ TaskbarFrameBootstrapStatus ProbeTaskbarFrameBootstrap(
             input.treeProfileStatus = profile.status;
         }
     } catch (...) {
-        return TaskbarFrameBootstrapFailureStatus(
-            TaskbarFrameBootstrapFailureStage::Unknown);
+        return TaskbarFrameBootstrapStatus::RootQueryFailed;
     }
 
-    return EvaluateTaskbarFrameBootstrapPolicy(input);
+    return EvaluateTaskbarPublicRootBootstrapPolicy(input);
 }
 
 const wchar_t* TaskbarFrameBootstrapStatusName(
@@ -363,6 +431,22 @@ const wchar_t* TaskbarFrameBootstrapStatusName(
             return L"identity-projection-failed";
         case TaskbarFrameBootstrapStatus::TreeProbeUnavailable:
             return L"tree-probe-unavailable";
+        case TaskbarFrameBootstrapStatus::RootUnavailable:
+            return L"root-unavailable";
+        case TaskbarFrameBootstrapStatus::RootQueryFailed:
+            return L"root-query-failed";
+        case TaskbarFrameBootstrapStatus::RootNotAssociatedWithTaskbar:
+            return L"root-not-associated-with-taskbar";
+        case TaskbarFrameBootstrapStatus::RootFrameNotObserved:
+            return L"root-frame-not-observed";
+        case TaskbarFrameBootstrapStatus::RootFrameAmbiguous:
+            return L"root-frame-ambiguous";
+        case TaskbarFrameBootstrapStatus::RootTreeProfileMismatch:
+            return L"root-tree-profile-mismatch";
+        case TaskbarFrameBootstrapStatus::RootBootstrapValidated:
+            return L"root-bootstrap-validated";
+        case TaskbarFrameBootstrapStatus::RootEnumerationOverflow:
+            return L"root-enumeration-overflow";
     }
     return L"unknown";
 }

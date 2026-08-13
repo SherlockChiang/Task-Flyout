@@ -165,11 +165,81 @@ int wmain() {
                 L"identity-projection-failed" &&
             std::wstring_view(TaskbarFrameBootstrapStatusName(
                 TaskbarFrameBootstrapStatus::TreeProbeUnavailable)) ==
-                L"tree-probe-unavailable",
+                L"tree-probe-unavailable" &&
+            std::wstring_view(TaskbarFrameBootstrapStatusName(
+                TaskbarFrameBootstrapStatus::RootUnavailable)) ==
+                L"root-unavailable" &&
+            std::wstring_view(TaskbarFrameBootstrapStatusName(
+                TaskbarFrameBootstrapStatus::RootQueryFailed)) ==
+                L"root-query-failed" &&
+            std::wstring_view(TaskbarFrameBootstrapStatusName(
+                TaskbarFrameBootstrapStatus::RootNotAssociatedWithTaskbar)) ==
+                L"root-not-associated-with-taskbar" &&
+            std::wstring_view(TaskbarFrameBootstrapStatusName(
+                TaskbarFrameBootstrapStatus::RootBootstrapValidated)) ==
+                L"root-bootstrap-validated" &&
+            std::wstring_view(TaskbarFrameBootstrapStatusName(
+                TaskbarFrameBootstrapStatus::RootEnumerationOverflow)) ==
+                L"root-enumeration-overflow",
         L"bootstrap failures should remain diagnosable");
     passed &= Expect(
         kMaxTaskbarFrameBootstrapElements == 1024,
         L"the public enumeration budget must remain fixed and bounded");
+
+    TaskbarPublicRootBootstrapPolicyInput rootInput;
+    passed &= Expect(
+        EvaluateTaskbarPublicRootBootstrapPolicy(rootInput) ==
+            TaskbarFrameBootstrapStatus::WindowInvalid,
+        L"the public-root route must retain the exact taskbar window gate");
+    rootInput.windowExists = true;
+    rootInput.windowClassMatches = true;
+    rootInput.windowProcessMatches = true;
+    rootInput.ownerThreadMatches = true;
+    rootInput.hostBoundsValid = true;
+    rootInput.rootLookupSucceeded = true;
+    passed &= Expect(
+        EvaluateTaskbarPublicRootBootstrapPolicy(rootInput) ==
+            TaskbarFrameBootstrapStatus::RootUnavailable,
+        L"a missing Window::Current root must be explicit");
+    rootInput.publicRootAvailable = true;
+    passed &= Expect(
+        EvaluateTaskbarPublicRootBootstrapPolicy(rootInput) ==
+            TaskbarFrameBootstrapStatus::RootQueryFailed,
+        L"an unverified root HWND association must fail closed");
+    rootInput.publicRootAssociationKnown = true;
+    passed &= Expect(
+        EvaluateTaskbarPublicRootBootstrapPolicy(rootInput) ==
+            TaskbarFrameBootstrapStatus::RootNotAssociatedWithTaskbar,
+        L"a root from another window must fail closed");
+    rootInput.publicRootAssociatedWithTaskbar = true;
+    rootInput.subtreeQuerySucceeded = true;
+    passed &= Expect(
+        EvaluateTaskbarPublicRootBootstrapPolicy(rootInput) ==
+            TaskbarFrameBootstrapStatus::RootFrameNotObserved,
+        L"a validated root without a frame must remain unsupported");
+    rootInput.uniqueFrameCount = 2;
+    passed &= Expect(
+        EvaluateTaskbarPublicRootBootstrapPolicy(rootInput) ==
+            TaskbarFrameBootstrapStatus::RootFrameAmbiguous,
+        L"multiple frames under a public root must be ambiguous");
+    rootInput.uniqueFrameCount = 0;
+    rootInput.enumerationOverflow = true;
+    passed &= Expect(
+        EvaluateTaskbarPublicRootBootstrapPolicy(rootInput) ==
+            TaskbarFrameBootstrapStatus::RootEnumerationOverflow,
+        L"a bounded root enumeration must report overflow explicitly");
+    rootInput.enumerationOverflow = false;
+    rootInput.uniqueFrameCount = 1;
+    rootInput.treeProfileStatus = TaskbarTreeProbeStatus::RootGridMissing;
+    passed &= Expect(
+        EvaluateTaskbarPublicRootBootstrapPolicy(rootInput) ==
+            TaskbarFrameBootstrapStatus::RootTreeProfileMismatch,
+        L"a root frame must pass the complete tree profile");
+    rootInput.treeProfileStatus = TaskbarTreeProbeStatus::LandmarksMatched;
+    passed &= Expect(
+        EvaluateTaskbarPublicRootBootstrapPolicy(rootInput) ==
+            TaskbarFrameBootstrapStatus::RootBootstrapValidated,
+        L"only a uniquely profiled frame under the associated root validates");
 
     winrt::Windows::Foundation::Point point{};
     passed &= Expect(

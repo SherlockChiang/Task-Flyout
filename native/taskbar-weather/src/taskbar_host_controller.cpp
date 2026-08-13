@@ -24,7 +24,7 @@ constexpr DWORD kWeatherPipePollIntervalMilliseconds = 15000;
 constexpr DWORD kMountReadinessReportIntervalMilliseconds = 5000;
 constexpr ULONGLONG kMountObservationMaximumAgeMilliseconds = 12000;
 constexpr DWORD kWeatherPipeStopWaitMilliseconds = 2000;
-// API v7 is deliberately diagnostic-only. It proves that the already-live
+// API v10 is deliberately diagnostic-only. It tests whether the already-live
 // primary TaskbarFrame can be found through public XAML APIs before that frame
 // is ever handed to the existing mount path.
 constexpr bool kReadOnlyBootstrapProbe = true;
@@ -822,7 +822,7 @@ void WINAPI OnTaskbarFrameLayout(void* privateTaskbarFrame) {
 
 void WINAPI OnTaskbarFrameLayoutReadOnly(void*) noexcept {
     // Keep the exact detour observable without dereferencing the private
-    // object or mutating the XAML tree. API v7 promotes the separately stored
+    // object or mutating the XAML tree. API v10 promotes the separately stored
     // public bootstrap result over this callback's telemetry.
     PublishMountReadinessObservation(false);
 }
@@ -1013,6 +1013,24 @@ HostControlDiagnostic TaskbarFrameBootstrapDiagnostic(
             return HostControlDiagnostic::BootstrapIdentityProjectionFailed;
         case TaskbarFrameBootstrapStatus::TreeProbeUnavailable:
             return HostControlDiagnostic::BootstrapTreeProbeUnavailable;
+        case TaskbarFrameBootstrapStatus::RootUnavailable:
+            return HostControlDiagnostic::BootstrapRootUnavailable;
+        case TaskbarFrameBootstrapStatus::RootQueryFailed:
+            return HostControlDiagnostic::BootstrapRootQueryFailed;
+        case TaskbarFrameBootstrapStatus::RootNotAssociatedWithTaskbar:
+            return HostControlDiagnostic::
+                BootstrapRootNotAssociatedWithTaskbar;
+        case TaskbarFrameBootstrapStatus::RootFrameNotObserved:
+            return HostControlDiagnostic::BootstrapRootFrameNotObserved;
+        case TaskbarFrameBootstrapStatus::RootFrameAmbiguous:
+            return HostControlDiagnostic::BootstrapRootFrameAmbiguous;
+        case TaskbarFrameBootstrapStatus::RootTreeProfileMismatch:
+            return HostControlDiagnostic::
+                BootstrapRootTreeProfileMismatch;
+        case TaskbarFrameBootstrapStatus::RootBootstrapValidated:
+            return HostControlDiagnostic::BootstrapRootValidated;
+        case TaskbarFrameBootstrapStatus::RootEnumerationOverflow:
+            return HostControlDiagnostic::BootstrapRootEnumerationOverflow;
     }
     return HostControlDiagnostic::BootstrapQueryFailed;
 }
@@ -1162,7 +1180,7 @@ QueryTaskbarWeatherControllerStatusSnapshot() noexcept {
     if (kReadOnlyBootstrapProbe) {
         HostControlDiagnostic diagnostic = LoadBootstrapDiagnostic();
         if (diagnostic == HostControlDiagnostic::None) {
-            diagnostic = HostControlDiagnostic::BootstrapQueryFailed;
+            diagnostic = HostControlDiagnostic::BootstrapRootQueryFailed;
             PublishBootstrapDiagnostic(diagnostic);
         }
         runtime.lastResult.store(

@@ -24,6 +24,14 @@ enum class TaskbarFrameBootstrapStatus : std::uint32_t {
     ClassInspectionFailed = 11,
     IdentityProjectionFailed = 12,
     TreeProbeUnavailable = 13,
+    RootUnavailable = 14,
+    RootQueryFailed = 15,
+    RootNotAssociatedWithTaskbar = 16,
+    RootFrameNotObserved = 17,
+    RootFrameAmbiguous = 18,
+    RootTreeProfileMismatch = 19,
+    RootBootstrapValidated = 20,
+    RootEnumerationOverflow = 21,
 };
 
 enum class TaskbarFrameBootstrapFailureStage : std::uint32_t {
@@ -59,6 +67,26 @@ struct TaskbarFrameBootstrapPointInput {
     double height = 0.0;
 };
 
+// Pure policy input for the API v10 Window::Current route. A public root is
+// accepted only when its CoreWindow maps back to the exact Shell_TrayWnd and
+// one distinct TaskbarFrame under that root passes the complete tree profile.
+struct TaskbarPublicRootBootstrapPolicyInput {
+    bool windowExists = false;
+    bool windowClassMatches = false;
+    bool windowProcessMatches = false;
+    bool ownerThreadMatches = false;
+    bool hostBoundsValid = false;
+    bool rootLookupSucceeded = false;
+    bool publicRootAvailable = false;
+    bool publicRootAssociationKnown = false;
+    bool publicRootAssociatedWithTaskbar = false;
+    bool subtreeQuerySucceeded = false;
+    bool enumerationOverflow = false;
+    std::uint32_t uniqueFrameCount = 0;
+    TaskbarTreeProbeStatus treeProfileStatus =
+        TaskbarTreeProbeStatus::XamlTreeUnavailable;
+};
+
 TaskbarFrameBootstrapStatus EvaluateTaskbarFrameBootstrapPolicy(
     const TaskbarFrameBootstrapPolicyInput& input) noexcept;
 
@@ -68,6 +96,9 @@ TaskbarFrameBootstrapStatus TaskbarFrameBootstrapFailureStatus(
 bool TrySelectTaskbarFrameBootstrapPoint(
     const TaskbarFrameBootstrapPointInput& input,
     winrt::Windows::Foundation::Point& point) noexcept;
+
+TaskbarFrameBootstrapStatus EvaluateTaskbarPublicRootBootstrapPolicy(
+    const TaskbarPublicRootBootstrapPolicyInput& input) noexcept;
 
 // This probe must run synchronously on the Shell_TrayWnd owner thread. It does
 // not initialize a COM apartment and retains no XAML reference after return.

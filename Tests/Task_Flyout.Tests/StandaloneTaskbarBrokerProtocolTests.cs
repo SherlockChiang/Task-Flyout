@@ -140,6 +140,14 @@ public class StandaloneTaskbarBrokerProtocolTests
     [InlineData("bootstrap-class-inspection-failed")]
     [InlineData("bootstrap-identity-projection-failed")]
     [InlineData("bootstrap-tree-probe-unavailable")]
+    [InlineData("bootstrap-root-unavailable")]
+    [InlineData("bootstrap-root-query-failed")]
+    [InlineData("bootstrap-root-not-associated-with-taskbar")]
+    [InlineData("bootstrap-root-frame-not-observed")]
+    [InlineData("bootstrap-root-frame-ambiguous")]
+    [InlineData("bootstrap-root-tree-profile-mismatch")]
+    [InlineData("root-bootstrap-validated")]
+    [InlineData("bootstrap-root-enumeration-overflow")]
     public void Additive_controller_diagnostic_preserves_older_parser_behavior(
         string controllerDiagnostic)
     {

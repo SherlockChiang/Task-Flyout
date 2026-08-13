@@ -572,6 +572,22 @@ const wchar_t* HostControlDiagnosticName(
             return L"bootstrap-identity-projection-failed";
         case HostControlDiagnostic::BootstrapTreeProbeUnavailable:
             return L"bootstrap-tree-probe-unavailable";
+        case HostControlDiagnostic::BootstrapRootUnavailable:
+            return L"bootstrap-root-unavailable";
+        case HostControlDiagnostic::BootstrapRootQueryFailed:
+            return L"bootstrap-root-query-failed";
+        case HostControlDiagnostic::BootstrapRootNotAssociatedWithTaskbar:
+            return L"bootstrap-root-not-associated-with-taskbar";
+        case HostControlDiagnostic::BootstrapRootFrameNotObserved:
+            return L"bootstrap-root-frame-not-observed";
+        case HostControlDiagnostic::BootstrapRootFrameAmbiguous:
+            return L"bootstrap-root-frame-ambiguous";
+        case HostControlDiagnostic::BootstrapRootTreeProfileMismatch:
+            return L"bootstrap-root-tree-profile-mismatch";
+        case HostControlDiagnostic::BootstrapRootValidated:
+            return L"root-bootstrap-validated";
+        case HostControlDiagnostic::BootstrapRootEnumerationOverflow:
+            return L"bootstrap-root-enumeration-overflow";
     }
     return L"invalid";
 }

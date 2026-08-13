@@ -166,7 +166,31 @@ int wmain() {
                 HostControlDiagnostic::BootstrapIdentityProjectionFailed &&
             TaskbarFrameBootstrapDiagnostic(
                 TaskbarFrameBootstrapStatus::TreeProbeUnavailable) ==
-                HostControlDiagnostic::BootstrapTreeProbeUnavailable,
+                HostControlDiagnostic::BootstrapTreeProbeUnavailable &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::RootUnavailable) ==
+                HostControlDiagnostic::BootstrapRootUnavailable &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::RootQueryFailed) ==
+                HostControlDiagnostic::BootstrapRootQueryFailed &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::RootNotAssociatedWithTaskbar) ==
+                HostControlDiagnostic::BootstrapRootNotAssociatedWithTaskbar &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::RootFrameNotObserved) ==
+                HostControlDiagnostic::BootstrapRootFrameNotObserved &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::RootFrameAmbiguous) ==
+                HostControlDiagnostic::BootstrapRootFrameAmbiguous &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::RootTreeProfileMismatch) ==
+                HostControlDiagnostic::BootstrapRootTreeProfileMismatch &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::RootBootstrapValidated) ==
+                HostControlDiagnostic::BootstrapRootValidated &&
+            TaskbarFrameBootstrapDiagnostic(
+                TaskbarFrameBootstrapStatus::RootEnumerationOverflow) ==
+                HostControlDiagnostic::BootstrapRootEnumerationOverflow,
         L"bootstrap outcomes should map only to additive fixed diagnostics");
 
     passed &= Expect(
