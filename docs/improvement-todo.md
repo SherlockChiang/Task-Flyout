@@ -1241,3 +1241,35 @@ transport foundation for the standalone host.
   `QueryInterface`, exact runtime class, dispatcher access, and complete tree
   profile. Any next slice must remain diagnostic-only and validate that bridge
   inside a naturally occurring layout callback before mount logic is enabled.
+
+### 2026-08-13 API v11 Private-Bridge Diagnosis
+
+- Commit `ddd4a6e` advances the standalone Host protocol to API version 11 and
+  connects the existing private `TaskbarFrame` bridge only to the read-only
+  diagnostic callback. The path remains gated by the exact Windows/PE/prologue
+  profile, active detour state, exact TLS callback token, captured owner thread,
+  bounded slot/interface/vtable reads, executable method validation, and the
+  SEH-protected `QueryInterface(IFrameworkElement)` projection.
+- A resolved projection is not sufficient: the exact
+  `Taskbar.TaskbarFrame` runtime class, dispatcher access, loaded/geometry/
+  shared-XamlRoot checks, and unique `RootGrid`, `BackgroundControl`, and
+  `TaskbarFrameRepeater` landmarks must all pass. All apartment-affine XAML
+  references are released before the natural callback returns.
+- Historical diagnostics 0–38 remain unchanged. API v11 appends 39–55 for
+  `private-bridge-awaiting-callback`, each bridge gate stage,
+  `private-bridge-tree-profile-mismatch`, and `private-bridge-validated`.
+  The first natural callback result is latched for the diagnostic session; only
+  the validated value succeeds.
+- Commit `69d892d` updates the disposable harness to wait at most 15 seconds
+  for a naturally occurring callback and explicitly does not request relayout.
+  This checkpoint never starts the weather worker, creates a view, acquires a
+  lease, appends/mounts a child, or enters the readiness hold interval. Its
+  `finally` path still performs bounded idempotent stop and final
+  `not-started` verification.
+- Isolated Release output is in
+  `.testbuild/native-taskbar-weather-v11`. The Native suite passes 13/13, the
+  complete managed suite passes 1148/1148, Debug x64 builds with zero warnings
+  and zero errors, and PowerShell 7 plus Windows PowerShell pass the AST/
+  `DescribeOnly` gates. The native import gate remains free of WebView, browser,
+  and network dependencies. Signing and a fresh disposable Explorer runtime
+  diagnosis remain pending; M3-07/M3-08 stay in progress.
