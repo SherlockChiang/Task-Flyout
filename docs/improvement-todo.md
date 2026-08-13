@@ -1185,9 +1185,9 @@ transport foundation for the standalone host.
 - Native policy/control tests and the managed protocol allowlist cover the
   additive values. Release output is isolated in
   `.testbuild/native-taskbar-weather-v10`; the full Native suite is green
-  (13/13). A live Explorer injection has not been attempted for v10 yet; a
-  disposable Explorer must be restarted before any runtime check. M3-07/M3-08
-  remain in progress.
+  (13/13). A disposable Explorer runtime check remains the only path that can
+  promote this probe; no mount or worker is enabled by this checkpoint.
+  M3-07/M3-08 remain in progress.
 
 ### 2026-08-13 Signed API v10 Artifacts
 
@@ -1200,6 +1200,23 @@ transport foundation for the standalone host.
   for `TaskFlyout.TaskbarBroker.exe` and
   `87DB30CE1A5F7D922C4D281FC925688FF3EC92B99A6AB75D85675CBF32B4BD5D`
   for `TaskFlyout.TaskbarHost.dll`.
-- The current Explorer may still pin the API v9 Host. Restart only the
-  disposable Explorer session before running the v10 harness; do not load the
-  new Host into the current process. M3-07/M3-08 remain in progress.
+- The v10 binaries were loaded only through the disposable harness described
+  below; no persistent Host load remains. M3-07/M3-08 remain in progress.
+
+### 2026-08-13 Signed API v10 Public-Root Diagnosis
+
+- After the strict preflight accepted Windows build `26200`, Explorer process
+  `14636`, and primary taskbar thread `15476`, the signed v10 harness started
+  against a `not-started` baseline and returned the stable fixed diagnostic
+  `bootstrap-root-unavailable`. The taskbar owner thread therefore exposed no
+  usable public `Window::Current()` root for this route; no inference about a
+  private XAML object is made.
+- The harness failed closed, ran its `finally` stop path, and an independent
+  post-run strict probe still reported `supported`; an independent status
+  acknowledgement reported `not-started` with diagnostic `none`. Explorer
+  remained responsive. This is evidence that the public-root route is
+  unsupported on the tested taskbar context, not evidence to relax the HWND
+  association gate or construct a `DesktopWindowXamlSource`.
+- M3-07/M3-08 remain in progress but the next experiment must be a separately
+  scoped, explicitly documented child-host association study if one is still
+  justified. The v10 path itself should remain disabled for mounting.
