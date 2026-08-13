@@ -1200,8 +1200,9 @@ transport foundation for the standalone host.
   for `TaskFlyout.TaskbarBroker.exe` and
   `87DB30CE1A5F7D922C4D281FC925688FF3EC92B99A6AB75D85675CBF32B4BD5D`
   for `TaskFlyout.TaskbarHost.dll`.
-- The v10 binaries were loaded only through the disposable harness described
-  below; no persistent Host load remains. M3-07/M3-08 remain in progress.
+- The v10 controller was stopped by the disposable harness described below.
+  The Explorer process can still pin the Host DLL by design until that
+  disposable Explorer is restarted. M3-07/M3-08 remain in progress.
 
 ### 2026-08-13 Signed API v10 Public-Root Diagnosis
 
@@ -1220,3 +1221,23 @@ transport foundation for the standalone host.
 - M3-07/M3-08 remain in progress but the next experiment must be a separately
   scoped, explicitly documented child-host association study if one is still
   justified. The v10 path itself should remain disabled for mounting.
+
+### 2026-08-13 Public Child-Host API Boundary
+
+- Local Windows SDK `10.0.26100.0` inspection found no public
+  `DesktopWindowXamlSource::GetForWindowId`, `GetForWindow`, or equivalent
+  existing-source lookup. The projection exposes construction plus instance
+  `Content`/focus members only. `GetWindowIdFromWindow` and
+  `GetWindowFromWindowId` convert identifiers but do not return a XAML source,
+  `XamlRoot`, or content root.
+- Enumerating taskbar child HWNDs therefore cannot be promoted into a public
+  XAML-root route without constructing/initializing/attaching a new source or
+  guessing a private object. Both actions are outside the read-only bootstrap
+  boundary. No API v11 public-child-host implementation will be added on this
+  evidence.
+- The only existing evidence-backed candidate is the already guarded private
+  TaskbarFrame bridge: exact OS/PE/prologue allowlist, active detour, exact TLS
+  callback token, owner thread, bounded slot/vtable reads, SEH-protected
+  `QueryInterface`, exact runtime class, dispatcher access, and complete tree
+  profile. Any next slice must remain diagnostic-only and validate that bridge
+  inside a naturally occurring layout callback before mount logic is enabled.
