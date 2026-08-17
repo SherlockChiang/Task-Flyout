@@ -1353,3 +1353,54 @@ transport foundation for the standalone host.
 - Working-tree changes in `Package.appxmanifest` and
   `windhawk/task-flyout-weather-companion.wh.cpp` remain user-owned and are not
   included in the maintenance commits.
+
+### 2026-08-17 API v12 Pending-Layout Checkpoint
+
+- Commit `bc8bdcb` advances the diagnostic-only Host protocol to API version
+  12 and replaces the low-frequency changed-layout target with
+  `TaskbarFrame::OnTaskbarLayoutChildBoundsPending` at RVA `0x001DFE40`. The
+  exact Windows build, PE fingerprint, 20-byte prologue, owner thread, detour
+  TLS token, private bridge gates, and complete tree profile remain mandatory.
+  The Host still does not request relayout, start the weather worker, create a
+  view or lease, modify the taskbar tree, or enter the mount path.
+- A first strict probe rejected a manually mistranscribed prologue before any
+  Explorer injection. Direct PE mapping of the allowlisted image identified
+  the omitted displacement byte; the corrected exact bytes then passed a
+  clean strict probe. This is evidence that the on-disk prologue gate remains
+  fail-closed rather than silently accepting a near match.
+- Clean Release output is isolated in
+  `.testbuild/native-taskbar-weather-v12-verified`. The Native suite passes
+  13/13, the import gate remains free of WebView, browser, and network
+  dependencies, and the strict probe accepts Windows build `26200`, Explorer
+  process `52884`, taskbar thread `56812`, and the existing allowlisted
+  `Taskbar.View.dll` fingerprint.
+
+### 2026-08-17 Signed API v12 Natural-Callback Diagnosis
+
+- The verified Broker and Host are signed with the existing current-user
+  code-signing certificate
+  `15303040F7CEECFDE9C023F15481D15C39CCDB46`. SignTool verified both chains
+  with zero warnings and zero errors; neither file is timestamped. Raw signed
+  file SHA-256 hashes are
+  `90CE38FAC68E49B892B02DD4186E3D20B364006BAC9B6CC75A24369BDABC9202`
+  for `TaskFlyout.TaskbarBroker.exe` and
+  `717D44387A9DA230EF8383E315DC4852509E557EEB008F57CF5DD9654C6A0DC8`
+  for `TaskFlyout.TaskbarHost.dll`.
+- Module inspection confirmed that Explorer process `52884` loaded the Host
+  from `.testbuild/native-taskbar-weather-v12-verified`, not an earlier v11 or
+  rejected v12 artifact. The signed harness started from a `not-started`
+  baseline and remained at `private-bridge-awaiting-callback` for the full
+  bounded 15-second window. No natural call to
+  `TaskbarFrame::OnTaskbarLayoutChildBoundsPending` was observed, and the Host
+  did not synthesize a relayout or call the private target directly.
+- The harness failed closed and completed its `finally` cleanup. An independent
+  status acknowledgement returned `not-started` with diagnostic `none`; the
+  independent strict probe still returned `supported`, and Explorer remained
+  responsive. The pending-layout target therefore is not a deterministic idle
+  bootstrap on the tested taskbar either.
+- This experiment is archived without enabling mount logic. Any future slice
+  requires new evidence for a naturally occurring owner-thread callback or a
+  separately justified shell-owned request; it must not broaden the ABI
+  allowlist, invoke the private method synthetically, or enable worker/view/
+  lease creation before the bridge is diagnosed successfully. M3-07/M3-08
+  remain in progress.
