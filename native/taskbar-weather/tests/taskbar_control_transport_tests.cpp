@@ -20,7 +20,7 @@ int wmain() {
 
     bool passed = true;
     passed &= Expect(
-        kHostApiVersion == 11u &&
+        kHostApiVersion == 12u &&
             static_cast<std::uint32_t>(
                 HostControlDiagnostic::DetourTargetNotObserved) == 12u &&
             static_cast<std::uint32_t>(

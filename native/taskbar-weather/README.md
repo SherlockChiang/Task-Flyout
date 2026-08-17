@@ -55,9 +55,9 @@ See `docs/manual-verification.md` for the runtime matrix and the full opt-in
 invocation. The harness never installs a package, changes `TaskbarDa`, kills
 Explorer, or restarts it.
 
-Host API version 11 is a diagnostic-only private-bridge checkpoint. It waits
+Host API version 12 is a diagnostic-only private-bridge checkpoint. It waits
 for a naturally occurring call to the exact allowlisted
-`TaskbarFrame::OnTaskbarLayoutChildBoundsChanged` target and never requests a
+`TaskbarFrame::OnTaskbarLayoutChildBoundsPending` target and never requests a
 relayout. Only inside that detour's synchronous callback, with the exact TLS
 lifetime token and captured taskbar owner thread, may the host inspect the
 profile-specific private slot. The slot/interface/vtable reads remain bounded,
@@ -85,7 +85,7 @@ bind later pipe reports to the exact Explorer process and controller generation.
 No pointer is dereferenced across processes, and Explorer never waits on the
 broker.
 
-Outside the v11 diagnostic-only checkpoint, `status` is a fail-closed readiness
+Outside the v12 diagnostic-only checkpoint, `status` is a fail-closed readiness
 query. It returns `mount-ready` only after
 the controller revalidates, on the taskbar XAML owner thread, that the exact
 owned Button is still a loaded, visible, arranged child of the live RootGrid
@@ -99,7 +99,7 @@ The initial allowlist is intentionally limited to the development profile:
 - `Taskbar.View.dll` timestamp `0x6A3CD591`
 - image size `0x0098B000`
 - checksum `0x00985653`
-- `TaskbarFrame::OnTaskbarLayoutChildBoundsChanged` RVA `0x001F3540`
+- `TaskbarFrame::OnTaskbarLayoutChildBoundsPending` RVA `0x001DFE40`
 - exact 20-byte x64 function prologue
 
 The broker validates the PE profile and on-disk prologue. The Explorer host

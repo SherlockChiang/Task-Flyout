@@ -24,8 +24,8 @@ constexpr DWORD kWeatherPipePollIntervalMilliseconds = 15000;
 constexpr DWORD kMountReadinessReportIntervalMilliseconds = 5000;
 constexpr ULONGLONG kMountObservationMaximumAgeMilliseconds = 12000;
 constexpr DWORD kWeatherPipeStopWaitMilliseconds = 2000;
-// API v11 is deliberately diagnostic-only. It validates the existing guarded
-// private TaskbarFrame bridge only inside a naturally occurring detour callback
+// API v12 is deliberately diagnostic-only. It validates the existing guarded
+// private TaskbarFrame bridge only inside the allowlisted pending-layout callback
 // before that frame is ever handed to the existing mount path.
 constexpr bool kPrivateBridgeDiagnosticProbe = true;
 

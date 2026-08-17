@@ -14,14 +14,17 @@ inline constexpr std::uint32_t kValidatedWindowsBuild = 26200;
 inline constexpr std::uint32_t kValidatedTaskbarViewTimestamp = 0x6A3CD591;
 inline constexpr std::uint32_t kValidatedTaskbarViewImageSize = 0x0098B000;
 inline constexpr std::uint32_t kValidatedTaskbarViewChecksum = 0x00985653;
-inline constexpr std::uint32_t kTaskbarFrameLayoutHookRva = 0x001F3540;
+// API v12 observes the naturally occurring pending-layout member. The exact
+// RVA and bytes are tied to the allowlisted Windows build below; they are not
+// a general-purpose symbol lookup or ABI fallback.
+inline constexpr std::uint32_t kTaskbarFrameLayoutHookRva = 0x001DFE40;
 inline constexpr std::size_t kTaskbarFrameIInspectableSlot = 3;
 inline constexpr std::array<std::uint8_t, 20>
     kTaskbarFrameLayoutHookPrologue{
-        0x48, 0x89, 0x5C, 0x24, 0x08,
-        0x48, 0x89, 0x6C, 0x24, 0x10,
-        0x48, 0x89, 0x74, 0x24, 0x18,
-        0x57, 0x48, 0x83, 0xEC, 0x20,
+        0x40, 0x53, 0x48, 0x83, 0xEC,
+        0x20, 0x80, 0xB9, 0x82, 0x03,
+        0x00, 0x00, 0x00, 0x48, 0x8B,
+        0xD9, 0x74, 0x64, 0x80, 0xB9,
     };
 
 struct PeFingerprint {

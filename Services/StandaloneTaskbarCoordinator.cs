@@ -390,7 +390,7 @@ internal sealed class StandaloneTaskbarCoordinator : IAsyncDisposable
             StandaloneTaskbarLifecyclePolicy.MapStart(start.Kind);
         if (startState == StandaloneTaskbarRuntimeState.DiagnosticOnly)
         {
-            // The v11 Host is diagnostic-only and has no managed mount
+            // The diagnostic Host is diagnostic-only and has no managed mount
             // lifecycle. Stop it before publishing a terminal state so the
             // app never observes a diagnostic controller as active while its
             // detour is still installed or its cleanup lease is unresolved.
