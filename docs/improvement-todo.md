@@ -107,6 +107,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M1-10 | DONE | Reliability/UI | Recover the taskbar weather bar after Explorer restarts. | Taskbar recreation triggers prompt reattachment or a throttled rebuild; disabled/re-enabled bars cannot reuse a dead native window; polling remains a fallback and the recovery matrix is tested. | `fix(weatherbar): recover after Explorer restarts` |
 | M1-11 | DONE | Reliability/Startup | Keep tray-triggered Flyout construction behind stable account hydration. | The click path records request diagnostics and restores efficiency state on failure; the Flyout never enumerates the account collection while startup hydration is mutating it. | `fix(flyout): serialize account hydration before opening` |
 | M1-12 | DONE | Reliability/Calendar | Refresh agenda data while the Flyout remains hidden. | The app heartbeat force-refreshes the shared agenda range at the configured interval after account hydration, throttles failed attempts, invalidates the reminder snapshot, and checks upcoming events against the refreshed cache. | `fix(calendar): refresh agenda while flyout is hidden` |
+| M1-13 | DONE | Reliability/Mail | Open new-mail notification targets directly after background-only polling. | Polling keeps a bounded body-free unread metadata slice without presenting it as a complete folder window; activation resolves explicit Inbox aliases, falls back across folders only for Google/Outlook identities, and never treats IMAP UIDs as cross-folder identities. | `fix(mail): open notification targets reliably` |
 
 ### P2 - Long-Running Efficiency, Architecture, And UI Quality
 
@@ -1421,3 +1422,21 @@ transport foundation for the standalone host.
   passes 1160/1160, and the Debug x64 app build completes with zero warnings
   and zero errors. Existing user-owned changes in `Package.appxmanifest` and
   `windhawk/task-flyout-weather-companion.wh.cpp` remain excluded.
+
+### 2026-08-31 Mail Notification Target Navigation
+
+- Background polling now persists a bounded, body-free unread metadata slice
+  even when the Mail page has never been opened. It deliberately omits the
+  pagination-completeness marker, so normal folder navigation still performs a
+  provider fetch instead of treating the five-message poll result as complete.
+- Toast activation matches the account, folder, and message identity exactly,
+  with a narrow exception for explicit localized Inbox aliases. If a provider
+  folder reference is stale, cached cross-folder identity is allowed only for
+  configured Google and Outlook accounts; IMAP remains folder-scoped even when
+  legacy cache metadata lacks UIDVALIDITY.
+- `MailNotificationNavigationPolicyTests` pass 11/11, the complete managed
+  suite passes 1171/1171, and the Debug x64 app build completes with zero
+  warnings and zero errors. A live click on a newly generated mail toast remains
+  the final packaged-runtime check. Existing user-owned changes in
+  `Package.appxmanifest` and `windhawk/task-flyout-weather-companion.wh.cpp`
+  remain excluded.

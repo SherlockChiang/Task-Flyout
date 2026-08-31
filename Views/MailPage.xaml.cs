@@ -388,15 +388,53 @@ namespace Task_Flyout.Views
             await RefreshAccountsAsync(autoSelect: false);
 
             var accountNode = _accountNodes.FirstOrDefault(pair => pair.Value.Id == accountId).Key;
-            if (accountNode == null) return;
+            if (accountNode == null)
+            {
+                ShowMailNotificationTargetNotFound();
+                return;
+            }
 
             await LoadFoldersForNodeAsync(accountNode);
             accountNode.IsExpanded = true;
 
             var folderNode = accountNode.Children.FirstOrDefault(node =>
                 _folderNodes.TryGetValue(node, out var selection) &&
-                string.Equals(selection.Folder.Id, folderId, StringComparison.Ordinal));
-            if (folderNode == null) return;
+                MailNotificationNavigationPolicy.FolderMatches(selection.Folder, folderId));
+            MailItem? cachedFallback = null;
+            if (folderNode == null)
+            {
+                // Folder IDs/display names can change between polling and toast
+                // activation.  A stable Gmail/Outlook message ID can still open a
+                // cached target; IMAP is excluded by the service because its UID is
+                // folder-scoped.
+                cachedFallback = _mailService.TryGetCachedMessageById(accountId, messageId);
+                if (cachedFallback != null)
+                {
+                    var cachedFolderNode = accountNode.Children.FirstOrDefault(node =>
+                        _folderNodes.TryGetValue(node, out var selection) &&
+                        MailNotificationNavigationPolicy.FolderMatches(
+                            selection.Folder, cachedFallback.FolderId));
+                    if (cachedFolderNode != null)
+                    {
+                        folderNode = cachedFolderNode;
+                        folderId = cachedFallback.FolderId;
+                    }
+                }
+            }
+            if (folderNode == null)
+            {
+                if (cachedFallback != null)
+                {
+                    AccountTree.SelectedNode = accountNode;
+                    await OpenDetachedNotificationTargetAsync(
+                        _accountNodes[accountNode],
+                        cachedFallback);
+                    return;
+                }
+
+                ShowMailNotificationTargetNotFound();
+                return;
+            }
 
             AccountTree.SelectedNode = folderNode;
             var selected = _folderNodes[folderNode];
@@ -408,7 +446,9 @@ namespace Task_Flyout.Views
 
             await LoadMessagesAsync(forceRefresh: false, preferredMessageId: messageId, selectFirstWhenNoMatch: false);
 
-            var target = _items.FirstOrDefault(item => item.Id == messageId);
+            var target = _items.FirstOrDefault(item =>
+                MailNotificationNavigationPolicy.MessageMatches(
+                    item, accountId, folderId, messageId));
             if (target == null)
             {
                 target = _mailService.TryGetCachedMessage(accountId, folderId, messageId);
@@ -422,7 +462,9 @@ namespace Task_Flyout.Views
             if (target == null)
             {
                 await LoadMessagesAsync(forceRefresh: true, preferredMessageId: messageId, selectFirstWhenNoMatch: false);
-                target = _items.FirstOrDefault(item => item.Id == messageId);
+                target = _items.FirstOrDefault(item =>
+                    MailNotificationNavigationPolicy.MessageMatches(
+                        item, accountId, folderId, messageId));
             }
 
             if (target != null)
@@ -434,9 +476,31 @@ namespace Task_Flyout.Views
             }
             else
             {
-                SetMessageListStatus(_loader.GetStringOrDefault("TextMailNotFound") ?? "This message was not found in the local cache or current folder.", isError: true);
-                ClearDetail();
+                ShowMailNotificationTargetNotFound();
             }
+        }
+
+        private async Task OpenDetachedNotificationTargetAsync(MailAccount account, MailItem target)
+        {
+            SetActiveAccount(account);
+            _selectedFolder = new MailFolder
+            {
+                AccountId = account.Id,
+                Id = target.FolderId,
+                DisplayName = target.FolderId
+            };
+            _selectedAccountForRemoval = account;
+            RemoveMailButton.IsEnabled = true;
+            SetUnreadOnlyWithoutReload(false);
+
+            MessageListTitle.Text = target.FolderId;
+            _items.Clear();
+            _items.Add(target);
+            MailListView.SelectedItem = target;
+            MailListView.ScrollIntoView(target);
+            SetMessageListStatus(
+                $"{account.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}");
+            await OpenMailItemAsync(target);
         }
 
         private Task WaitUntilLoadedAsync()
@@ -1490,6 +1554,15 @@ namespace Task_Flyout.Views
                 }
                 throw;
             }
+        }
+
+        private void ShowMailNotificationTargetNotFound()
+        {
+            SetMessageListStatus(
+                _loader.GetStringOrDefault("TextMailNotFound")
+                    ?? "This message was not found in the local cache or current folder.",
+                isError: true);
+            ClearDetail();
         }
 
         private async Task CompleteMarkAsReadAsync(Task remoteSyncTask)
