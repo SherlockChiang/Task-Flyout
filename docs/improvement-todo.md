@@ -90,6 +90,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M0-01 | DONE | Git/CI | Gate beta publication on a tested package instead of every direct `master` push. | Candidate packaging and packaged smoke complete before publication; publication is manual or tag-driven; the required remote branch/environment protections are documented. | `ci: gate beta publication on packaged smoke` |
 | M0-02 | DONE | Distribution | Make installation artifacts and documentation agree. | English and Chinese READMEs name the installer actually shipped by the beta workflow; the generated installer has a documented invocation path. | `docs: align beta install instructions` |
 | M0-03 | DONE | Git | Split the existing iCloud, provider-capability, localization, weather, and documentation work into focused commits. | Every commit builds/tests at its dependency boundary; no required untracked source is omitted; unrelated maintenance is excluded. | `refactor: centralize provider capabilities`<br>`fix: preserve provider calendar colors`<br>`feat: implement iCloud CalDAV sync`<br>`feat: add iCloud account onboarding`<br>`feat(i18n): localize last-success status messages`<br>`feat(weather): localize forecasts and alerts`<br>`feat(i18n): add Traditional Chinese localization`<br>`fix(i18n): recognize Traditional Chinese content aliases`<br>`fix(i18n): guard resource-backed Chinese XAML fallbacks`<br>`fix(weather): resume tracking with specific location labels`<br>`docs: document iCloud and privacy handling`<br>`build: bump package version`<br>`chore(i18n): remove stale localization note` |
+| M0-04 | DONE | Privacy/OAuth | Remove redundant Google Gmail scopes from initial consent. | New consent requests Calendar, Tasks, and Gmail Modify only; legacy five-scope tokens remain valid; a token without Gmail Modify requires an explicit reconnect and background paths remain non-interactive. | `privacy(oauth): minimize Google scopes` |
 
 ### P1 - Data Integrity, Reliability, And Visible Defects
 
@@ -1438,5 +1439,22 @@ transport foundation for the standalone host.
   suite passes 1171/1171, and the Debug x64 app build completes with zero
   warnings and zero errors. A live click on a newly generated mail toast remains
   the final packaged-runtime check. Existing user-owned changes in
+  `Package.appxmanifest` and `windhawk/task-flyout-weather-companion.wh.cpp`
+  remain excluded.
+
+### 2026-09-01 Google OAuth Scope Minimization
+
+- Google initial consent now requests three scopes instead of five: Calendar,
+  Tasks, and Gmail Modify. The pinned Gmail SDK describes Gmail Modify as
+  covering read, compose, and send, so the separate Gmail Readonly and Gmail
+  Send scopes were redundant for Task Flyout's current feature set.
+- Existing tokens containing the previous five-scope superset continue to
+  restore silently. Tokens without Gmail Modify enter the existing explicit
+  reconnect-required state; startup sync and background mail polling still
+  cannot launch an authorization browser.
+- This reduces the consent surface but does not remove Gmail's restricted-scope
+  verification requirements or guarantee approval. Scope policy tests pass 4/4,
+  the complete managed suite passes 1173/1173, and the Debug x64 app build
+  completes with zero warnings and zero errors. Existing user-owned changes in
   `Package.appxmanifest` and `windhawk/task-flyout-weather-companion.wh.cpp`
   remain excluded.
