@@ -155,7 +155,11 @@ namespace Task_Flyout
 
             NotificationService = new NotificationService(SyncManager);
             NotificationService.Initialize();
-            _backgroundRefresh = new BackgroundRefreshCoordinator(MainDispatcherQueue, NotificationService, MailService);
+            _backgroundRefresh = new BackgroundRefreshCoordinator(
+                MainDispatcherQueue,
+                SyncManager,
+                NotificationService,
+                MailService);
             MailService.NewMailArrived += MailService_NewMailArrived;
             MemoryDiagnostics.StartIfEnabled();
 

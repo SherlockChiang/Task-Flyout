@@ -107,8 +107,6 @@ namespace Task_Flyout
 
         private DateTime _selectedDay = DateTime.Today;
 
-        private const int QuickSyncPastDays = 14;
-        private const int QuickSyncFutureDays = 90;
         private const int VisibleCacheFutureDays = 45;
         private static readonly SemaphoreSlim _syncLock = new(1, 1);
         private bool _backgroundRefreshQueued;
@@ -836,8 +834,17 @@ namespace Task_Flyout
                     AdjustWindowHeight();
                 }
 
-                var min = fullSync ? DateTime.Today.AddYears(-1) : DateTime.Today.AddDays(-QuickSyncPastDays);
-                var max = fullSync ? DateTime.Today.AddYears(3) : DateTime.Today.AddDays(QuickSyncFutureDays);
+                DateTime min;
+                DateTime max;
+                if (fullSync)
+                {
+                    min = DateTime.Today.AddYears(-1);
+                    max = DateTime.Today.AddYears(3);
+                }
+                else
+                {
+                    (min, max) = BackgroundRefreshSchedulePolicy.GetAgendaRefreshRange(DateTime.Today);
+                }
 
                 await _syncManager.GetAllDataAsync(min, max, forceRefresh);
                 if (_isShuttingDown) return;
@@ -863,7 +870,7 @@ namespace Task_Flyout
 
                 if (outcome.Kind == FlyoutSyncOutcomeKind.Success)
                 {
-                    if (App.Current is App app) app.NotificationService?.CheckUpcomingEvents();
+                    if (App.Current is App app) app.NotificationService?.CheckUpcomingEvents(forceCacheRefresh: true);
                     _lastSyncSucceededAt = DateTimeOffset.Now;
                 }
             }

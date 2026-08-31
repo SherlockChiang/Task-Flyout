@@ -106,6 +106,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M1-09 | TODO | Reliability | Replace blanket handling of unknown UI exceptions with scoped async boundaries. | Fire-and-forget operations use a named safe runner and restore flags/state; unknown global failures log and terminate or recover explicitly instead of always setting `Handled`. | `reliability: add scoped async exception boundaries` |
 | M1-10 | DONE | Reliability/UI | Recover the taskbar weather bar after Explorer restarts. | Taskbar recreation triggers prompt reattachment or a throttled rebuild; disabled/re-enabled bars cannot reuse a dead native window; polling remains a fallback and the recovery matrix is tested. | `fix(weatherbar): recover after Explorer restarts` |
 | M1-11 | DONE | Reliability/Startup | Keep tray-triggered Flyout construction behind stable account hydration. | The click path records request diagnostics and restores efficiency state on failure; the Flyout never enumerates the account collection while startup hydration is mutating it. | `fix(flyout): serialize account hydration before opening` |
+| M1-12 | DONE | Reliability/Calendar | Refresh agenda data while the Flyout remains hidden. | The app heartbeat force-refreshes the shared agenda range at the configured interval after account hydration, throttles failed attempts, invalidates the reminder snapshot, and checks upcoming events against the refreshed cache. | `fix(calendar): refresh agenda while flyout is hidden` |
 
 ### P2 - Long-Running Efficiency, Architecture, And UI Quality
 
@@ -1404,3 +1405,19 @@ transport foundation for the standalone host.
   allowlist, invoke the private method synthetically, or enable worker/view/
   lease creation before the bridge is diagnosed successfully. M3-07/M3-08
   remain in progress.
+
+### 2026-08-31 Background Agenda Refresh
+
+- The app-level one-minute heartbeat now reads the current
+  `SyncIntervalMinutes` value and force-refreshes the same 14-day-past through
+  90-day-future range used by the Flyout whenever an agenda account is present.
+  The attempt timestamp is recorded before remote I/O so a failed provider
+  cannot create a one-minute retry loop.
+- Upcoming-event checks run after the refresh attempt and explicitly invalidate
+  their five-minute snapshot first. This also applies to a visible Flyout sync,
+  so newly fetched events can produce reminders without waiting for the old
+  snapshot to expire.
+- `BackgroundRefreshSchedulePolicyTests` pass 9/9, the complete managed suite
+  passes 1160/1160, and the Debug x64 app build completes with zero warnings
+  and zero errors. Existing user-owned changes in `Package.appxmanifest` and
+  `windhawk/task-flyout-weather-companion.wh.cpp` remain excluded.
