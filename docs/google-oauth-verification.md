@@ -67,6 +67,40 @@ Before submitting, verify these values in OAuth Branding and Search Console:
 Do not put reviewer credentials, refresh tokens, client secrets, or personal
 mail/calendar data in this repository or in a public issue.
 
+## Live Console Audit (2026-09-01)
+
+A read-only review of the production Google Auth Platform project found:
+
+- Branding contains the expected `Task Flyout` name, public home page, privacy
+  policy, authorized `sherlockchiang.github.io` domain, logo, support contact,
+  and developer contact. Google reports one specific branding issue: ownership
+  of `https://sherlockchiang.github.io/Task-Flyout/` is not verified. The brand
+  is therefore not displayed to users.
+- Audience is External and In production. The console reports 3 of the
+  unverified-app lifetime limit of 100 users.
+- One active Desktop OAuth client named `Task Flyout` is present.
+- Data Access still lists the former five-scope set: Calendar, Tasks, Gmail
+  Modify, Gmail Readonly, and Gmail Send. Both scope-justification fields and
+  the YouTube demonstration field are empty.
+- Verification Center records that the previous Branding and Data Access
+  submissions were not approved. `Prepare for verification` is disabled until
+  the homepage ownership issue is resolved and the brand is verified/published.
+- The overview reports current contact information and correctly configured
+  project owners/editors. It also reports that no Cloud Billing account is
+  associated; this is recorded for completeness and is not treated here as a
+  verified submission requirement.
+
+Required order from the observed console state:
+
+1. Publish the repository's updated `docs/` site from `master`.
+2. Verify ownership of the exact homepage URL in Google Search Console, then
+   resolve the Branding issue and publish the verified brand.
+3. Remove Gmail Readonly and Gmail Send from Data Access so the console matches
+   the three scopes requested by the current app build.
+4. Enter the scope justifications and unlisted YouTube URL.
+5. Return to Verification Center only after `Prepare for verification` becomes
+   enabled.
+
 ## Paste-Ready Scope Justification
 
 Task Flyout is a local-first Windows 11 productivity app. Users explicitly

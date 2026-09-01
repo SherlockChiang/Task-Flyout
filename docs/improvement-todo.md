@@ -1481,3 +1481,20 @@ They are historical records; active work remains in the backlog tables above.
   Cloud Console resubmission remains blocked on publishing the updated site,
   verifying the domain/branding, recording the unlisted demo, and securely
   preparing a synthetic reviewer account; Google approval is not implied.
+
+### 2026-09-01 Google Auth Platform Live Audit
+
+- A read-only console review confirmed that Audience is External/In production,
+  with 3 of the unverified-app lifetime limit of 100 users, and that one active
+  Desktop OAuth client named `Task Flyout` remains configured.
+- Branding contains the expected app name, homepage, privacy link, logo,
+  authorized domain, and contacts, but Google reports that ownership of the
+  exact GitHub Pages homepage has not been verified. The brand is not displayed
+  to users, and Verification Center disables `Prepare for verification` until
+  this issue is resolved and the brand is verified/published.
+- Data Access still contains the former Calendar, Tasks, Gmail Modify, Gmail
+  Readonly, and Gmail Send set. The scope-justification and YouTube fields are
+  empty. M0-06 therefore remains externally blocked in this order: publish the
+  updated `master:/docs` site, verify the exact homepage in Search Console,
+  publish Branding, reduce Data Access to the three current scopes, add the
+  justification/video/reviewer material, and then resubmit.
