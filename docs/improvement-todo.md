@@ -1500,3 +1500,19 @@ They are historical records; active work remains in the backlog tables above.
   updated `master:/docs` site, resubmit and publish Branding, reduce Data Access
   to the three current scopes, add the justification/video/reviewer material,
   and then resubmit.
+
+### 2026-09-01 OAuth Publication Checkpoint
+
+- PR #2 was merged with merge commit `1837427`, preserving the maintenance
+  branch's focused history. Master Quality run `33518068424` and Pages
+  deployment `33518065281` both completed successfully.
+- The live home page and privacy policy now return the published September 2026
+  content. The home page visibly describes Google Calendar, Google Tasks, and
+  Gmail; the privacy policy identifies Gmail Modify, excludes redundant Gmail
+  Readonly/Gmail Send consent, and contains the data-flow, retention, deletion,
+  and Limited Use disclosures.
+- The publication prerequisite for M0-06 is complete. M0-06 remains `BLOCKED`
+  on the external steps: resubmit the stale Branding ownership issue as
+  resolved, publish the verified brand, reduce Data Access to the three current
+  scopes, provide the unlisted English demo and synthetic reviewer account, and
+  submit the new Verification Center request.
