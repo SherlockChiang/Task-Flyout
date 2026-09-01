@@ -2,20 +2,28 @@ using Microsoft.UI.Dispatching;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Windows.Storage;
 
 namespace Task_Flyout.Services
 {
     internal sealed class BackgroundRefreshCoordinator
     {
         private readonly DispatcherQueue _dispatcher;
+        private readonly SyncManager _syncManager;
         private readonly NotificationService _notifications;
         private readonly MailService _mail;
         private DispatcherQueueTimer? _timer;
+        private DateTimeOffset _lastAgendaRefreshStarted = DateTimeOffset.MinValue;
         private int _running;
 
-        public BackgroundRefreshCoordinator(DispatcherQueue dispatcher, NotificationService notifications, MailService mail)
+        public BackgroundRefreshCoordinator(
+            DispatcherQueue dispatcher,
+            SyncManager syncManager,
+            NotificationService notifications,
+            MailService mail)
         {
             _dispatcher = dispatcher;
+            _syncManager = syncManager;
             _notifications = notifications;
             _mail = mail;
         }
@@ -43,9 +51,28 @@ namespace Task_Flyout.Services
             if (Interlocked.CompareExchange(ref _running, 1, 0) != 0) return;
             try
             {
-                try { _notifications.CheckUpcomingEvents(); }
+                var now = DateTimeOffset.UtcNow;
+                bool agendaRefreshAttempted = false;
+                try
+                {
+                    int intervalMinutes = ApplicationData.Current.LocalSettings.Values["SyncIntervalMinutes"] as int? ?? 15;
+                    bool hasAccounts = _syncManager.AccountManager.Accounts.Count > 0;
+                    if (BackgroundRefreshSchedulePolicy.IsAgendaRefreshDue(
+                        now,
+                        _lastAgendaRefreshStarted,
+                        intervalMinutes,
+                        hasAccounts))
+                    {
+                        _lastAgendaRefreshStarted = now;
+                        agendaRefreshAttempted = true;
+                        var (min, max) = BackgroundRefreshSchedulePolicy.GetAgendaRefreshRange(DateTime.Today);
+                        await _syncManager.GetAllDataAsync(min, max, forceRefresh: true);
+                    }
+                }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Agenda heartbeat failed: {ex.Message}"); }
+                try { _notifications.CheckUpcomingEvents(forceCacheRefresh: agendaRefreshAttempted); }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Notification heartbeat failed: {ex.Message}"); }
-                try { await _mail.RunScheduledPollIfDueAsync(DateTimeOffset.UtcNow); }
+                try { await _mail.RunScheduledPollIfDueAsync(now); }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Mail heartbeat failed: {ex.Message}"); }
             }
             finally

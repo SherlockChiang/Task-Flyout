@@ -1,15 +1,13 @@
 name: Quality
 
 on:
+  push:
+    branches:
+      - master
   pull_request:
   workflow_dispatch:
   schedule:
     - cron: "0 6 * * 1"
-  workflow_run:
-    workflows:
-      - Beta Release
-    types:
-      - completed
 
 permissions:
   contents: read
@@ -17,7 +15,7 @@ permissions:
 jobs:
   unit:
     name: Unit, localization, and policy tests
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     steps:
       - name: Check out repository
@@ -35,34 +33,22 @@ jobs:
 
   packaged:
     name: Packaged smoke and soak
-    if: >-
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success') ||
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
       - name: Check out tested revision
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - name: Download matching beta release
+      - name: Download latest beta release
         id: release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          TEST_SHA: ${{ github.event.workflow_run.head_sha || '' }}
         run: |
           $releases = gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=20" | ConvertFrom-Json
-          $release = if ([string]::IsNullOrWhiteSpace($env:TEST_SHA)) {
-            $releases | Where-Object prerelease | Select-Object -First 1
-          }
-          else {
-            $releases | Where-Object { $_.prerelease -and $_.target_commitish -eq $env:TEST_SHA } | Select-Object -First 1
-          }
-          if ($null -eq $release) { throw "A matching beta release was not found." }
+          $release = $releases | Where-Object prerelease | Select-Object -First 1
+          if ($null -eq $release) { throw "A beta release was not found." }
           $asset = $release.assets | Where-Object name -Like "*-win-x64.zip" | Select-Object -First 1
           if ($null -eq $asset) { throw "The beta release has no x64 zip asset." }
           New-Item -ItemType Directory -Path "$env:RUNNER_TEMP\release" -Force | Out-Null

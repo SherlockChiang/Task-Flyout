@@ -122,10 +122,17 @@ namespace Task_Flyout.Views
             ThemeComboBox.SelectedIndex = theme switch { "Light" => 1, "Dark" => 2, _ => 0 };
 
             var lang = settings.Values["AppLang"] as string;
-            LanguageComboBox.SelectedIndex = lang switch { "zh-Hans" => 1, "en-US" => 2, _ => 0 };
+            LanguageComboBox.SelectedIndex = lang switch
+            {
+                "zh" or "zh-CN" or "zh-Hans" => 1,
+                "zh-TW" or "zh-Hant" or "zh-CHT" or "zh-HK" or "zh-MO" => 2,
+                "en" or "en-US" => 3,
+                _ => 0
+            };
 
             BackgroundToggle.IsOn = settings.Values["RunInBackground"] as bool? ?? true;
             EfficiencyModeToggle.IsOn = settings.Values["EfficiencyModeEnabled"] as bool? ?? true;
+            FlyoutPrewarmToggle.IsOn = settings.Values["FlyoutPrewarmEnabled"] as bool? ?? false;
             NotifyToggle.IsOn = settings.Values["NotifyEnabled"] as bool? ?? true;
             HideNotificationContentToggle.IsOn = settings.Values["HideNotificationContent"] as bool? ?? true;
             MailPollingToggle.IsOn = settings.Values["MailPollingEnabled"] as bool? ?? true;
@@ -137,7 +144,6 @@ namespace Task_Flyout.Views
             UpdateWeatherBarDiagnostics();
             await UpdateWebViewCacheStatusAsync();
 
-            // 👉 这里已经支持多语言了！只需在英文 resw 中添加键名 TextMinutes，值为 Minutes 即可。
             string minuteStr = GetSafeString("TextMinutes", "minutes");
 
             NotifyTimeComboBox.Items.Clear();
@@ -198,14 +204,43 @@ namespace Task_Flyout.Views
             var unavailable = _loader.GetStringOrDefault("TextUnavailable") ?? "Unavailable";
             WeatherBarDiagnosticsText.Text = string.Format(
                 _loader.GetStringOrDefault("SettingsPage_WeatherBarDiagnosticsFormat")
-                    ?? "Taskbar class: {0}\nWidgets bridge source: {1}\nMonitor: {2}\nDPI: {3}\nTaskbar: {4}\nWeather bar: {5}\nFallback: {6}",
+                    ?? "Taskbar class: {0}\nWidgets bridge source: {1}\nMonitor: {2}\nDPI: {3}\nTaskbar: {4}\nWeather bar: {5}\nTaskbar surface: {6}\nSurface slot: {7}\nFallback: {8}",
                 diagnostics.TaskbarClass,
                 diagnostics.WidgetsBridgeSource,
                 diagnostics.MonitorRect,
                 diagnostics.Dpi == 0 ? unavailable : diagnostics.Dpi,
                 diagnostics.TaskbarRect,
                 diagnostics.BarRect,
+                diagnostics.TaskbarSurface,
+                diagnostics.SurfaceSlot,
                 diagnostics.FallbackReason);
+
+            var mode = App.GetWeatherBarMode();
+            var native = App.GetWindowsWidgetsAvailability();
+            var runtimeDetail = App.GetWeatherBarModeRuntimeDetail();
+            StandaloneTaskbarDiagnostics standalone =
+                App.GetStandaloneTaskbarDiagnostics();
+            string snapshotState = !standalone.WidgetsSnapshotCaptured
+                ? "none"
+                : !standalone.WidgetsSnapshotValid
+                    ? "invalid"
+                    : standalone.WidgetsSnapshotApplied
+                        ? "applied"
+                        : "prepared";
+            WeatherBarDiagnosticsText.Text += "\n" + string.Format(
+                _loader.GetStringOrDefault("SettingsPage_WeatherBarModeDiagnosticsFormat")
+                    ?? "Requested mode: {0}\nNative Widgets: {1}; entry point: {2}\nMode detail: {3}\nStandalone controller: {4}; requested: {5}; cleanup pending: {6}\nCompanion pipe active: {7}\nWidgets suppression: ready {8}; snapshot {9}; notification pending {10}",
+                mode,
+                native.Reason,
+                native.NativeEntryPointPresent,
+                string.IsNullOrWhiteSpace(runtimeDetail) ? unavailable : runtimeDetail,
+                standalone.RuntimeStatus.DiagnosticKey,
+                standalone.ControllerRequested,
+                standalone.ControllerCleanupPending,
+                standalone.CompanionPipeActive,
+                standalone.WidgetsSuppressionReady,
+                snapshotState,
+                standalone.WidgetsNotificationPending);
         }
 
         private async void ReattachTaskbarButton_Click(object sender, RoutedEventArgs e)
@@ -275,16 +310,19 @@ namespace Task_Flyout.Views
                     ColorPalettePanel.Children.Add(row);
                 }
 
-                var taskRow = CreateColorRow(
-                    GetSafeString("MainWindow_ToggleTasks/Text", "Tasks"),
-                    account.TaskColorHex,
-                    selectedColor =>
-                    {
-                        account.TaskColorHex = selectedColor;
-                        mgr.Save();
-                        BroadcastChange();
-                    });
-                ColorPalettePanel.Children.Add(taskRow);
+                if (SyncProviderCapabilityPolicy.ForProvider(account.ProviderName).SupportsTasks)
+                {
+                    var taskRow = CreateColorRow(
+                        GetSafeString("MainWindow_ToggleTasks/Text", "Tasks"),
+                        account.TaskColorHex,
+                        selectedColor =>
+                        {
+                            account.TaskColorHex = selectedColor;
+                            mgr.Save();
+                            BroadcastChange();
+                        });
+                    ColorPalettePanel.Children.Add(taskRow);
+                }
             }
         }
 
@@ -600,7 +638,7 @@ namespace Task_Flyout.Views
 
             if (LanguageComboBox.SelectedItem is ComboBoxItem item && item.Tag != null)
             {
-                string langCode = item.Tag.ToString() ?? "zh";
+                string langCode = item.Tag.ToString() ?? "en-US";
                 ApplicationData.Current.LocalSettings.Values["AppLang"] = langCode;
                 Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = langCode;
             }
@@ -867,6 +905,12 @@ namespace Task_Flyout.Views
             if (_isInitializing) return;
             ApplicationData.Current.LocalSettings.Values["EfficiencyModeEnabled"] = EfficiencyModeToggle.IsOn;
             App.UpdateEfficiencyMode();
+        }
+
+        private void FlyoutPrewarmToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+            ApplicationData.Current.LocalSettings.Values["FlyoutPrewarmEnabled"] = FlyoutPrewarmToggle.IsOn;
         }
 
         private void ShowSecondsToggle_Toggled(object sender, RoutedEventArgs e)

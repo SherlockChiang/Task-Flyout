@@ -14,6 +14,8 @@ Use this checklist before and after performance-sensitive changes. Record result
 
 Performance diagnostics are off by default. Enable them with the local setting `PerformanceDiagnosticsEnabled=true` or set `TASKFLYOUT_PERFORMANCE_DIAGNOSTICS=1` before starting the process. Restart the app after changing either option.
 
+Flyout preloading is off by default and can be enabled under **Settings > System & General**. The preload runs after startup only when the app is below the memory-usage ceiling and has sufficient headroom; memory pressure skips it.
+
 Each process gets a random `run_id`. Records are appended in the background to `%LOCALAPPDATA%\TaskFlyout\Logs\performance-diagnostics.csv` (or the corresponding packaged local app-data location). The log rotates to one `.1` backup at 2 MB. Exit performs a best-effort two-second flush.
 
 The long-form CSV schema is `run_id,sequence,timestamp,scenario,metric,start,end,duration,outcome,source`. These fields contain fixed diagnostic identifiers and timings only. Do not add account names, message/feed/calendar content, URLs, locations, identifiers, or arbitrary content fields.
@@ -71,4 +73,4 @@ Run the default 10-minute soak with:
 
 The soak activates the package directly into its tray-idle state, waits 60 seconds for normal runtime initialization, then samples process handles, working set, private memory, and threads every 10 seconds. It writes `TestResults\packaged-soak.csv` and fails when 10-minute median handle growth exceeds 150 or median private-memory growth exceeds 64 MB. The handle guard includes the packaged .NET 10 and Windows App SDK runtime's observed thread-handle churn; established local and hosted-runner baselines were 81-123 handles with stable or declining private memory. Override duration and limits with `TASKFLYOUT_SOAK_MINUTES`, `TASKFLYOUT_SOAK_MAX_HANDLE_GROWTH`, and `TASKFLYOUT_SOAK_MAX_PRIVATE_MB_GROWTH`.
 
-The `Quality` workflow runs unit/resource checks for pull requests, packaged smoke after a successful beta release, and packaged soak on its weekly schedule or manual dispatch.
+The beta workflow runs packaged smoke against the exact candidate payload before entering the signing environment or publishing. The `Quality` workflow runs unit/resource checks for pushes and pull requests, and manually or weekly rechecks the latest published beta with packaged smoke and soak.

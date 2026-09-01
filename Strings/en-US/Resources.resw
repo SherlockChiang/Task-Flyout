@@ -240,6 +240,9 @@
   <data name="TextSyncFailed" xml:space="preserve">
     <value>Sync failed</value>
   </data>
+  <data name="TextSyncUnavailableProvidersFormat" xml:space="preserve">
+    <value>Couldn't refresh {0}. Cached data may still be shown.</value>
+  </data>
   <data name="TextAddFailed" xml:space="preserve">
     <value>❌ Failed to add task</value>
   </data>
@@ -314,6 +317,18 @@
   </data>
   <data name="Flyout_BtnAdd.ToolTipService.ToolTip" xml:space="preserve">
     <value>Add item</value>
+  </data>
+  <data name="Flyout_AgendaRetry.Content" xml:space="preserve">
+    <value>Retry sync</value>
+  </data>
+  <data name="Flyout_AgendaRetry.AutomationProperties.Name" xml:space="preserve">
+    <value>Retry calendar synchronization</value>
+  </data>
+  <data name="Flyout_AgendaAddAccount.Content" xml:space="preserve">
+    <value>Add account</value>
+  </data>
+  <data name="Flyout_AgendaAddAccount.AutomationProperties.Name" xml:space="preserve">
+    <value>Add an account to Task Flyout</value>
   </data>
   <data name="Flyout_TextNew.Text" xml:space="preserve">
     <value>New</value>
@@ -405,6 +420,9 @@
   <data name="SettingsPage_EfficiencyMode.Header" xml:space="preserve">
     <value>Use efficiency mode while collapsed to the tray (saves power)</value>
   </data>
+  <data name="SettingsPage_FlyoutPrewarm.Header" xml:space="preserve">
+    <value>Preload the tray flyout after startup (faster first open, uses more memory)</value>
+  </data>
   <data name="CloseToExit_Title" xml:space="preserve">
     <value>Exit Task Flyout?</value>
   </data>
@@ -435,11 +453,20 @@
   <data name="AddAccount_MSDesc.Text" xml:space="preserve">
     <value>Outlook Calendar &amp; To Do</value>
   </data>
+  <data name="AddAccount_ICloudTitle.Text" xml:space="preserve">
+    <value>iCloud</value>
+  </data>
+  <data name="AddAccount_ICloudDesc.Text" xml:space="preserve">
+    <value>iCloud Calendar</value>
+  </data>
   <data name="AddAccount_AlreadyConnected" xml:space="preserve">
     <value>Already connected</value>
   </data>
   <data name="AddAccount_Reconnect" xml:space="preserve">
     <value>Reconnect all features</value>
+  </data>
+  <data name="AddAccount_ReconnectICloud" xml:space="preserve">
+    <value>Reconnect iCloud Calendar</value>
   </data>
   <data name="AddAccount_ChecklistTitle.Text" xml:space="preserve">
     <value>Account health and offline status</value>
@@ -498,6 +525,17 @@
   <data name="AddAccount_ConnectMicrosoft" xml:space="preserve">
     <value>Connect Microsoft for Outlook Calendar and To Do.</value>
   </data>
+  <data name="AddAccount_ConnectICloud" xml:space="preserve">
+    <value>Connect iCloud Calendar with an app-specific password.</value>
+  </data>
+  <data name="AddAccount_ICloudDialogTitle" xml:space="preserve"><value>Connect iCloud Calendar</value></data>
+  <data name="AddAccount_ICloudAccountHeader" xml:space="preserve"><value>Apple Account email</value></data>
+  <data name="AddAccount_ICloudAccountPlaceholder" xml:space="preserve"><value>name@example.com</value></data>
+  <data name="AddAccount_ICloudPasswordHeader" xml:space="preserve"><value>App-specific password</value></data>
+  <data name="AddAccount_ICloudPasswordHelp" xml:space="preserve"><value>Manage app-specific passwords</value></data>
+  <data name="AddAccount_ICloudExplanation" xml:space="preserve"><value>Use your Apple Account email and an app-specific password. Your main Apple Account password is not accepted or stored.</value></data>
+  <data name="AddAccount_ICloudValidation" xml:space="preserve"><value>Enter a valid Apple Account email and app-specific password.</value></data>
+  <data name="TextConnect" xml:space="preserve"><value>Connect</value></data>
   <data name="AddAccount_ConnectMail" xml:space="preserve">
     <value>Add Gmail, Outlook, or IMAP from the Mail page.</value>
   </data>
@@ -1371,6 +1409,41 @@
   <data name="WeatherPage_WeatherBarDesc" xml:space="preserve">
     <value>Show a floating weather pill on the taskbar (replaces Win11 widget weather)</value>
   </data>
+  <data name="WeatherPage_StandaloneTaskbar.Header" xml:space="preserve"><value>Experimental: pure-XAML Task Flyout weather button</value></data>
+  <data name="WeatherPage_StandaloneTaskbar.OnContent" xml:space="preserve"><value>On</value></data>
+  <data name="WeatherPage_StandaloneTaskbar.OffContent" xml:space="preserve"><value>Off</value></data>
+  <data name="WeatherPage_StandaloneStatus_Off" xml:space="preserve"><value>Off: the experimental pure-XAML Task Flyout button is not selected. Turning it on switches away from Windows-managed Widgets; Explorer receives no WebView or network code.</value></data>
+  <data name="WeatherPage_StandaloneStatus_WeatherBarDisabled" xml:space="preserve"><value>Turn on the taskbar weather bar to use the experimental button.</value></data>
+  <data name="WeatherPage_StandaloneStatus_WeatherProviderDisabled" xml:space="preserve"><value>Turn on Task Flyout weather first; the native button depends on the app-owned weather provider.</value></data>
+  <data name="WeatherPage_StandaloneStatus_Preparing" xml:space="preserve"><value>Preparing the native button and removing the Windows Widgets entry. The Task Flyout bar remains the fallback.</value></data>
+  <data name="WeatherPage_StandaloneStatus_ActiveUnverified" xml:space="preserve"><value>The native controller acknowledged startup. Visibility is not yet proven, so the Task Flyout bar remains the fallback.</value></data>
+  <data name="WeatherPage_StandaloneStatus_Active" xml:space="preserve"><value>The native XAML weather button is mounted and now owns the taskbar surface. The Task Flyout fallback is closed.</value></data>
+  <data name="WeatherPage_StandaloneStatus_ClosingFallback" xml:space="preserve"><value>The native button is mounted. Task Flyout is retrying a safe close of the fallback bar.</value></data>
+  <data name="WeatherPage_StandaloneStatus_BinaryMissing" xml:space="preserve"><value>The standalone native binaries are not available beside the app. The Task Flyout bar remains the fallback.</value></data>
+  <data name="WeatherPage_StandaloneStatus_Unsupported" xml:space="preserve"><value>This Windows taskbar build is not in the exact native compatibility profile. No Explorer change was attempted.</value></data>
+  <data name="WeatherPage_StandaloneStatus_TemporarilyUnavailable" xml:space="preserve"><value>Explorer or its taskbar is temporarily unavailable. The Task Flyout bar remains the fallback.</value></data>
+  <data name="WeatherPage_StandaloneStatus_WidgetsConflict" xml:space="preserve"><value>The Windows Widgets setting changed or its recovery snapshot is ambiguous. Turn this option off to release recovery state before retrying.</value></data>
+  <data name="WeatherPage_StandaloneStatus_ControlSuppressed" xml:space="preserve"><value>Standalone taskbar control is disabled for this safety launch. No Explorer or taskbar-setting change was attempted.</value></data>
+  <data name="WeatherPage_StandaloneStatus_Stopping" xml:space="preserve"><value>Stopping the native controller before restoring the Windows Widgets setting.</value></data>
+  <data name="WeatherPage_StandaloneStatus_Failed" xml:space="preserve"><value>The native controller request failed or was rejected. The Task Flyout bar remains the fallback.</value></data>
+  <data name="WeatherPage_StandaloneStatus_Fallback" xml:space="preserve"><value>The standalone button is not active. The Task Flyout bar remains the fallback.</value></data>
+  <data name="WeatherPage_NativeWidgets.Header" xml:space="preserve"><value>Use the Windows-managed Widgets taskbar entry</value></data>
+  <data name="WeatherPage_NativeWidgets.OnContent" xml:space="preserve"><value>On</value></data>
+  <data name="WeatherPage_NativeWidgets.OffContent" xml:space="preserve"><value>Off</value></data>
+  <data name="WeatherPage_NativeWidgetsModeDesc" xml:space="preserve"><value>Off: do not use Windows-managed Widgets. On: use Windows-managed Widgets content; this does not inject Task Flyout weather data into Explorer.</value></data>
+  <data name="WeatherPage_NativeWidgetsAvailable" xml:space="preserve"><value>This is Windows-managed dynamic Widgets content, not Task Flyout weather injection. Windows can rotate finance, sports, and news announcements. To keep weather on the taskbar, open Widgets &gt; Settings &gt; Notifications and turn off taskbar announcements (and badges if desired).</value></data>
+  <data name="WeatherPage_NativeWidgetsWaiting" xml:space="preserve"><value>Windows Widgets was requested. The Task Flyout bar remains visible until Explorer creates the native taskbar entry.</value></data>
+  <data name="WeatherPage_NativeWidgetsUnavailable" xml:space="preserve"><value>Windows native Widgets are unavailable ({0}). The Task Flyout weather bar remains the fallback.</value></data>
+  <data name="WeatherPage_NativeWidgetsReasonUnsupported" xml:space="preserve"><value>Windows 11 taskbar components were not detected</value></data>
+  <data name="WeatherPage_NativeWidgetsReasonPackMissing" xml:space="preserve"><value>Windows Web Experience Pack is not registered for this user</value></data>
+  <data name="WeatherPage_NativeWidgetsReasonTaskbarUnavailable" xml:space="preserve"><value>Explorer's taskbar is not ready</value></data>
+  <data name="WeatherPage_NativeWidgetsReasonDetectionFailed" xml:space="preserve"><value>availability detection failed</value></data>
+  <data name="WeatherPage_OpenWidgetsSettings.Content" xml:space="preserve"><value>Open Windows taskbar settings</value></data>
+  <data name="WeatherPage_NativeWidgetsSettingsFailed" xml:space="preserve"><value>Windows taskbar settings could not be opened. Press Win+W or open Settings &gt; Personalization &gt; Taskbar manually.</value></data>
+  <data name="WeatherPage_OpenWidgetsBoard.Content" xml:space="preserve"><value>Open Widgets (then Settings &gt; Notifications)</value></data>
+  <data name="WeatherPage_NativeWidgetsBoardFailed" xml:space="preserve"><value>The Windows Widgets board could not be opened. Press Win+W, then open Settings &gt; Notifications manually.</value></data>
+  <data name="WeatherPage_OpenWidgetsStore.Content" xml:space="preserve"><value>Install or repair Windows Web Experience Pack</value></data>
+  <data name="WeatherPage_NativeWidgetsStoreFailed" xml:space="preserve"><value>Microsoft Store could not be opened. Search the Store for Windows Web Experience Pack.</value></data>
   <data name="WeatherPage_DailyForecastTitle" xml:space="preserve">
     <value>7-day forecast</value>
   </data>
@@ -1614,8 +1687,9 @@
   </data>
   <data name="AddAccount_ChecklistFormat" xml:space="preserve"><value>Google: {0}
 Microsoft: {1}
-Mail: {2}
-Weather: {3}</value></data>
+iCloud: {2}
+Mail: {3}
+Weather: {4}</value></data>
   <data name="TextRssRefreshBlockedPrivateNetwork" xml:space="preserve"><value>Refresh was blocked because the RSS URL or redirect resolved to a non-public IP address. Local access must be approved for this subscription's exact host, port, and protocol.</value></data>
   <data name="TextAllowLocalNetworkRss" xml:space="preserve"><value>Allow this subscription to access its exact local network host and port</value></data>
   <data name="TextLocalNetworkRssWarning" xml:space="preserve"><value>Enable only for a trusted feed on your home or work network. Redirects to a different local host or port remain blocked.</value></data>
@@ -1895,7 +1969,15 @@ Monitor: {2}
 DPI: {3}
 Taskbar: {4}
 Weather bar: {5}
-Fallback: {6}</value></data>
+Taskbar surface: {6}
+Surface slot: {7}
+Fallback: {8}</value></data>
+  <data name="SettingsPage_WeatherBarModeDiagnosticsFormat" xml:space="preserve"><value>Requested mode: {0}
+Native Widgets: {1}; entry point: {2}
+Mode detail: {3}
+Standalone controller: {4}; requested: {5}; cleanup pending: {6}
+Companion pipe active: {7}
+Widgets suppression: ready {8}; snapshot {9}; notification pending {10}</value></data>
   <data name="WeatherPage_IconPackError" xml:space="preserve"><value>Icon-pack operation failed: {0}</value></data>
   <data name="MailPage_ImapDisplayName.PlaceholderText" xml:space="preserve"><value>Work Mail</value></data>
   <data name="MailPage_BtnGoogleAccount.Text" xml:space="preserve"><value>Google OAuth</value></data>
@@ -1904,4 +1986,46 @@ Fallback: {6}</value></data>
   <data name="CalendarPage_ViewYear.Content" xml:space="preserve"><value>Year</value></data>
   <data name="CalendarPage_YearNoItems.Text" xml:space="preserve"><value>No events</value></data>
   <data name="CalendarPage_YearItemCount" xml:space="preserve"><value>{0} items</value></data>
+  <data name="Lang_ChineseSimplified.Content" xml:space="preserve"><value>简体中文</value></data>
+  <data name="Lang_ChineseTraditional.Content" xml:space="preserve"><value>繁體中文</value></data>
+  <data name="Lang_English.Content" xml:space="preserve"><value>English</value></data>
+  <data name="TextLastSuccessFormat" xml:space="preserve"><value>Last success: {0:g}</value></data>
+  <data name="WeatherAlert_NowFormat" xml:space="preserve"><value>{0} now</value></data>
+  <data name="WeatherAlert_InHoursFormat" xml:space="preserve"><value>{0} in {1}h</value></data>
+  <data name="WeatherField_PollenValueFormat" xml:space="preserve"><value>Pollen {0}</value></data>
+  <data name="WeatherCondition_ClearSky" xml:space="preserve"><value>Clear sky</value></data>
+  <data name="WeatherCondition_MainlyClear" xml:space="preserve"><value>Mainly clear</value></data>
+  <data name="WeatherCondition_PartlyCloudy" xml:space="preserve"><value>Partly cloudy</value></data>
+  <data name="WeatherCondition_Overcast" xml:space="preserve"><value>Overcast</value></data>
+  <data name="WeatherCondition_Fog" xml:space="preserve"><value>Fog</value></data>
+  <data name="WeatherCondition_RimeFog" xml:space="preserve"><value>Rime fog</value></data>
+  <data name="WeatherCondition_LightDrizzle" xml:space="preserve"><value>Light drizzle</value></data>
+  <data name="WeatherCondition_ModerateDrizzle" xml:space="preserve"><value>Moderate drizzle</value></data>
+  <data name="WeatherCondition_DenseDrizzle" xml:space="preserve"><value>Dense drizzle</value></data>
+  <data name="WeatherCondition_FreezingDrizzle" xml:space="preserve"><value>Freezing drizzle</value></data>
+  <data name="WeatherCondition_SlightRain" xml:space="preserve"><value>Slight rain</value></data>
+  <data name="WeatherCondition_ModerateRain" xml:space="preserve"><value>Moderate rain</value></data>
+  <data name="WeatherCondition_HeavyRain" xml:space="preserve"><value>Heavy rain</value></data>
+  <data name="WeatherCondition_FreezingRain" xml:space="preserve"><value>Freezing rain</value></data>
+  <data name="WeatherCondition_SlightSnow" xml:space="preserve"><value>Slight snow</value></data>
+  <data name="WeatherCondition_ModerateSnow" xml:space="preserve"><value>Moderate snow</value></data>
+  <data name="WeatherCondition_HeavySnow" xml:space="preserve"><value>Heavy snow</value></data>
+  <data name="WeatherCondition_SnowGrains" xml:space="preserve"><value>Snow grains</value></data>
+  <data name="WeatherCondition_SlightRainShowers" xml:space="preserve"><value>Slight rain showers</value></data>
+  <data name="WeatherCondition_ModerateRainShowers" xml:space="preserve"><value>Moderate rain showers</value></data>
+  <data name="WeatherCondition_ViolentRainShowers" xml:space="preserve"><value>Violent rain showers</value></data>
+  <data name="WeatherCondition_SlightSnowShowers" xml:space="preserve"><value>Slight snow showers</value></data>
+  <data name="WeatherCondition_HeavySnowShowers" xml:space="preserve"><value>Heavy snow showers</value></data>
+  <data name="WeatherCondition_Thunderstorm" xml:space="preserve"><value>Thunderstorm</value></data>
+  <data name="WeatherCondition_ThunderstormWithHail" xml:space="preserve"><value>Thunderstorm with hail</value></data>
+  <data name="WeatherCondition_Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="WeatherWind_N" xml:space="preserve"><value>N</value></data>
+  <data name="WeatherWind_NE" xml:space="preserve"><value>NE</value></data>
+  <data name="WeatherWind_E" xml:space="preserve"><value>E</value></data>
+  <data name="WeatherWind_SE" xml:space="preserve"><value>SE</value></data>
+  <data name="WeatherWind_S" xml:space="preserve"><value>S</value></data>
+  <data name="WeatherWind_SW" xml:space="preserve"><value>SW</value></data>
+  <data name="WeatherWind_W" xml:space="preserve"><value>W</value></data>
+  <data name="WeatherWind_NW" xml:space="preserve"><value>NW</value></data>
+  <data name="TextRainHour" xml:space="preserve"><value>{0}h</value></data>
 </root>

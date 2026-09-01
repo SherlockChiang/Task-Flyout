@@ -73,7 +73,7 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <FontIcon Grid.Column="0" Glyph="&#xE77B;" FontSize="15"
+                                        <FontIcon Grid.Column="0" Glyph="{Binding IconGlyph}" FontSize="15"
                                                   Margin="0,0,12,0"
                                                   Foreground="{ThemeResource SystemAccentColor}"
                                                   VerticalAlignment="Center"/>

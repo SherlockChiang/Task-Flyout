@@ -1,0 +1,7 @@
+LIBRARY "TaskFlyout.TaskbarHost"
+
+EXPORTS
+    TaskFlyoutTaskbarHost_GetApiVersion
+    TaskFlyoutTaskbarHost_ProbeCurrentProcess
+    TaskFlyoutTaskbarHost_EntryHook
+

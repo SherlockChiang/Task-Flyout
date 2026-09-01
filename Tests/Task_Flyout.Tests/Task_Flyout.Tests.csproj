@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Ical.Net" Version="5.2.3" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
@@ -41,6 +42,23 @@
     <Compile Include="..\..\Services\LocalSearchMatcher.cs" Link="Source\LocalSearchMatcher.cs" />
     <Compile Include="..\..\Services\TrayStatusPolicy.cs" Link="Source\TrayStatusPolicy.cs" />
     <Compile Include="..\..\Services\TaskbarSelectionPolicy.cs" Link="Source\TaskbarSelectionPolicy.cs" />
+    <Compile Include="..\..\Services\WeatherBarTaskbarStylePolicy.cs" Link="Source\WeatherBarTaskbarStylePolicy.cs" />
+    <Compile Include="..\..\Services\WeatherBarModePolicy.cs" Link="Source\WeatherBarModePolicy.cs" />
+    <Compile Include="..\..\Services\WeatherBarModeSettings.cs" Link="Source\WeatherBarModeSettings.cs" />
+    <Compile Include="..\..\Services\WeatherCompanionProtocol.cs" Link="Source\WeatherCompanionProtocol.cs" />
+    <Compile Include="..\..\Services\WeatherCompanionServer.cs" Link="Source\WeatherCompanionServer.cs" />
+    <Compile Include="..\..\Services\WindowsWidgetsAvailabilityPolicy.cs" Link="Source\WindowsWidgetsAvailabilityPolicy.cs" />
+    <Compile Include="..\..\Services\WindowsWidgetsService.cs" Link="Source\WindowsWidgetsService.cs" />
+    <Compile Include="..\..\Services\StandaloneTaskbarWidgetsService.cs" Link="Source\StandaloneTaskbarWidgetsService.cs" />
+    <Compile Include="..\..\Services\StandaloneTaskbarWidgetsLifecyclePolicy.cs" Link="Source\StandaloneTaskbarWidgetsLifecyclePolicy.cs" />
+    <Compile Include="..\..\Services\StandaloneTaskbarUiStatusPolicy.cs" Link="Source\StandaloneTaskbarUiStatusPolicy.cs" />
+    <Compile Include="..\..\Services\WeatherBarRecoveryPolicy.cs" Link="Source\WeatherBarRecoveryPolicy.cs" />
+    <Compile Include="..\..\Services\StandaloneTaskbarBrokerProtocol.cs" Link="Source\StandaloneTaskbarBrokerProtocol.cs" />
+    <Compile Include="..\..\Services\StandaloneTaskbarBrokerClient.cs" Link="Source\StandaloneTaskbarBrokerClient.cs" />
+    <Compile Include="..\..\Services\StandaloneTaskbarLifecyclePolicy.cs" Link="Source\StandaloneTaskbarLifecyclePolicy.cs" />
+    <Compile Include="..\..\Services\StandaloneTaskbarCoordinator.cs" Link="Source\StandaloneTaskbarCoordinator.cs" />
+    <Compile Include="..\..\Services\StandaloneTaskbarLaunchPolicy.cs" Link="Source\StandaloneTaskbarLaunchPolicy.cs" />
+    <Compile Include="..\..\Services\StandaloneTaskbarCleanupSettings.cs" Link="Source\StandaloneTaskbarCleanupSettings.cs" />
     <Compile Include="..\..\Services\ComposeDraftCoordinator.cs" Link="Source\ComposeDraftCoordinator.cs" />
     <Compile Include="..\..\Services\MailAttachmentPolicy.cs" Link="Source\MailAttachmentPolicy.cs" />
     <Compile Include="..\..\Services\RssFetchPolicy.cs" Link="Source\RssFetchPolicy.cs" />
@@ -52,7 +70,10 @@
     <Compile Include="..\..\Services\DiagnosticLogRetention.cs" Link="Source\DiagnosticLogRetention.cs" />
     <Compile Include="..\..\Services\DiagnosticEventFormatter.cs" Link="Source\DiagnosticEventFormatter.cs" />
     <Compile Include="..\..\Services\DeferredStartupWork.cs" Link="Source\DeferredStartupWork.cs" />
+    <Compile Include="..\..\Services\FlyoutResidencyPolicy.cs" Link="Source\FlyoutResidencyPolicy.cs" />
+    <Compile Include="..\..\Services\FlyoutAgendaSurfacePolicy.cs" Link="Source\FlyoutAgendaSurfacePolicy.cs" />
     <Compile Include="..\..\Services\IncrementalBucketSnapshot.cs" Link="Source\IncrementalBucketSnapshot.cs" />
+    <Compile Include="..\..\Services\VersionedBucketSlicePolicy.cs" Link="Source\VersionedBucketSlicePolicy.cs" />
     <Compile Include="..\..\Services\TaskMutationCoordinator.cs" Link="Source\TaskMutationCoordinator.cs" />
     <Compile Include="..\..\Services\TaskMutationStatusPolicy.cs" Link="Source\TaskMutationStatusPolicy.cs" />
     <Compile Include="..\..\Services\TaskEditCapabilityPolicy.cs" Link="Source\TaskEditCapabilityPolicy.cs" />
@@ -69,6 +90,7 @@
     <Compile Include="..\..\Services\ProviderAuthCleanup.cs" Link="Source\ProviderAuthCleanup.cs" />
     <Compile Include="..\..\Services\ProviderAuthorizationLifecycle.cs" Link="Source\ProviderAuthorizationLifecycle.cs" />
     <Compile Include="..\..\Services\ProviderAuthorizationScopePolicy.cs" Link="Source\ProviderAuthorizationScopePolicy.cs" />
+    <Compile Include="..\..\Services\AuthorizationInteractionRequiredException.cs" Link="Source\AuthorizationInteractionRequiredException.cs" />
     <Compile Include="..\..\Services\OnboardingPolicy.cs" Link="Source\OnboardingPolicy.cs" />
     <Compile Include="..\..\Services\CachePrunePolicy.cs" Link="Source\CachePrunePolicy.cs" />
     <Compile Include="..\..\Services\BoundedHostGatePool.cs" Link="Source\BoundedHostGatePool.cs" />
@@ -76,6 +98,12 @@
     <Compile Include="..\..\Services\PersistedOrderPolicy.cs" Link="Source\PersistedOrderPolicy.cs" />
     <Compile Include="..\..\Services\SyncRangePolicy.cs" Link="Source\SyncRangePolicy.cs" />
     <Compile Include="..\..\Services\SyncEventTimePolicy.cs" Link="Source\SyncEventTimePolicy.cs" />
+    <Compile Include="..\..\Services\SyncProviderEnums.cs" Link="Source\SyncProviderEnums.cs" />
+    <Compile Include="..\..\Services\SyncProviderCapabilityPolicy.cs" Link="Source\SyncProviderCapabilityPolicy.cs" />
+    <Compile Include="..\..\Services\ICloudCalDavPolicy.cs" Link="Source\ICloudCalDavPolicy.cs" />
+    <Compile Include="..\..\Services\ICloudCredentialEnvelope.cs" Link="Source\ICloudCredentialEnvelope.cs" />
+    <Compile Include="..\..\Services\ICloudCalDavClient.cs" Link="Source\ICloudCalDavClient.cs" />
+    <Compile Include="..\..\Services\ICloudIcsCodec.cs" Link="Source\ICloudIcsCodec.cs" />
     <Compile Include="..\..\Services\SyncItemMappingPolicy.cs" Link="Source\SyncItemMappingPolicy.cs" />
     <Compile Include="..\..\Services\SyncPaginationPolicy.cs" Link="Source\SyncPaginationPolicy.cs" />
     <Compile Include="..\..\Services\SyncRetryPolicy.cs" Link="Source\SyncRetryPolicy.cs" />
@@ -104,6 +132,7 @@
     <Compile Include="..\..\Services\MailBulkMutationPolicy.cs" Link="Source\MailBulkMutationPolicy.cs" />
     <Compile Include="..\..\Services\MailCacheRepository.cs" Link="Source\MailCacheRepository.cs" />
     <Compile Include="..\..\Services\MailCacheModels.cs" Link="Source\MailCacheModels.cs" />
+    <Compile Include="..\..\Services\MailNotificationNavigationPolicy.cs" Link="Source\MailNotificationNavigationPolicy.cs" />
     <Compile Include="..\..\Services\MailPersistentCachePolicy.cs" Link="Source\MailPersistentCachePolicy.cs" />
     <Compile Include="..\..\Services\MailSendConfirmationPolicy.cs" Link="Source\MailSendConfirmationPolicy.cs" />
     <Compile Include="..\..\Services\MailBodyCachePolicy.cs" Link="Source\MailBodyCachePolicy.cs" />

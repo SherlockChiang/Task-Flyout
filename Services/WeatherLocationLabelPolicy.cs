@@ -6,6 +6,18 @@ namespace Task_Flyout.Services
 {
     internal static class WeatherLocationLabelPolicy
     {
+        private static readonly HashSet<string> GenericCurrentLocationLabels = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Current location",
+            "My location",
+            "当前位置",
+            "我的位置",
+            "當前位置",
+            "目前位置",
+            "當前地點",
+            "目前地點"
+        };
+
         public static string FormatProvinceCity(string? province, string? city)
         {
             province = province?.Trim();
@@ -45,6 +57,25 @@ namespace Task_Flyout.Services
             if (mostSpecific.Length <= maximumLength) return mostSpecific;
             return mostSpecific[..Math.Max(1, maximumLength - 1)] + "…";
         }
+
+        public static string ChooseSpecificLabel(
+            string? reverseGeocoded,
+            string? civicAddress,
+            string? previousLabel,
+            string fallback)
+        {
+            string?[] candidates = { reverseGeocoded, civicAddress, previousLabel };
+            string? specific = candidates.FirstOrDefault(candidate =>
+                !string.IsNullOrWhiteSpace(candidate) && !IsGenericCurrentLocationLabel(candidate));
+            if (specific != null) return specific.Trim();
+
+            return candidates.FirstOrDefault(candidate => !string.IsNullOrWhiteSpace(candidate))?.Trim()
+                ?? fallback;
+        }
+
+        public static bool IsGenericCurrentLocationLabel(string? label)
+            => !string.IsNullOrWhiteSpace(label)
+               && GenericCurrentLocationLabels.Contains(label.Trim());
 
         private static List<string> DistinctParts(params string?[] values)
         {

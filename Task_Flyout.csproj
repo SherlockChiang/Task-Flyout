@@ -65,6 +65,7 @@
         <PackageReference Include="Google.Apis.Gmail.v1" Version="1.74.0.4134" />
         <PackageReference Include="Google.Apis.Tasks.v1" Version="1.72.0.3958" />
         <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.1" />
+        <PackageReference Include="Ical.Net" Version="5.2.3" />
         <PackageReference Include="MailKit" Version="4.16.0" />
         <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
         <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
@@ -139,6 +140,45 @@
         <AppxBundlePlatforms>x64</AppxBundlePlatforms>
         <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
     </PropertyGroup>
+
+    <PropertyGroup>
+        <!-- The native taskbar path is opt-out for x64 application builds so
+             the adjacent broker/host are present when the experimental mode is
+             selected. Design-time builds and test projects never invoke it. -->
+        <BuildStandaloneTaskbarNative Condition="'$(BuildStandaloneTaskbarNative)' == ''">true</BuildStandaloneTaskbarNative>
+        <SignStandaloneTaskbarNativeArtifacts Condition="'$(SignStandaloneTaskbarNativeArtifacts)' == '' and '$(UapAppxPackageBuildMode)' == 'SideloadOnly'">true</SignStandaloneTaskbarNativeArtifacts>
+        <StandaloneTaskbarNativeOutputDirectory>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)native-taskbar-weather-ninja\$(Configuration)</StandaloneTaskbarNativeOutputDirectory>
+        <StandaloneTaskbarNativeBuildEnabled Condition="'$(BuildStandaloneTaskbarNative)' != 'false' and '$(DesignTimeBuild)' != 'true' and ('$(Platform)' == 'x64' or '$(RuntimeIdentifier)' == 'win-x64')">true</StandaloneTaskbarNativeBuildEnabled>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(StandaloneTaskbarNativeBuildEnabled)' == 'true'">
+        <_StandaloneTaskbarNativeInput Include="native\taskbar-weather\**\*.*" />
+        <_StandaloneTaskbarNativeInput Include="scripts\build-native-taskbar-weather.ps1" />
+        <Content Include="$(StandaloneTaskbarNativeOutputDirectory)\TaskFlyout.TaskbarBroker.exe"
+                 Link="TaskFlyout.TaskbarBroker.exe"
+                 CopyToOutputDirectory="PreserveNewest"
+                 CopyToPublishDirectory="PreserveNewest" />
+        <Content Include="$(StandaloneTaskbarNativeOutputDirectory)\TaskFlyout.TaskbarHost.dll"
+                 Link="TaskFlyout.TaskbarHost.dll"
+                 CopyToOutputDirectory="PreserveNewest"
+                 CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+
+    <Target Name="BuildStandaloneTaskbarNative"
+            BeforeTargets="PrepareForBuild"
+            Condition="'$(StandaloneTaskbarNativeBuildEnabled)' == 'true'"
+            Inputs="@(_StandaloneTaskbarNativeInput)"
+            Outputs="$(StandaloneTaskbarNativeOutputDirectory)\TaskFlyout.TaskbarBroker.exe;$(StandaloneTaskbarNativeOutputDirectory)\TaskFlyout.TaskbarHost.dll">
+        <Exec Command="powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\scripts\build-native-taskbar-weather.ps1&quot; -Configuration &quot;$(Configuration)&quot; -OutputDirectory &quot;$(StandaloneTaskbarNativeOutputDirectory)&quot; -SkipProbe"
+              StandardOutputImportance="Low" />
+    </Target>
+
+    <Target Name="SignStandaloneTaskbarNative"
+            AfterTargets="BuildStandaloneTaskbarNative"
+            Condition="'$(StandaloneTaskbarNativeBuildEnabled)' == 'true' and '$(SignStandaloneTaskbarNativeArtifacts)' == 'true'">
+        <Exec Command="powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\scripts\sign-native-taskbar-weather.ps1&quot; -BinaryDirectory &quot;$(StandaloneTaskbarNativeOutputDirectory)&quot; -CertificateThumbprint &quot;$(PackageCertificateThumbprint)&quot;"
+              StandardOutputImportance="Low" />
+    </Target>
 
     <Target Name="ResolveLocalVCToolsForAppxSymbols"
             BeforeTargets="_EnsurePdbCmfExeFullPath"

@@ -21,33 +21,42 @@
 
 ## 简介
 
-Task Flyout 常驻 Windows 11 系统托盘，将日历、任务、邮件、RSS 与天气汇聚到一个原生小窗中。它与 Google Calendar 和 Microsoft To Do 双向同步，让你无需打开浏览器即可查看与管理日程。
+Task Flyout 常驻 Windows 11 系统托盘，将日历、任务、邮件、RSS 与天气汇聚到一个原生小窗中。它支持 Google、Microsoft 与 iCloud 日历以及 Google Tasks、Microsoft To Do，让你无需打开浏览器即可查看与管理日程。
 
 ## 功能
 
-- **日历与任务** — 与 Google Calendar、Microsoft To Do 双向同步，可在托盘中直接新建、编辑、完成日程与任务。
+- **日历与任务** — 与 Google、Microsoft、iCloud 日历以及 Google Tasks、Microsoft To Do 双向同步，可在托盘中直接新建、编辑、完成日程与任务。
 - **邮件** — 支持 Gmail、Outlook 及任意 IMAP/SMTP 账户，后台定时抓取，新邮件抵达时弹出原生 Windows 通知。
 - **RSS 阅读器** — 内置阅读器订阅源，并提供按源的图片与隐私加载控制。
-- **天气** — 由 [Open-Meteo](https://open-meteo.com/) 驱动的天气面板，并可选启用任务栏天气栏。
+- **天气** — 由 [Open-Meteo](https://open-meteo.com/) 驱动的天气面板，并可选启用任务栏天气栏；天气设置可在 Web Experience Pack 可用时请求 Windows 原生 Widgets 入口，并在 Explorer 确认原生入口前保留现有 Task Flyout 自绘天气栏。该入口的数据由 Windows 管理，可能轮播股票或新闻公告；Task Flyout 提供受支持的 Widgets 通知设置入口，但不会改写 Web Experience 私有配置。`windhawk/` 下另有一个需独立构建且默认关闭的 Windhawk 伴侣原型，MSIX 不会安装它。
 - **提醒** — 在日程开始前的自定义分钟数弹出通知。
 - **原生设计** — 基于 WinUI 3 构建，支持 Mica 材质、明暗主题，以及按日历区分的配色方案。
 - **轻量** — 常驻托盘，支持开机自启与后台运行；收起时切换至 Windows 11 效能模式 (EcoQoS)，降低 CPU、功耗与内存占用。
-- **多语言** — 内置简体中文与英文，默认跟随系统语言。
+- **多语言** — 内置简体中文、繁体中文与英文，默认跟随系统语言。
 
 ## 安装
 
 1. 在 [Releases 页面](https://github.com/SherlockChiang/Task-Flyout/releases/latest) 下载最新的 `.zip` 压缩包。
 2. 将压缩包解压到本地文件夹。
-3. 右键点击 `install.bat`，选择 **以管理员身份运行**。
-4. 脚本会自动导入受信任证书并安装应用。
+3. 在解压目录中打开 Windows PowerShell，然后运行：
 
-### Google 登录提示
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\Install.ps1
+   ```
 
-Task Flyout 仍在 Google 的应用验证流程中，因此授权页面可能出现「未验证应用」警告。应用完全在本地运行。如需继续，请点击页面底部的 **高级 (Advanced)**，再点击 **转到 Task_Flyout (不安全)**。
+4. 同意证书信任提示，脚本随后会安装已签名的应用包。
+
+### Google 登录可用性
+
+公开构建中的 Google 登录取决于该版本 OAuth 客户端的验证状态。若授权页显示应用未经验证或被阻止，请勿使用含真实数据的账户绕过警告。开发测试应使用已加入许可名单的测试用户，或按下文说明使用你自己的桌面 OAuth 客户端构建。发行说明会注明内置公共客户端何时可供普通 Google 账户使用。
+
+### iCloud 日历
+
+请使用 Apple 账户邮箱，以及在 [account.apple.com](https://account.apple.com/) 生成的 App 专用密码连接。Apple 要求账户先启用双重认证；Task Flyout 不接受也不会保存 Apple 账户主密码。详见 [Apple 支持](https://support.apple.com/zh-cn/102654)。
 
 ## 隐私与安全
 
-Task Flyout 作为公共 OAuth 客户端在本地运行。所有凭证、邮件与日程数据均保存在你的设备上，绝不会被收集、存储或上传至任何第三方服务器。完整内容见[隐私政策](https://sherlockchiang.github.io/Task-Flyout/privacy.html)。
+Task Flyout 不运营开发者后端。凭据与本地缓存均在设备上受到保护；数据只会发送到你主动配置的服务提供方，开发者不会收集这些数据。完整内容见[隐私政策](https://sherlockchiang.github.io/Task-Flyout/privacy.html)。
 
 应用声明 `runFullTrust` 能力，是为了实现纯 UWP API 无法覆盖的桌面集成：托盘图标、开机启动任务、任务栏天气栏定位，以及通知激活路由。它不会用于后台安装程序、提权或执行下载的代码。
 
@@ -70,6 +79,22 @@ dotnet build Task_Flyout.csproj -c Debug -p:Platform=x64
 ```
 
 或在 Visual Studio 2022 中打开 `Task_Flyout.slnx` 并运行 `Task_Flyout` 项目。
+
+**Google OAuth 凭据**
+
+Google 日历、Google Tasks 与 Gmail 同步需要你自己的 Google OAuth 客户端。
+真实的 `credentials.json` 已被 Git 忽略，不会提交；请复制模板，并在
+[Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+中创建桌面应用类型的 OAuth 客户端后填写：
+
+```powershell
+Copy-Item credentials.example.json credentials.json
+# 然后编辑 credentials.json，填入 client_id / client_secret / project_id
+```
+
+它会在构建时嵌入安装包。桌面 OAuth 客户端的 secret 不是真正的服务器密钥；
+发布公开版本时仍应轮换客户端，并从构建或 CI 注入 `credentials.json`，不要把
+长期凭据留在检出目录中。
 
 ## 技术栈
 

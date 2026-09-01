@@ -74,7 +74,7 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <FontIcon Grid.Column="0" Glyph="&#xE77B;" FontSize="15" Margin="0,0,12,0"
+                                        <FontIcon Grid.Column="0" Glyph="{Binding IconGlyph}" FontSize="15" Margin="0,0,12,0"
                                                   Foreground="{ThemeResource SystemAccentColor}" VerticalAlignment="Center"/>
                                         <TextBlock Grid.Column="1" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"
                                                    Text="{Binding ProviderName}" TextTrimming="CharacterEllipsis"/>
@@ -114,7 +114,7 @@
                                             </ItemsRepeater.ItemTemplate>
                                         </ItemsRepeater>
 
-                                        <Grid Margin="32,0,0,8" ColumnSpacing="8">
+                                        <Grid Margin="32,0,0,8" ColumnSpacing="8" Visibility="{Binding TaskSettingsVisibility}">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
@@ -172,7 +172,7 @@
                         Click="ToggleAccountPane_Click">
                     <FontIcon x:Name="ToggleAccountPaneIcon" Glyph="&#xE76B;" FontSize="12"/>
                 </Button>
-                <Button x:Name="BtnMonthYear" Content="2026年 3月" FontSize="28" FontWeight="Bold" Background="Transparent" BorderThickness="0"
+                <Button x:Name="BtnMonthYear" Content="" FontSize="28" FontWeight="Bold" Background="Transparent" BorderThickness="0"
                         Padding="8,4" Margin="-8,0,0,0" Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                         Click="BtnMonthYear_Click"/>
 

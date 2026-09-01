@@ -347,7 +347,6 @@ namespace Task_Flyout.Services
             var enabled = GetEnabledAlertTypes();
             if (enabled.Count == 0) return null;
 
-            string lang = GetCurrentLanguage();
             var now = DateTime.Now;
             var forecast = info.HourlyForecast
                 .OrderBy(h => h.RawTime)
@@ -371,7 +370,7 @@ namespace Task_Flyout.Services
                     HoursAhead = 0,
                     MinutesUntilEnd = GetRainDurationMinutes(stopHour, now, forecast.LastOrDefault()?.RawTime),
                     Icon = GetAlertIcon(currentRainType),
-                    Message = BuildRainEndingMessage(stopHour, now, forecast.LastOrDefault()?.RawTime, lang),
+                    Message = BuildRainEndingMessage(stopHour, now, forecast.LastOrDefault()?.RawTime),
                     StartTime = currentHour.RawTime,
                     EndTime = stopHour?.RawTime,
                     PrecipProbability = currentHour.PrecipProbValue,
@@ -408,7 +407,7 @@ namespace Task_Flyout.Services
                         Type = type,
                         HoursAhead = hoursAhead,
                         Icon = GetAlertIcon(type),
-                        Message = BuildAlertMessage(type, hoursAhead, lang),
+                        Message = BuildAlertMessage(type, hoursAhead),
                         StartTime = hit.RawTime,
                         EndTime = end?.RawTime,
                         PrecipProbability = hit.PrecipProbValue,
@@ -452,7 +451,7 @@ namespace Task_Flyout.Services
             return h.PrecipValue > 0.05 && h.PrecipProbValue >= 40;
         }
 
-        private static string BuildRainEndingMessage(HourlyWeather? stopHour, DateTime now, DateTime? lastForecastTime, string lang)
+        private static string BuildRainEndingMessage(HourlyWeather? stopHour, DateTime now, DateTime? lastForecastTime)
         {
             if (stopHour != null)
             {
@@ -460,7 +459,7 @@ namespace Task_Flyout.Services
                 if (minutes <= 5)
                     return _loader.GetStringOrDefault("TextRainStopSoon") ?? "Rain now, should stop soon";
 
-                var when = FormatRainTimeSpan(minutes, lang == "zh");
+                var when = FormatRainTimeSpan(minutes);
                 return string.Format(_loader.GetStringOrDefault("TextRainStopInAbout") ?? "Rain now, should stop in about {0}", when);
             }
 
@@ -476,12 +475,15 @@ namespace Task_Flyout.Services
             return end.HasValue ? Math.Max(1, (int)Math.Round((end.Value - now).TotalMinutes)) : null;
         }
 
-        private static string FormatRainTimeSpan(int minutes, bool zh)
+        private static string FormatRainTimeSpan(int minutes)
         {
             if (minutes < 60) return string.Format(_loader.GetStringOrDefault("TextRainMinute") ?? "{0} min", minutes);
 
-            var hours = (int)Math.Round(minutes / 60.0);
-            return $"{Math.Max(1, hours)}h";
+            var hours = Math.Max(1, (int)Math.Round(minutes / 60.0));
+            return string.Format(
+                LocalizationHelper.AppCulture,
+                _loader.GetStringOrDefault("TextRainHour") ?? "{0}h",
+                hours);
         }
 
         private static bool MatchAlert(HourlyWeather h, WeatherAlertType type)
@@ -528,27 +530,34 @@ namespace Task_Flyout.Services
             _ => "\u26A0\uFE0F"
         };
 
-        private static string BuildAlertMessage(WeatherAlertType type, int hoursAhead, string lang)
+        private static string BuildAlertMessage(WeatherAlertType type, int hoursAhead)
         {
-            bool zh = lang == "zh";
-            string when = hoursAhead <= 0
-                ? (zh ? "\u5373\u5c06" : "now")
-                : (zh ? $"{hoursAhead}h\u540e" : $"in {hoursAhead}h");
-            string label = type switch
+            string labelKey = type switch
             {
-                WeatherAlertType.Thunderstorm => zh ? "\u96f7\u9635\u96e8" : "Thunderstorm",
-                WeatherAlertType.FreezingRain => zh ? "\u51bb\u96e8" : "Freezing rain",
-                WeatherAlertType.HeavyRain => zh ? "\u5927\u96e8" : "Heavy rain",
-                WeatherAlertType.Rain => zh ? "\u964d\u96e8" : "Rain",
-                WeatherAlertType.HeavySnow => zh ? "\u5927\u96ea" : "Heavy snow",
-                WeatherAlertType.Snow => zh ? "\u964d\u96ea" : "Snow",
-                WeatherAlertType.Fog => zh ? "\u8d77\u96fe" : "Fog",
-                WeatherAlertType.HighWind => zh ? "\u5927\u98ce" : "Strong wind",
-                WeatherAlertType.ExtremeHeat => zh ? "\u9ad8\u6e29" : "Extreme heat",
-                WeatherAlertType.ExtremeCold => zh ? "\u4e25\u5bd2" : "Extreme cold",
-                _ => ""
+                WeatherAlertType.Thunderstorm => "WeatherAlert_Thunderstorm",
+                WeatherAlertType.FreezingRain => "WeatherAlert_FreezingRain",
+                WeatherAlertType.HeavyRain => "WeatherAlert_HeavyRain",
+                WeatherAlertType.Rain => "WeatherAlert_Rain",
+                WeatherAlertType.HeavySnow => "WeatherAlert_HeavySnow",
+                WeatherAlertType.Snow => "WeatherAlert_Snow",
+                WeatherAlertType.Fog => "WeatherAlert_Fog",
+                WeatherAlertType.HighWind => "WeatherAlert_HighWind",
+                WeatherAlertType.ExtremeHeat => "WeatherAlert_ExtremeHeat",
+                WeatherAlertType.ExtremeCold => "WeatherAlert_ExtremeCold",
+                _ => "WeatherCondition_Unknown"
             };
-            return zh ? $"{when}{label}" : $"{label} {when}";
+            string label = _loader.GetStringOrDefault(labelKey) ?? type.ToString();
+            if (hoursAhead <= 0)
+            {
+                return string.Format(
+                    _loader.GetStringOrDefault("WeatherAlert_NowFormat") ?? "{0} now",
+                    label);
+            }
+
+            return string.Format(
+                _loader.GetStringOrDefault("WeatherAlert_InHoursFormat") ?? "{0} in {1}h",
+                label,
+                hoursAhead);
         }
 
         public static readonly (string Key, string ResourceKey, string EnLabel)[] AllBarFields = new[]
@@ -653,8 +662,8 @@ namespace Task_Flyout.Services
 
         /// <summary>Set the weather location directly from coordinates (e.g. device GPS),
         /// with a display label. Open-Meteo uses the coordinates directly.</summary>
-        public void SetCoordinates(double latitude, double longitude, string displayName)
-            => AddLocation(latitude, longitude, displayName, true);
+        public Task<bool> SetCoordinatesAsync(double latitude, double longitude, string displayName)
+            => SetCoordinatesAsync(latitude, longitude, displayName, expectedGeneration: null);
 
         public bool AddLocation(double latitude, double longitude, string displayName, bool currentLocation)
         {
@@ -691,6 +700,33 @@ namespace Task_Flyout.Services
         {
             EnsureLocationLoaded();
             lock (_weatherLock) return _cachedWeatherKey == BuildCurrentWeatherKey() ? _cachedWeather : null;
+        }
+
+        public (WeatherInfo? Info, DateTimeOffset UpdatedUtc) GetActiveCachedWeatherState()
+        {
+            EnsureLocationLoaded();
+            string currentKey;
+            lock (_contextLock)
+            lock (_locationLock)
+            {
+                string providerCity = _favorites.Locations
+                    .FirstOrDefault(x => x.Id == _favorites.ActiveId)?.DisplayLabel
+                    ?? _location.City;
+                currentKey = $"{WeatherSource}|{providerCity}|" +
+                    $"{_location.Latitude.ToString(CultureInfo.InvariantCulture)}|" +
+                    _location.Longitude.ToString(CultureInfo.InvariantCulture);
+            }
+
+            lock (_weatherLock)
+            {
+                if (_cachedWeatherKey != currentKey || _cachedWeather == null)
+                    return (null, DateTimeOffset.MinValue);
+
+                DateTimeOffset updatedUtc = _lastFetchTime == DateTime.MinValue
+                    ? DateTimeOffset.MinValue
+                    : new DateTimeOffset(_lastFetchTime).ToUniversalTime();
+                return (_cachedWeather, updatedUtc);
+            }
         }
 
         private string BuildCurrentWeatherKey()
@@ -764,16 +800,19 @@ namespace Task_Flyout.Services
             LocalSqliteStore.WriteProtectedText(ProtectedWeatherScope, ProtectedLocationKey, json);
         }
 
-        private void SetCoordinates(double latitude, double longitude, string displayName, long? expectedGeneration)
+        private async Task<bool> SetCoordinatesAsync(
+            double latitude,
+            double longitude,
+            string displayName,
+            long? expectedGeneration)
         {
             EnsureLocationLoaded();
             var normalized = WeatherLocationPolicy.Normalize(displayName, latitude, longitude);
             string json;
-            long generation;
             lock (_contextLock)
             {
                 if (expectedGeneration.HasValue
-                    && expectedGeneration.Value != Volatile.Read(ref _weatherDataGeneration)) return;
+                    && expectedGeneration.Value != Volatile.Read(ref _weatherDataGeneration)) return false;
 
                 lock (_locationLock)
                 {
@@ -781,10 +820,10 @@ namespace Task_Flyout.Services
                     if (current != null && _location.City == normalized.City &&
                         _location.Latitude == normalized.Latitude &&
                         _location.Longitude == normalized.Longitude)
-                        return;
+                        return false;
                     if (current == null)
                     {
-                        if (!WeatherLocationPolicy.TryAdd(_favorites, displayName, latitude, longitude, true, out current)) return;
+                        if (!WeatherLocationPolicy.TryAdd(_favorites, displayName, latitude, longitude, true, out current)) return false;
                     }
                     else
                     {
@@ -797,19 +836,20 @@ namespace Task_Flyout.Services
                     json = JsonSerializer.Serialize(_favorites, AppJsonContext.Default.WeatherFavoritesStore);
                 }
                 InvalidateWeatherContext();
-                generation = Volatile.Read(ref _weatherDataGeneration);
             }
 
-            _weatherPersistenceGate.Wait();
+            await _weatherPersistenceGate.WaitAsync();
             try
             {
-                if (generation != Volatile.Read(ref _weatherDataGeneration)) return;
-                LocalSqliteStore.WriteProtectedText(ProtectedWeatherScope, ProtectedLocationKey, json);
+                await LocalSqliteStore.WriteProtectedTextAsync(ProtectedWeatherScope, ProtectedLocationKey, json);
             }
             finally
             {
                 _weatherPersistenceGate.Release();
             }
+
+            LocationsChanged?.Invoke(this, EventArgs.Empty);
+            return true;
         }
 
         /// <summary>Outcome of a reverse-geocode, including which provider answered (for diagnostics).</summary>
@@ -846,6 +886,52 @@ namespace Task_Flyout.Services
             return new ReverseGeocodeResult { Name = null, Source = area.Source };
         }
 
+        public async Task<ReverseGeocodeResult> ResolvePositionLabelAsync(
+            Geoposition position,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(position);
+            var coordinates = position.Coordinate.Point.Position;
+            var reverseGeocoded = await ReverseGeocodeDetailedAsync(
+                coordinates.Latitude,
+                coordinates.Longitude,
+                cancellationToken);
+
+            string civicLabel = "";
+            try
+            {
+                var civic = position.CivicAddress;
+                civicLabel = WeatherLocationLabelPolicy.FormatProvinceCity(civic?.State, civic?.City);
+                if (string.IsNullOrWhiteSpace(civicLabel))
+                    civicLabel = civic?.Country ?? "";
+                civicLabel = LocalizationHelper.LocalizeExternalText(civicLabel);
+            }
+            catch
+            {
+            }
+
+            string previousLabel;
+            EnsureLocationLoaded();
+            lock (_locationLock)
+                previousLabel = _favorites.Locations.FirstOrDefault(location => location.IsCurrentLocation)?.DisplayLabel ?? "";
+
+            string fallback = _loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location";
+            string label = WeatherLocationLabelPolicy.ChooseSpecificLabel(
+                reverseGeocoded.Name,
+                civicLabel,
+                previousLabel,
+                fallback);
+            string source = !string.IsNullOrWhiteSpace(reverseGeocoded.Name)
+                && !WeatherLocationLabelPolicy.IsGenericCurrentLocationLabel(reverseGeocoded.Name)
+                    ? reverseGeocoded.Source
+                    : !string.IsNullOrWhiteSpace(civicLabel)
+                        ? "windows-civic"
+                        : !string.IsNullOrWhiteSpace(previousLabel)
+                            ? "cached-location"
+                            : "none";
+            return new ReverseGeocodeResult { Name = label, Source = source };
+        }
+
         /// <summary>Street-level reverse geocode via OpenStreetMap Nominatim.</summary>
         private async Task<ReverseGeocodeResult> ReverseGeocodeStreetAsync(
             double latitude,
@@ -854,7 +940,7 @@ namespace Task_Flyout.Services
         {
             try
             {
-                string lang = GetCurrentLanguage() == "zh" ? "zh" : "en";
+                string lang = LocalizationHelper.IsChineseLanguage(GetCurrentLanguage()) ? "zh" : "en";
                 string url = "https://nominatim.openstreetmap.org/reverse" +
                              $"?lat={latitude.ToString(CultureInfo.InvariantCulture)}" +
                              $"&lon={longitude.ToString(CultureInfo.InvariantCulture)}" +
@@ -880,7 +966,8 @@ namespace Task_Flyout.Services
                                    ?? Pick("neighbourhood") ?? Pick("quarter");
                 string? street = Pick("road") ?? Pick("pedestrian") ?? Pick("residential")
                                  ?? Pick("footway") ?? Pick("path");
-                string label = WeatherLocationLabelPolicy.FormatDetailed(province, city, district, township, street);
+                string label = LocalizationHelper.LocalizeExternalText(
+                    WeatherLocationLabelPolicy.FormatDetailed(province, city, district, township, street));
                 return string.IsNullOrWhiteSpace(label)
                     ? new ReverseGeocodeResult { Source = "osm-empty" }
                     : new ReverseGeocodeResult { Name = label, Source = string.IsNullOrWhiteSpace(street) ? "osm-area" : "osm-road" };
@@ -901,7 +988,7 @@ namespace Task_Flyout.Services
         {
             try
             {
-                string lang = GetCurrentLanguage() == "zh" ? "zh" : "en";
+                string lang = LocalizationHelper.IsChineseLanguage(GetCurrentLanguage()) ? "zh" : "en";
                 string url = "https://api.bigdatacloud.net/data/reverse-geocode-client" +
                              $"?latitude={latitude.ToString(CultureInfo.InvariantCulture)}" +
                              $"&longitude={longitude.ToString(CultureInfo.InvariantCulture)}" +
@@ -918,7 +1005,8 @@ namespace Task_Flyout.Services
                 string? province = Pick("principalSubdivision");
                 string? city = Pick("city");
                 if (string.IsNullOrWhiteSpace(city)) city = Pick("locality");
-                string label = WeatherLocationLabelPolicy.FormatProvinceCity(province, city);
+                string label = LocalizationHelper.LocalizeExternalText(
+                    WeatherLocationLabelPolicy.FormatProvinceCity(province, city));
                 return string.IsNullOrWhiteSpace(label) ? null : label;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
@@ -943,6 +1031,7 @@ namespace Task_Flyout.Services
         }
 
         private Geolocator? _trackingGeolocator;
+        private readonly SemaphoreSlim _locationTrackingGate = new(1, 1);
 
         public bool IsLocationTrackingActive => _trackingGeolocator != null;
 
@@ -953,12 +1042,14 @@ namespace Task_Flyout.Services
         /// <summary>Begin following the device location. Returns false if access was denied.</summary>
         public async Task<bool> StartLocationTrackingAsync()
         {
+            if (!AutoFollowLocation) return false;
+            await _locationTrackingGate.WaitAsync();
             try
             {
                 if (_trackingGeolocator != null) return true;
 
                 var access = await Geolocator.RequestAccessAsync();
-                if (access != GeolocationAccessStatus.Allowed) return false;
+                if (access != GeolocationAccessStatus.Allowed || !AutoFollowLocation) return false;
 
                 // High accuracy so the followed position resolves to a street; the 3km
                 // movement threshold still keeps us from refetching weather constantly.
@@ -968,12 +1059,17 @@ namespace Task_Flyout.Services
                     MovementThreshold = 3000
                 };
                 _trackingGeolocator.PositionChanged += OnTrackedPositionChanged;
+                _ = RefreshTrackedPositionAsync(_trackingGeolocator);
                 return true;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"StartLocationTracking failed: {ex.Message}");
                 return false;
+            }
+            finally
+            {
+                _locationTrackingGate.Release();
             }
         }
 
@@ -987,24 +1083,38 @@ namespace Task_Flyout.Services
         }
 
         private async void OnTrackedPositionChanged(Geolocator sender, PositionChangedEventArgs args)
+            => await ApplyTrackedPositionAsync(sender, args.Position);
+
+        private async Task RefreshTrackedPositionAsync(Geolocator sender)
+        {
+            try
+            {
+                var position = await sender.GetGeopositionAsync(
+                    TimeSpan.FromMinutes(5),
+                    TimeSpan.FromSeconds(15));
+                await ApplyTrackedPositionAsync(sender, position);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Initial tracked position failed: {ex.Message}");
+            }
+        }
+
+        private async Task ApplyTrackedPositionAsync(Geolocator sender, Geoposition position)
         {
             if (!ReferenceEquals(sender, _trackingGeolocator) || !AutoFollowLocation) return;
             long generation = Volatile.Read(ref _weatherDataGeneration);
             try
             {
-                var p = args.Position.Coordinate.Point.Position;
+                var p = position.Coordinate.Point.Position;
                 CancellationToken serviceToken;
                 lock (_contextLock) serviceToken = _weatherContextCancellation.Token;
-                string? place = await ReverseGeocodeAsync(p.Latitude, p.Longitude, serviceToken);
+                var resolved = await ResolvePositionLabelAsync(position, serviceToken);
                 if (generation != Volatile.Read(ref _weatherDataGeneration) ||
                     !ReferenceEquals(sender, _trackingGeolocator) || !AutoFollowLocation)
                     return;
-                string label = !string.IsNullOrWhiteSpace(place)
-                    ? place!
-                    : (_loader.GetStringOrDefault("WeatherCurrentLocation") ?? "Current location");
-
-                SetCoordinates(p.Latitude, p.Longitude, label, generation);
-                if (generation + 1 != Volatile.Read(ref _weatherDataGeneration) || !AutoFollowLocation)
+                bool changed = await SetCoordinatesAsync(p.Latitude, p.Longitude, resolved.Name ?? "", generation);
+                if (!changed || generation + 1 != Volatile.Read(ref _weatherDataGeneration) || !AutoFollowLocation)
                     return;
                 // Coordinates are part of the cache key, so the next fetch is a miss and refetches.
                 LocationUpdated?.Invoke(this, EventArgs.Empty);
@@ -1459,10 +1569,9 @@ namespace Task_Flyout.Services
             string sunriseTime = sunrise.Contains("T") ? sunrise.Split('T')[1] : sunrise;
             string sunsetTime = sunset.Contains("T") ? sunset.Split('T')[1] : sunset;
 
-            string lang = GetCurrentLanguage();
             var info = new WeatherInfo
             {
-                City = context.City,
+                City = LocalizationHelper.LocalizeExternalText(context.City),
                 IconFont = context.IconFont,
                 Sunrise = sunriseTime,
                 Sunset = sunsetTime,
@@ -1471,7 +1580,7 @@ namespace Task_Flyout.Services
                 DailyForecast = new()
             };
 
-            BuildOpenMeteoDailyForecast(info, daily, lang, context.IconFont);
+            BuildOpenMeteoDailyForecast(info, daily, context.IconFont);
 
             int totalHours = times.GetArrayLength();
             int nowHour = DateTime.Now.Hour;
@@ -1530,11 +1639,11 @@ namespace Task_Flyout.Services
                     Icon = OpenMeteoCodeToIcon(code, context.IconFont),
                     IconFont = context.IconFont,
                     IconLayerUris = IconPackService.Instance.TryResolveBitmapLayers(code, omHourIsDay, isOpenMeteo: true),
-                    Description = OpenMeteoCodeToDescription(code, lang),
+                    Description = OpenMeteoCodeToDescription(code),
                     FeelsLike = $"{flVal:F0}°C",
                     Humidity = $"{humVal}%",
                     WindSpeed = $"{wsVal:F0} km/h",
-                    WindDirection = WindDegreeToDirection(wdVal, lang),
+                    WindDirection = WindDegreeToDirection(wdVal),
                     PrecipProbability = $"{ppVal:F0}%",
                     Precipitation = $"{pVal:F1} mm",
                     UVIndex = $"{uvVal:F1}",
@@ -1581,7 +1690,7 @@ namespace Task_Flyout.Services
             return info;
         }
 
-        private void BuildOpenMeteoDailyForecast(WeatherInfo info, JsonElement daily, string lang, string iconFont)
+        private void BuildOpenMeteoDailyForecast(WeatherInfo info, JsonElement daily, string iconFont)
         {
             try
             {
@@ -1611,7 +1720,7 @@ namespace Task_Flyout.Services
                     info.DailyForecast.Add(new DailyWeather
                     {
                         Date = date,
-                        DayLabel = GetDailyDayLabel(date, lang),
+                        DayLabel = GetDailyDayLabel(date),
                         DateLabel = date.ToString(_loader.GetStringOrDefault("TextWeatherDateFormat") ?? "MMM d", LocalizationHelper.AppCulture),
                         WeatherCode = code,
                         HighTemperature = $"{high:F0}°",
@@ -1620,7 +1729,7 @@ namespace Task_Flyout.Services
                         Icon = OpenMeteoCodeToIcon(code, iconFont),
                         IconFont = iconFont,
                         IconLayerUris = IconPackService.Instance.TryResolveBitmapLayers(code, true, isOpenMeteo: true),
-                        Description = OpenMeteoCodeToDescription(code, lang),
+                        Description = OpenMeteoCodeToDescription(code),
                         PrecipProbability = $"{chance:F0}%",
                         Precipitation = $"{rain:F1} mm",
                         WindSpeed = $"{wind:F0} km/h",
@@ -1631,7 +1740,7 @@ namespace Task_Flyout.Services
             catch { }
         }
 
-        private static string GetDailyDayLabel(DateTime date, string lang)
+        private static string GetDailyDayLabel(DateTime date)
         {
             int days = (date.Date - DateTime.Today).Days;
             if (days == 0) return _loader.GetStringOrDefault("TextToday") ?? "Today";
@@ -1681,77 +1790,51 @@ namespace Task_Flyout.Services
             };
         }
 
-        private static string OpenMeteoCodeToDescription(int code, string lang)
+        private static string OpenMeteoCodeToDescription(int code)
         {
-            if (lang == "zh")
+            string key = code switch
             {
-                return code switch
-                {
-                    0 => "\u6674",
-                    1 => "\u5927\u90E8\u6674\u6717",
-                    2 => "\u591A\u4E91",
-                    3 => "\u9634",
-                    45 => "\u96FE",
-                    48 => "\u51BB\u96FE",
-                    51 => "\u5C0F\u6BDB\u6BDB\u96E8",
-                    53 => "\u6BDB\u6BDB\u96E8",
-                    55 => "\u5927\u6BDB\u6BDB\u96E8",
-                    56 or 57 => "\u51BB\u6BDB\u6BDB\u96E8",
-                    61 => "\u5C0F\u96E8",
-                    63 => "\u4E2D\u96E8",
-                    65 => "\u5927\u96E8",
-                    66 or 67 => "\u51BB\u96E8",
-                    71 => "\u5C0F\u96EA",
-                    73 => "\u4E2D\u96EA",
-                    75 => "\u5927\u96EA",
-                    77 => "\u96EA\u7C92",
-                    80 => "\u5C0F\u9635\u96E8",
-                    81 => "\u4E2D\u9635\u96E8",
-                    82 => "\u5927\u9635\u96E8",
-                    85 => "\u5C0F\u9635\u96EA",
-                    86 => "\u5927\u9635\u96EA",
-                    95 => "\u96F7\u9635\u96E8",
-                    96 or 99 => "\u96F7\u9635\u96E8\u4F34\u51B0\u96F9",
-                    _ => "\u672A\u77E5"
-                };
-            }
-            return code switch
-            {
-                0 => "Clear sky",
-                1 => "Mainly clear",
-                2 => "Partly cloudy",
-                3 => "Overcast",
-                45 => "Fog",
-                48 => "Rime fog",
-                51 => "Light drizzle",
-                53 => "Moderate drizzle",
-                55 => "Dense drizzle",
-                56 or 57 => "Freezing drizzle",
-                61 => "Slight rain",
-                63 => "Moderate rain",
-                65 => "Heavy rain",
-                66 or 67 => "Freezing rain",
-                71 => "Slight snow",
-                73 => "Moderate snow",
-                75 => "Heavy snow",
-                77 => "Snow grains",
-                80 => "Slight rain showers",
-                81 => "Moderate rain showers",
-                82 => "Violent rain showers",
-                85 => "Slight snow showers",
-                86 => "Heavy snow showers",
-                95 => "Thunderstorm",
-                96 or 99 => "Thunderstorm with hail",
-                _ => "Unknown"
+                0 => "WeatherCondition_ClearSky",
+                1 => "WeatherCondition_MainlyClear",
+                2 => "WeatherCondition_PartlyCloudy",
+                3 => "WeatherCondition_Overcast",
+                45 => "WeatherCondition_Fog",
+                48 => "WeatherCondition_RimeFog",
+                51 => "WeatherCondition_LightDrizzle",
+                53 => "WeatherCondition_ModerateDrizzle",
+                55 => "WeatherCondition_DenseDrizzle",
+                56 or 57 => "WeatherCondition_FreezingDrizzle",
+                61 => "WeatherCondition_SlightRain",
+                63 => "WeatherCondition_ModerateRain",
+                65 => "WeatherCondition_HeavyRain",
+                66 or 67 => "WeatherCondition_FreezingRain",
+                71 => "WeatherCondition_SlightSnow",
+                73 => "WeatherCondition_ModerateSnow",
+                75 => "WeatherCondition_HeavySnow",
+                77 => "WeatherCondition_SnowGrains",
+                80 => "WeatherCondition_SlightRainShowers",
+                81 => "WeatherCondition_ModerateRainShowers",
+                82 => "WeatherCondition_ViolentRainShowers",
+                85 => "WeatherCondition_SlightSnowShowers",
+                86 => "WeatherCondition_HeavySnowShowers",
+                95 => "WeatherCondition_Thunderstorm",
+                96 or 99 => "WeatherCondition_ThunderstormWithHail",
+                _ => "WeatherCondition_Unknown"
             };
+            return _loader.GetStringOrDefault(key)
+                ?? _loader.GetStringOrDefault("WeatherCondition_Unknown")
+                ?? "Unknown";
         }
 
-        private static string WindDegreeToDirection(int deg, string lang)
+        private static string WindDegreeToDirection(int deg)
         {
-            string[] dirsZh = { "\u5317", "\u4E1C\u5317", "\u4E1C", "\u4E1C\u5357", "\u5357", "\u897F\u5357", "\u897F", "\u897F\u5317" };
-            string[] dirsEn = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
-            int idx = (int)Math.Round(deg / 45.0) % 8;
-            return lang == "zh" ? dirsZh[idx] : dirsEn[idx];
+            string[] keys =
+            {
+                "WeatherWind_N", "WeatherWind_NE", "WeatherWind_E", "WeatherWind_SE",
+                "WeatherWind_S", "WeatherWind_SW", "WeatherWind_W", "WeatherWind_NW"
+            };
+            int idx = ((int)Math.Round(deg / 45.0) % keys.Length + keys.Length) % keys.Length;
+            return _loader.GetStringOrDefault(keys[idx]) ?? keys[idx]["WeatherWind_".Length..];
         }
 
         private static string GetMoonPhaseEmoji(DateTime date)
@@ -1783,7 +1866,7 @@ namespace Task_Flyout.Services
             CancellationToken cancellationToken)
         {
             string lang = GetCurrentLanguage();
-            string wttrLang = lang == "en" ? "en" : "zh";
+            string wttrLang = LocalizationHelper.IsChineseLanguage(lang) ? "zh" : "en";
             string searchCity = context.ProviderCity.Split(',')[0].Trim();
             string url = $"https://wttr.in/{Uri.EscapeDataString(searchCity)}?format=j1&lang={wttrLang}";
 
@@ -1813,14 +1896,14 @@ namespace Task_Flyout.Services
             var info = new WeatherInfo
             {
                 Temperature = $"{tempC}\u00B0C",
-                Description = desc,
+                Description = LocalizationHelper.LocalizeExternalText(desc),
                 Icon = WttrCodeToIcon(weatherCode, context.IconFont),
                 IconFont = context.IconFont,
                 IconLayerUris = wttrLayers,
                 IconBitmapUri = wttrLayers.Length > 0 ? wttrLayers[0] : null,
                 RawWeatherCode = wttrRawCode,
                 IsDayTime = wttrIsDay,
-                City = context.City,
+                City = LocalizationHelper.LocalizeExternalText(context.City),
                 FeelsLike = string.IsNullOrEmpty(flVal) ? "" : $"{flVal}\u00B0C",
                 Humidity = string.IsNullOrEmpty(humidityVal) ? "" : $"{humidityVal}%",
                 WindSpeed = string.IsNullOrEmpty(windVal) ? "" : $"{windVal} km/h",
@@ -1883,7 +1966,7 @@ namespace Task_Flyout.Services
                     info.DailyForecast.Add(new DailyWeather
                     {
                         Date = date,
-                        DayLabel = GetDailyDayLabel(date, lang),
+                        DayLabel = GetDailyDayLabel(date),
                         DateLabel = date.ToString(_loader.GetStringOrDefault("TextWeatherDateFormat") ?? "MMM d", LocalizationHelper.AppCulture),
                         WeatherCode = rawDailyCode,
                         HighTemperature = string.IsNullOrEmpty(maxC) ? "" : $"{maxC}°",
@@ -1892,7 +1975,7 @@ namespace Task_Flyout.Services
                         Icon = WttrCodeToIcon(dayCode, context.IconFont),
                         IconFont = context.IconFont,
                         IconLayerUris = IconPackService.Instance.TryResolveBitmapLayers(rawDailyCode, true, isOpenMeteo: false),
-                        Description = dayDesc,
+                        Description = LocalizationHelper.LocalizeExternalText(dayDesc),
                         PrecipProbability = $"{maxRainChance}%",
                         Precipitation = string.IsNullOrEmpty(totalPrecip) ? "" : $"{totalPrecip} mm",
                         WindSpeed = string.IsNullOrEmpty(maxWind) ? "" : $"{maxWind} km/h",
@@ -1965,7 +2048,7 @@ namespace Task_Flyout.Services
                         Icon = WttrCodeToIcon(source.code, context.IconFont),
                         IconFont = context.IconFont,
                         IconLayerUris = IconPackService.Instance.TryResolveBitmapLayers(rawCode, hIsDay, isOpenMeteo: false),
-                        Description = source.hDesc,
+                        Description = LocalizationHelper.LocalizeExternalText(source.hDesc),
                         FeelsLike = string.IsNullOrEmpty(source.flC) ? "" : $"{source.flC}\u00B0C",
                         Humidity = string.IsNullOrEmpty(source.hum) ? "" : $"{source.hum}%",
                         WindSpeed = string.IsNullOrEmpty(source.ws) ? "" : $"{source.ws} km/h",

@@ -57,6 +57,19 @@
                 </StackPanel>
             </Button>
 
+            <!-- iCloud -->
+            <Button x:Name="BtnICloud" HorizontalAlignment="Stretch" Padding="16" Click="BtnICloud_Click"
+                    HorizontalContentAlignment="Left">
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                    <FontIcon Glyph="&#xE787;" Foreground="#6E6E73" FontSize="24"/>
+                    <StackPanel Spacing="2" VerticalAlignment="Center" MinWidth="0">
+                        <TextBlock x:Uid="AddAccount_ICloudTitle" Text="iCloud" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock x:Uid="AddAccount_ICloudDesc" Text="iCloud Calendar" FontSize="12"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="WrapWholeWords"/>
+                    </StackPanel>
+                </StackPanel>
+            </Button>
+
             <ProgressRing x:Name="AuthProgress" IsActive="False" Width="32" Height="32"/>
             <TextBlock x:Name="StatusText" Text="" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"
                        HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="WrapWholeWords"/>

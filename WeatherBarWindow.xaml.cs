@@ -57,12 +57,26 @@ namespace Task_Flyout
         private const double AlertDescriptionMaxWidth = 170;
         private const double ConservativeWidgetsReservation = 340;
         private const double TaskbarObstacleClearance = 48;
+        private const string WindhawkTaskbarModRegistryPath = @"SOFTWARE\Windhawk\Engine\Mods\windows-11-taskbar-styler";
+        private static readonly RegistryView[] WindhawkRegistryViews =
+        {
+            RegistryView.Registry64,
+            RegistryView.Registry32
+        };
         private bool _subclassInstalled;
         private string _lastWeatherLayerKey = "";
         private WeatherAlert? _activeAlert;
         private WeatherInfo? _activeWeatherInfo;
         private string _activeAlertBarLabel = "";
         private readonly StringBuilder _classNameBuffer = new(256);
+        private WeatherBarTaskbarStyleProfile _taskbarStyleProfile = WeatherBarTaskbarStyleProfile.SystemDefault;
+        private WindhawkTaskbarStyleStamp _lastWindhawkTaskbarStyleStamp;
+        private bool _windhawkTaskbarStyleInitialized;
+
+        private readonly record struct WindhawkTaskbarStyleStamp(
+            bool ModExists,
+            bool Enabled,
+            long? SettingsChangeTime);
 
         #region P/Invoke
 
@@ -224,8 +238,13 @@ namespace Task_Flyout
             var windowId = Win32Interop.GetWindowIdFromWindow(hWnd);
             _appWindow = AppWindow.GetFromWindowId(windowId);
 
+            // WinUI assigns a default top-level rectangle before the weather bar is
+            // reparented. Hide it immediately so that rectangle can never flash as a
+            // white box near the desktop edge during startup or Explorer recovery.
+            ShowWindow(hWnd, SW_HIDE);
             ConfigureBarStyle(hWnd);
             InstallSubclass(hWnd);
+            RefreshTaskbarStyleProfile(force: true);
             // Replace WinUI's default opaque-black window background with a fully
             // transparent backdrop so the taskbar material shows through the bar.
             SystemBackdrop = new TransparentBackdrop();
@@ -279,10 +298,7 @@ namespace Task_Flyout
 
         private void RootGrid_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            double radius = Math.Max(0, e.NewSize.Height * 0.18);
-            var cornerRadius = new CornerRadius(radius);
-            MainBorder.CornerRadius = cornerRadius;
-            TopBorder.CornerRadius = cornerRadius;
+            ApplyTaskbarStyleCornerRadius(e.NewSize.Height);
         }
 
         private void QueueBarWidthRecompute()
@@ -309,6 +325,12 @@ namespace Task_Flyout
         {
             try
             {
+                if (Volatile.Read(ref _detached) != 0)
+                {
+                    _reparentTimer.Stop();
+                    return;
+                }
+
                 if (_userHidden)
                 {
                     _reparentTimer.Stop();
@@ -317,6 +339,8 @@ namespace Task_Flyout
 
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
+
+                RefreshTaskbarStyleProfile(force: false);
 
                 IntPtr currentTaskbar = FindTaskbarWindow();
                 if (currentTaskbar == IntPtr.Zero || !IsWindow(currentTaskbar))
@@ -337,7 +361,7 @@ namespace Task_Flyout
                 RefreshThemeIfTaskbarThemeChanged();
 
                 if (!_layoutSuppressed && (needsAttach || !IsWindowVisible(hWnd)) && IsWindow(hWnd))
-                    _appWindow.Show(activateWindow: false);
+                    ShowWindow(hWnd, SW_SHOWNOACTIVATE);
 
                 // Keep polling after parenting: taskbar widgets and FluentFlyout media
                 // controls can appear or disappear without changing our parent HWND.
@@ -524,39 +548,70 @@ namespace Task_Flyout
 
             IntPtr previousFluentFlyout = _fluentFlyoutHwnd;
             TaskbarWidgetGeometry widgets = GetTaskbarWidgetGeometry(hWnd, tbRect, scaleFactor);
+            int gap = (int)Math.Ceiling(6 * scaleFactor);
+            WeatherBarTaskbarSlot themedSlot = WeatherBarTaskbarStylePolicy.GetSlot(
+                _taskbarStyleProfile,
+                taskbarWidth,
+                taskbarHeight,
+                scaleFactor);
+            themedSlot = WeatherBarTaskbarStylePolicy.ConstrainThemedSlot(
+                themedSlot,
+                taskbarWidth,
+                taskbarHeight,
+                widgets.OccupiedOffset,
+                widgets.RightBoundary,
+                gap);
             int pillHeight = ResponsiveLayoutPolicy.GetWeatherBarPhysicalHeight(
                 widgets.NativeWidgetHeight,
                 taskbarHeight);
+            if (themedSlot.IsThemed)
+                pillHeight = Math.Min(pillHeight, themedSlot.Height);
             if (previousFluentFlyout != _fluentFlyoutHwnd)
                 UseFastReparentPolling();
 
-            int gap = (int)Math.Ceiling(6 * scaleFactor);
             int obstacleClearance = (int)Math.Ceiling(TaskbarObstacleClearance * scaleFactor);
             int x = widgets.OccupiedOffset + (widgets.OccupiedOffset > 0 ? gap : 0);
             int rightBoundary = widgets.RightBoundary > 0 ? widgets.RightBoundary : tbClient.Right;
-            int availablePhysicalWidth = (int)Math.Floor(WeatherBarLayoutPolicy.GetAvailableWidth(
-                taskbarWidth,
-                widgets.OccupiedOffset,
-                rightBoundary,
-                gap,
-                obstacleClearance));
-            double taskbarLogicalWidth = taskbarWidth / scaleFactor;
-            double maximumLogicalWidth = Math.Min(
-                ResponsiveLayoutPolicy.GetWeatherBarMaximumWidth(taskbarLogicalWidth),
-                availablePhysicalWidth / scaleFactor);
+            int availablePhysicalWidth;
+            if (themedSlot.IsThemed)
+            {
+                x = themedSlot.Left;
+                rightBoundary = themedSlot.Right;
+                availablePhysicalWidth = themedSlot.Width;
+            }
+            else
+            {
+                availablePhysicalWidth = (int)Math.Floor(WeatherBarLayoutPolicy.GetAvailableWidth(
+                    taskbarWidth,
+                    widgets.OccupiedOffset,
+                    rightBoundary,
+                    gap,
+                    obstacleClearance));
+            }
+
+            double taskbarLogicalWidth = (themedSlot.IsThemed ? themedSlot.Width : taskbarWidth) / scaleFactor;
+            double maximumLogicalWidth = themedSlot.IsThemed
+                ? availablePhysicalWidth / scaleFactor
+                : Math.Min(
+                    ResponsiveLayoutPolicy.GetWeatherBarMaximumWidth(taskbarLogicalWidth),
+                    availablePhysicalWidth / scaleFactor);
             var layout = ApplyLayoutPlan(maximumLogicalWidth);
             if (!layout.ShouldShow)
             {
                 _layoutSuppressed = true;
                 ShowWindow(hWnd, SW_HIDE);
                 widgets = widgets with { FallbackReason = "No unobstructed taskbar space" };
-                UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets);
+                UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets, themedSlot);
                 return true;
             }
 
             _layoutSuppressed = false;
-            int pillWidth = Math.Min(availablePhysicalWidth, (int)Math.Ceiling(layout.Width * scaleFactor));
-            int y = (taskbarHeight - pillHeight) / 2;
+            int pillWidth = themedSlot.IsThemed
+                ? availablePhysicalWidth
+                : Math.Min(availablePhysicalWidth, (int)Math.Ceiling(layout.Width * scaleFactor));
+            int y = themedSlot.IsThemed
+                ? themedSlot.Top + (themedSlot.Height - pillHeight) / 2
+                : (taskbarHeight - pillHeight) / 2;
 
                 // If FluentFlyout is detected, place ourselves behind it (lower z-order) to avoid overlap
                 IntPtr insertAfter = _fluentFlyoutHwnd != IntPtr.Zero ? _fluentFlyoutHwnd : IntPtr.Zero;
@@ -594,12 +649,12 @@ namespace Task_Flyout
                     {
                         widgets = widgets with { FallbackReason = "SetWindowPos failed" };
                         ResetCachedWindowPlacement();
-                        UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets);
+                        UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets, themedSlot);
                         return false;
                     }
                 }
 
-                UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets);
+                UpdateDiagnostics(hWnd, tbRect, scaleFactor, widgets, themedSlot);
                 return true;
             }
             catch
@@ -643,13 +698,18 @@ namespace Task_Flyout
 
         public void ForceReattach()
         {
-            if (_userHidden) return;
+            if (_userHidden || Volatile.Read(ref _detached) != 0) return;
             InvalidateTaskbarAttachment("Manual reattach requested");
             UseFastReparentPolling();
             ReparentTimer_Tick(null, EventArgs.Empty);
         }
 
-        private void UpdateDiagnostics(IntPtr barHwnd, RECT taskbarRect, double scaleFactor, TaskbarWidgetGeometry widgets)
+        private void UpdateDiagnostics(
+            IntPtr barHwnd,
+            RECT taskbarRect,
+            double scaleFactor,
+            TaskbarWidgetGeometry widgets,
+            WeatherBarTaskbarSlot themedSlot)
         {
             string monitorRect = "Unavailable";
             IntPtr monitor = MonitorFromWindow(_taskbarHwnd, MONITOR_DEFAULTTONEAREST);
@@ -660,6 +720,12 @@ namespace Task_Flyout
             string barRect = GetWindowRect(barHwnd, out RECT currentBarRect)
                 ? FormatRect(currentBarRect)
                 : "Unavailable";
+            string taskbarSurface = themedSlot.IsThemed
+                ? "Windhawk Luminosity Dock"
+                : "Native taskbar";
+            string surfaceSlot = themedSlot.IsThemed
+                ? $"({themedSlot.Left}, {themedSlot.Top}) {themedSlot.Width}x{themedSlot.Height}"
+                : "Native bounds";
             _diagnostics = new WeatherBarDiagnostics(
                 GetWindowClassName(_taskbarHwnd),
                 widgets.DetectionSource,
@@ -667,6 +733,8 @@ namespace Task_Flyout
                 (uint)Math.Round(scaleFactor * 96),
                 FormatRect(taskbarRect),
                 barRect,
+                taskbarSurface,
+                surfaceSlot,
                 widgets.FallbackReason);
         }
 
@@ -949,11 +1017,14 @@ namespace Task_Flyout
         private DateTime _lastThemeApplyUtc = DateTime.MinValue;
         private bool _glassBrushCacheValid;
         private bool _glassBrushCacheLightTheme;
+        private bool _glassBrushCacheMatchesTaskbarSurface;
         private SolidColorBrush? _glassTransparentBrush;
         private Brush? _glassRestBrush;
         private Brush? _glassHoverBrush;
         private Brush? _glassRestHighlightBrush;
         private Brush? _glassHoverHighlightBrush;
+        private Brush? _glassRestBorderBrush;
+        private Brush? _glassHoverBorderBrush;
         private const int WeatherBarIconDecodePixelWidth = 48;
         private const int MaxWeatherBarIconImageCacheSize = 32;
         private static readonly TimeSpan MinThemeApplyInterval = TimeSpan.FromMilliseconds(250);
@@ -1058,6 +1129,110 @@ namespace Task_Flyout
             catch (Exception ex) { Debug.WriteLine($"Reading Windows light theme failed: {ex.Message}"); }
 
             return false;
+        }
+
+        private void RefreshTaskbarStyleProfile(bool force)
+        {
+            if (!TryReadWindhawkTaskbarStyle(out WindhawkTaskbarStyleStamp stamp, out WeatherBarTaskbarStyleProfile profile))
+                return;
+
+            if (!force &&
+                _windhawkTaskbarStyleInitialized &&
+                stamp == _lastWindhawkTaskbarStyleStamp &&
+                profile == _taskbarStyleProfile)
+            {
+                return;
+            }
+
+            _windhawkTaskbarStyleInitialized = true;
+            _lastWindhawkTaskbarStyleStamp = stamp;
+            if (profile == _taskbarStyleProfile)
+                return;
+
+            _taskbarStyleProfile = profile;
+            ResetCachedWindowPlacement();
+            InvalidateGlassBrushCache();
+            ApplyTaskbarStyleCornerRadius(RootGrid.ActualHeight);
+            ApplyGlassBrushes();
+        }
+
+        private static bool TryReadWindhawkTaskbarStyle(
+            out WindhawkTaskbarStyleStamp stamp,
+            out WeatherBarTaskbarStyleProfile profile)
+        {
+            stamp = default;
+            profile = WeatherBarTaskbarStyleProfile.SystemDefault;
+
+            // Windhawk is normally installed as a 64-bit machine-wide mod, but a
+            // portable/older installation can leave the same settings in the 32-bit
+            // view. Probe the 64-bit view first (the packaged app is x64), then the
+            // 32-bit view, while keeping a missing key a normal native-fallback case.
+            bool sawExistingKey = false;
+            foreach (RegistryView view in WindhawkRegistryViews)
+            {
+                try
+                {
+                    using RegistryKey baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
+                    using RegistryKey? key = baseKey.OpenSubKey(WindhawkTaskbarModRegistryPath);
+                    if (key == null)
+                        continue;
+                    sawExistingKey = true;
+
+                    bool enabled = ReadRegistryInt64(key.GetValue("Disabled")) == 0;
+                    long? changeTime = ReadRegistryInt64(key.GetValue("SettingsChangeTime"));
+                    stamp = new WindhawkTaskbarStyleStamp(true, enabled, changeTime);
+                    if (!enabled)
+                        return true;
+
+                    using RegistryKey? settings = baseKey.OpenSubKey(
+                        $@"{WindhawkTaskbarModRegistryPath}\Settings");
+                    if (settings == null)
+                        return true;
+
+                    string? theme = settings.GetValue("theme") as string;
+                    var styleConstants = new List<string?>();
+                    for (int index = 0; index < 256; index++)
+                    {
+                        string? value = settings.GetValue($"styleConstants[{index}]")?.ToString();
+                        if (string.IsNullOrEmpty(value)) break;
+                        styleConstants.Add(value);
+                    }
+
+                    profile = WeatherBarTaskbarStylePolicy.Resolve(enabled, theme, styleConstants);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Reading Windhawk taskbar style profile ({view}) failed: {ex.Message}");
+                    if (sawExistingKey)
+                        break;
+                }
+            }
+
+            // If the key is temporarily locked or inaccessible, do not retain an old
+            // themed profile and continue positioning against stale Dock geometry.
+            // Returning the native profile is the same safe behavior as an absent or
+            // disabled mod and will be retried by the normal reparent timer.
+            stamp = default;
+            profile = WeatherBarTaskbarStyleProfile.SystemDefault;
+            return true;
+        }
+
+        private static long? ReadRegistryInt64(object? value)
+        {
+            if (value == null) return null;
+            try { return Convert.ToInt64(value); }
+            catch (Exception) { return null; }
+        }
+
+        private void ApplyTaskbarStyleCornerRadius(double currentHeight)
+        {
+            double radius = _taskbarStyleProfile.MatchesTaskbarSurface
+                ? _taskbarStyleProfile.CornerRadius
+                : Math.Max(0, currentHeight * 0.18);
+            var cornerRadius = new CornerRadius(radius);
+            MainBorder.CornerRadius = cornerRadius;
+            TopBorder.CornerRadius = cornerRadius;
         }
 
         private static int? TryReadThemeRegistryInt(string subKeyPath, string valueName)
@@ -1284,7 +1459,12 @@ namespace Task_Flyout
 
             if (topBorder != null)
             {
-                topBorder.BorderBrush = _glassTransparentBrush;
+                topBorder.BorderThickness = _taskbarStyleProfile.MatchesTaskbarSurface
+                    ? new Thickness(1)
+                    : new Thickness(0);
+                topBorder.BorderBrush = _taskbarStyleProfile.MatchesTaskbarSurface
+                    ? _glassRestBorderBrush
+                    : _glassTransparentBrush;
                 topBorder.Background = _glassRestHighlightBrush;
             }
         }
@@ -1408,15 +1588,20 @@ namespace Task_Flyout
 
         private void EnsureGlassBrushCache()
         {
-            if (_glassBrushCacheValid && _glassBrushCacheLightTheme == _isLightTheme)
+            if (_glassBrushCacheValid &&
+                _glassBrushCacheLightTheme == _isLightTheme &&
+                _glassBrushCacheMatchesTaskbarSurface == _taskbarStyleProfile.MatchesTaskbarSurface)
                 return;
 
             _glassBrushCacheLightTheme = _isLightTheme;
+            _glassBrushCacheMatchesTaskbarSurface = _taskbarStyleProfile.MatchesTaskbarSurface;
             _glassTransparentBrush = new SolidColorBrush(Colors.Transparent);
             _glassRestBrush = CreateGlassMaterialBrush(isHovering: false);
             _glassHoverBrush = CreateGlassMaterialBrush(isHovering: true);
             _glassRestHighlightBrush = CreateGlassHighlightBrush(isHovering: false);
             _glassHoverHighlightBrush = CreateGlassHighlightBrush(isHovering: true);
+            _glassRestBorderBrush = CreateGlassBorderBrush(isHovering: false);
+            _glassHoverBorderBrush = CreateGlassBorderBrush(isHovering: true);
             _glassBrushCacheValid = true;
         }
 
@@ -1428,10 +1613,22 @@ namespace Task_Flyout
             _glassHoverBrush = null;
             _glassRestHighlightBrush = null;
             _glassHoverHighlightBrush = null;
+            _glassRestBorderBrush = null;
+            _glassHoverBorderBrush = null;
         }
 
         private Brush CreateGlassMaterialBrush(bool isHovering)
         {
+            if (_taskbarStyleProfile.MatchesTaskbarSurface)
+            {
+                // The left reserve sits outside TaskbarFrame's Windhawk blur surface.
+                // Give it a small translucent fill of its own instead of leaving a
+                // transparent child window over the desktop (or exposing a white host).
+                return new SolidColorBrush(_isLightTheme
+                    ? Color.FromArgb(isHovering ? (byte)64 : (byte)40, 255, 255, 255)
+                    : Color.FromArgb(isHovering ? (byte)58 : (byte)36, 20, 24, 30));
+            }
+
             // The window backdrop is fully transparent, so the pill is only a faint
             // translucent veil with the signature cyan/violet/amber tint drift —
             // the real taskbar material shines through instead of an opaque imitation.
@@ -1468,6 +1665,9 @@ namespace Task_Flyout
 
         private Brush CreateGlassHighlightBrush(bool isHovering)
         {
+            if (_taskbarStyleProfile.MatchesTaskbarSurface)
+                return new SolidColorBrush(Colors.Transparent);
+
             // Dark mode: no top sheen at rest. That bright top rim is what made the pill
             // look like a glossy, raised button; drop it so the bar sits flush, and let only
             // a whisper return on hover. Light mode keeps its gentle sheen (it blends well).
@@ -1490,6 +1690,17 @@ namespace Task_Flyout
             return brush;
         }
 
+        private Brush CreateGlassBorderBrush(bool isHovering)
+        {
+            if (!_taskbarStyleProfile.MatchesTaskbarSurface)
+                return new SolidColorBrush(Colors.Transparent);
+
+            byte alpha = _isLightTheme
+                ? (isHovering ? (byte)88 : (byte)56)
+                : (isHovering ? (byte)72 : (byte)44);
+            return new SolidColorBrush(Color.FromArgb(alpha, 255, 255, 255));
+        }
+
         private void MainBorder_PointerEntered(object sender, PointerRoutedEventArgs e)
         {
             var button = sender as Microsoft.UI.Xaml.Controls.Button;
@@ -1503,7 +1714,9 @@ namespace Task_Flyout
 
             if (topBorder != null)
             {
-                topBorder.BorderBrush = _glassTransparentBrush;
+                topBorder.BorderBrush = _taskbarStyleProfile.MatchesTaskbarSurface
+                    ? _glassHoverBorderBrush
+                    : _glassTransparentBrush;
                 topBorder.Background = _glassHoverHighlightBrush;
             }
         }
@@ -1523,7 +1736,9 @@ namespace Task_Flyout
 
             if (topBorder != null)
             {
-                topBorder.BorderBrush = _glassTransparentBrush;
+                topBorder.BorderBrush = _taskbarStyleProfile.MatchesTaskbarSurface
+                    ? _glassRestBorderBrush
+                    : _glassTransparentBrush;
                 topBorder.Background = _glassRestHighlightBrush;
             }
         }
@@ -1533,8 +1748,10 @@ namespace Task_Flyout
 
         public async Task RefreshWeatherAsync(bool forceRefresh = false)
         {
+            if (Volatile.Read(ref _detached) != 0 || !IsAlive()) return;
+
             var cts = ReplaceWeatherRefreshCancellation();
-            long generation = _weatherRefreshGeneration;
+            long generation = Interlocked.Read(ref _weatherRefreshGeneration);
             try
             {
                 await RefreshWeatherCoreAsync(forceRefresh, cts.Token, generation);
@@ -1558,7 +1775,7 @@ namespace Task_Flyout
             {
                 DispatcherQueue.TryEnqueue(() =>
                 {
-                    if (generation != _weatherRefreshGeneration || _userHidden) return;
+                    if (!CanApplyWeatherRefresh(generation)) return;
                     _barAlertActive = false;
                     _activeAlert = null;
                     _activeWeatherInfo = null;
@@ -1586,14 +1803,16 @@ namespace Task_Flyout
             }
 
             var info = await weatherService.GetWeatherAsync(forceRefresh, cancellationToken);
-            if (generation != _weatherRefreshGeneration) return;
+            if (generation != Interlocked.Read(ref _weatherRefreshGeneration) ||
+                Volatile.Read(ref _detached) != 0)
+                return;
             var alert = (info != null && weatherService.BarAlertsEnabled)
                 ? weatherService.DetectUpcomingAlert(info)
                 : null;
 
             DispatcherQueue.TryEnqueue(() =>
             {
-                if (generation != _weatherRefreshGeneration || _userHidden) return;
+                if (!CanApplyWeatherRefresh(generation)) return;
                 if (info == null)
                 {
                     _barAlertActive = false;
@@ -1674,7 +1893,7 @@ namespace Task_Flyout
                 {
                     NextRenderHelper.RunOnce(() =>
                     {
-                        if (generation != _weatherRefreshGeneration || !_requestIcon || !_layoutShowsIcon) return;
+                        if (!CanApplyWeatherRefresh(generation) || !_requestIcon || !_layoutShowsIcon) return;
                         WeatherIconHost.Visibility = Visibility.Visible;
                         if (useBitmap)
                             ApplyWeatherIconLayerImages(displayLayers!, layerImages);
@@ -1733,9 +1952,18 @@ namespace Task_Flyout
                 QueueBarWidthRecompute();
                 UpdateWeatherIconGlow();
                 NextRenderHelper.RunOnce(() =>
-                    PerformanceDiagnostics.MarkOnce("weatherbar.display", "weather_bar", "first_weather_display", source: "ui"));
+                {
+                    if (!CanApplyWeatherRefresh(generation)) return;
+                    PerformanceDiagnostics.MarkOnce("weatherbar.display", "weather_bar", "first_weather_display", source: "ui");
+                });
             });
         }
+
+        private bool CanApplyWeatherRefresh(long generation)
+            => generation == Interlocked.Read(ref _weatherRefreshGeneration) &&
+               Volatile.Read(ref _detached) == 0 &&
+               !_userHidden &&
+               IsAlive();
 
         private CancellationTokenSource ReplaceWeatherRefreshCancellation()
         {
@@ -2020,10 +2248,34 @@ namespace Task_Flyout
         }
 
         /// <summary>
+        /// Returns true only when this native window belongs to the currently active taskbar.
+        /// A surviving HWND alone is not sufficient after Explorer recreates the shell.
+        /// </summary>
+        public bool IsAttachedToCurrentTaskbar()
+        {
+            try
+            {
+                IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                if (hWnd == IntPtr.Zero || !IsWindow(hWnd) || !_isParented)
+                    return false;
+
+                IntPtr currentTaskbar = FindTaskbarWindow();
+                return currentTaskbar != IntPtr.Zero &&
+                       IsWindow(currentTaskbar) &&
+                       _taskbarHwnd == currentTaskbar &&
+                       GetParent(hWnd) == currentTaskbar;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Tear down a bar whose native window Explorer already destroyed so its timers stop
         /// keeping the object alive, allowing the App to replace it with a fresh window.
         /// </summary>
-        public void DetachForRecovery()
+        public bool DetachForRecovery()
         {
             Interlocked.Exchange(ref _detached, 1);
             CancelWeatherRefresh();
@@ -2036,9 +2288,16 @@ namespace Task_Flyout
             try
             {
                 if (IsAlive())
+                {
+                    IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                    if (hWnd != IntPtr.Zero && IsWindow(hWnd))
+                        ShowWindow(hWnd, SW_HIDE);
                     Close();
+                }
             }
             catch { }
+
+            return !IsAlive();
         }
 
         public void ShowBar()
@@ -2048,6 +2307,8 @@ namespace Task_Flyout
                 _userHidden = false;
                 IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
+
+                RefreshTaskbarStyleProfile(force: true);
 
                 // Never expose the default top-level WinUI geometry. Explorer may not
                 // have created a usable taskbar yet during sign-in or after a restart.
@@ -2061,7 +2322,7 @@ namespace Task_Flyout
                 if (!_isParented && !AttachToTaskbar()) return;
 
                 if (PositionOnTaskbar(showWindow: false) && !_layoutSuppressed && IsWindow(hWnd))
-                    _appWindow.Show(activateWindow: false);
+                    ShowWindow(hWnd, SW_SHOWNOACTIVATE);
             }
             catch
             {

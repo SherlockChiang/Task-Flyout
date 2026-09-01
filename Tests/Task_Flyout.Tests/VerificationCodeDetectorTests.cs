@@ -30,6 +30,18 @@ public class VerificationCodeDetectorTests
     }
 
     [Fact]
+    public void Extracts_traditional_chinese_otp()
+    {
+        bool ok = VerificationCodeDetector.TryExtract(
+            "登入驗證碼",
+            "您的登入驗證碼是 482731，請勿將一次性密碼提供給他人。",
+            out var code);
+
+        Assert.True(ok);
+        Assert.Equal("482731", code);
+    }
+
+    [Fact]
     public void Extracts_english_code()
     {
         Assert.True(VerificationCodeDetector.TryExtract("Sign-in code", "Your verification code is 123456.", out var code));

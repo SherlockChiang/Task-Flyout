@@ -89,13 +89,27 @@ namespace Task_Flyout.Services
                             var existing = account.Calendars.FirstOrDefault(c => c.Id == rCal.Id);
                             if (existing == null)
                             {
-                                account.Calendars.Add(new SubscribedCalendarInfo { Id = rCal.Id, Name = rCal.Name, IsVisible = true });
+                                account.Calendars.Add(new SubscribedCalendarInfo
+                                {
+                                    Id = rCal.Id,
+                                    Name = rCal.Name,
+                                    ColorHex = rCal.ColorHex,
+                                    IsVisible = true
+                                });
                                 changed = true;
                             }
-                            else if (existing.Name != rCal.Name)
+                            else
                             {
-                                existing.Name = rCal.Name;
-                                changed = true;
+                                if (existing.Name != rCal.Name)
+                                {
+                                    existing.Name = rCal.Name;
+                                    changed = true;
+                                }
+                                if (string.IsNullOrWhiteSpace(existing.ColorHex) && !string.IsNullOrWhiteSpace(rCal.ColorHex))
+                                {
+                                    existing.ColorHex = rCal.ColorHex;
+                                    changed = true;
+                                }
                             }
                         }
 
@@ -137,21 +151,36 @@ namespace Task_Flyout.Services
         public VersionedDayItemsSnapshot GetVersionedDayItemsSnapshot(IEnumerable<string> dateKeys)
         {
             EnsureCacheLoaded();
-            var keys = dateKeys
-                .Where(key => !string.IsNullOrWhiteSpace(key))
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-
             var published = Volatile.Read(ref _publishedCache);
-            var cache = published.Cache;
-            var result = new Dictionary<string, List<AgendaItem>>(StringComparer.Ordinal);
-            foreach (var key in keys)
-            {
-                if (cache.DayItems.TryGetValue(key, out var items))
-                    result[key] = items.Select(CloneAgendaItem).ToList();
-            }
+            return CreateDayItemsSnapshotIfChanged(
+                published,
+                long.MinValue,
+                dateKeys)!;
+        }
 
-            return new VersionedDayItemsSnapshot(published.Version, result);
+        public VersionedDayItemsSnapshot? GetVersionedDayItemsSnapshotIfChanged(
+            long knownVersion,
+            IEnumerable<string> dateKeys)
+        {
+            EnsureCacheLoaded();
+            var published = Volatile.Read(ref _publishedCache);
+            return CreateDayItemsSnapshotIfChanged(published, knownVersion, dateKeys);
+        }
+
+        private static VersionedDayItemsSnapshot? CreateDayItemsSnapshotIfChanged(
+            PublishedCacheSnapshot published,
+            long knownVersion,
+            IEnumerable<string> dateKeys)
+        {
+            var slice = VersionedBucketSlicePolicy.CreateIfChanged(
+                knownVersion,
+                published.Version,
+                published.Cache.DayItems,
+                dateKeys,
+                CloneAgendaItem);
+            return slice == null
+                ? null
+                : new VersionedDayItemsSnapshot(slice.Version, slice.Buckets);
         }
 
         public AppCache GetRangeCacheSnapshot(DateTime min, DateTime max, bool tasksOnly = false)
@@ -489,6 +518,8 @@ namespace Task_Flyout.Services
                     await google.ClearLocalAuthorizationAsync();
                 else if (provider is MicrosoftSyncProvider microsoft)
                     await microsoft.ClearLocalAuthorizationAsync();
+                else if (provider is ICloudSyncProvider iCloud)
+                    await iCloud.ClearLocalAuthorizationAsync();
             }
             catch (Exception ex)
             {

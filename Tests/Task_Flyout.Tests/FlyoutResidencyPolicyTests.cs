@@ -1,0 +1,68 @@
+using Task_Flyout.Services;
+
+namespace Task_Flyout.Tests;
+
+public class FlyoutResidencyPolicyTests
+{
+    [Fact]
+    public void Explicit_prewarm_runs_when_memory_has_headroom()
+        => Assert.True(FlyoutResidencyPolicy.ShouldPrewarm(
+            configured: true,
+            underMemoryPressure: false,
+            currentUsageBytes: 320L * 1024 * 1024,
+            usageLimitBytes: 4L * 1024 * 1024 * 1024));
+
+    [Theory]
+    [InlineData(false, false, 320L, 4096L)]
+    [InlineData(null, false, 320L, 4096L)]
+    [InlineData(null, true, 320L, 4096L)]
+    [InlineData(null, false, 700L, 4096L)]
+    [InlineData(true, false, 500L, 1000L)]
+    public void Avoids_prewarm_when_disabled_or_memory_is_constrained(
+        bool? configured,
+        bool underMemoryPressure,
+        long usageMb,
+        long limitMb)
+        => Assert.False(FlyoutResidencyPolicy.ShouldPrewarm(
+            configured,
+            underMemoryPressure,
+            usageMb * 1024 * 1024,
+            limitMb * 1024 * 1024));
+
+    [Theory]
+    [InlineData(-1L, 4096L)]
+    [InlineData(320L, 0L)]
+    [InlineData(1200L, 1000L)]
+    public void Invalid_memory_readings_fail_closed(long usageMb, long limitMb)
+        => Assert.False(FlyoutResidencyPolicy.ShouldPrewarm(
+            configured: true,
+            underMemoryPressure: false,
+            usageMb * 1024 * 1024,
+            limitMb * 1024 * 1024));
+
+    [Theory]
+    [InlineData(false, 60, true)]
+    [InlineData(false, 59, false)]
+    [InlineData(true, 60, false)]
+    [InlineData(false, -1, false)]
+    public void Background_refresh_respects_queue_state_and_cooldown(
+        bool queued,
+        int elapsedSeconds,
+        bool expected)
+        => Assert.Equal(
+            expected,
+            FlyoutResidencyPolicy.ShouldQueueBackgroundRefresh(
+                queued,
+                TimeSpan.FromSeconds(elapsedSeconds),
+                TimeSpan.FromMinutes(1)));
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void Memory_cache_trim_only_runs_while_hidden(
+        bool isVisibleOrOpening,
+        bool expected)
+        => Assert.Equal(
+            expected,
+            FlyoutResidencyPolicy.ShouldTrimMemoryCaches(isVisibleOrOpening));
+}

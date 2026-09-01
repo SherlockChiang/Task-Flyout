@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 
 namespace Task_Flyout.Models
 {
@@ -56,19 +57,30 @@ namespace Task_Flyout.Models
         public ObservableCollection<SubscribedCalendarInfo> Calendars { get; set; } = new();
 
         // Display helpers (not serialized, computed at runtime)
+        [JsonIgnore]
         public string IconGlyph => ProviderName switch
         {
             "Google" => "\uE77B",
             "Microsoft" => "\uE77B",
+            "iCloud" => "\uE787",
             _ => "\uE77B"
         };
 
+        [JsonIgnore]
         public string IconColor => ProviderName switch
         {
             "Google" => "#EA4335",
             "Microsoft" => "#0078D4",
+            "iCloud" => "#6E6E73",
             _ => "#888888"
         };
+
+        [JsonIgnore]
+        public bool SupportsTasks
+            => Task_Flyout.Services.SyncProviderCapabilityPolicy.ForProvider(ProviderName).SupportsTasks;
+        [JsonIgnore]
+        public Microsoft.UI.Xaml.Visibility TaskSettingsVisibility
+            => SupportsTasks ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? name = null)

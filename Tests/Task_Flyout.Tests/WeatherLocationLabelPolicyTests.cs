@@ -36,4 +36,23 @@ public class WeatherLocationLabelPolicyTests
     [InlineData("Very Long Administrative Area · Long Specific Locality", "Long Specific Loc…")]
     public void Weather_bar_keeps_only_the_most_specific_location_part(string location, string expected)
         => Assert.Equal(expected, WeatherLocationLabelPolicy.FormatForWeatherBar(location));
+
+    [Theory]
+    [InlineData("余杭区 · 仓前街道", "杭州市", "当前位置", "余杭区 · 仓前街道")]
+    [InlineData("", "浙江省 · 杭州市", "当前位置", "浙江省 · 杭州市")]
+    [InlineData("", "", "西湖区 · 古荡街道", "西湖区 · 古荡街道")]
+    [InlineData("当前位置", "", "西湖区 · 古荡街道", "西湖区 · 古荡街道")]
+    [InlineData("目前位置", "", "", "目前位置")]
+    public void Location_resolution_prefers_specific_labels(
+        string reverseGeocoded,
+        string civicAddress,
+        string previousLabel,
+        string expected)
+        => Assert.Equal(
+            expected,
+            WeatherLocationLabelPolicy.ChooseSpecificLabel(
+                reverseGeocoded,
+                civicAddress,
+                previousLabel,
+                "Current location"));
 }

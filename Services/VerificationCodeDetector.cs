@@ -17,6 +17,7 @@ namespace Task_Flyout.Services
         // Chinese + English cues commonly used by OTP / 2FA messages.
         private static readonly Regex KeywordRegex = new(
             "验证码|校验码|安全代码|安全码|动态密码|动态码|确认码|验证代码|一次性密码|短信码|" +
+            "驗證碼|校驗碼|安全代碼|動態密碼|動態碼|確認碼|驗證代碼|一次性密碼|簡訊碼|" +
             @"verification|security code|one[\- ]?time|passcode|\bOTP\b|\bcode\b|2FA|two[\- ]?factor",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 

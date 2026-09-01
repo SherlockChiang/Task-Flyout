@@ -3525,29 +3525,32 @@ namespace Task_Flyout.Services
                     var key = GetMessageCacheKey(accountId, folderId, unreadOnly);
                     List<MailItem> existing;
                     if (_persistentCache.Messages.TryGetValue(key, out var cached))
+                    {
                         existing = StripBodies(cached);
+                    }
                     else if (_messageCache.TryGetValue(key, out var memoryEntry))
+                    {
                         existing = StripBodies(memoryEntry.Value);
+                    }
+                    else if (unreadOnly)
+                    {
+                        // Keep a bounded unread slice for notification targets even
+                        // when Mail has never been opened. Do not create a partial
+                        // all-mail window: that would hide older messages on a later
+                        // normal folder visit.
+                        existing = new List<MailItem>();
+                    }
                     else
                         continue;
 
-                    int retainedCount = existing.Count;
+                    var merged = MailNotificationNavigationPolicy.MergePolledMessages(
+                        existing,
+                        strippedNewMessages,
+                        unreadOnly,
+                        MaxPageSize);
+                    if (merged.Count == 0) continue;
 
-                    foreach (var message in strippedNewMessages)
-                    {
-                        if (unreadOnly && message.IsRead) continue;
-                        bool isNew = existing.All(item => item.Id != message.Id);
-                        existing.RemoveAll(item => item.Id == message.Id);
-                        existing.Add(CloneMailItem(message, includeBodies: false));
-                        if (isNew)
-                            retainedCount = Math.Min(retainedCount + 1, MaxPageSize);
-                    }
-
-                    _persistentCache.Messages[key] = existing
-                        .OrderByDescending(item => item.RawReceivedTime)
-                        .Take(retainedCount)
-                        .ToList();
-
+                    _persistentCache.Messages[key] = StripBodies(merged);
                     _messageCache[key] = new CacheEntry<List<MailItem>> { Value = StripBodies(_persistentCache.Messages[key]) };
                     changed = true;
                 }
@@ -3563,19 +3566,56 @@ namespace Task_Flyout.Services
             lock (_mailCacheLock)
             {
 
-            foreach (var pair in _messageCache.Concat(_persistentCache?.Messages.ToDictionary(
-                         entry => entry.Key,
-                         entry => new CacheEntry<List<MailItem>> { Value = entry.Value }) ?? new Dictionary<string, CacheEntry<List<MailItem>>>()))
-            {
-                var item = pair.Value.Value.FirstOrDefault(message =>
-                    message.AccountId == accountId &&
-                    message.FolderId == folderId &&
-                    message.Id == messageId);
-                if (item != null) return CloneMailItem(item, includeBodies: false);
-            }
+                foreach (var messages in EnumerateCachedMessagesLocked())
+                {
+                    var item = messages.FirstOrDefault(message =>
+                        MailNotificationNavigationPolicy.MessageMatches(
+                            message, accountId, folderId, messageId));
+                    if (item != null) return CloneMailItem(item, includeBodies: false);
+                }
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Finds a cached Gmail/Outlook message by its stable provider identity
+        /// when the folder/label in the toast is stale (for example, after a move).
+        /// IMAP UIDs are deliberately excluded because they are scoped to a folder.
+        /// </summary>
+        public MailItem? TryGetCachedMessageById(string accountId, string messageId)
+        {
+            if (string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(messageId))
+                return null;
+
+            EnsureAccountsLoaded();
+            var account = _accounts.FirstOrDefault(candidate =>
+                string.Equals(candidate.Id, accountId, StringComparison.Ordinal));
+            if (account == null ||
+                !MailNotificationNavigationPolicy.CanUseCrossFolderIdentity(account.Kind))
+                return null;
+
+            EnsurePersistentCacheLoaded();
+            lock (_mailCacheLock)
+            {
+                var item = EnumerateCachedMessagesLocked()
+                    .SelectMany(messages => messages)
+                    .Where(message => string.Equals(message.AccountId, accountId, StringComparison.Ordinal)
+                                   && string.Equals(message.Id, messageId, StringComparison.Ordinal))
+                    .OrderByDescending(message => message.RawReceivedTime)
+                    .FirstOrDefault();
+                return item == null ? null : CloneMailItem(item, includeBodies: false);
+            }
+        }
+
+        private IEnumerable<List<MailItem>> EnumerateCachedMessagesLocked()
+        {
+            foreach (var entry in _messageCache.Values)
+                yield return entry.Value;
+
+            if (_persistentCache == null) yield break;
+            foreach (var entry in _persistentCache.Messages.Values)
+                yield return entry;
         }
 
         private static List<MailItem> CloneMailItems(IEnumerable<MailItem> messages, bool includeBodies)
@@ -3715,14 +3755,17 @@ namespace Task_Flyout.Services
             return name.StartsWith("CATEGORY_", StringComparison.OrdinalIgnoreCase) ||
                    name.StartsWith("[Imap]/", StringComparison.OrdinalIgnoreCase) ||
                    name.Contains("/", StringComparison.OrdinalIgnoreCase) ||
-                   name.Contains("同步问题", StringComparison.OrdinalIgnoreCase);
+                   name.Contains("同步问题", StringComparison.OrdinalIgnoreCase) ||
+                   name.Contains("同步問題", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsNoisyImapFolder(string id, string displayName)
         {
             return string.IsNullOrWhiteSpace(id) ||
                    id.Contains("同步问题", StringComparison.OrdinalIgnoreCase) ||
-                   displayName.Contains("同步问题", StringComparison.OrdinalIgnoreCase);
+                   displayName.Contains("同步问题", StringComparison.OrdinalIgnoreCase) ||
+                   id.Contains("同步問題", StringComparison.OrdinalIgnoreCase) ||
+                   displayName.Contains("同步問題", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string NormalizeFolderKey(string id, string displayName)
@@ -3854,7 +3897,8 @@ namespace Task_Flyout.Services
         private static bool IsInboxName(string value)
             => string.Equals(value, "INBOX", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(value, "Inbox", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(value, "收件箱", StringComparison.OrdinalIgnoreCase);
+               string.Equals(value, "收件箱", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, "收件匣", StringComparison.OrdinalIgnoreCase);
 
         private static string GetImapPassword(string accountId)
         {

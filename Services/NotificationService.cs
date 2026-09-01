@@ -78,8 +78,14 @@ namespace Task_Flyout.Services
             catch { }
         }
 
-        public void CheckUpcomingEvents()
+        public void CheckUpcomingEvents(bool forceCacheRefresh = false)
         {
+            if (forceCacheRefresh)
+            {
+                _cachedItems = null;
+                _cacheReadTime = DateTime.MinValue;
+            }
+
             if (!IsEnabled) return;
 
             try

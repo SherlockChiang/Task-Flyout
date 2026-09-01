@@ -57,12 +57,12 @@ namespace Task_Flyout.Services
                 var dataStore = new ProtectedGoogleDataStore();
                 await TryMigrateLegacyTokenStoreAsync(tokenPath, dataStore);
                 UserCredential credential = await AuthorizeAsync(dataStore, AllFeatureScopes, cancellationToken);
-                if (!HasScopes(GetGrantedScopes(credential.Token), AllFeatureScopes))
+                if (!ProviderAuthorizationScopePolicy.HasAllScopes(GetGrantedScopes(credential.Token), AllFeatureScopes))
                 {
                     await dataStore.ClearAsync();
                     credential = await AuthorizeAsync(dataStore, AllFeatureScopes, cancellationToken);
                 }
-                if (!HasScopes(GetGrantedScopes(credential.Token), AllFeatureScopes))
+                if (!ProviderAuthorizationScopePolicy.HasAllScopes(GetGrantedScopes(credential.Token), AllFeatureScopes))
                     throw new AuthorizationInteractionRequiredException(ProviderName, "Google did not grant all requested Task Flyout permissions.");
                 InitializeServices(credential);
             }
@@ -83,7 +83,7 @@ namespace Task_Flyout.Services
                 await TryMigrateLegacyTokenStoreAsync(ProviderAuthCleanup.GoogleLegacyTokenPath, dataStore);
                 var token = await dataStore.GetAsync<TokenResponse>("user");
                 if (token == null || string.IsNullOrWhiteSpace(token.RefreshToken)
-                    || !HasScopes(GetGrantedScopes(token), AllFeatureScopes))
+                    || !ProviderAuthorizationScopePolicy.HasAllScopes(GetGrantedScopes(token), AllFeatureScopes))
                     throw new AuthorizationInteractionRequiredException(ProviderName, "Google reconnect is required. Open account settings to reconnect explicitly.");
 
                 var credential = new UserCredential(CreateAuthorizationFlow(dataStore), "user", token);
@@ -97,6 +97,9 @@ namespace Task_Flyout.Services
 
         public async Task<GmailService> EnsureGmailAuthorizedAsync(bool requireModify = false, bool requireSend = false, CancellationToken cancellationToken = default)
         {
+            // gmail.modify already covers reading, composing, and sending. Every
+            // connected Google account requires that one Gmail scope, so all three
+            // mail capability paths restore the same protected credential silently.
             await EnsureAuthorizedAsync(cancellationToken);
             return GmailSvc!;
         }
@@ -147,12 +150,6 @@ namespace Task_Flyout.Services
             {
                 throw new Exception(_loader.GetStringOrDefault("TextCredNotFound") ?? "Credential file not found.");
             }
-        }
-
-        private static bool HasScopes(IEnumerable<string> grantedScopes, IEnumerable<string> requiredScopes)
-        {
-            var granted = grantedScopes.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            return requiredScopes.All(scope => granted.Contains(scope));
         }
 
         private static async Task TryMigrateLegacyTokenStoreAsync(string tokenPath, IDataStore targetStore)
