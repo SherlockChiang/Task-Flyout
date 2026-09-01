@@ -73,9 +73,16 @@ A read-only review of the production Google Auth Platform project found:
 
 - Branding contains the expected `Task Flyout` name, public home page, privacy
   policy, authorized `sherlockchiang.github.io` domain, logo, support contact,
-  and developer contact. Google reports one specific branding issue: ownership
-  of `https://sherlockchiang.github.io/Task-Flyout/` is not verified. The brand
-  is therefore not displayed to users.
+  and developer contact. Google still displays the previous review issue that
+  ownership of `https://sherlockchiang.github.io/Task-Flyout/` was not verified,
+  so the brand is not currently displayed to users.
+- A subsequent read-only Search Console review found that the exact URL-prefix
+  property already exists, the signed-in project owner is a verified owner, and
+  HTML-tag verification is currently successful. The property was added on
+  2026-03-25, and the verification meta tag is also present on the published
+  `master:/docs/index.html`. The Cloud Branding issue is therefore a stale
+  previous-review finding that must be resubmitted as resolved, not evidence
+  that ownership is presently absent.
 - Audience is External and In production. The console reports 3 of the
   unverified-app lifetime limit of 100 users.
 - One active Desktop OAuth client named `Task Flyout` is present.
@@ -93,8 +100,9 @@ A read-only review of the production Google Auth Platform project found:
 Required order from the observed console state:
 
 1. Publish the repository's updated `docs/` site from `master`.
-2. Verify ownership of the exact homepage URL in Google Search Console, then
-   resolve the Branding issue and publish the verified brand.
+2. In Branding, mark the previous homepage-ownership issue as resolved and
+   request brand re-verification; do not recreate the already verified Search
+   Console property.
 3. Remove Gmail Readonly and Gmail Send from Data Access so the console matches
    the three scopes requested by the current app build.
 4. Enter the scope justifications and unlisted YouTube URL.

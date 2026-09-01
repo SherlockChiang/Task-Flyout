@@ -1488,13 +1488,15 @@ They are historical records; active work remains in the backlog tables above.
   with 3 of the unverified-app lifetime limit of 100 users, and that one active
   Desktop OAuth client named `Task Flyout` remains configured.
 - Branding contains the expected app name, homepage, privacy link, logo,
-  authorized domain, and contacts, but Google reports that ownership of the
-  exact GitHub Pages homepage has not been verified. The brand is not displayed
-  to users, and Verification Center disables `Prepare for verification` until
-  this issue is resolved and the brand is verified/published.
+  authorized domain, and contacts, but still displays the previous review
+  finding that homepage ownership was not verified. A follow-up read-only
+  Search Console audit confirmed that the exact URL-prefix property exists,
+  HTML-tag verification is currently successful, and the signed-in project
+  owner is a verified owner. The issue must be resubmitted as resolved after the
+  updated site is published; the existing property must not be recreated.
 - Data Access still contains the former Calendar, Tasks, Gmail Modify, Gmail
   Readonly, and Gmail Send set. The scope-justification and YouTube fields are
   empty. M0-06 therefore remains externally blocked in this order: publish the
-  updated `master:/docs` site, verify the exact homepage in Search Console,
-  publish Branding, reduce Data Access to the three current scopes, add the
-  justification/video/reviewer material, and then resubmit.
+  updated `master:/docs` site, resubmit and publish Branding, reduce Data Access
+  to the three current scopes, add the justification/video/reviewer material,
+  and then resubmit.
