@@ -8,11 +8,21 @@ Requested scopes:
 
 - `CalendarService.Scope.Calendar`: required for creating, editing, deleting, and reading calendar events.
 - `TasksService.Scope.Tasks`: required for creating, editing, completing, and reading Google Tasks.
-- `GmailService.Scope.GmailReadonly`: required for listing and reading Gmail messages.
-- `GmailService.Scope.GmailModify`: required when marking Gmail messages as read.
-- `GmailService.Scope.GmailSend`: required when sending Gmail replies/new messages from Task Flyout.
+- `GmailService.Scope.GmailModify`: required for listing and reading messages,
+  marking messages read/starred, managing labels, archiving or moving messages
+  to trash, and composing/sending mail. Google's scope catalog defines this
+  scope as covering read, compose, and send.
 
-All five Google scopes are requested together from an explicit Connect/Reconnect action. Runtime calendar, task, mail, polling, and mutation paths restore the protected token silently and never call the browser authorization broker.
+The separate `GmailReadonly` and `GmailSend` scopes are not requested because
+they are subsets of the Gmail capability already granted by `GmailModify` for
+this app. Task Flyout does not request `https://mail.google.com/` and does not
+permanently delete messages while bypassing trash. See Google's
+[Gmail scope catalog](https://developers.google.com/workspace/gmail/api/auth/scopes).
+
+All three Google scopes are requested together from an explicit
+Connect/Reconnect action. Runtime calendar, task, mail, polling, and mutation
+paths restore the protected token silently and never call the browser
+authorization broker.
 
 Local cleanup on account removal:
 
@@ -53,8 +63,10 @@ Local cleanup on mail account removal:
 ## Notes
 
 - OAuth tokens and local mail/calendar/task caches are stored only on the device.
-- Google and Microsoft setup request each provider's complete current feature scope set once.
-- Existing complete-scope tokens remain valid and are restored silently.
+- Google setup requests three scopes (Calendar, Tasks, and Gmail Modify), while
+  Microsoft setup requests its complete current feature scope set once.
+- Existing Google tokens containing the former five-scope superset remain valid
+  and are restored silently.
 - Existing partial-scope tokens produce a reconnect-required state. They are upgraded only after the user explicitly clicks Connect/Reconnect.
 - Background sync, startup polling, message reading, mark-read, sending, and task/calendar mutations cannot start an interactive browser flow.
 

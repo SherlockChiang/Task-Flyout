@@ -54,12 +54,12 @@
             <div class="lang-zh">
                 <h1 class="text-3xl font-bold mb-6 border-b border-black/10 pb-4">隐私政策</h1>
                 <div class="space-y-4 text-gray-600 leading-relaxed text-sm md:text-base">
-                    <p><strong>最后更新时间：</strong> 2026年8月</p>
+                    <p><strong>最后更新时间：</strong> 2026年9月1日</p>
                     <p>Task Flyout（以下简称“本软件”）采用“本地优先”的设计。<strong>开发者不运营任何服务器，您的数据保存在您自己的设备上，不会上传给开发者。</strong></p>
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">1. 各类数据如何存储</h2>
                     <ul class="list-disc pl-6 space-y-2">
-                        <li><strong>邮件：</strong>账户配置与邮件元数据（发件人、主题、预览）以 Windows 数据保护接口（DPAPI）加密后缓存在本地；邮件正文按需从您的邮件服务器加载，通常不持久化保存。</li>
+                        <li><strong>邮件：</strong>账户配置与邮件元数据（发件人、主题、预览）以 Windows 数据保护接口（DPAPI）加密后缓存在本地；邮件正文按需从您的邮件服务器加载，不写入持久邮件窗口。一个未发送的恢复草稿可经 DPAPI 保护后保留至发送或丢弃；所选附件仅在准备和发送期间临时保留。远程图片默认被阻止；只有您明确选择显示或信任来源后，应用才会连接图片来源站点，该站点可能获得常规网络请求信息。</li>
                         <li><strong>日历与任务：</strong>同步得到的日程与任务缓存经 DPAPI 加密后保存在本地，用于离线查看。连接 iCloud 日历时，Apple 账户邮箱和 App 专用密码同样经 DPAPI（CurrentUser）保护，不保存 Apple 账户主密码。</li>
                         <li><strong>RSS：</strong>订阅列表与文章保存在本地的 SQLite 数据库中。订阅、文件夹和文章的标题、URL、摘要、正文与远程图片 URL 使用 Windows DPAPI（CurrentUser）保护；ID、发布时间和本地图片路径保留为明文，以支持本地关联、排序和图片缓存。删除订阅会从应用数据库移除其记录，但系统备份、文件系统快照或 SQLite 空闲页可能在一段时间内仍保留历史数据。</li>
                         <li><strong>天气：</strong>最多五个已保存地点（名称、别名和坐标）及其最近成功天气和重试状态，经 Windows DPAPI 加密后保存在本地 SQLite 数据库中；坐标不会写入 LocalSettings。请求天气时，所选地点会直接发送给 Open-Meteo 或 wttr.in。</li>
@@ -75,32 +75,42 @@
                         <li>天气服务（Open-Meteo 或 wttr.in）：获取天气时会向其发送您选择的地点信息。</li>
                     </ul>
 
-                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">3. OAuth 令牌与密码如何保护</h2>
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">3. 如何访问和使用 Google 用户数据</h2>
+                    <p>只有在您明确连接 Google 后，本软件才会访问以下数据，并仅用于界面中清晰可见的功能：</p>
+                    <ul class="list-disc pl-6 space-y-2">
+                        <li><strong>Google Calendar：</strong>读取并显示日历和日程，以及执行您发起的新建、修改和删除操作。</li>
+                        <li><strong>Google Tasks：</strong>读取并显示任务列表和任务，以及执行您发起的新建、修改、完成和删除操作。</li>
+                        <li><strong>Gmail：</strong>通过 <code>gmail.modify</code> 列出标签和邮件、按需读取正文、标记已读或星标、归档、变更标签、移入/移出垃圾箱，以及发送您撰写的邮件。本软件不申请可绕过垃圾箱永久删除邮件的完整邮箱权限。</li>
+                        <li><strong>受限使用：</strong>Google 用户数据不会用于广告、重定向营销、用户画像、信贷决策，也不会出售或转移给广告平台、数据经纪商或信息转售商；不会用于训练通用 AI/机器学习模型。开发者不运营后端，因此开发者及其人员无法读取这些数据。</li>
+                    </ul>
+                    <p>Task Flyout 对从 Google API 获取的信息的使用及向任何其他应用的转移，将遵守 <a href="https://developers.google.com/terms/api-services-user-data-policy" class="text-[#0067C0] hover:underline" target="_blank" rel="noopener noreferrer">Google API 服务用户数据政策</a>，包括受限使用（Limited Use）要求。</p>
+
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">4. OAuth 令牌与密码如何保护</h2>
                     <ul class="list-disc pl-6 space-y-2">
                         <li><strong>OAuth 访问/刷新令牌：</strong>通过 Windows DPAPI（<code>CurrentUser</code> 范围并附加额外 entropy）加密保存在本地。加密密钥与您当前的 Windows 用户账户绑定，其他用户或其他设备无法解密。</li>
                         <li><strong>Microsoft 登录：</strong>采用官方 MSAL 库，令牌缓存同样以 DPAPI 加密保存在本地。</li>
                         <li><strong>IMAP/SMTP 密码：</strong>保存在 <strong>Windows 凭据管理器（Credential Manager）</strong> 中，而非明文文件。</li>
                         <li><strong>iCloud App 专用密码：</strong>通过 Windows DPAPI（<code>CurrentUser</code>）加密保存在本地，仅发送至 Apple 的 iCloud CalDAV 服务。</li>
-                        <li><strong>最小权限：</strong>仅申请实现功能所必需的最少 OAuth 权限范围，并遵守 <a href="https://developers.google.com/terms/api-services-user-data-policy" class="text-[#0067C0] hover:underline" target="_blank">Google API 服务用户数据政策</a>。</li>
+                        <li><strong>最小权限：</strong>Google 连接仅申请 Calendar、Tasks 和 Gmail Modify；Gmail Modify 已覆盖本软件需要的读取、修改和发送能力，因此不重复申请 Gmail Readonly 或 Gmail Send。</li>
                     </ul>
 
-                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">4. 删除数据</h2>
-                    <p>在应用内移除某个账户会删除应用记录、IMAP/SMTP 密码、Google 授权材料、iCloud App 专用密码和对应缓存。Microsoft 登录使用 Windows 加密的共享平台令牌缓存；应用会移除认证记录，但缓存条目可能保留到其自然过期或由 Microsoft 帐户/Windows 管理。卸载会移除应用包数据，但系统备份、通知历史和文件系统快照不受本软件控制。</p>
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">5. 删除数据</h2>
+                    <p>在邮件页选择「仅从邮件移除」会删除该 Gmail 邮件账户、恢复草稿与邮件缓存，但会保留仍供日历和任务使用的共享 Google 授权。在邮件、日历或账户界面选择「完全断开」会先清除本地 Google 授权材料，再删除 Google 日历、任务、邮件、草稿、通知状态和嵌入式浏览器数据；若授权清理失败，应用会保留业务账户以便重试。您也可在 Google 账户的第三方连接页面撤销访问，但仍需在应用内完全断开或卸载，才能清除设备上的本地缓存。IMAP/SMTP 密码和 iCloud App 专用密码会随对应账户移除。Microsoft 登录使用 Windows 加密的共享平台令牌缓存；应用会移除认证记录，但缓存条目可能保留到自然过期或由 Microsoft 帐户/Windows 管理。卸载会移除应用包数据，但系统备份、通知历史和文件系统快照不受本软件控制。</p>
 
-                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">5. 联系我们</h2>
-                    <p>如果您对本隐私政策有任何疑问或安全担忧，请通过 GitHub Issues 联系开发者。</p>
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">6. 联系我们</h2>
+                    <p>如果您对本隐私政策、Google 用户数据或数据删除有任何疑问，请通过 <a href="https://github.com/SherlockChiang/Task-Flyout/issues" class="text-[#0067C0] hover:underline" target="_blank" rel="noopener noreferrer">GitHub Issues</a> 联系开发者。</p>
                 </div>
             </div>
 
             <div class="lang-en hidden-lang">
                 <h1 class="text-3xl font-bold mb-6 border-b border-black/10 pb-4">Privacy Policy</h1>
                 <div class="space-y-4 text-gray-600 leading-relaxed text-sm md:text-base">
-                    <p><strong>Last Updated:</strong> August 2026</p>
+                    <p><strong>Last Updated:</strong> September 1, 2026</p>
                     <p>Task Flyout ("the App") is local-first by design. <strong>The developer operates no servers; your data is kept on your own device and is never uploaded to the developer.</strong></p>
 
                     <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">1. How each type of data is stored</h2>
                     <ul class="list-disc pl-6 space-y-2">
-                        <li><strong>Mail:</strong> Account configuration and message metadata (sender, subject, preview) are cached locally, encrypted with the Windows Data Protection API (DPAPI). Full message bodies are loaded on demand from your mail server and are generally not persisted. One active unsent compose draft may be stored locally as a DPAPI-protected recovery record until it is sent or discarded.</li>
+                        <li><strong>Mail:</strong> Account configuration and message metadata (sender, subject, preview) are cached locally, encrypted with the Windows Data Protection API (DPAPI). Full message bodies are loaded on demand from your mail server and are not written to persistent message windows. One active unsent compose draft may be stored locally as a DPAPI-protected recovery record until it is sent or discarded; selected attachments are held temporarily while preparing and sending. Remote images are blocked by default. They are fetched from the source site only after you explicitly show them or trust the source, which can expose ordinary network-request information to that site.</li>
                         <li><strong>Calendar &amp; tasks:</strong> Synced events and tasks are cached locally, encrypted with DPAPI, for offline viewing. When you connect iCloud Calendar, the Apple Account email and app-specific password are also protected with DPAPI (CurrentUser); the App does not store your main Apple Account password.</li>
                         <li><strong>RSS:</strong> Your subscriptions and articles are stored in a local SQLite database. Subscription, folder, and article titles, URLs, summaries, bodies, and remote image URLs are protected with Windows DPAPI (CurrentUser); IDs, publication times, and local image paths remain plaintext to support local association, sorting, and image caching. Deleting a feed removes its records from the app database, but system backups, filesystem snapshots, or SQLite free pages can retain historic data for a period of time.</li>
                         <li><strong>Weather:</strong> Up to five saved locations (name, alias, and coordinates), their last successful weather, and retry state are encrypted with Windows DPAPI in the local SQLite database; coordinates are not written to LocalSettings. The selected location is sent directly to Open-Meteo or wttr.in when weather is requested.</li>
@@ -116,20 +126,30 @@
                         <li>The weather service (Open-Meteo or wttr.in): your chosen location is sent to it when fetching the forecast.</li>
                     </ul>
 
-                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">3. How OAuth tokens and passwords are protected</h2>
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">3. How Google user data is accessed and used</h2>
+                    <p>The App accesses the following data only after you explicitly connect Google, and only for features that are visible in the user interface:</p>
+                    <ul class="list-disc pl-6 space-y-2">
+                        <li><strong>Google Calendar:</strong> Read and display calendars/events, and perform event create, edit, and delete actions that you initiate.</li>
+                        <li><strong>Google Tasks:</strong> Read and display task lists/tasks, and perform task create, edit, complete, and delete actions that you initiate.</li>
+                        <li><strong>Gmail:</strong> Use <code>gmail.modify</code> to list labels/messages, load bodies on demand, mark read/starred, archive, change labels, move to/from trash, and send messages that you compose. The App does not request full-mail access that can permanently delete messages while bypassing trash.</li>
+                        <li><strong>Limited use:</strong> Google user data is not used for advertising, retargeting, profiling, or credit decisions; sold or transferred to advertising platforms, data brokers, or information resellers; or used to train generalized AI/ML models. The developer operates no backend, so the developer and its personnel cannot read this data.</li>
+                    </ul>
+                    <p>Task Flyout's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" class="text-[#0067C0] hover:underline" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">4. How OAuth tokens and passwords are protected</h2>
                     <ul class="list-disc pl-6 space-y-2">
                         <li><strong>OAuth access/refresh tokens:</strong> Encrypted at rest with the Windows DPAPI (<code>CurrentUser</code> scope plus additional entropy). The encryption key is bound to your current Windows user account, so other users or other machines cannot decrypt it.</li>
                         <li><strong>Microsoft sign-in:</strong> Uses the official MSAL library; its token cache is likewise stored locally, encrypted with DPAPI.</li>
                         <li><strong>IMAP/SMTP passwords:</strong> Stored in the <strong>Windows Credential Manager</strong>, not in a plaintext file.</li>
                         <li><strong>iCloud app-specific password:</strong> Encrypted locally with Windows DPAPI (<code>CurrentUser</code>) and sent only to Apple's iCloud CalDAV service.</li>
-                        <li><strong>Least privilege:</strong> The App requests only the minimum OAuth scopes needed for its features and complies with the <a href="https://developers.google.com/terms/api-services-user-data-policy" class="text-[#0067C0] hover:underline" target="_blank">Google API Services User Data Policy</a>.</li>
+                        <li><strong>Least privilege:</strong> Google connection requests only Calendar, Tasks, and Gmail Modify. Gmail Modify already covers the read, change, and send capabilities used by the App, so Gmail Readonly and Gmail Send are not requested separately.</li>
                     </ul>
 
-                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">4. Deleting your data</h2>
-                    <p>Removing an account deletes the app record, IMAP/SMTP password, Google authorization material, iCloud app-specific password, and associated cache. Microsoft sign-in uses a Windows-encrypted shared platform token cache; the App removes its authentication record, but cache entries can remain until they expire naturally or are managed through the Microsoft account or Windows. Uninstalling removes app package data, but system backups, notification history, and filesystem snapshots are outside the App's control.</p>
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">5. Deleting your data</h2>
+                    <p>Choosing Remove Mail only deletes that Gmail mail account, recovery draft, and mail cache while preserving shared Google authorization still used by Calendar/Tasks. Choosing Disconnect completely from Mail, Calendar, or account management first clears local Google authorization, then removes Google calendar, task, mail, draft, notification-state, and embedded-browser data; if authorization cleanup fails, the business account is preserved so you can retry. You can also revoke access from your Google Account's third-party connections page, but you must still disconnect completely in the App or uninstall it to clear local device caches. IMAP/SMTP passwords and iCloud app-specific passwords are removed with their accounts. Microsoft sign-in uses a Windows-encrypted shared platform token cache; the App removes its authentication record, but cache entries can remain until they expire naturally or are managed through the Microsoft account or Windows. Uninstalling removes app package data, but system backups, notification history, and filesystem snapshots are outside the App's control.</p>
 
-                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">5. Contact Us</h2>
-                    <p>If you have any questions or security concerns regarding this Privacy Policy, please contact the developer via GitHub Issues.</p>
+                    <h2 class="text-lg text-[#1c1c1c] font-semibold mt-6">6. Contact Us</h2>
+                    <p>If you have questions about this Privacy Policy, Google user data, or data deletion, contact the developer through <a href="https://github.com/SherlockChiang/Task-Flyout/issues" class="text-[#0067C0] hover:underline" target="_blank" rel="noopener noreferrer">GitHub Issues</a>.</p>
                 </div>
             </div>
 

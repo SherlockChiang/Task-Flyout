@@ -49,12 +49,13 @@ see and manage your day without opening a browser.
 
 4. Approve the certificate trust prompt. The script then installs the signed app package.
 
-### Google sign-in warning
+### Google sign-in availability
 
-Task Flyout is still going through Google's app verification, so the OAuth
-consent screen may show an "unverified app" warning. The app runs entirely on
-your machine. To continue, click **Advanced** at the bottom of the page, then
-**Go to Task_Flyout (unsafe)**.
+Google sign-in in a public build depends on that build's OAuth verification
+status. Do not bypass an unverified/blocked consent warning with an account that
+contains real data. During development, use an allowlisted test user or build
+with your own Desktop OAuth client as described below. Release notes will state
+when the bundled public client is available for general Google accounts.
 
 ### iCloud Calendar
 

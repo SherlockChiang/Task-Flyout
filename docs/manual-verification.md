@@ -9,7 +9,8 @@ Use this checklist for flows that require real Windows credentials, DPAPI, Passw
 1. Connect a Google account and complete an initial sync.
 2. Confirm calendar/task data appears in Calendar, Tasks, and Flyout.
 3. Open Mail and confirm Gmail folders/messages load if Gmail mail was configured.
-4. Remove the Google calendar account from Calendar or MainWindow account list.
+4. Remove the Google account from Calendar or the MainWindow account list and
+   choose `Disconnect completely`, not the feature-only removal option.
 5. Restart the app.
 6. Confirm Google calendar/task data no longer appears.
 7. Confirm the protected Google token store was cleared by reconnecting Google and observing a fresh OAuth prompt.
@@ -35,6 +36,47 @@ Use this checklist for flows that require real Windows credentials, DPAPI, Passw
 6. Confirm folders/messages from that account are absent from local cache views.
 7. For IMAP, confirm the account password is removed from Windows Credential Manager / PasswordVault.
 8. Confirm new mail notifications no longer fire for the removed account.
+
+## Google OAuth Verification Rehearsal
+
+Use a dedicated Windows profile and a Google test account containing only
+synthetic review data. Keep reviewer credentials out of the repository and logs.
+
+1. Confirm the public home page and privacy policy both return HTTP 200 without
+   sign-in, use the same verified domain, and visibly identify Task Flyout.
+2. In Google Cloud Console, confirm Branding is published, support/developer
+   contact mailboxes are monitored, and Data Access contains exactly Calendar,
+   Tasks, and Gmail Modify. Confirm Gmail Readonly, Gmail Send, and full-mail
+   access are absent.
+3. Clear/revoke the test account's prior grant, start from a disconnected app,
+   and click Connect Google. Confirm no startup, sync, or mail polling path opens
+   the browser before this explicit action.
+4. Run the Google grant flow in English. Confirm the consent page shows the exact
+   app name `Task Flyout`, the browser address bar contains the submitted OAuth
+   client ID, and only the three declared scopes are requested.
+5. Calendar: load data, create `OAuth Review Event`, edit it, and delete it.
+6. Tasks: load a list, create `OAuth Review Task`, edit/complete it, and delete it.
+7. Gmail: load labels/messages, open `OAuth Review Message`, mark it read and
+   starred, archive or relabel it and undo, move it to trash and restore it, then
+   send a synthetic reply to the same test account.
+8. Restart Task Flyout and confirm the protected token restores silently and all
+   three features load without a new consent prompt.
+9. Revoke Task Flyout from the Google account, restart the app, and confirm a
+   reconnect-required state appears without a background browser prompt.
+10. Reconnect explicitly. Remove Gmail with `Remove Mail only` and confirm its
+    mail cache/draft are deleted while Calendar/Tasks remain connected.
+11. Choose `Disconnect completely`; confirm Google calendar, task, mail, draft,
+    notification, token, and embedded-browser data are cleared and a subsequent
+    connection requires consent again.
+12. Record the same flow for the unlisted YouTube demonstration. Keep the app
+    name, consent URL/client ID, and each scope-to-feature transition visible;
+    obscure credentials and unrelated synthetic content.
+13. Verify the test account and any 2-step-verification instructions immediately
+    before submission. After submission, check Verification Center and every
+    support/developer-contact inbox (including spam) at least weekly.
+
+Use `docs/google-oauth-verification.md` for paste-ready scope justification,
+reviewer steps, video order, official references, and the console checklist.
 
 ## Status And Onboarding
 

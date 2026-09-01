@@ -91,6 +91,8 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M0-02 | DONE | Distribution | Make installation artifacts and documentation agree. | English and Chinese READMEs name the installer actually shipped by the beta workflow; the generated installer has a documented invocation path. | `docs: align beta install instructions` |
 | M0-03 | DONE | Git | Split the existing iCloud, provider-capability, localization, weather, and documentation work into focused commits. | Every commit builds/tests at its dependency boundary; no required untracked source is omitted; unrelated maintenance is excluded. | `refactor: centralize provider capabilities`<br>`fix: preserve provider calendar colors`<br>`feat: implement iCloud CalDAV sync`<br>`feat: add iCloud account onboarding`<br>`feat(i18n): localize last-success status messages`<br>`feat(weather): localize forecasts and alerts`<br>`feat(i18n): add Traditional Chinese localization`<br>`fix(i18n): recognize Traditional Chinese content aliases`<br>`fix(i18n): guard resource-backed Chinese XAML fallbacks`<br>`fix(weather): resume tracking with specific location labels`<br>`docs: document iCloud and privacy handling`<br>`build: bump package version`<br>`chore(i18n): remove stale localization note` |
 | M0-04 | DONE | Privacy/OAuth | Remove redundant Google Gmail scopes from initial consent. | New consent requests Calendar, Tasks, and Gmail Modify only; legacy five-scope tokens remain valid; a token without Gmail Modify requires an explicit reconnect and background paths remain non-interactive. | `privacy(oauth): minimize Google scopes` |
+| M0-05 | DONE | Privacy/OAuth | Prepare a complete Google OAuth verification resubmission packet and align public disclosures. | Scope declarations, data-flow and Limited Use disclosures, reviewer/video checklists, and English/Chinese privacy and README text agree with the implementation; public links and HTML structure validate; no credentials or tokens are included. | `docs(oauth): prepare Google verification resubmission` |
+| M0-06 | BLOCKED | External/OAuth | Resubmit the Google OAuth verification request with published branding, a demo, and a synthetic reviewer account. | Branding and domain ownership are published; Data Access declares exactly the three scopes; the unlisted English demo and secure reviewer credentials are supplied; Verification Center accepts the request and contact inboxes are monitored. | External: Google Cloud Console, Search Console, YouTube |
 
 ### P1 - Data Integrity, Reliability, And Visible Defects
 
@@ -152,6 +154,11 @@ M3-05 through M3-08 supersede the Windhawk runtime/package work in M3-03.
 M3-03 remains as historical POC scope and must not be installed or enabled. The
 protocol and app-side snapshot work already completed under M3-04 remains the
 transport foundation for the standalone host.
+
+## Maintenance Checkpoint Archive
+
+The dated entries below preserve completed experiments and verification evidence.
+They are historical records; active work remains in the backlog tables above.
 
 ### Audit Verification Baseline
 
@@ -1458,3 +1465,19 @@ transport foundation for the standalone host.
   completes with zero warnings and zero errors. Existing user-owned changes in
   `Package.appxmanifest` and `windhawk/task-flyout-weather-companion.wh.cpp`
   remain excluded.
+
+### 2026-09-01 Google OAuth Verification Resubmission Packet
+
+- The public README guidance no longer instructs users to bypass an
+  unverified/blocked consent warning. The English and Chinese privacy policy
+  now describe the exact Calendar, Tasks, and Gmail Modify data uses, local
+  DPAPI protection, retention/deletion behavior, and Limited Use restrictions.
+- `docs/google-oauth-verification.md` records the three-scope justification,
+  direct-device data flow, paste-ready submission text, reviewer steps, English
+  demo shot list, official references, and a console checklist. The packet
+  intentionally contains no reviewer credentials, refresh tokens, or client
+  secrets.
+- The packet and local disclosures are complete and ready for review. Actual
+  Cloud Console resubmission remains blocked on publishing the updated site,
+  verifying the domain/branding, recording the unlisted demo, and securely
+  preparing a synthetic reviewer account; Google approval is not implied.

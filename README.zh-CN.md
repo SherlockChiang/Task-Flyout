@@ -46,9 +46,9 @@ Task Flyout 常驻 Windows 11 系统托盘，将日历、任务、邮件、RSS �
 
 4. 同意证书信任提示，脚本随后会安装已签名的应用包。
 
-### Google 登录提示
+### Google 登录可用性
 
-Task Flyout 仍在 Google 的应用验证流程中，因此授权页面可能出现「未验证应用」警告。应用完全在本地运行。如需继续，请点击页面底部的 **高级 (Advanced)**，再点击 **转到 Task_Flyout (不安全)**。
+公开构建中的 Google 登录取决于该版本 OAuth 客户端的验证状态。若授权页显示应用未经验证或被阻止，请勿使用含真实数据的账户绕过警告。开发测试应使用已加入许可名单的测试用户，或按下文说明使用你自己的桌面 OAuth 客户端构建。发行说明会注明内置公共客户端何时可供普通 Google 账户使用。
 
 ### iCloud 日历
 
@@ -79,6 +79,22 @@ dotnet build Task_Flyout.csproj -c Debug -p:Platform=x64
 ```
 
 或在 Visual Studio 2022 中打开 `Task_Flyout.slnx` 并运行 `Task_Flyout` 项目。
+
+**Google OAuth 凭据**
+
+Google 日历、Google Tasks 与 Gmail 同步需要你自己的 Google OAuth 客户端。
+真实的 `credentials.json` 已被 Git 忽略，不会提交；请复制模板，并在
+[Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+中创建桌面应用类型的 OAuth 客户端后填写：
+
+```powershell
+Copy-Item credentials.example.json credentials.json
+# 然后编辑 credentials.json，填入 client_id / client_secret / project_id
+```
+
+它会在构建时嵌入安装包。桌面 OAuth 客户端的 secret 不是真正的服务器密钥；
+发布公开版本时仍应轮换客户端，并从构建或 CI 注入 `credentials.json`，不要把
+长期凭据留在检出目录中。
 
 ## 技术栈
 
