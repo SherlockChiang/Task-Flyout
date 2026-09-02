@@ -109,6 +109,8 @@ namespace Task_Flyout.Views
         private ResponsiveLayoutMode _layoutMode = ResponsiveLayoutMode.Wide;
         private DateTimeOffset? _lastCalendarSyncSucceededAt;
         private CalendarMonthRange _displayedRange;
+        private readonly VersionedUiRefreshGate _cacheRefreshGate = new();
+        private bool _isPageLoaded;
 
         private void TaskCheckBox_Tapped(object sender, TappedRoutedEventArgs e)
         {
@@ -123,17 +125,64 @@ namespace Task_Flyout.Views
             SetWeekdayHeaders();
             if (Application.Current is App app) _syncManager = app.SyncManager;
             this.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(Global_PointerWheelChanged), handledEventsToo: true);
-            this.Loaded += (s, e) =>
+            this.Loaded += CalendarPage_Loaded;
+            this.Unloaded += CalendarPage_Unloaded;
+        }
+
+        private void CalendarPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            _isPageLoaded = true;
+            if (_syncManager != null)
             {
-                RefreshAccountList();
-                LoadCalendar(_viewDate);
-            };
-            this.Unloaded += (_, _) =>
+                _syncManager.CachePublished -= SyncManager_CachePublished;
+                _syncManager.CachePublished += SyncManager_CachePublished;
+            }
+            RefreshAccountList();
+            LoadCalendar(_viewDate);
+        }
+
+        private void CalendarPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _isPageLoaded = false;
+            if (_syncManager != null)
+                _syncManager.CachePublished -= SyncManager_CachePublished;
+            _syncCts?.Cancel();
+            _syncCts?.Dispose();
+            _syncCts = null;
+        }
+
+        private void SyncManager_CachePublished(object? sender, AgendaCachePublishedEventArgs e)
+        {
+            if (!_cacheRefreshGate.TryQueue(e.Version)) return;
+            if (!DispatcherQueue.TryEnqueue(ApplyPublishedCacheUpdate))
+                _cacheRefreshGate.CancelQueuedDispatch();
+        }
+
+        private void ApplyPublishedCacheUpdate()
+        {
+            if (!_cacheRefreshGate.TryBeginApply(out _) || !_isPageLoaded || CalendarGrid == null)
+                return;
+
+            LoadCache(_displayedRange);
+            if (_viewMode == CalendarViewMode.Year)
             {
-                _syncCts?.Cancel();
-                _syncCts?.Dispose();
-                _syncCts = null;
-            };
+                PopulateYearMonths();
+            }
+            else if (_viewMode == CalendarViewMode.Week)
+            {
+                BuildWeekTimeline();
+            }
+            else
+            {
+                foreach (var cell in DayCells)
+                {
+                    if (_localCache.DayItems.TryGetValue(cell.Date.ToString("yyyy-MM-dd"), out var dayItems))
+                        SetCellItems(cell, dayItems);
+                    else
+                        SetCellItems(cell, Array.Empty<AgendaItem>());
+                }
+            }
+            UpdateSideBar();
         }
 
         private void SetWeekdayHeaders()

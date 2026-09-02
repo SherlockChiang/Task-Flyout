@@ -31,6 +31,12 @@ namespace Task_Flyout.Services
         long Version,
         Dictionary<string, List<AgendaItem>> DayItems);
 
+    internal sealed class AgendaCachePublishedEventArgs : EventArgs
+    {
+        public AgendaCachePublishedEventArgs(long version) => Version = version;
+        public long Version { get; }
+    }
+
     public class SyncManager
     {
         private readonly List<ISyncProvider> _providers = new();
@@ -51,6 +57,7 @@ namespace Task_Flyout.Services
         public IReadOnlyList<ISyncProvider> Providers => _providers;
         public AccountManager AccountManager { get; } = new AccountManager();
         public event EventHandler? ProviderHealthChanged;
+        internal event EventHandler<AgendaCachePublishedEventArgs>? CachePublished;
 
         public void RegisterProvider(ISyncProvider provider) => _providers.Add(provider);
 
@@ -922,7 +929,25 @@ namespace Task_Flyout.Services
                     .ToList()
                     ?? new List<AgendaCacheRange>()
             };
-            Volatile.Write(ref _publishedCache, new PublishedCacheSnapshot(++_cacheVersion, snapshot));
+            long version = ++_cacheVersion;
+            Volatile.Write(ref _publishedCache, new PublishedCacheSnapshot(version, snapshot));
+            QueueCachePublished(version);
+        }
+
+        private void QueueCachePublished(long version)
+        {
+            var handlers = CachePublished;
+            if (handlers == null) return;
+
+            _ = Task.Run(() =>
+            {
+                var args = new AgendaCachePublishedEventArgs(version);
+                foreach (EventHandler<AgendaCachePublishedEventArgs> handler in handlers.GetInvocationList())
+                {
+                    try { handler(this, args); }
+                    catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Agenda cache subscriber failed: {ex.Message}"); }
+                }
+            });
         }
 
         private sealed record PublishedCacheSnapshot(long Version, AppCache Cache);
