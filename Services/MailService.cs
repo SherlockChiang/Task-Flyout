@@ -1349,9 +1349,11 @@ namespace Task_Flyout.Services
 
         public void ApplyCachedMutation(MailItem item, MailMutationKind kind, bool value)
         {
-            bool previousRead = item.IsRead;
-            MailMutationCachePolicy.Apply(new[] { item }, item.AccountId, item.FolderId, item.Id, kind, value);
-            UpdateCachedMutation(item, kind, value, previousRead);
+            EnsureAccountsLoaded();
+            var providerKind = _accounts.FirstOrDefault(account =>
+                string.Equals(account.Id, item.AccountId, StringComparison.Ordinal))?.Kind ?? MailAccountKind.Imap;
+            var directResult = MailMutationCachePolicy.Apply(new[] { item }, providerKind, item, kind, value);
+            UpdateCachedMutation(providerKind, item, kind, value, directResult.ReadStateChangedFolderIds);
         }
 
         public Task SetReadStateAsync(MailAccount account, MailItem item, bool value, CancellationToken cancellationToken = default)
@@ -3231,48 +3233,51 @@ namespace Task_Flyout.Services
             SavePersistentCache();
         }
 
-        private void UpdateCachedMutation(MailItem item, MailMutationKind kind, bool value, bool previousRead)
+        private void UpdateCachedMutation(
+            MailAccountKind providerKind,
+            MailItem item,
+            MailMutationKind kind,
+            bool value,
+            IReadOnlyCollection<string> directlyChangedFolderIds)
         {
             EnsurePersistentCacheLoaded();
             lock (_mailCacheLock)
             {
+                var changedFolderIds = new HashSet<string>(directlyChangedFolderIds, StringComparer.Ordinal);
                 foreach (var pair in _messageCache.ToList())
                 {
-                    var cached = pair.Value.Value.FirstOrDefault(message =>
-                        message.AccountId == item.AccountId &&
-                        message.FolderId == item.FolderId &&
-                        message.Id == item.Id);
-
-                    if (cached != null)
-                        MailMutationCachePolicy.Apply(new[] { cached }, item.AccountId, item.FolderId, item.Id, kind, value);
+                    var result = MailMutationCachePolicy.Apply(pair.Value.Value, providerKind, item, kind, value);
+                    changedFolderIds.UnionWith(result.ReadStateChangedFolderIds);
                 }
 
-                if (_persistentCache == null) return;
-
-                foreach (var pair in _persistentCache.Messages.ToList())
+                if (_persistentCache != null)
                 {
-                    var cached = pair.Value.FirstOrDefault(message =>
-                        message.AccountId == item.AccountId &&
-                        message.FolderId == item.FolderId &&
-                        message.Id == item.Id);
-
-                    if (cached != null)
-                        MailMutationCachePolicy.Apply(new[] { cached }, item.AccountId, item.FolderId, item.Id, kind, value);
+                    foreach (var pair in _persistentCache.Messages.ToList())
+                    {
+                        var result = MailMutationCachePolicy.Apply(pair.Value, providerKind, item, kind, value);
+                        changedFolderIds.UnionWith(result.ReadStateChangedFolderIds);
+                    }
                 }
 
-                if (kind == MailMutationKind.SetReadState)
+                if (kind == MailMutationKind.SetReadState && changedFolderIds.Count > 0)
                 {
-                    var unreadKey = GetMessageCacheKey(item.AccountId, item.FolderId, true);
-                    _messageCache.Remove(unreadKey);
-                    _persistentCache.Messages.Remove(unreadKey);
-                    _persistentCache.MessageCursors.Remove(unreadKey);
-                    _persistentCache.MessageHasMore.Remove(unreadKey);
+                    foreach (var folderId in changedFolderIds)
+                    {
+                        var unreadKey = GetMessageCacheKey(item.AccountId, folderId, true);
+                        _messageCache.Remove(unreadKey);
+                        _persistentCache?.Messages.Remove(unreadKey);
+                        _persistentCache?.MessageCursors.Remove(unreadKey);
+                        _persistentCache?.MessageHasMore.Remove(unreadKey);
+                    }
 
-                    var folder = _persistentCache.Folders.TryGetValue(item.AccountId, out var folders)
-                        ? folders.FirstOrDefault(candidate => candidate.Id == item.FolderId)
-                        : null;
-                    if (folder != null)
-                        folder.UnreadCount = MailMutationCachePolicy.AdjustUnreadCount(folder.UnreadCount, previousRead, value);
+                    var cachedFolders = new HashSet<MailFolder>();
+                    if (_folderCache.TryGetValue(item.AccountId, out var folderEntry))
+                        cachedFolders.UnionWith(folderEntry.Value);
+                    if (_persistentCache?.Folders.TryGetValue(item.AccountId, out var persistentFolders) == true)
+                        cachedFolders.UnionWith(persistentFolders);
+
+                    foreach (var folder in cachedFolders.Where(folder => changedFolderIds.Contains(folder.Id)))
+                        folder.UnreadCount = MailMutationCachePolicy.AdjustUnreadCount(folder.UnreadCount, !value, value);
                 }
             }
             SavePersistentCache();

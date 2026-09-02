@@ -111,7 +111,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M1-11 | DONE | Reliability/Startup | Keep tray-triggered Flyout construction behind stable account hydration. | The click path records request diagnostics and restores efficiency state on failure; the Flyout never enumerates the account collection while startup hydration is mutating it. | `fix(flyout): serialize account hydration before opening` |
 | M1-12 | DONE | Reliability/Calendar | Refresh agenda data while the Flyout remains hidden. | The app heartbeat force-refreshes the shared agenda range at the configured interval after account hydration, throttles failed attempts, invalidates the reminder snapshot, and checks upcoming events against the refreshed cache. | `fix(calendar): refresh agenda while flyout is hidden` |
 | M1-13 | DONE | Reliability/Mail | Open new-mail notification targets directly after background-only polling. | Polling keeps a bounded body-free unread metadata slice without presenting it as a complete folder window; activation resolves explicit Inbox aliases, falls back across folders only for Google/Outlook identities, and never treats IMAP UIDs as cross-folder identities. | `fix(mail): open notification targets reliably` |
-| M1-14 | TODO | Data integrity/Mail | Keep unread state coherent across provider, folder views, cache, notifications, and background polling. | Read/unread mutations update every cached identity for the account, reconcile authoritative provider state after refresh, and cannot resurrect stale unread badges or notifications. | `fix(mail): synchronize unread state consistently` |
+| M1-14 | IN PROGRESS | Data integrity/Mail | Keep unread state coherent across provider, folder views, cache, notifications, and background polling. | Read/unread mutations update every cached identity for the account, reconcile authoritative provider state after refresh, and cannot resurrect stale unread badges or notifications. | `fix(mail): converge mutable state by provider identity`, `fix(mail): reconcile authoritative unread snapshots` |
 | M1-15 | DONE | Reliability/Calendar | Correct event editor times, timeline duration, date-strip overflow, and automatic refresh. | Existing events hydrate both start and end controls; the day timeline renders the complete interval; the date header has no unintended horizontal scrollbar; foreground and hidden refresh paths reliably publish fresh data without overlap or stale replacement. | `fix(calendar): align event times and timeline`, `fix(calendar): publish background refreshes to open views`, `fix(google): route mutations to source calendar` |
 | M1-16 | DONE | Reliability/Flyout | Reliably dismiss an unpinned Flyout when focus moves elsewhere. | A focus loss during either the opening transition or the fully open state closes the Flyout exactly once; pinned behavior is preserved; rapid tray toggles cannot strand a visible Flyout. | `fix(flyout): close reliably on focus loss` |
 
@@ -1564,3 +1564,18 @@ They are historical records; active work remains in the backlog tables above.
   completes with zero warnings and zero errors. The final packaged test pass
   should still exercise an event from a non-primary Google calendar and
   background refresh while the page is open.
+
+### 2026-09-03 Mail Unread Consistency (In Progress)
+
+- The first M1-14 slice makes optimistic read and flag mutations converge by
+  provider identity across every in-memory and persistent message window.
+  Google and Outlook IDs are account-scoped across folders; IMAP identities
+  remain scoped to account, folder, UIDVALIDITY, and UID.
+- Read-state changes collect unique affected folder IDs before invalidating
+  unread-only windows and adjusting each cached folder representation once.
+  Authoritative polling reconciliation, cache timestamps, pending-intent
+  overlays, open-page publications, and notification withdrawal remain in the
+  next M1-14 slice.
+- The focused cache-policy tests pass 8/8, the complete managed suite passes
+  1197/1197, and the Debug x64 app build completes with zero warnings and zero
+  errors. Existing user-owned manifest and Windhawk changes remain excluded.
