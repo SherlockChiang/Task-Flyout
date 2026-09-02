@@ -90,7 +90,9 @@ namespace Task_Flyout.Services
     public class MailPersistentCache
     {
         public Dictionary<string, List<MailFolder>> Folders { get; set; } = new();
+        public Dictionary<string, long> FolderFetchedUtcTicks { get; set; } = new();
         public Dictionary<string, List<MailItem>> Messages { get; set; } = new();
+        public Dictionary<string, long> MessageFetchedUtcTicks { get; set; } = new();
         public Dictionary<string, MailCursor> MessageCursors { get; set; } = new();
         public Dictionary<string, bool> MessageHasMore { get; set; } = new();
         public List<PendingMailMutation> PendingMutations { get; set; } = new();

@@ -287,7 +287,10 @@ namespace Task_Flyout.Services
                 {
                     var orderedFolders = ApplyFolderOrder(accountId, folders);
                     _persistentCache.Folders[accountId] = orderedFolders;
-                    _folderCache[accountId] = new CacheEntry<List<MailFolder>> { Value = orderedFolders };
+                    var fetchedAt = _persistentCache.FolderFetchedUtcTicks.TryGetValue(accountId, out var fetchedUtcTicks)
+                        ? new DateTimeOffset(fetchedUtcTicks, TimeSpan.Zero)
+                        : DateTimeOffset.MinValue;
+                    _folderCache[accountId] = new CacheEntry<List<MailFolder>> { CreatedAt = fetchedAt, Value = orderedFolders };
                 }
             }
 
@@ -833,7 +836,7 @@ namespace Task_Flyout.Services
                 throw new InvalidOperationException("The IMAP message identity is invalid.");
 
             var gates = new[] { MailMutationKind.SetReadState, MailMutationKind.SetFlagged }
-                .Select(kind => _mutationGates.GetOrAdd(GetMutationKey(account.Id, item.FolderId, item.Id, kind), _ => new SemaphoreSlim(1, 1)))
+                .Select(kind => _mutationGates.GetOrAdd(GetMutationKey(account.Kind, account.Id, item.FolderId, item.Id, item.ImapUidValidity, kind), _ => new SemaphoreSlim(1, 1)))
                 .ToList();
             var acquiredGates = new List<SemaphoreSlim>();
             try
@@ -1145,10 +1148,12 @@ namespace Task_Flyout.Services
             {
                 _folderCache.Remove(accountId);
                 _persistentCache?.Folders.Remove(accountId);
+                _persistentCache?.FolderFetchedUtcTicks.Remove(accountId);
                 foreach (string key in GmailLabelMutationPolicy.InvalidatedWindowKeys(accountId, possiblyAffectedLabels.Append(item.FolderId)))
                 {
                     _messageCache.Remove(key);
                     _persistentCache?.Messages.Remove(key);
+                    _persistentCache?.MessageFetchedUtcTicks.Remove(key);
                     _persistentCache?.MessageCursors.Remove(key);
                     _persistentCache?.MessageHasMore.Remove(key);
                 }
@@ -1168,6 +1173,7 @@ namespace Task_Flyout.Services
                 {
                     _messageCache.Remove(key);
                     _persistentCache?.Messages.Remove(key);
+                    _persistentCache?.MessageFetchedUtcTicks.Remove(key);
                     _persistentCache?.MessageCursors.Remove(key);
                     _persistentCache?.MessageHasMore.Remove(key);
                 }
@@ -1214,6 +1220,7 @@ namespace Task_Flyout.Services
                 {
                     _messageCache.Remove(key);
                     _persistentCache?.Messages.Remove(key);
+                    _persistentCache?.MessageFetchedUtcTicks.Remove(key);
                     _persistentCache?.MessageCursors.Remove(key);
                     _persistentCache?.MessageHasMore.Remove(key);
                 }
@@ -1306,7 +1313,7 @@ namespace Task_Flyout.Services
                 throw;
             }
 
-            return CommitMessagePage(cacheKey, page, append: loadMore);
+            return CommitMessagePage(account, folder, unreadOnly, cacheKey, page, append: loadMore);
         }
 
         public async Task SendMailAsync(
@@ -1367,7 +1374,7 @@ namespace Task_Flyout.Services
             if (!MailMutationCapabilityPolicy.Supports(account.Kind, kind))
                 throw new NotSupportedException("This mail provider does not support the requested mutation.");
 
-            string mutationKey = GetMutationKey(account.Id, item.FolderId, item.Id, kind);
+            string mutationKey = GetMutationKey(account.Kind, account.Id, item.FolderId, item.Id, item.ImapUidValidity, kind);
             var mutationGate = _mutationGates.GetOrAdd(mutationKey, _ => new SemaphoreSlim(1, 1));
             await mutationGate.WaitAsync(cancellationToken);
             try
@@ -1377,6 +1384,8 @@ namespace Task_Flyout.Services
                         AccountId = account.Id,
                         FolderId = item.FolderId,
                         MessageId = item.Id,
+                        ProviderKind = account.Kind,
+                        ImapUidValidity = item.ImapUidValidity,
                         Kind = kind
                     }))
                     SavePersistentCache();
@@ -2014,17 +2023,27 @@ namespace Task_Flyout.Services
             {
                 List<PendingMailMutation> due;
                 var now = DateTimeOffset.UtcNow;
+                bool changed;
                 lock (_mailCacheLock)
                 {
                     if (_persistentCache == null) return;
+                    var expired = MailPendingMutationPolicy.RemoveExpiredItems(_persistentCache.PendingMutations, now);
+                    foreach (var mutation in expired)
+                        InvalidatePendingMutationCacheLocked(mutation);
+                    changed = expired.Count > 0;
                     due = MailPendingMutationPolicy.SelectDue(
                         _persistentCache.PendingMutations, account.Id, account.Kind, now, maximumCount: 3);
                 }
 
-                bool changed = false;
                 foreach (var mutation in due)
                 {
-                    string mutationKey = GetMutationKey(mutation.AccountId, mutation.FolderId, mutation.MessageId, mutation.Kind);
+                    string mutationKey = GetMutationKey(
+                        mutation.ProviderKind,
+                        mutation.AccountId,
+                        mutation.FolderId,
+                        mutation.MessageId,
+                        mutation.ImapUidValidity,
+                        mutation.Kind);
                     var mutationGate = _mutationGates.GetOrAdd(mutationKey, _ => new SemaphoreSlim(1, 1));
                     await mutationGate.WaitAsync();
                     using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
@@ -2050,8 +2069,12 @@ namespace Task_Flyout.Services
                     {
                         if (IsTransientMutationFailure(ex, timeoutCts.IsCancellationRequested))
                             changed |= ReschedulePendingMutation(mutation);
-                        else
-                            changed |= RemovePendingMutationIfCurrent(mutation);
+                        else if (RemovePendingMutationIfCurrent(mutation))
+                        {
+                            lock (_mailCacheLock)
+                                InvalidatePendingMutationCacheLocked(mutation);
+                            changed = true;
+                        }
                     }
                     finally
                     {
@@ -2109,8 +2132,22 @@ namespace Task_Flyout.Services
             }
         }
 
-        private static string GetMutationKey(string accountId, string folderId, string messageId, MailMutationKind kind)
-            => $"{accountId}\u001f{folderId}\u001f{messageId}\u001f{(int)kind}";
+        private static string GetMutationKey(
+            MailAccountKind providerKind,
+            string accountId,
+            string folderId,
+            string messageId,
+            uint? imapUidValidity,
+            MailMutationKind kind)
+            => MailPendingMutationPolicy.MutationKey(new PendingMailMutation
+            {
+                AccountId = accountId,
+                FolderId = folderId,
+                MessageId = messageId,
+                ProviderKind = providerKind,
+                ImapUidValidity = imapUidValidity,
+                Kind = kind
+            });
 
         private async Task CheckNewMailAsync()
         {
@@ -2143,8 +2180,8 @@ namespace Task_Flyout.Services
                             continue;
                         }
 
-                        var unreadItems = await PollFetchInboxUnreadAsync(account, inbox);
-                        MergeMessagesIntoPersistentCache(account.Id, inbox.Id, unreadItems);
+                        var unreadPage = await PollFetchInboxUnreadAsync(account, inbox);
+                        var unreadItems = MergeMessagesIntoPersistentCache(account, inbox, unreadPage);
 
                         string inboxKey = $"{account.Id}|{inbox.Id}";
                         long previousSeenTicks = GetLastSeenInboxTicks(inboxKey);
@@ -2267,17 +2304,17 @@ namespace Task_Flyout.Services
 
         // Fetch the inbox unread slice during a background poll. IMAP reuses the
         // persistent connection; other providers go through the normal fetch path.
-        private async Task<List<MailItem>> PollFetchInboxUnreadAsync(MailAccount account, MailFolder inbox)
+        private async Task<MailProviderPage> PollFetchInboxUnreadAsync(MailAccount account, MailFolder inbox)
         {
             const int pollPageSize = 5;
             if (account.Kind != MailAccountKind.Imap)
-                return (await FetchMessagesFromProviderAsync(account, inbox, unreadOnly: true, pageSize: pollPageSize)).Items;
+                return await FetchMessagesFromProviderAsync(account, inbox, unreadOnly: true, pageSize: pollPageSize);
 
             var client = await GetOrConnectPollImapClientAsync(account);
-            List<MailItem> messages;
+            MailProviderPage page;
             try
             {
-                messages = (await FetchImapMessagesWithClientAsync(client, account, inbox, unreadOnly: true, pageSize: pollPageSize)).Items;
+                page = await FetchImapMessagesWithClientAsync(client, account, inbox, unreadOnly: true, pageSize: pollPageSize);
             }
             catch
             {
@@ -2286,7 +2323,11 @@ namespace Task_Flyout.Services
                 throw;
             }
 
-            return CloneMailItems(messages, includeBodies: false);
+            return new MailProviderPage
+            {
+                Items = CloneMailItems(page.Items, includeBodies: false),
+                NextCursor = page.NextCursor
+            };
         }
 
         private async Task<MailProviderPage> FetchMessagesFromProviderAsync(
@@ -3144,17 +3185,24 @@ namespace Task_Flyout.Services
         {
             lock (_mailCacheLock)
             {
-                if (_folderCache.TryGetValue(key, out var entry) && DateTimeOffset.Now - entry.CreatedAt < CacheLifetime)
+                var now = DateTimeOffset.UtcNow;
+                if (_folderCache.TryGetValue(key, out var entry) && now - entry.CreatedAt < CacheLifetime)
                 {
                     folders = ApplyFolderOrder(key, entry.Value);
                     return true;
                 }
 
                 EnsurePersistentCacheLoaded();
-                if (_persistentCache?.Folders.TryGetValue(key, out var persistentFolders) == true)
+                if (_persistentCache?.Folders.TryGetValue(key, out var persistentFolders) == true &&
+                    _persistentCache.FolderFetchedUtcTicks.TryGetValue(key, out var fetchedUtcTicks) &&
+                    MailPersistentCachePolicy.IsFresh(fetchedUtcTicks, now, CacheLifetime))
                 {
                     folders = ApplyFolderOrder(key, persistentFolders);
-                    _folderCache[key] = new CacheEntry<List<MailFolder>> { Value = folders };
+                    _folderCache[key] = new CacheEntry<List<MailFolder>>
+                    {
+                        CreatedAt = new DateTimeOffset(fetchedUtcTicks, TimeSpan.Zero),
+                        Value = folders
+                    };
                     return true;
                 }
             }
@@ -3167,7 +3215,8 @@ namespace Task_Flyout.Services
         {
             lock (_mailCacheLock)
             {
-                if (_messageCache.TryGetValue(key, out var entry) && DateTimeOffset.Now - entry.CreatedAt < CacheLifetime)
+                var now = DateTimeOffset.UtcNow;
+                if (_messageCache.TryGetValue(key, out var entry) && now - entry.CreatedAt < CacheLifetime)
                 {
                     EnsurePersistentCacheLoaded();
                     if (_persistentCache?.MessageHasMore.ContainsKey(key) != true)
@@ -3184,7 +3233,9 @@ namespace Task_Flyout.Services
                 }
 
                 EnsurePersistentCacheLoaded();
-                if (_persistentCache?.Messages.TryGetValue(key, out var persistentMessages) == true)
+                if (_persistentCache?.Messages.TryGetValue(key, out var persistentMessages) == true &&
+                    _persistentCache.MessageFetchedUtcTicks.TryGetValue(key, out var fetchedUtcTicks) &&
+                    MailPersistentCachePolicy.IsFresh(fetchedUtcTicks, now, CacheLifetime))
                 {
                     if (!_persistentCache.MessageHasMore.ContainsKey(key))
                     {
@@ -3193,7 +3244,11 @@ namespace Task_Flyout.Services
                     }
                     var cachedMessages = StripBodies(persistentMessages);
                     _persistentCache.Messages[key] = cachedMessages;
-                    _messageCache[key] = new CacheEntry<List<MailItem>> { Value = cachedMessages };
+                    _messageCache[key] = new CacheEntry<List<MailItem>>
+                    {
+                        CreatedAt = new DateTimeOffset(fetchedUtcTicks, TimeSpan.Zero),
+                        Value = cachedMessages
+                    };
                     window = new MailMessageWindow
                     {
                         Items = CloneMailItems(cachedMessages, includeBodies: false),
@@ -3218,10 +3273,13 @@ namespace Task_Flyout.Services
                     _messageCache.Remove(key);
                 if (_persistentCache == null) return;
                 _persistentCache.Folders.Remove(accountId);
+                _persistentCache.FolderFetchedUtcTicks.Remove(accountId);
                 _persistentCache.AccountOrder.RemoveAll(id => string.Equals(id, accountId, StringComparison.Ordinal));
                 _persistentCache.FolderOrder.Remove(accountId);
                 foreach (var key in _persistentCache.Messages.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
                     _persistentCache.Messages.Remove(key);
+                foreach (var key in _persistentCache.MessageFetchedUtcTicks.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
+                    _persistentCache.MessageFetchedUtcTicks.Remove(key);
                 foreach (var key in _persistentCache.MessageCursors.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
                     _persistentCache.MessageCursors.Remove(key);
                 foreach (var key in _persistentCache.MessageHasMore.Keys.Where(key => key.StartsWith(accountId + "|", StringComparison.Ordinal)).ToList())
@@ -3266,6 +3324,7 @@ namespace Task_Flyout.Services
                         var unreadKey = GetMessageCacheKey(item.AccountId, folderId, true);
                         _messageCache.Remove(unreadKey);
                         _persistentCache?.Messages.Remove(unreadKey);
+                        _persistentCache?.MessageFetchedUtcTicks.Remove(unreadKey);
                         _persistentCache?.MessageCursors.Remove(unreadKey);
                         _persistentCache?.MessageHasMore.Remove(unreadKey);
                     }
@@ -3307,9 +3366,74 @@ namespace Task_Flyout.Services
                 }
 
                 _persistentCache ??= new MailPersistentCache();
-                if (MailPersistentCachePolicy.Normalize(_persistentCache, DateTimeOffset.UtcNow, MaxPageSize))
+                var now = DateTimeOffset.UtcNow;
+                bool dirty = MailPersistentCachePolicy.Normalize(
+                    _persistentCache,
+                    now,
+                    MaxPageSize,
+                    removeExpiredMutations: false);
+                var expired = MailPendingMutationPolicy.RemoveExpiredItems(_persistentCache.PendingMutations, now);
+                foreach (var mutation in expired)
+                    InvalidatePendingMutationCacheLocked(mutation);
+                if (dirty || expired.Count > 0)
                     SavePersistentCache();
             }
+        }
+
+        private void InvalidatePendingMutationCacheLocked(PendingMailMutation mutation)
+        {
+            if (_persistentCache == null) return;
+
+            var target = new MailItem
+            {
+                AccountId = mutation.AccountId,
+                FolderId = mutation.FolderId,
+                Id = mutation.MessageId,
+                ImapUidValidity = mutation.ImapUidValidity
+            };
+            var affectedFolderIds = new HashSet<string>(StringComparer.Ordinal);
+            if (!string.IsNullOrWhiteSpace(mutation.FolderId))
+                affectedFolderIds.Add(mutation.FolderId);
+            var affectedKeys = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var pair in _messageCache)
+            {
+                var matches = pair.Value.Value
+                    .Where(item => MailMutationCachePolicy.IsSameProviderIdentity(item, target, mutation.ProviderKind))
+                    .ToList();
+                if (matches.Count == 0) continue;
+                affectedKeys.Add(pair.Key);
+                affectedFolderIds.UnionWith(matches.Select(item => item.FolderId));
+            }
+
+            foreach (var pair in _persistentCache.Messages)
+            {
+                var matches = pair.Value
+                    .Where(item => MailMutationCachePolicy.IsSameProviderIdentity(item, target, mutation.ProviderKind))
+                    .ToList();
+                if (matches.Count == 0) continue;
+                affectedKeys.Add(pair.Key);
+                affectedFolderIds.UnionWith(matches.Select(item => item.FolderId));
+            }
+
+            foreach (var folderId in affectedFolderIds.Where(id => !string.IsNullOrWhiteSpace(id)))
+            {
+                affectedKeys.Add(GetMessageCacheKey(mutation.AccountId, folderId, unreadOnly: false));
+                affectedKeys.Add(GetMessageCacheKey(mutation.AccountId, folderId, unreadOnly: true));
+            }
+
+            foreach (var key in affectedKeys)
+            {
+                _messageCache.Remove(key);
+                _persistentCache.Messages.Remove(key);
+                _persistentCache.MessageFetchedUtcTicks.Remove(key);
+                _persistentCache.MessageCursors.Remove(key);
+                _persistentCache.MessageHasMore.Remove(key);
+            }
+
+            _folderCache.Remove(mutation.AccountId);
+            _persistentCache.Folders.Remove(mutation.AccountId);
+            _persistentCache.FolderFetchedUtcTicks.Remove(mutation.AccountId);
         }
 
         private void SavePersistentCache()
@@ -3401,12 +3525,14 @@ namespace Task_Flyout.Services
         private void UpdateFolderWindow(string key, List<MailFolder> folders)
         {
             EnsurePersistentCacheLoaded();
+            var fetchedAt = DateTimeOffset.UtcNow;
             lock (_mailCacheLock)
             {
                 if (_persistentCache == null) return;
                 var orderedFolders = ApplyFolderOrder(key, folders);
                 _persistentCache.Folders[key] = orderedFolders;
-                _folderCache[key] = new CacheEntry<List<MailFolder>> { Value = orderedFolders };
+                _persistentCache.FolderFetchedUtcTicks[key] = fetchedAt.UtcTicks;
+                _folderCache[key] = new CacheEntry<List<MailFolder>> { CreatedAt = fetchedAt, Value = orderedFolders };
             }
 
             SavePersistentCache();
@@ -3436,32 +3562,67 @@ namespace Task_Flyout.Services
             }
         }
 
-        private MailMessageWindow CommitMessagePage(string key, MailProviderPage page, bool append)
+        private MailMessageWindow CommitMessagePage(
+            MailAccount account,
+            MailFolder folder,
+            bool unreadOnly,
+            string key,
+            MailProviderPage page,
+            bool append)
         {
             EnsurePersistentCacheLoaded();
             List<MailItem> windowItems;
             bool hasMore;
+            var fetchedAt = DateTimeOffset.UtcNow;
             lock (_mailCacheLock)
             {
                 if (_persistentCache == null) return new MailMessageWindow();
-                var currentItems = append && _persistentCache.Messages.TryGetValue(key, out var current)
+                var currentItems = _persistentCache.Messages.TryGetValue(key, out var current)
                     ? current
-                    : Enumerable.Empty<MailItem>();
-                windowItems = currentItems.Concat(page.Items)
-                    .GroupBy(item => item.Id, StringComparer.Ordinal)
-                    .Select(group => group.First())
-                    .OrderByDescending(item => item.RawReceivedTime)
-                    .Take(MaxPageSize)
+                    : new List<MailItem>();
+                var pending = _persistentCache.PendingMutations
+                    .Where(mutation => mutation.AccountId == account.Id && mutation.ProviderKind == account.Kind)
                     .ToList();
+
+                if (unreadOnly)
+                {
+                    var existingUnreadItems = EnumerateCachedMessagesLocked()
+                        .SelectMany(messages => messages)
+                        .Where(item => string.Equals(item.AccountId, account.Id, StringComparison.Ordinal) &&
+                                       string.Equals(item.FolderId, folder.Id, StringComparison.Ordinal) &&
+                                       !item.IsRead)
+                        .ToList();
+                    var providerItems = append ? currentItems.Concat(page.Items) : page.Items;
+                    windowItems = MailUnreadSnapshotPolicy.Reconcile(
+                        existingUnreadItems,
+                        providerItems,
+                        isComplete: !append && !page.HasMore,
+                        account.Kind,
+                        account.Id,
+                        folder.Id,
+                        pending,
+                        MaxPageSize).Items;
+                }
+                else
+                {
+                    windowItems = (append ? currentItems.Concat(page.Items) : page.Items)
+                        .GroupBy(item => item.Id, StringComparer.Ordinal)
+                        .Select(group => group.First())
+                        .OrderByDescending(item => item.RawReceivedTime)
+                        .Take(MaxPageSize)
+                        .ToList();
+                    MailUnreadSnapshotPolicy.ApplyPendingMutations(windowItems, account.Kind, account.Id, pending);
+                }
                 hasMore = page.HasMore && windowItems.Count < MaxPageSize;
 
                 _persistentCache.Messages[key] = StripBodies(windowItems);
+                _persistentCache.MessageFetchedUtcTicks[key] = fetchedAt.UtcTicks;
                 if (!hasMore || page.NextCursor == null)
                     _persistentCache.MessageCursors.Remove(key);
                 else
                     _persistentCache.MessageCursors[key] = page.NextCursor;
                 _persistentCache.MessageHasMore[key] = hasMore;
-                _messageCache[key] = new CacheEntry<List<MailItem>> { Value = StripBodies(windowItems) };
+                _messageCache[key] = new CacheEntry<List<MailItem>> { CreatedAt = fetchedAt, Value = StripBodies(windowItems) };
             }
             SavePersistentCache();
             return new MailMessageWindow
@@ -3515,19 +3676,28 @@ namespace Task_Flyout.Services
             item.HtmlBody = Truncate(item.HtmlBody ?? "", MaxHtmlBodyChars);
         }
 
-        private void MergeMessagesIntoPersistentCache(string accountId, string folderId, List<MailItem> newMessages)
+        private List<MailItem> MergeMessagesIntoPersistentCache(MailAccount account, MailFolder folder, MailProviderPage page)
         {
             EnsurePersistentCacheLoaded();
-            if (newMessages.Count == 0) return;
-
-            var strippedNewMessages = StripBodies(newMessages);
+            var strippedProviderItems = StripBodies(page.Items);
+            var currentProviderItems = new List<MailItem>();
             bool changed = false;
             lock (_mailCacheLock)
             {
-                if (_persistentCache == null) return;
+                if (_persistentCache == null) return currentProviderItems;
+                var pending = _persistentCache.PendingMutations
+                    .Where(mutation => mutation.AccountId == account.Id && mutation.ProviderKind == account.Kind)
+                    .ToList();
+                MailUnreadSnapshotPolicy.ApplyPendingMutations(
+                    strippedProviderItems,
+                    account.Kind,
+                    account.Id,
+                    pending);
+                currentProviderItems = strippedProviderItems.Where(item => !item.IsRead).ToList();
+
                 foreach (bool unreadOnly in new[] { true, false })
                 {
-                    var key = GetMessageCacheKey(accountId, folderId, unreadOnly);
+                    var key = GetMessageCacheKey(account.Id, folder.Id, unreadOnly);
                     List<MailItem> existing;
                     if (_persistentCache.Messages.TryGetValue(key, out var cached))
                     {
@@ -3548,21 +3718,60 @@ namespace Task_Flyout.Services
                     else
                         continue;
 
-                    var merged = MailNotificationNavigationPolicy.MergePolledMessages(
-                        existing,
-                        strippedNewMessages,
-                        unreadOnly,
-                        MaxPageSize);
-                    if (merged.Count == 0) continue;
+                    List<MailItem> merged;
+                    if (unreadOnly)
+                    {
+                        var existingUnreadItems = EnumerateCachedMessagesLocked()
+                            .SelectMany(messages => messages)
+                            .Where(item => string.Equals(item.AccountId, account.Id, StringComparison.Ordinal) &&
+                                           string.Equals(item.FolderId, folder.Id, StringComparison.Ordinal) &&
+                                           !item.IsRead)
+                            .ToList();
+                        merged = MailUnreadSnapshotPolicy.Reconcile(
+                            existingUnreadItems,
+                            currentProviderItems,
+                            isComplete: !page.HasMore,
+                            account.Kind,
+                            account.Id,
+                            folder.Id,
+                            pending,
+                            MaxPageSize).Items;
+                    }
+                    else
+                    {
+                        merged = MailNotificationNavigationPolicy.MergePolledMessages(
+                            existing,
+                            currentProviderItems,
+                            unreadOnly: false,
+                            MaxPageSize);
+                        MailUnreadSnapshotPolicy.ApplyPendingMutations(merged, account.Kind, account.Id, pending);
+                    }
 
                     _persistentCache.Messages[key] = StripBodies(merged);
-                    _messageCache[key] = new CacheEntry<List<MailItem>> { Value = StripBodies(_persistentCache.Messages[key]) };
+                    DateTimeOffset fetchedAt = _messageCache.TryGetValue(key, out var existingEntry)
+                        ? existingEntry.CreatedAt
+                        : _persistentCache.MessageFetchedUtcTicks.TryGetValue(key, out var fetchedUtcTicks)
+                            ? new DateTimeOffset(fetchedUtcTicks, TimeSpan.Zero)
+                            : DateTimeOffset.MinValue;
+                    if (unreadOnly && !page.HasMore)
+                    {
+                        fetchedAt = DateTimeOffset.UtcNow;
+                        _persistentCache.MessageFetchedUtcTicks[key] = fetchedAt.UtcTicks;
+                        _persistentCache.MessageCursors.Remove(key);
+                        _persistentCache.MessageHasMore[key] = false;
+                    }
+                    _messageCache[key] = new CacheEntry<List<MailItem>>
+                    {
+                        CreatedAt = fetchedAt,
+                        Value = StripBodies(_persistentCache.Messages[key])
+                    };
                     changed = true;
                 }
             }
 
             if (changed)
                 SavePersistentCache();
+            return currentProviderItems;
         }
 
         public MailItem? TryGetCachedMessage(string accountId, string folderId, string messageId)

@@ -47,7 +47,7 @@ namespace Task_Flyout.Services
             return Math.Max(0, unreadCount.Value + (newRead ? -1 : 1));
         }
 
-        private static bool IsSameProviderIdentity(MailItem item, MailItem target, MailAccountKind providerKind)
+        internal static bool IsSameProviderIdentity(MailItem item, MailItem target, MailAccountKind providerKind)
         {
             if (!string.Equals(item.AccountId, target.AccountId, StringComparison.Ordinal) ||
                 !string.Equals(item.Id, target.Id, StringComparison.Ordinal))

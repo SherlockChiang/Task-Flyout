@@ -1573,9 +1573,28 @@ They are historical records; active work remains in the backlog tables above.
   remain scoped to account, folder, UIDVALIDITY, and UID.
 - Read-state changes collect unique affected folder IDs before invalidating
   unread-only windows and adjusting each cached folder representation once.
-  Authoritative polling reconciliation, cache timestamps, pending-intent
-  overlays, open-page publications, and notification withdrawal remain in the
-  next M1-14 slice.
+  Open-page publications and notification withdrawal remain in the final
+  M1-14 slice.
 - The focused cache-policy tests pass 8/8, the complete managed suite passes
   1197/1197, and the Debug x64 app build completes with zero warnings and zero
   errors. Existing user-owned manifest and Windhawk changes remain excluded.
+
+### 2026-09-03 Mail Authoritative Unread Reconciliation
+
+- Provider pages now retain their continuation state through background polls.
+  A complete unread snapshot replaces the cached unread set, including an
+  empty result; a truncated five-message poll only merges its known prefix and
+  cannot delete unknown older unread mail.
+- Current queued read and flag intents are applied before provider results enter
+  memory or persistent caches. Google and Outlook pending intents converge by
+  account-scoped provider identity, while IMAP retry identity includes folder,
+  UIDVALIDITY, and UID. Expired or permanently failed retries invalidate their
+  optimistic message and folder windows so stale state must be refetched.
+- Folder and message windows persist their actual provider-fetch timestamps.
+  Missing, expired, future, or orphaned timestamps cannot grant a restored
+  cache a fresh ten-minute lifetime, and partial background merges do not renew
+  an existing window's age.
+- The complete managed suite passes 1211/1211 and the Debug x64 app build
+  completes with zero warnings and zero errors. M1-14 remains in progress for
+  open-page cache publication, forced folder-count refresh, and deterministic
+  mail-toast withdrawal.
