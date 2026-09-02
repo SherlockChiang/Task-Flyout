@@ -112,6 +112,11 @@ Required order from the observed console state:
 5. Return to Verification Center only after `Prepare for verification` becomes
    enabled.
 
+As of 2026-09-02, step 3 is complete: Data Access was saved with exactly
+Calendar, Tasks, and Gmail Modify. The scope-justification fields and YouTube
+field remain empty, and Verification Center still requires the brand to be
+verified and published before `Prepare for verification` can be used.
+
 ## Paste-Ready Scope Justification
 
 Task Flyout is a local-first Windows 11 productivity app. Users explicitly

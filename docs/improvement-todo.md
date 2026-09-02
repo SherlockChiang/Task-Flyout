@@ -1516,3 +1516,13 @@ They are historical records; active work remains in the backlog tables above.
   resolved, publish the verified brand, reduce Data Access to the three current
   scopes, provide the unlisted English demo and synthetic reviewer account, and
   submit the new Verification Center request.
+
+### 2026-09-02 Google Data Access Scope Reduction
+
+- In the `mytaskflyout` project, `gmail.readonly` and `gmail.send` were removed
+  and the change was saved. Data Access now contains exactly Calendar, Tasks,
+  and Gmail Modify, matching the current build and public disclosures.
+- Verification Center still reports that the brand is not displayed and keeps
+  `Prepare for verification` disabled. Scope justifications, the YouTube demo,
+  reviewer instructions, and synthetic credentials remain pending external
+  submission work. M0-06 remains `BLOCKED` until Branding is published.
