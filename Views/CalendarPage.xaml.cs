@@ -977,11 +977,21 @@ namespace Task_Flyout.Views
                     .ThenBy(i => i.Subtitle);
                 foreach (var item in sortedItems)
                 {
+                    bool isAllDay = IsAllDaySubtitle(item.Subtitle);
+                    string allDayText = _loader.GetStringOrDefault("TextAllDay") ?? "All Day";
+                    string timeText = item.IsEvent
+                        ? CalendarEventTimePolicy.FormatTimeRange(
+                            item.StartDateTime,
+                            item.EndDateTime,
+                            isAllDay,
+                            allDayText,
+                            item.Subtitle)
+                        : item.Subtitle;
                     var displayItem = new AgendaItem
                     {
                         Id = item.Id,
                         Title = item.Title,
-                        Subtitle = $"{itemDate.ToString("M", LocalizationHelper.AppCulture)}\n{(IsAllDaySubtitle(item.Subtitle) ? (_loader.GetStringOrDefault("TextAllDay") ?? "All Day") : item.Subtitle)}",
+                        Subtitle = $"{itemDate.ToString("M", LocalizationHelper.AppCulture)}\n{timeText}",
                         Location = item.Location,
                         Description = item.Description,
                         IsEvent = item.IsEvent,
@@ -1334,21 +1344,15 @@ namespace Task_Flyout.Views
 
             if (DateTime.TryParse(item.DateKey, out var d)) EditDatePicker.Date = d;
 
-            var timePart = item.Subtitle?.Split('\n').LastOrDefault()?.Trim();
-            if (timePart == _loader.GetStringOrDefault("TextAllDay") || string.IsNullOrEmpty(timePart))
-            {
-                EditChkAllDay.IsChecked = true;
-                EditStartTimePicker.SelectedTime = null;
-                EditEndTimePicker.SelectedTime = null;
-            }
-            else
-            {
-                EditChkAllDay.IsChecked = false;
-                var times = timePart.Split('-');
-                if (times.Length >= 1 && TimeSpan.TryParse(times[0].Trim(), out var st)) EditStartTimePicker.SelectedTime = st;
-                if (times.Length >= 2 && TimeSpan.TryParse(times[1].Trim(), out var et)) EditEndTimePicker.SelectedTime = et;
-                else if (EditStartTimePicker.SelectedTime.HasValue) EditEndTimePicker.SelectedTime = EditStartTimePicker.SelectedTime.Value.Add(TimeSpan.FromHours(1));
-            }
+            bool isAllDay = IsAllDaySubtitle(item.Subtitle);
+            var editorTime = CalendarEventTimePolicy.CreateEditorState(
+                item.StartDateTime,
+                item.EndDateTime,
+                isAllDay,
+                item.Subtitle);
+            EditChkAllDay.IsChecked = editorTime.IsAllDay;
+            EditStartTimePicker.SelectedTime = editorTime.StartTime;
+            EditEndTimePicker.SelectedTime = editorTime.EndTime;
 
             EditRadioType_Changed(null, null);
         }
@@ -1438,12 +1442,21 @@ namespace Task_Flyout.Views
                         if (original != null)
                         {
                             var oldDateKey = original.DateKey;
+                            var updatedTime = SyncEventTimePolicy.Create(
+                                EditDatePicker.Date.DateTime,
+                                newStartTime,
+                                newEndTime);
                             oldList.Remove(original);
                             original.Title = EditTxtTitle.Text;
                             original.Location = EditTxtLocation.Text;
                             original.Description = EditTxtDescription.Text;
                             original.DateKey = newDateKey;
-                            original.Subtitle = newSubtitleText;
+                            if (original.IsEvent)
+                            {
+                                original.Subtitle = newSubtitleText;
+                                original.StartDateTime = updatedTime.Start;
+                                original.EndDateTime = updatedTime.End;
+                            }
                             if (!_localCache.DayItems.ContainsKey(newDateKey)) _localCache.DayItems[newDateKey] = new List<AgendaItem>();
                             _localCache.DayItems[newDateKey].Add(original);
                             await _syncManager.UpsertCachedItemAsync(original, oldDateKey);

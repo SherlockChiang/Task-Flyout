@@ -165,7 +165,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <ScrollViewer Grid.Column="0" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Auto"
+                <ScrollViewer Grid.Column="0" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Hidden"
                               VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Horizontal" Spacing="12">
                 <Button x:Uid="CalendarPage_BtnToggleAccounts" x:Name="ToggleAccountPaneButton" AutomationProperties.AutomationId="CalendarToggleAccounts" Width="40" Height="36" Padding="0" Background="Transparent" BorderThickness="0"

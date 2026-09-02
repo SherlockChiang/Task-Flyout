@@ -719,7 +719,7 @@ namespace Task_Flyout.Services
 
                 sb.Append(key).Append('=');
                 foreach (var line in items
-                    .Select(i => $"{i.Provider}{i.Id}{i.Title}{i.IsCompleted}{(i.StartDateTime?.Ticks ?? 0)}{i.Subtitle}")
+                    .Select(i => $"{i.Provider}{i.Id}{i.Title}{i.IsCompleted}{(i.StartDateTime?.Ticks ?? 0)}{(i.EndDateTime?.Ticks ?? 0)}{i.Subtitle}")
                     .OrderBy(s => s, StringComparer.Ordinal))
                 {
                     sb.Append(line).Append('');
