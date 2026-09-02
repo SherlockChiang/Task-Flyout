@@ -113,7 +113,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M1-13 | DONE | Reliability/Mail | Open new-mail notification targets directly after background-only polling. | Polling keeps a bounded body-free unread metadata slice without presenting it as a complete folder window; activation resolves explicit Inbox aliases, falls back across folders only for Google/Outlook identities, and never treats IMAP UIDs as cross-folder identities. | `fix(mail): open notification targets reliably` |
 | M1-14 | TODO | Data integrity/Mail | Keep unread state coherent across provider, folder views, cache, notifications, and background polling. | Read/unread mutations update every cached identity for the account, reconcile authoritative provider state after refresh, and cannot resurrect stale unread badges or notifications. | `fix(mail): synchronize unread state consistently` |
 | M1-15 | TODO | Reliability/Calendar | Correct event editor times, timeline duration, date-strip overflow, and automatic refresh. | Existing events hydrate both start and end controls; the day timeline renders the complete interval; the date header has no unintended horizontal scrollbar; foreground and hidden refresh paths reliably publish fresh data without overlap or stale replacement. | `fix(calendar): align event times and automatic refresh` |
-| M1-16 | TODO | Reliability/Flyout | Reliably dismiss an unpinned Flyout when focus moves elsewhere. | A focus loss during either the opening transition or the fully open state closes the Flyout exactly once; pinned behavior is preserved; rapid tray toggles cannot strand a visible Flyout. | `fix(flyout): close reliably on focus loss` |
+| M1-16 | DONE | Reliability/Flyout | Reliably dismiss an unpinned Flyout when focus moves elsewhere. | A focus loss during either the opening transition or the fully open state closes the Flyout exactly once; pinned behavior is preserved; rapid tray toggles cannot strand a visible Flyout. | `fix(flyout): close reliably on focus loss` |
 
 ### P2 - Long-Running Efficiency, Architecture, And UI Quality
 
@@ -1530,3 +1530,17 @@ They are historical records; active work remains in the backlog tables above.
   `Prepare for verification` disabled. Scope justifications, the YouTube demo,
   reviewer instructions, and synthetic credentials remain pending external
   submission work. M0-06 remains `BLOCKED` until Branding is published.
+
+### 2026-09-02 Flyout Focus-Loss Dismissal
+
+- The Flyout now rechecks the actual foreground host when its opening
+  transition completes. If focus moved elsewhere while the dependency's open
+  animation was suppressing `Hide()`, an unpinned Flyout closes instead of
+  allowing the completion path to reclaim focus.
+- The foreground probe recognizes only this process's DesktopFlyout host and
+  fails open when Windows cannot provide a foreground handle. Pinned mode and
+  an explicitly disabled `HideOnLostFocus` remain unaffected.
+- `FlyoutDismissalPolicyTests` cover focused, unfocused, pinned, disabled, and
+  unknown-focus cases. The Debug x64 app build completes with zero warnings and
+  zero errors; packaged-runtime rapid-click validation remains in the final
+  four-item test pass.

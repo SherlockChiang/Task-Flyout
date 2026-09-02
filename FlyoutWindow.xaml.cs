@@ -1035,6 +1035,18 @@ namespace Task_Flyout
         {
             if (IsOpen)
             {
+                bool focusStateKnown = FlyoutForegroundProbe.TryIsCurrentFlyoutForeground(
+                    out bool isFlyoutForeground);
+                if (FlyoutDismissalPolicy.ShouldDismissAfterOpening(
+                        _isPinned,
+                        HideOnLostFocus,
+                        focusStateKnown,
+                        isFlyoutForeground))
+                {
+                    HideFlyout(autoHide: true);
+                    return;
+                }
+
                 _showPending = false;
                 _openRequestIssued = false;
                 if (!_desiredOpen)
