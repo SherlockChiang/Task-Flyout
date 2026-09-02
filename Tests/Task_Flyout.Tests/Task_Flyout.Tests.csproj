@@ -130,6 +130,7 @@
     <Compile Include="..\..\Services\MailMutationCachePolicy.cs" Link="Source\MailMutationCachePolicy.cs" />
     <Compile Include="..\..\Services\MailMoveCachePolicy.cs" Link="Source\MailMoveCachePolicy.cs" />
     <Compile Include="..\..\Services\GmailLabelMutationPolicy.cs" Link="Source\GmailLabelMutationPolicy.cs" />
+    <Compile Include="..\..\Services\GoogleItemContainerPolicy.cs" Link="Source\GoogleItemContainerPolicy.cs" />
     <Compile Include="..\..\Services\ImapMovePolicy.cs" Link="Source\ImapMovePolicy.cs" />
     <Compile Include="..\..\Services\MailBulkMutationPolicy.cs" Link="Source\MailBulkMutationPolicy.cs" />
     <Compile Include="..\..\Services\MailCacheRepository.cs" Link="Source\MailCacheRepository.cs" />

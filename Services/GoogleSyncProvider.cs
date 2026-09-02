@@ -434,7 +434,8 @@ namespace Task_Flyout.Services
             {
                 await EnsureAuthorizedAsync();
                 var calendarSvc = CalendarSvc!;
-                var ev = await calendarSvc.Events.Get("primary", itemId).ExecuteAsync();
+                string calendarId = GoogleItemContainerPolicy.ResolveCalendarId(taskListId);
+                var ev = await calendarSvc.Events.Get(calendarId, itemId).ExecuteAsync();
                 ev.Summary = title;
                 ev.Location = location;
                 ev.Description = description;
@@ -450,13 +451,13 @@ namespace Task_Flyout.Services
                     ev.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = window.Start };
                     ev.End = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = window.End };
                 }
-                await calendarSvc.Events.Update(ev, "primary", itemId).ExecuteAsync();
+                await calendarSvc.Events.Update(ev, calendarId, itemId).ExecuteAsync();
             }
             else
             {
                 await EnsureAuthorizedAsync();
                 var tasksSvc = TasksSvc!;
-                taskListId = string.IsNullOrWhiteSpace(taskListId) ? "@default" : taskListId;
+                taskListId = GoogleItemContainerPolicy.ResolveTaskListId(taskListId);
                 var task = await tasksSvc.Tasks.Get(taskListId, itemId).ExecuteAsync();
                 task.Title = title;
                 task.Notes = description;
@@ -469,7 +470,7 @@ namespace Task_Flyout.Services
         {
             var status = isCompleted ? "completed" : "needsAction";
             await EnsureAuthorizedAsync();
-            taskListId = string.IsNullOrWhiteSpace(taskListId) ? "@default" : taskListId;
+            taskListId = GoogleItemContainerPolicy.ResolveTaskListId(taskListId);
             var updateRequest = TasksSvc!.Tasks.Patch(new Google.Apis.Tasks.v1.Data.Task { Id = taskId, Status = status }, taskListId, taskId);
             await updateRequest.ExecuteAsync();
         }
@@ -518,25 +519,26 @@ namespace Task_Flyout.Services
             {
                 if (CalendarSvc != null)
                 {
+                    string calendarId = GoogleItemContainerPolicy.ResolveCalendarId(taskListId);
                     if (recurringDeleteMode == RecurringDeleteMode.All && !string.IsNullOrWhiteSpace(recurringEventId))
                     {
-                        await CalendarSvc.Events.Delete("primary", recurringEventId).ExecuteAsync();
+                        await CalendarSvc.Events.Delete(calendarId, recurringEventId).ExecuteAsync();
                     }
                     else if (recurringDeleteMode == RecurringDeleteMode.ThisAndFollowing && !string.IsNullOrWhiteSpace(recurringEventId) && occurrenceDate.HasValue)
                     {
-                        var master = await CalendarSvc.Events.Get("primary", recurringEventId).ExecuteAsync();
+                        var master = await CalendarSvc.Events.Get(calendarId, recurringEventId).ExecuteAsync();
                         master.Recurrence = ClampGoogleRecurrence(master.Recurrence, occurrenceDate.Value.AddDays(-1));
-                        await CalendarSvc.Events.Update(master, "primary", recurringEventId).ExecuteAsync();
+                        await CalendarSvc.Events.Update(master, calendarId, recurringEventId).ExecuteAsync();
                     }
                     else
                     {
-                        await CalendarSvc.Events.Delete("primary", itemId).ExecuteAsync();
+                        await CalendarSvc.Events.Delete(calendarId, itemId).ExecuteAsync();
                     }
                 }
             }
             else
             {
-                taskListId = string.IsNullOrWhiteSpace(taskListId) ? "@default" : taskListId;
+                taskListId = GoogleItemContainerPolicy.ResolveTaskListId(taskListId);
                 await TasksSvc!.Tasks.Delete(taskListId, itemId).ExecuteAsync();
             }
         }

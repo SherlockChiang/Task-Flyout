@@ -112,7 +112,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M1-12 | DONE | Reliability/Calendar | Refresh agenda data while the Flyout remains hidden. | The app heartbeat force-refreshes the shared agenda range at the configured interval after account hydration, throttles failed attempts, invalidates the reminder snapshot, and checks upcoming events against the refreshed cache. | `fix(calendar): refresh agenda while flyout is hidden` |
 | M1-13 | DONE | Reliability/Mail | Open new-mail notification targets directly after background-only polling. | Polling keeps a bounded body-free unread metadata slice without presenting it as a complete folder window; activation resolves explicit Inbox aliases, falls back across folders only for Google/Outlook identities, and never treats IMAP UIDs as cross-folder identities. | `fix(mail): open notification targets reliably` |
 | M1-14 | TODO | Data integrity/Mail | Keep unread state coherent across provider, folder views, cache, notifications, and background polling. | Read/unread mutations update every cached identity for the account, reconcile authoritative provider state after refresh, and cannot resurrect stale unread badges or notifications. | `fix(mail): synchronize unread state consistently` |
-| M1-15 | TODO | Reliability/Calendar | Correct event editor times, timeline duration, date-strip overflow, and automatic refresh. | Existing events hydrate both start and end controls; the day timeline renders the complete interval; the date header has no unintended horizontal scrollbar; foreground and hidden refresh paths reliably publish fresh data without overlap or stale replacement. | `fix(calendar): align event times and automatic refresh` |
+| M1-15 | DONE | Reliability/Calendar | Correct event editor times, timeline duration, date-strip overflow, and automatic refresh. | Existing events hydrate both start and end controls; the day timeline renders the complete interval; the date header has no unintended horizontal scrollbar; foreground and hidden refresh paths reliably publish fresh data without overlap or stale replacement. | `fix(calendar): align event times and timeline`, `fix(calendar): publish background refreshes to open views`, `fix(google): route mutations to source calendar` |
 | M1-16 | DONE | Reliability/Flyout | Reliably dismiss an unpinned Flyout when focus moves elsewhere. | A focus loss during either the opening transition or the fully open state closes the Flyout exactly once; pinned behavior is preserved; rapid tray toggles cannot strand a visible Flyout. | `fix(flyout): close reliably on focus loss` |
 
 ### P2 - Long-Running Efficiency, Architecture, And UI Quality
@@ -1544,3 +1544,23 @@ They are historical records; active work remains in the backlog tables above.
   unknown-focus cases. The Debug x64 app build completes with zero warnings and
   zero errors; packaged-runtime rapid-click validation remains in the final
   four-item test pass.
+
+### 2026-09-02 Calendar Time And Refresh Consistency
+
+- Existing event dialogs now hydrate their controls from structured start and
+  end values instead of reconstructing them from display text. Legacy cache
+  entries retain a narrow parser fallback, and optimistic updates persist both
+  endpoints so reopening an edited event preserves its complete interval.
+- The right-side agenda renders start and end times, the toolbar no longer
+  exposes a horizontal scrollbar, and the cache content signature includes the
+  event end time so end-only provider changes are persisted.
+- Shared agenda-cache publications carry a monotonic version. A loaded Calendar
+  page coalesces notifications onto its dispatcher and redraws the current
+  month, week, year, and upcoming range without issuing another network fetch;
+  stale or reordered callbacks cannot replace a newer view.
+- Google mutations now target the source `CalendarId` for single events and all
+  recurring deletion modes, falling back to `primary` only for legacy records
+  without an ID. The managed suite passes 1193/1193 and the Debug x64 app build
+  completes with zero warnings and zero errors. The final packaged test pass
+  should still exercise an event from a non-primary Google calendar and
+  background refresh while the page is open.
