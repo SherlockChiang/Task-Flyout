@@ -524,6 +524,7 @@ namespace Task_Flyout
                 try
                 {
                     SyncManager.AccountManager.Load();
+                    SyncManager.HydrateAccountProviders();
                 }
                 catch (Exception ex)
                 {

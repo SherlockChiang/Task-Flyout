@@ -36,11 +36,19 @@ namespace Task_Flyout.Services
         private List<SubscribedCalendarInfo>? _cachedCalendarList;
         private DateTimeOffset _calendarListCacheExpiresAt = DateTimeOffset.MinValue;
         private static readonly string[] AllFeatureScopes = ProviderAuthorizationScopePolicy.GoogleAllFeatures;
+        private bool OwnsLegacyAuthorization
+            => GoogleAuthorizationNamespacePolicy.OwnsLegacyAuthorization(AccountId);
 
         public GoogleSyncProvider(string? accountId = null, string? accountDisplayName = null)
         {
             AccountId = AccountIdentityPolicy.ResolveAccountId(ProviderName, accountId);
             AccountDisplayName = accountDisplayName?.Trim() ?? string.Empty;
+        }
+
+        public void SetAccountDisplayName(string? displayName)
+        {
+            if (!string.IsNullOrWhiteSpace(displayName))
+                AccountDisplayName = displayName.Trim();
         }
 
         public async Task ClearLocalAuthorizationAsync()
@@ -53,23 +61,31 @@ namespace Task_Flyout.Services
 
             await new ProtectedGoogleDataStore(AccountId).ClearAsync();
 
-            string legacyTokenPath = ProviderAuthCleanup.GoogleLegacyTokenPath;
-            ProviderAuthCleanup.DeleteGoogleLegacyTokenStore(legacyTokenPath);
+            if (OwnsLegacyAuthorization)
+                ProviderAuthCleanup.DeleteGoogleLegacyTokenStore(ProviderAuthCleanup.GoogleLegacyTokenPath);
         }
 
-        public async Task ConnectInteractivelyAsync(CancellationToken cancellationToken = default)
+        public Task ConnectInteractivelyAsync(CancellationToken cancellationToken = default)
+            => ConnectInteractivelyAsync(selectAccount: false, cancellationToken);
+
+        public async Task ConnectInteractivelyAsync(bool selectAccount, CancellationToken cancellationToken = default)
         {
             await _authorizationLock.WaitAsync(cancellationToken);
             try
             {
                 string tokenPath = ProviderAuthCleanup.GoogleLegacyTokenPath;
                 var dataStore = new ProtectedGoogleDataStore(AccountId);
-                await TryMigrateLegacyTokenStoreAsync(tokenPath, dataStore);
-                UserCredential credential = await AuthorizeAsync(dataStore, AllFeatureScopes, cancellationToken);
+                if (OwnsLegacyAuthorization)
+                    await TryMigrateLegacyTokenStoreAsync(tokenPath, dataStore);
+                UserCredential credential = await AuthorizeAsync(
+                    dataStore,
+                    AllFeatureScopes,
+                    selectAccount ? "select_account" : null,
+                    cancellationToken);
                 if (!ProviderAuthorizationScopePolicy.HasAllScopes(GetGrantedScopes(credential.Token), AllFeatureScopes))
                 {
                     await dataStore.ClearAsync();
-                    credential = await AuthorizeAsync(dataStore, AllFeatureScopes, cancellationToken);
+                    credential = await AuthorizeAsync(dataStore, AllFeatureScopes, "consent", cancellationToken);
                 }
                 if (!ProviderAuthorizationScopePolicy.HasAllScopes(GetGrantedScopes(credential.Token), AllFeatureScopes))
                     throw new AuthorizationInteractionRequiredException(ProviderName, "Google did not grant all requested Task Flyout permissions.");
@@ -89,7 +105,8 @@ namespace Task_Flyout.Services
             {
                 if (CalendarSvc != null && TasksSvc != null && GmailSvc != null) return;
                 var dataStore = new ProtectedGoogleDataStore(AccountId);
-                await TryMigrateLegacyTokenStoreAsync(ProviderAuthCleanup.GoogleLegacyTokenPath, dataStore);
+                if (OwnsLegacyAuthorization)
+                    await TryMigrateLegacyTokenStoreAsync(ProviderAuthCleanup.GoogleLegacyTokenPath, dataStore);
                 var token = await dataStore.GetAsync<TokenResponse>("user");
                 if (token == null || string.IsNullOrWhiteSpace(token.RefreshToken)
                     || !ProviderAuthorizationScopePolicy.HasAllScopes(GetGrantedScopes(token), AllFeatureScopes))
@@ -126,34 +143,37 @@ namespace Task_Flyout.Services
             });
         }
 
-        private GoogleAuthorizationCodeFlow CreateAuthorizationFlow(IDataStore dataStore)
+        private GoogleAuthorizationCodeFlow CreateAuthorizationFlow(
+            IDataStore dataStore,
+            IEnumerable<string>? scopes = null,
+            string? prompt = null)
         {
             using var stream = OpenCredentialsStream();
             var secrets = GoogleClientSecrets.FromStream(stream).Secrets;
             return new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
             {
                 ClientSecrets = secrets,
-                Scopes = AllFeatureScopes,
-                DataStore = dataStore
+                Scopes = scopes ?? AllFeatureScopes,
+                DataStore = dataStore,
+                Prompt = prompt
             });
         }
 
         private static string[] GetGrantedScopes(TokenResponse? token)
             => token?.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
 
-        private async Task<UserCredential> AuthorizeAsync(IDataStore dataStore, string[] scopes, CancellationToken cancellationToken = default)
+        private async Task<UserCredential> AuthorizeAsync(
+            IDataStore dataStore,
+            string[] scopes,
+            string? prompt,
+            CancellationToken cancellationToken = default)
         {
             try
             {
-                using (var stream = OpenCredentialsStream())
-                {
-                    return await GoogleWebAuthorizationBroker.AuthorizeAsync(
-                        GoogleClientSecrets.FromStream(stream).Secrets,
-                        scopes,
-                        "user",
-                        cancellationToken,
-                        dataStore);
-                }
+                var installedApp = new AuthorizationCodeInstalledApp(
+                    CreateAuthorizationFlow(dataStore, scopes, prompt),
+                    new LocalServerCodeReceiver());
+                return await installedApp.AuthorizeAsync("user", cancellationToken);
             }
             catch (FileNotFoundException)
             {

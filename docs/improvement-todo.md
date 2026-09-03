@@ -1637,3 +1637,19 @@ They are historical records; active work remains in the backlog tables above.
   warnings and zero errors. M3-09 remains in progress for provider hydration,
   interactive account selection, per-account Gmail linkage, and account-aware UI
   add/remove/reconnect flows.
+
+### 2026-09-04 Google Provider Hydration And Account Selection
+
+- Deferred account hydration now restores one `GoogleSyncProvider` for every
+  saved Google account ID. Provider registration and removal use locked
+  snapshots so account changes cannot invalidate an in-flight sync enumeration.
+- New Google account flows can allocate an opaque provider identity and request
+  Google's `select_account` prompt. A missing-scope retry explicitly requests
+  consent while keeping the account-specific protected token store.
+- Only `legacy-google` may migrate or clear the former shared Google token.
+  Newly allocated accounts can no longer absorb an old credential and bypass
+  the account picker. Namespace-policy tests pass 13/13 and the Debug x64 app
+  build completes with zero warnings and zero errors.
+- M3-09 remains in progress for connecting the new provider from both account
+  entry points, linking each Gmail mailbox to its provider account ID, and
+  making create/remove/reconnect UI actions account-aware.

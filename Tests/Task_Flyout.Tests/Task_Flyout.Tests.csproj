@@ -92,6 +92,7 @@
     <Compile Include="..\..\Services\ProviderAuthCleanup.cs" Link="Source\ProviderAuthCleanup.cs" />
     <Compile Include="..\..\Services\ProviderAuthorizationLifecycle.cs" Link="Source\ProviderAuthorizationLifecycle.cs" />
     <Compile Include="..\..\Services\AccountIdentityPolicy.cs" Link="Source\AccountIdentityPolicy.cs" />
+    <Compile Include="..\..\Services\GoogleAuthorizationNamespacePolicy.cs" Link="Source\GoogleAuthorizationNamespacePolicy.cs" />
     <Compile Include="..\..\Services\ProviderAuthorizationScopePolicy.cs" Link="Source\ProviderAuthorizationScopePolicy.cs" />
     <Compile Include="..\..\Services\AuthorizationInteractionRequiredException.cs" Link="Source\AuthorizationInteractionRequiredException.cs" />
     <Compile Include="..\..\Services\OnboardingPolicy.cs" Link="Source\OnboardingPolicy.cs" />

@@ -15,10 +15,7 @@ namespace Task_Flyout.Services
         {
             string resolvedAccountId = AccountIdentityPolicy.ResolveAccountId("Google", accountId);
             _storeScope = $"google_token:{resolvedAccountId}";
-            _ownsLegacyScope = string.Equals(
-                resolvedAccountId,
-                AccountIdentityPolicy.CreateLegacyAccountId("Google"),
-                StringComparison.OrdinalIgnoreCase);
+            _ownsLegacyScope = GoogleAuthorizationNamespacePolicy.OwnsLegacyAuthorization(resolvedAccountId);
         }
 
         public async Task StoreAsync<T>(string key, T value)

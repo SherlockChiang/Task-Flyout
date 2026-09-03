@@ -44,6 +44,7 @@ namespace Task_Flyout.Services
     public class SyncManager
     {
         private readonly List<ISyncProvider> _providers = new();
+        private readonly object _providerLock = new();
         private AppCache _cache = new();
         private PublishedCacheSnapshot _publishedCache = new(0, new AppCache());
         private int _cacheLoaded;
@@ -58,24 +59,90 @@ namespace Task_Flyout.Services
         private const int RetainedTaskPastYears = 1;
         private const int RetainedTaskFutureYears = 3;
 
-        public IReadOnlyList<ISyncProvider> Providers => _providers;
+        public IReadOnlyList<ISyncProvider> Providers => GetProvidersSnapshot();
         public AccountManager AccountManager { get; } = new AccountManager();
         public event EventHandler? ProviderHealthChanged;
         internal event EventHandler<AgendaCachePublishedEventArgs>? CachePublished;
 
         public void RegisterProvider(ISyncProvider provider)
         {
-            if (_providers.Any(existing => string.Equals(existing.ProviderKey, provider.ProviderKey, StringComparison.OrdinalIgnoreCase)))
-                throw new InvalidOperationException("A sync provider with the same account identity is already registered.");
-            _providers.Add(provider);
+            ArgumentNullException.ThrowIfNull(provider);
+            lock (_providerLock)
+            {
+                if (_providers.Any(existing => string.Equals(existing.ProviderKey, provider.ProviderKey, StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("A sync provider with the same account identity is already registered.");
+                _providers.Add(provider);
+            }
+        }
+
+        public GoogleSyncProvider RegisterGoogleProviderForNewAccount()
+        {
+            while (true)
+            {
+                string accountId = AccountIdentityPolicy.CreateAccountId();
+                if (AccountManager.GetAccountById(accountId) != null || GetProvider("Google", accountId) != null)
+                    continue;
+
+                var provider = new GoogleSyncProvider(accountId);
+                RegisterProvider(provider);
+                return provider;
+            }
+        }
+
+        public GoogleSyncProvider EnsureGoogleProvider(string accountId, string? displayName = null)
+        {
+            string resolvedAccountId = AccountIdentityPolicy.ResolveAccountId("Google", accountId);
+            if (GetProvider("Google", resolvedAccountId) is GoogleSyncProvider existing)
+            {
+                existing.SetAccountDisplayName(displayName);
+                return existing;
+            }
+
+            var provider = new GoogleSyncProvider(resolvedAccountId, displayName);
+            RegisterProvider(provider);
+            return provider;
+        }
+
+        public void HydrateAccountProviders()
+        {
+            foreach (var account in AccountManager.Accounts
+                .Where(account => string.Equals(
+                    ProviderAuthorizationLifecycle.NormalizeProviderName(account.ProviderName),
+                    "Google",
+                    StringComparison.OrdinalIgnoreCase))
+                .ToList())
+            {
+                EnsureGoogleProvider(account.AccountId, account.DisplayName);
+            }
+        }
+
+        public bool UnregisterProvider(string providerName, string? accountId)
+        {
+            string providerKey = AccountIdentityPolicy.CreateProviderKey(providerName, accountId);
+            bool removed;
+            lock (_providerLock)
+            {
+                removed = _providers.RemoveAll(provider => string.Equals(
+                    provider.ProviderKey,
+                    providerKey,
+                    StringComparison.OrdinalIgnoreCase)) > 0;
+            }
+
+            if (removed)
+            {
+                _providerHealth.TryRemove(providerKey, out _);
+                ProviderHealthChanged?.Invoke(this, EventArgs.Empty);
+            }
+            return removed;
         }
 
         public ProviderHealthSnapshot GetProviderHealth(string providerName)
         {
-            var provider = _providers.FirstOrDefault(candidate =>
+            var providers = GetProvidersSnapshot();
+            var provider = providers.FirstOrDefault(candidate =>
                 string.Equals(candidate.ProviderName, providerName, StringComparison.OrdinalIgnoreCase)
                 && IsProviderConnected(candidate))
-                ?? _providers.FirstOrDefault(candidate =>
+                ?? providers.FirstOrDefault(candidate =>
                     string.Equals(candidate.ProviderName, providerName, StringComparison.OrdinalIgnoreCase));
             return GetProviderHealth(providerName, provider?.AccountId);
         }
@@ -98,11 +165,11 @@ namespace Task_Flyout.Services
         }
 
         public IReadOnlyList<ProviderHealthSnapshot> GetProviderHealthSnapshot()
-            => _providers.Select(provider => GetProviderHealth(provider.ProviderName, provider.AccountId)).ToList();
+            => GetProvidersSnapshot().Select(provider => GetProviderHealth(provider.ProviderName, provider.AccountId)).ToList();
 
         public async Task SyncAllCalendarsAsync()
         {
-            var activeProviders = _providers.Where(IsProviderConnected).ToList();
+            var activeProviders = GetProvidersSnapshot().Where(IsProviderConnected).ToList();
 
             foreach (var provider in activeProviders)
             {
@@ -367,7 +434,7 @@ namespace Task_Flyout.Services
             max = max.Date;
 
             var providerKey = string.Join(',',
-                _providers
+                GetProvidersSnapshot()
                     .Where(IsProviderConnected)
                     .Select(provider => provider.ProviderKey)
                     .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
@@ -386,7 +453,7 @@ namespace Task_Flyout.Services
             min = min.Date;
             max = max.Date;
 
-            var activeProviders = _providers.Where(IsProviderConnected).ToList();
+            var activeProviders = GetProvidersSnapshot().Where(IsProviderConnected).ToList();
             if (activeProviders.Count == 0)
                 return GetCachedItems(min, max);
 
@@ -521,7 +588,7 @@ namespace Task_Flyout.Services
         {
             var provider = providerName != null
                 ? ResolveProvider(providerName, accountId)
-                : _providers.FirstOrDefault(IsProviderConnected);
+                : GetProvidersSnapshot().FirstOrDefault(IsProviderConnected);
             if (provider == null) return;
 
             if (isEvent)
@@ -580,7 +647,7 @@ namespace Task_Flyout.Services
 
         private ISyncProvider? ResolveProvider(string providerName, string? accountId)
         {
-            var matches = _providers.Where(provider => string.Equals(
+            var matches = GetProvidersSnapshot().Where(provider => string.Equals(
                 provider.ProviderName,
                 ProviderAuthorizationLifecycle.NormalizeProviderName(providerName),
                 StringComparison.OrdinalIgnoreCase));
@@ -595,6 +662,12 @@ namespace Task_Flyout.Services
 
         private bool IsProviderConnected(ISyncProvider provider)
             => AccountManager.IsConnected(provider.ProviderName, provider.AccountId);
+
+        private List<ISyncProvider> GetProvidersSnapshot()
+        {
+            lock (_providerLock)
+                return _providers.ToList();
+        }
 
         private void EnsureCacheLoaded()
         {
