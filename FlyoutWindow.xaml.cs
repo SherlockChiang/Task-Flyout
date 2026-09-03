@@ -32,6 +32,7 @@ namespace Task_Flyout
     public class AgendaCacheRange
     {
         public string ProviderName { get; set; } = "";
+        public string AccountId { get; set; } = "";
         public string StartDateKey { get; set; } = "";
         public string EndDateKey { get; set; } = "";
     }
@@ -712,6 +713,7 @@ namespace Task_Flyout
                             IsTask = item.IsTask,
                             IsCompleted = item.IsCompleted,
                             Provider = item.Provider,
+                            AccountId = item.AccountId,
                             CalendarId = item.CalendarId,
                             ColorHex = item.ColorHex,
                             DateKey = item.DateKey
@@ -785,6 +787,7 @@ namespace Task_Flyout
                && left.IsTask == right.IsTask
                && left.IsCompleted == right.IsCompleted
                && left.Provider == right.Provider
+               && left.AccountId == right.AccountId
                && left.CalendarId == right.CalendarId
                && left.CalendarName == right.CalendarName
                && left.ColorHex == right.ColorHex
@@ -1292,10 +1295,10 @@ namespace Task_Flyout
                     item.IsCompleted = newValue;
                     if (App.Current is App app)
                     {
-                        var key = $"{item.Provider}|{item.CalendarId}|{item.Id}";
+                        var key = $"{item.ProviderKey}|{item.CalendarId}|{item.Id}";
                         var result = await app.TaskMutations.ExecuteAsync(
                             key,
-                            () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId),
+                            () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId, item.AccountId),
                             ShowTaskMutationState);
                         if (result.Phase == TaskMutationPhase.Failed)
                         {

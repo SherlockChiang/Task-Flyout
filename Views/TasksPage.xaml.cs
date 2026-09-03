@@ -183,7 +183,7 @@ namespace Task_Flyout.Views
         }
 
         private static string GetTaskIdentity(AgendaItem item)
-            => $"{item.Provider}|{item.Id}|{item.Title}|{item.DateKey}";
+            => $"{item.ProviderKey}|{item.Id}|{item.Title}|{item.DateKey}";
 
         private static DateTime GetTaskSortDate(AgendaItem item)
         {
@@ -213,7 +213,7 @@ namespace Task_Flyout.Views
                     var key = BuildMutationKey(item, "complete");
                     var result = await app.TaskMutations.ExecuteAsync(
                         key,
-                        () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId),
+                        () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId, item.AccountId),
                         ShowMutationState);
                     if (result.Phase == TaskMutationPhase.Failed)
                     {
@@ -253,7 +253,7 @@ namespace Task_Flyout.Views
         }
 
         private static string BuildMutationKey(AgendaItem item, string operation)
-            => $"{item.Provider}|{item.CalendarId}|{item.Id}";
+            => $"{item.ProviderKey}|{item.CalendarId}|{item.Id}";
 
         private void ShowMutationState(TaskMutationState state)
         {
@@ -421,7 +421,7 @@ namespace Task_Flyout.Views
                     var key = BuildMutationKey(item, "delete");
                     var mutation = await app.TaskMutations.ExecuteAsync(
                         key,
-                        () => _syncManager.DeleteItemAsync(item.Provider, item.Id, isEvent: false, taskListId: item.CalendarId),
+                        () => _syncManager.DeleteItemAsync(item.Provider, item.Id, isEvent: false, taskListId: item.CalendarId, accountId: item.AccountId),
                         ShowMutationState);
                     if (mutation.Phase == TaskMutationPhase.Failed)
                     {
@@ -656,9 +656,9 @@ namespace Task_Flyout.Views
                     var key = BuildMutationKey(item, "edit");
                     var mutation = await (App.Current as App)!.TaskMutations.ExecuteAsync(key, async () =>
                     {
-                        await _syncManager.UpdateItemAsync(item.Provider, item.Id, false, title, "", notesBox.Text, newDate, null, null, item.CalendarId);
+                        await _syncManager.UpdateItemAsync(item.Provider, item.Id, false, title, "", notesBox.Text, newDate, null, null, item.CalendarId, item.AccountId);
                         if (newCompleted != item.IsCompleted)
-                            await _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newCompleted, item.CalendarId);
+                            await _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newCompleted, item.CalendarId, item.AccountId);
                     }, ShowMutationState);
                     if (mutation.Phase == TaskMutationPhase.Failed)
                     {

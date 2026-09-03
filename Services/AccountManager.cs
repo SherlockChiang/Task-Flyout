@@ -37,7 +37,9 @@ namespace Task_Flyout.Services
                 MigrateFromLocalSettings();
             }
 
+            bool identitiesChanged = EnsureAccountIdentities();
             EnsureDefaultColors();
+            if (identitiesChanged) Save();
         }
 
         private void MigrateFromLocalSettings()
@@ -51,6 +53,7 @@ namespace Task_Flyout.Services
                 Accounts.Add(new ConnectedAccountInfo
                 {
                     ProviderName = "Google",
+                    AccountId = AccountIdentityPolicy.CreateLegacyAccountId("Google"),
                     ShowEvents = settings.Values["ShowGoogleEvents"] as bool? ?? true,
                     ShowTasks = settings.Values["ShowGoogleTasks"] as bool? ?? true
                 });
@@ -60,6 +63,7 @@ namespace Task_Flyout.Services
                 Accounts.Add(new ConnectedAccountInfo
                 {
                     ProviderName = "Microsoft",
+                    AccountId = AccountIdentityPolicy.CreateLegacyAccountId("Microsoft"),
                     ShowEvents = settings.Values["ShowMSEvents"] as bool? ?? true,
                     ShowTasks = settings.Values["ShowMSTasks"] as bool? ?? true
                 });
@@ -119,13 +123,49 @@ namespace Task_Flyout.Services
         }
 
         public ConnectedAccountInfo? GetAccount(string providerName)
-            => Accounts.FirstOrDefault(a => a.ProviderName == providerName);
+            => Accounts.FirstOrDefault(a => string.Equals(
+                ProviderAuthorizationLifecycle.NormalizeProviderName(a.ProviderName),
+                ProviderAuthorizationLifecycle.NormalizeProviderName(providerName),
+                StringComparison.OrdinalIgnoreCase));
+
+        public ConnectedAccountInfo? GetAccount(string providerName, string? accountId)
+        {
+            if (string.IsNullOrWhiteSpace(accountId)) return GetAccount(providerName);
+            return Accounts.FirstOrDefault(account => AccountIdentityPolicy.Matches(
+                account.ProviderName,
+                account.AccountId,
+                providerName,
+                accountId));
+        }
+
+        public ConnectedAccountInfo? GetAccountById(string? accountId)
+            => string.IsNullOrWhiteSpace(accountId)
+                ? null
+                : Accounts.FirstOrDefault(account => string.Equals(account.AccountId, accountId, StringComparison.OrdinalIgnoreCase));
 
         public bool IsConnected(string providerName)
-            => Accounts.Any(a => a.ProviderName == providerName);
+            => GetAccount(providerName) != null;
+
+        public bool IsConnected(string providerName, string? accountId)
+            => GetAccount(providerName, accountId) != null;
 
         public void AddAccount(ConnectedAccountInfo account)
         {
+            account.ProviderName = ProviderAuthorizationLifecycle.NormalizeProviderName(account.ProviderName);
+            if (string.IsNullOrWhiteSpace(account.AccountId))
+            {
+                account.AccountId = IsConnected(account.ProviderName)
+                    ? AccountIdentityPolicy.CreateAccountId()
+                    : AccountIdentityPolicy.CreateLegacyAccountId(account.ProviderName);
+            }
+            else
+            {
+                account.AccountId = account.AccountId.Trim();
+            }
+
+            if (GetAccountById(account.AccountId) != null)
+                throw new InvalidOperationException("An account with the same identity is already connected.");
+
             Accounts.Add(account);
             Save();
         }
@@ -140,9 +180,19 @@ namespace Task_Flyout.Services
             }
         }
 
-        public List<string> GetVisibleCalendarIds(string providerName)
+        public bool RemoveAccountById(string accountId)
         {
-            var account = GetAccount(providerName);
+            var account = GetAccountById(accountId);
+            if (account == null) return false;
+
+            Accounts.Remove(account);
+            Save();
+            return true;
+        }
+
+        public List<string> GetVisibleCalendarIds(string providerName, string? accountId = null)
+        {
+            var account = GetAccount(providerName, accountId);
             if (account == null) return new List<string>();
             return account.Calendars.Where(c => c.IsVisible).Select(c => c.Id).ToList();
         }
@@ -151,7 +201,7 @@ namespace Task_Flyout.Services
         {
             if (item == null || string.IsNullOrEmpty(item.Provider)) return true;
 
-            var account = GetAccount(item.Provider);
+            var account = GetAccount(item.Provider, item.AccountId);
             if (account == null) return false;
 
             if (item.IsTask) return account.ShowTasks;
@@ -175,7 +225,7 @@ namespace Task_Flyout.Services
         {
             if (item == null || string.IsNullOrEmpty(item.Provider)) return null;
 
-            var account = GetAccount(item.Provider);
+            var account = GetAccount(item.Provider, item.AccountId);
             if (account == null) return null;
 
             if (item.IsTask && !string.IsNullOrEmpty(account.TaskColorHex))
@@ -216,6 +266,48 @@ namespace Task_Flyout.Services
         {
             var color = GetColorForItem(item);
             if (color != null) item.ColorHex = color;
+        }
+
+        private bool EnsureAccountIdentities()
+        {
+            bool changed = false;
+            var usedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seenProviders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var account in Accounts)
+            {
+                string providerName = ProviderAuthorizationLifecycle.NormalizeProviderName(account.ProviderName);
+                if (!string.Equals(account.ProviderName, providerName, StringComparison.Ordinal))
+                {
+                    account.ProviderName = providerName;
+                    changed = true;
+                }
+
+                string accountId = account.AccountId?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(accountId) || usedIds.Contains(accountId))
+                {
+                    accountId = !seenProviders.Contains(providerName)
+                        ? AccountIdentityPolicy.CreateLegacyAccountId(providerName)
+                        : AccountIdentityPolicy.CreateAccountId();
+                    while (!usedIds.Add(accountId))
+                        accountId = AccountIdentityPolicy.CreateAccountId();
+                    account.AccountId = accountId;
+                    changed = true;
+                }
+                else
+                {
+                    usedIds.Add(accountId);
+                    if (!string.Equals(account.AccountId, accountId, StringComparison.Ordinal))
+                    {
+                        account.AccountId = accountId;
+                        changed = true;
+                    }
+                }
+
+                seenProviders.Add(providerName);
+            }
+
+            return changed;
         }
     }
 }

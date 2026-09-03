@@ -23,6 +23,9 @@ namespace Task_Flyout.Services
     public class GoogleSyncProvider : ISyncProvider
     {
         public string ProviderName => "Google";
+        public string AccountId { get; }
+        public string ProviderKey => AccountIdentityPolicy.CreateProviderKey(ProviderName, AccountId);
+        public string AccountDisplayName { get; private set; }
         public CalendarService? CalendarSvc { get; private set; }
         public TasksService? TasksSvc { get; private set; }
         public GmailService? GmailSvc { get; private set; }
@@ -34,6 +37,12 @@ namespace Task_Flyout.Services
         private DateTimeOffset _calendarListCacheExpiresAt = DateTimeOffset.MinValue;
         private static readonly string[] AllFeatureScopes = ProviderAuthorizationScopePolicy.GoogleAllFeatures;
 
+        public GoogleSyncProvider(string? accountId = null, string? accountDisplayName = null)
+        {
+            AccountId = AccountIdentityPolicy.ResolveAccountId(ProviderName, accountId);
+            AccountDisplayName = accountDisplayName?.Trim() ?? string.Empty;
+        }
+
         public async Task ClearLocalAuthorizationAsync()
         {
             CalendarSvc = null;
@@ -42,7 +51,7 @@ namespace Task_Flyout.Services
             _cachedCalendarList = null;
             _calendarListCacheExpiresAt = DateTimeOffset.MinValue;
 
-            await new ProtectedGoogleDataStore().ClearAsync();
+            await new ProtectedGoogleDataStore(AccountId).ClearAsync();
 
             string legacyTokenPath = ProviderAuthCleanup.GoogleLegacyTokenPath;
             ProviderAuthCleanup.DeleteGoogleLegacyTokenStore(legacyTokenPath);
@@ -54,7 +63,7 @@ namespace Task_Flyout.Services
             try
             {
                 string tokenPath = ProviderAuthCleanup.GoogleLegacyTokenPath;
-                var dataStore = new ProtectedGoogleDataStore();
+                var dataStore = new ProtectedGoogleDataStore(AccountId);
                 await TryMigrateLegacyTokenStoreAsync(tokenPath, dataStore);
                 UserCredential credential = await AuthorizeAsync(dataStore, AllFeatureScopes, cancellationToken);
                 if (!ProviderAuthorizationScopePolicy.HasAllScopes(GetGrantedScopes(credential.Token), AllFeatureScopes))
@@ -79,7 +88,7 @@ namespace Task_Flyout.Services
             try
             {
                 if (CalendarSvc != null && TasksSvc != null && GmailSvc != null) return;
-                var dataStore = new ProtectedGoogleDataStore();
+                var dataStore = new ProtectedGoogleDataStore(AccountId);
                 await TryMigrateLegacyTokenStoreAsync(ProviderAuthCleanup.GoogleLegacyTokenPath, dataStore);
                 var token = await dataStore.GetAsync<TokenResponse>("user");
                 if (token == null || string.IsNullOrWhiteSpace(token.RefreshToken)
@@ -364,7 +373,7 @@ namespace Task_Flyout.Services
                 {
                     Id = mapped.Id, Title = mapped.Title, Subtitle = mapped.Subtitle,
                     Location = mapped.Location, Description = mapped.Description, IsEvent = true,
-                    Provider = mapped.Provider, CalendarId = mapped.CalendarId,
+                    Provider = mapped.Provider, AccountId = AccountId, CalendarId = mapped.CalendarId,
                     CalendarName = mapped.CalendarName, DateKey = mapped.DateKey,
                     StartDateTime = mapped.StartDateTime, EndDateTime = mapped.EndDateTime,
                     IsRecurring = mapped.IsRecurring, RecurringEventId = mapped.RecurringEventId,
@@ -418,6 +427,7 @@ namespace Task_Flyout.Services
                             IsCompleted = mapped.IsCompleted,
                             Description = mapped.Description,
                             Provider = mapped.Provider,
+                            AccountId = AccountId,
                             CalendarId = mapped.CalendarId,
                             CalendarName = mapped.CalendarName,
                             DateKey = mapped.DateKey

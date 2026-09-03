@@ -1047,6 +1047,7 @@ namespace Task_Flyout.Views
                         IsTask = item.IsTask,
                         IsCompleted = item.IsCompleted,
                         Provider = item.Provider,
+                        AccountId = item.AccountId,
                         CalendarId = item.CalendarId,
                         CalendarName = item.CalendarName,
                         ColorHex = item.ColorHex,
@@ -1116,6 +1117,7 @@ namespace Task_Flyout.Views
                && left.IsTask == right.IsTask
                && left.IsCompleted == right.IsCompleted
                && left.Provider == right.Provider
+               && left.AccountId == right.AccountId
                && left.CalendarId == right.CalendarId
                && left.CalendarName == right.CalendarName
                && left.ColorHex == right.ColorHex
@@ -1138,10 +1140,10 @@ namespace Task_Flyout.Views
                     item.IsCompleted = newValue;
                     if (_syncManager != null && App.Current is App app)
                     {
-                        var key = $"{item.Provider}|{item.CalendarId}|{item.Id}";
+                        var key = $"{item.ProviderKey}|{item.CalendarId}|{item.Id}";
                         var result = await app.TaskMutations.ExecuteAsync(
                             key,
-                            () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId),
+                            () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId, item.AccountId),
                             ShowTaskMutationState);
                         if (result.Phase == TaskMutationPhase.Failed)
                         {
@@ -1483,7 +1485,7 @@ namespace Task_Flyout.Views
                     await _syncManager.UpdateItemAsync(
                         _itemBeingEdited.Provider, _itemBeingEdited.Id, _itemBeingEdited.IsEvent,
                         EditTxtTitle.Text, EditTxtLocation.Text, EditTxtDescription.Text,
-                         EditDatePicker.Date.DateTime, newStartTime, newEndTime, _itemBeingEdited.CalendarId);
+                         EditDatePicker.Date.DateTime, newStartTime, newEndTime, _itemBeingEdited.CalendarId, _itemBeingEdited.AccountId);
 
                     if (_localCache.DayItems.TryGetValue(_itemBeingEdited.DateKey, out var oldList))
                     {
@@ -1569,7 +1571,8 @@ namespace Task_Flyout.Views
                         deleteMode.Value,
                         occurrenceDate,
                         itemToDelete.RecurringEventId,
-                        itemToDelete.CalendarId);
+                        itemToDelete.CalendarId,
+                        itemToDelete.AccountId);
                 }
                 catch (Exception ex)
                 {

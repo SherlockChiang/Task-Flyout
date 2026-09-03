@@ -25,7 +25,11 @@ namespace Task_Flyout.Services
         ProviderHealthKind Kind,
         DateTimeOffset? LastAttemptUtc,
         DateTimeOffset? LastSuccessUtc,
-        bool HasCachedData);
+        bool HasCachedData)
+    {
+        public string AccountId { get; init; } = "";
+        public string ProviderKey => AccountIdentityPolicy.CreateProviderKey(ProviderName, AccountId);
+    }
 
     public sealed record VersionedDayItemsSnapshot(
         long Version,
@@ -59,25 +63,46 @@ namespace Task_Flyout.Services
         public event EventHandler? ProviderHealthChanged;
         internal event EventHandler<AgendaCachePublishedEventArgs>? CachePublished;
 
-        public void RegisterProvider(ISyncProvider provider) => _providers.Add(provider);
+        public void RegisterProvider(ISyncProvider provider)
+        {
+            if (_providers.Any(existing => string.Equals(existing.ProviderKey, provider.ProviderKey, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("A sync provider with the same account identity is already registered.");
+            _providers.Add(provider);
+        }
 
         public ProviderHealthSnapshot GetProviderHealth(string providerName)
         {
-            if (_providerHealth.TryGetValue(providerName, out var health)) return health;
+            var provider = _providers.FirstOrDefault(candidate =>
+                string.Equals(candidate.ProviderName, providerName, StringComparison.OrdinalIgnoreCase)
+                && IsProviderConnected(candidate))
+                ?? _providers.FirstOrDefault(candidate =>
+                    string.Equals(candidate.ProviderName, providerName, StringComparison.OrdinalIgnoreCase));
+            return GetProviderHealth(providerName, provider?.AccountId);
+        }
+
+        public ProviderHealthSnapshot GetProviderHealth(string providerName, string? accountId)
+        {
+            string resolvedAccountId = AccountIdentityPolicy.ResolveAccountId(providerName, accountId);
+            string providerKey = AccountIdentityPolicy.CreateProviderKey(providerName, resolvedAccountId);
+            if (_providerHealth.TryGetValue(providerKey, out var health)) return health;
+            bool hasCachedData = HasCachedData(providerName, resolvedAccountId);
             return new ProviderHealthSnapshot(
                 providerName,
-                HasCachedData(providerName) ? ProviderHealthKind.Cached : ProviderHealthKind.Ready,
+                hasCachedData ? ProviderHealthKind.Cached : ProviderHealthKind.Ready,
                 null,
                 null,
-                HasCachedData(providerName));
+                hasCachedData)
+            {
+                AccountId = resolvedAccountId
+            };
         }
 
         public IReadOnlyList<ProviderHealthSnapshot> GetProviderHealthSnapshot()
-            => _providers.Select(provider => GetProviderHealth(provider.ProviderName)).ToList();
+            => _providers.Select(provider => GetProviderHealth(provider.ProviderName, provider.AccountId)).ToList();
 
         public async Task SyncAllCalendarsAsync()
         {
-            var activeProviders = _providers.Where(p => AccountManager.IsConnected(p.ProviderName)).ToList();
+            var activeProviders = _providers.Where(IsProviderConnected).ToList();
 
             foreach (var provider in activeProviders)
             {
@@ -85,7 +110,7 @@ namespace Task_Flyout.Services
                 {
                     await provider.EnsureAuthorizedAsync();
                     var remoteCalendars = await provider.FetchCalendarListAsync();
-                    var account = AccountManager.GetAccount(provider.ProviderName);
+                    var account = AccountManager.GetAccount(provider.ProviderName, provider.AccountId);
 
                     if (account != null && remoteCalendars != null && remoteCalendars.Count > 0)
                     {
@@ -343,8 +368,8 @@ namespace Task_Flyout.Services
 
             var providerKey = string.Join(',',
                 _providers
-                    .Where(provider => AccountManager.IsConnected(provider.ProviderName))
-                    .Select(provider => provider.ProviderName)
+                    .Where(IsProviderConnected)
+                    .Select(provider => provider.ProviderKey)
                     .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
             var requestKey = $"{min:yyyy-MM-dd}|{max:yyyy-MM-dd}|{forceRefresh}|{providerKey}";
 
@@ -361,11 +386,11 @@ namespace Task_Flyout.Services
             min = min.Date;
             max = max.Date;
 
-            var activeProviders = _providers.Where(p => AccountManager.IsConnected(p.ProviderName)).ToList();
+            var activeProviders = _providers.Where(IsProviderConnected).ToList();
             if (activeProviders.Count == 0)
                 return GetCachedItems(min, max);
 
-            if (!forceRefresh && IsRangeCached(min, max, activeProviders.Select(provider => provider.ProviderName)))
+            if (!forceRefresh && IsRangeCached(min, max, activeProviders))
                 return GetCachedItems(min, max);
 
             var remoteSpan = PerformanceDiagnostics.StartSpanUntilSuccess(
@@ -375,33 +400,37 @@ namespace Task_Flyout.Services
                 "remote");
 
             var allItems = new List<AgendaItem>();
-            var successfulProviders = new List<string>();
-            var attemptedProviders = activeProviders.Select(provider => provider.ProviderName).ToList();
+            var successfulProviders = new List<ISyncProvider>();
 
             var fetchTasks = activeProviders.Select(async provider =>
             {
-                SetProviderHealth(provider.ProviderName, ProviderHealthKind.Syncing, DateTimeOffset.UtcNow, null);
+                SetProviderHealth(provider, ProviderHealthKind.Syncing, DateTimeOffset.UtcNow, null);
                 try
                 {
                     await provider.EnsureAuthorizedAsync(cancellationToken);
                     var items = await provider.FetchDataAsync(min, max, cancellationToken);
-                    SetProviderHealth(provider.ProviderName, ProviderHealthKind.Ready, null, DateTimeOffset.UtcNow);
-                    return (Provider: provider.ProviderName, Items: items ?? new List<AgendaItem>(), Success: true);
+                    foreach (var item in items ?? Enumerable.Empty<AgendaItem>())
+                    {
+                        if (string.IsNullOrWhiteSpace(item.Provider)) item.Provider = provider.ProviderName;
+                        if (string.IsNullOrWhiteSpace(item.AccountId)) item.AccountId = provider.AccountId;
+                    }
+                    SetProviderHealth(provider, ProviderHealthKind.Ready, null, DateTimeOffset.UtcNow);
+                    return (Provider: provider, Items: items ?? new List<AgendaItem>(), Success: true);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
                 catch (AuthorizationInteractionRequiredException)
                 {
-                    SetProviderHealth(provider.ProviderName, ProviderHealthKind.ReconnectRequired, null, null);
-                    return (Provider: provider.ProviderName, Items: new List<AgendaItem>(), Success: false);
+                    SetProviderHealth(provider, ProviderHealthKind.ReconnectRequired, null, null);
+                    return (Provider: provider, Items: new List<AgendaItem>(), Success: false);
                 }
                 catch
                 {
-                    SetProviderHealth(provider.ProviderName, HasCachedData(provider.ProviderName) ? ProviderHealthKind.Cached : ProviderHealthKind.Failed, null, null);
-                    return (Provider: provider.ProviderName, Items: new List<AgendaItem>(), Success: false);
+                    SetProviderHealth(provider, HasCachedData(provider.ProviderName, provider.AccountId) ? ProviderHealthKind.Cached : ProviderHealthKind.Failed, null, null);
+                    return (Provider: provider, Items: new List<AgendaItem>(), Success: false);
                 }
             });
 
-            (string Provider, List<AgendaItem> Items, bool Success)[] results;
+            (ISyncProvider Provider, List<AgendaItem> Items, bool Success)[] results;
             try
             {
                 results = await Task.WhenAll(fetchTasks);
@@ -427,7 +456,7 @@ namespace Task_Flyout.Services
 
             try
             {
-                bool changed = await MergeIntoCacheAsync(min, max, allItems, successfulProviders, attemptedProviders);
+                bool changed = await MergeIntoCacheAsync(min, max, allItems, successfulProviders, activeProviders);
                 if (changed)
                     await SaveCacheAsync();
             }
@@ -442,51 +471,57 @@ namespace Task_Flyout.Services
             return GetCachedItems(min, max);
         }
 
-        private bool HasCachedData(string providerName)
+        private bool HasCachedData(string providerName, string? accountId)
         {
             EnsureCacheLoaded();
             var cache = Volatile.Read(ref _publishedCache).Cache;
-            return cache.CachedRanges.Any(range => string.Equals(range.ProviderName, providerName, StringComparison.OrdinalIgnoreCase))
-                || cache.DayItems.Values.Any(items => items.Any(item => string.Equals(item.Provider, providerName, StringComparison.OrdinalIgnoreCase)));
+            return cache.CachedRanges.Any(range => AccountIdentityPolicy.Matches(range.ProviderName, range.AccountId, providerName, accountId))
+                || cache.DayItems.Values.Any(items => items.Any(item => AccountIdentityPolicy.Matches(item.Provider, item.AccountId, providerName, accountId)));
         }
 
-        private void SetProviderHealth(string providerName, ProviderHealthKind kind, DateTimeOffset? attempt, DateTimeOffset? success)
+        private void SetProviderHealth(ISyncProvider provider, ProviderHealthKind kind, DateTimeOffset? attempt, DateTimeOffset? success)
         {
             _providerHealth.AddOrUpdate(
-                providerName,
-                _ => new ProviderHealthSnapshot(providerName, kind, attempt, success, HasCachedData(providerName)),
+                provider.ProviderKey,
+                _ => new ProviderHealthSnapshot(provider.ProviderName, kind, attempt, success, HasCachedData(provider.ProviderName, provider.AccountId))
+                {
+                    AccountId = provider.AccountId
+                },
                 (_, current) => current with
                 {
                     Kind = kind,
                     LastAttemptUtc = attempt ?? current.LastAttemptUtc,
                     LastSuccessUtc = success ?? current.LastSuccessUtc,
-                    HasCachedData = HasCachedData(providerName)
+                    HasCachedData = HasCachedData(provider.ProviderName, provider.AccountId),
+                    AccountId = provider.AccountId
                 });
             ProviderHealthChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        public async Task UpdateTaskStatusAsync(string providerName, string taskId, bool isCompleted, string taskListId = "")
+        public async Task UpdateTaskStatusAsync(string providerName, string taskId, bool isCompleted, string taskListId = "", string? accountId = null)
         {
-            var provider = _providers.FirstOrDefault(p => p.ProviderName == providerName);
-            if (provider == null || !AccountManager.IsConnected(providerName))
+            var provider = ResolveProvider(providerName, accountId);
+            if (provider == null || !IsProviderConnected(provider))
                 throw new InvalidOperationException("The task provider is unavailable.");
             await provider.UpdateTaskStatusAsync(taskId, isCompleted, taskListId);
         }
 
-        public async Task UpdateItemAsync(string providerName, string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime, string taskListId = "")
+        public async Task UpdateItemAsync(string providerName, string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime, string taskListId = "", string? accountId = null)
         {
-            var provider = _providers.FirstOrDefault(p => p.ProviderName == providerName);
-            if (provider == null || !AccountManager.IsConnected(providerName))
+            var provider = ResolveProvider(providerName, accountId);
+            if (provider == null || !IsProviderConnected(provider))
                 throw new InvalidOperationException("The item provider is unavailable.");
             await provider.UpdateItemAsync(itemId, isEvent, title, location, description, targetDate, startTime, endTime, taskListId);
         }
 
-        public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, string? providerName = null)
-            => await CreateItemAsync(title, isEvent, isAllDay, targetDate, startTime, endTime, location, EventRecurrenceKind.None, providerName);
+        public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, string? providerName = null, string? accountId = null)
+            => await CreateItemAsync(title, isEvent, isAllDay, targetDate, startTime, endTime, location, EventRecurrenceKind.None, providerName, accountId);
 
-        public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, EventRecurrenceKind recurrence, string? providerName = null)
+        public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, EventRecurrenceKind recurrence, string? providerName = null, string? accountId = null)
         {
-            var provider = providerName != null ? _providers.FirstOrDefault(p => p.ProviderName == providerName) : _providers.FirstOrDefault();
+            var provider = providerName != null
+                ? ResolveProvider(providerName, accountId)
+                : _providers.FirstOrDefault(IsProviderConnected);
             if (provider == null) return;
 
             if (isEvent)
@@ -495,30 +530,32 @@ namespace Task_Flyout.Services
                 await provider.CreateTaskAsync(title, targetDate, startTime, isAllDay);
         }
 
-        public async Task DeleteItemAsync(string providerName, string itemId, bool isEvent, string taskListId = "")
-            => await DeleteItemAsync(providerName, itemId, isEvent, RecurringDeleteMode.Single, null, "", taskListId);
+        public async Task DeleteItemAsync(string providerName, string itemId, bool isEvent, string taskListId = "", string? accountId = null)
+            => await DeleteItemAsync(providerName, itemId, isEvent, RecurringDeleteMode.Single, null, "", taskListId, accountId);
 
-        public async Task DeleteItemAsync(string providerName, string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode, DateTime? occurrenceDate, string recurringEventId, string taskListId = "")
+        public async Task DeleteItemAsync(string providerName, string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode, DateTime? occurrenceDate, string recurringEventId, string taskListId = "", string? accountId = null)
         {
-            var provider = _providers.FirstOrDefault(p => p.ProviderName == providerName);
-            if (provider == null || !AccountManager.IsConnected(providerName))
+            var provider = ResolveProvider(providerName, accountId);
+            if (provider == null || !IsProviderConnected(provider))
                 throw new InvalidOperationException("The item provider is unavailable.");
             await provider.DeleteItemAsync(itemId, isEvent, recurringDeleteMode, occurrenceDate, recurringEventId, taskListId);
         }
 
-        public async Task RemoveAgendaAccountAsync(string providerName)
+        public async Task RemoveAgendaAccountAsync(string providerName, string? accountId = null)
         {
-            AccountManager.RemoveAccount(providerName);
-            RemoveProviderFromCache(providerName);
+            var account = AccountManager.GetAccount(providerName, accountId);
+            if (account == null) return;
+            AccountManager.RemoveAccountById(account.AccountId);
+            RemoveProviderFromCache(account.ProviderName, account.AccountId);
             await SaveCacheAsync();
         }
 
-        internal Task ClearProviderAuthorizationForDisconnectAsync(string providerName)
-            => ClearProviderAuthorizationAsync(providerName);
+        internal Task ClearProviderAuthorizationForDisconnectAsync(string providerName, string? accountId = null)
+            => ClearProviderAuthorizationAsync(providerName, accountId);
 
-        private async Task ClearProviderAuthorizationAsync(string providerName)
+        private async Task ClearProviderAuthorizationAsync(string providerName, string? accountId)
         {
-            var provider = _providers.FirstOrDefault(p => p.ProviderName == providerName);
+            var provider = ResolveProvider(providerName, accountId);
             try
             {
                 if (provider is GoogleSyncProvider google)
@@ -536,7 +573,28 @@ namespace Task_Flyout.Services
         }
 
         public ISyncProvider? GetProvider(string providerName)
-            => _providers.FirstOrDefault(p => p.ProviderName == providerName);
+            => ResolveProvider(providerName, null);
+
+        public ISyncProvider? GetProvider(string providerName, string? accountId)
+            => ResolveProvider(providerName, accountId);
+
+        private ISyncProvider? ResolveProvider(string providerName, string? accountId)
+        {
+            var matches = _providers.Where(provider => string.Equals(
+                provider.ProviderName,
+                ProviderAuthorizationLifecycle.NormalizeProviderName(providerName),
+                StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(accountId))
+                return matches.FirstOrDefault(provider => AccountIdentityPolicy.Matches(
+                    provider.ProviderName,
+                    provider.AccountId,
+                    providerName,
+                    accountId));
+            return matches.FirstOrDefault(IsProviderConnected) ?? matches.FirstOrDefault();
+        }
+
+        private bool IsProviderConnected(ISyncProvider provider)
+            => AccountManager.IsConnected(provider.ProviderName, provider.AccountId);
 
         private void EnsureCacheLoaded()
         {
@@ -570,9 +628,23 @@ namespace Task_Flyout.Services
                                     && !string.IsNullOrWhiteSpace(range.EndDateKey))
                     .ToList();
 
+                bool identityMigrated = false;
+                foreach (var range in loaded.CachedRanges)
+                {
+                    if (!string.IsNullOrWhiteSpace(range.AccountId)) continue;
+                    range.AccountId = AccountIdentityPolicy.CreateLegacyAccountId(range.ProviderName);
+                    identityMigrated = true;
+                }
+                foreach (var item in loaded.DayItems.Values.SelectMany(items => items))
+                {
+                    if (!string.IsNullOrWhiteSpace(item.AccountId)) continue;
+                    item.AccountId = AccountIdentityPolicy.CreateLegacyAccountId(item.Provider);
+                    identityMigrated = true;
+                }
+
                 _cache = loaded;
 
-                if (CompactCache(DateTime.Today))
+                if (identityMigrated || CompactCache(DateTime.Today))
                     SaveCacheSync(CloneCache(_cache));
                 PublishCacheSnapshotNoLock();
 
@@ -584,7 +656,7 @@ namespace Task_Flyout.Services
             }
         }
 
-        private void RemoveProviderFromCache(string providerName)
+        private void RemoveProviderFromCache(string providerName, string accountId)
         {
             EnsureCacheLoaded();
             _cacheLock.EnterWriteLock();
@@ -592,11 +664,20 @@ namespace Task_Flyout.Services
             {
                 foreach (var key in _cache.DayItems.Keys.ToList())
                 {
-                    _cache.DayItems[key].RemoveAll(item => string.Equals(item.Provider, providerName, StringComparison.OrdinalIgnoreCase));
+                    _cache.DayItems[key].RemoveAll(item => AccountIdentityPolicy.Matches(
+                        item.Provider,
+                        item.AccountId,
+                        providerName,
+                        accountId));
                     if (_cache.DayItems[key].Count == 0)
                         _cache.DayItems.Remove(key);
                 }
 
+                _cache.CachedRanges.RemoveAll(range => AccountIdentityPolicy.Matches(
+                    range.ProviderName,
+                    range.AccountId,
+                    providerName,
+                    accountId));
                 RebuildMarkedDates();
                 PublishCacheSnapshotNoLock();
             }
@@ -620,20 +701,20 @@ namespace Task_Flyout.Services
             }
         }
 
-        private bool IsRangeCached(DateTime min, DateTime max, IEnumerable<string> providerNames)
+        private bool IsRangeCached(DateTime min, DateTime max, IEnumerable<ISyncProvider> providers)
         {
             string start = min.ToString("yyyy-MM-dd");
             string end = max.AddDays(-1).ToString("yyyy-MM-dd");
-            var providers = providerNames
-                .Where(provider => !string.IsNullOrWhiteSpace(provider))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+            var providerList = providers
+                .GroupBy(provider => provider.ProviderKey, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
                 .ToList();
 
-            if (providers.Count == 0) return false;
+            if (providerList.Count == 0) return false;
 
             var cache = Volatile.Read(ref _publishedCache).Cache;
-            return providers.All(provider => cache.CachedRanges.Any(range =>
-                string.Equals(range.ProviderName, provider, StringComparison.OrdinalIgnoreCase) &&
+            return providerList.All(provider => cache.CachedRanges.Any(range =>
+                AccountIdentityPolicy.Matches(range.ProviderName, range.AccountId, provider.ProviderName, provider.AccountId) &&
                 string.Compare(range.StartDateKey, start, StringComparison.Ordinal) <= 0 &&
                 string.Compare(range.EndDateKey, end, StringComparison.Ordinal) >= 0));
         }
@@ -652,12 +733,12 @@ namespace Task_Flyout.Services
                 .ToList();
         }
 
-        private Task<bool> MergeIntoCacheAsync(DateTime min, DateTime max, List<AgendaItem> items, List<string> successfulProviders, List<string> attemptedProviders)
+        private Task<bool> MergeIntoCacheAsync(DateTime min, DateTime max, List<AgendaItem> items, List<ISyncProvider> successfulProviders, List<ISyncProvider> attemptedProviders)
         {
             string start = min.ToString("yyyy-MM-dd");
             string end = max.AddDays(-1).ToString("yyyy-MM-dd");
-            var successfulProviderSet = successfulProviders.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var attemptedProviderSet = attemptedProviders.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var successfulProviderSet = successfulProviders.Select(provider => provider.ProviderKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var attemptedProviderSet = attemptedProviders.Select(provider => provider.ProviderKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             _cacheLock.EnterWriteLock();
             try
@@ -674,7 +755,7 @@ namespace Task_Flyout.Services
                     if (!_cache.DayItems.ContainsKey(key)) continue;
 
                     _cache.DayItems[key].RemoveAll(item =>
-                        successfulProviderSet.Contains(item.Provider));
+                        successfulProviderSet.Contains(item.ProviderKey));
 
                     if (_cache.DayItems[key].Count == 0)
                         _cache.DayItems.Remove(key);
@@ -692,12 +773,18 @@ namespace Task_Flyout.Services
                 }
 
                 _cache.CachedRanges.RemoveAll(range =>
-                    attemptedProviderSet.Contains(range.ProviderName) &&
+                    attemptedProviderSet.Contains(AccountIdentityPolicy.CreateProviderKey(range.ProviderName, range.AccountId)) &&
                     string.Compare(range.EndDateKey, start, StringComparison.Ordinal) >= 0 &&
                     string.Compare(range.StartDateKey, end, StringComparison.Ordinal) <= 0);
 
-                foreach (var providerName in successfulProviderSet)
-                    _cache.CachedRanges.Add(new AgendaCacheRange { ProviderName = providerName, StartDateKey = start, EndDateKey = end });
+                foreach (var provider in successfulProviders)
+                    _cache.CachedRanges.Add(new AgendaCacheRange
+                    {
+                        ProviderName = provider.ProviderName,
+                        AccountId = provider.AccountId,
+                        StartDateKey = start,
+                        EndDateKey = end
+                    });
 
                 MergeCacheRanges();
                 bool compacted = CompactCache(DateTime.Today);
@@ -726,7 +813,7 @@ namespace Task_Flyout.Services
 
                 sb.Append(key).Append('=');
                 foreach (var line in items
-                    .Select(i => $"{i.Provider}{i.Id}{i.Title}{i.IsCompleted}{(i.StartDateTime?.Ticks ?? 0)}{(i.EndDateTime?.Ticks ?? 0)}{i.Subtitle}")
+                    .Select(i => $"{i.ProviderKey}{i.Id}{i.Title}{i.IsCompleted}{(i.StartDateTime?.Ticks ?? 0)}{(i.EndDateTime?.Ticks ?? 0)}{i.Subtitle}")
                     .OrderBy(s => s, StringComparer.Ordinal))
                 {
                     sb.Append(line).Append('');
@@ -742,7 +829,7 @@ namespace Task_Flyout.Services
                 .Where(range => !string.IsNullOrWhiteSpace(range.ProviderName) &&
                                 !string.IsNullOrWhiteSpace(range.StartDateKey) &&
                                 !string.IsNullOrWhiteSpace(range.EndDateKey))
-                .OrderBy(range => range.ProviderName, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(range => AccountIdentityPolicy.CreateProviderKey(range.ProviderName, range.AccountId), StringComparer.OrdinalIgnoreCase)
                 .ThenBy(range => range.StartDateKey)
                 .ToList();
 
@@ -756,7 +843,7 @@ namespace Task_Flyout.Services
                 }
 
                 var last = merged[^1];
-                if (string.Equals(range.ProviderName, last.ProviderName, StringComparison.OrdinalIgnoreCase) &&
+                if (AccountIdentityPolicy.Matches(range.ProviderName, range.AccountId, last.ProviderName, last.AccountId) &&
                     string.Compare(range.StartDateKey, last.EndDateKey, StringComparison.Ordinal) <= 0)
                 {
                     if (string.Compare(range.EndDateKey, last.EndDateKey, StringComparison.Ordinal) > 0)
@@ -830,6 +917,7 @@ namespace Task_Flyout.Services
                 .Select(range => new AgendaCacheRange
                 {
                     ProviderName = range.ProviderName,
+                    AccountId = range.AccountId,
                     StartDateKey = string.Compare(range.StartDateKey, minTaskKey, StringComparison.Ordinal) < 0 ? minTaskKey : range.StartDateKey,
                     EndDateKey = string.Compare(range.EndDateKey, maxTaskEndKey, StringComparison.Ordinal) > 0 ? maxTaskEndKey : range.EndDateKey
                 })
@@ -848,7 +936,7 @@ namespace Task_Flyout.Services
         private static string GetRangeSignature(IEnumerable<AgendaCacheRange> ranges)
             => string.Join(
                 "\n",
-                ranges.Select(range => $"{range.ProviderName}|{range.StartDateKey}|{range.EndDateKey}"));
+                ranges.Select(range => $"{AccountIdentityPolicy.CreateProviderKey(range.ProviderName, range.AccountId)}|{range.StartDateKey}|{range.EndDateKey}"));
 
         private static void AddCachedItem(Dictionary<string, List<AgendaItem>> dayItems, AgendaItem item)
         {
@@ -877,17 +965,17 @@ namespace Task_Flyout.Services
         private static string GetTaskCacheKey(AgendaItem item)
         {
             if (!string.IsNullOrWhiteSpace(item.Id))
-                return $"{item.Provider}|task|{item.Id}";
+                return $"{item.ProviderKey}|task|{item.Id}";
 
-            return $"{item.Provider}|task|{item.Title}|{item.DateKey}";
+            return $"{item.ProviderKey}|task|{item.Title}|{item.DateKey}";
         }
 
         private static string GetEventCacheKey(AgendaItem item)
         {
             if (!string.IsNullOrWhiteSpace(item.Id))
-                return $"{item.Provider}|event|{item.Id}|{item.DateKey}";
+                return $"{item.ProviderKey}|event|{item.Id}|{item.DateKey}";
 
-            return $"{item.Provider}|event|{item.Title}|{item.Subtitle}|{item.DateKey}";
+            return $"{item.ProviderKey}|event|{item.Title}|{item.Subtitle}|{item.DateKey}";
         }
 
         private static bool IsDateKeyInRange(string dateKey, DateTime min, DateTime max)
@@ -923,6 +1011,7 @@ namespace Task_Flyout.Services
                     .Select(range => new AgendaCacheRange
                     {
                         ProviderName = range.ProviderName,
+                        AccountId = range.AccountId,
                         StartDateKey = range.StartDateKey,
                         EndDateKey = range.EndDateKey
                     })
@@ -988,10 +1077,10 @@ namespace Task_Flyout.Services
         private static bool IsSameCachedItem(AgendaItem a, AgendaItem b)
         {
             if (!string.IsNullOrWhiteSpace(a.Id) && !string.IsNullOrWhiteSpace(b.Id))
-                return string.Equals(a.Provider, b.Provider, StringComparison.OrdinalIgnoreCase)
+                return AccountIdentityPolicy.Matches(a.Provider, a.AccountId, b.Provider, b.AccountId)
                     && string.Equals(a.Id, b.Id, StringComparison.Ordinal);
 
-            return string.Equals(a.Provider, b.Provider, StringComparison.OrdinalIgnoreCase)
+            return AccountIdentityPolicy.Matches(a.Provider, a.AccountId, b.Provider, b.AccountId)
                 && string.Equals(a.Title, b.Title, StringComparison.Ordinal)
                 && string.Equals(a.DateKey, b.DateKey, StringComparison.Ordinal);
         }
@@ -1010,6 +1099,7 @@ namespace Task_Flyout.Services
                     .Select(range => new AgendaCacheRange
                     {
                         ProviderName = range.ProviderName,
+                        AccountId = range.AccountId,
                         StartDateKey = range.StartDateKey,
                         EndDateKey = range.EndDateKey
                     })
@@ -1029,6 +1119,7 @@ namespace Task_Flyout.Services
                 Location = item.Location,
                 Description = item.Description,
                 Provider = item.Provider,
+                AccountId = item.AccountId,
                 CalendarId = item.CalendarId,
                 CalendarName = item.CalendarName,
                 DateKey = item.DateKey,
@@ -1050,6 +1141,7 @@ namespace Task_Flyout.Services
                && left.Location == right.Location
                && left.Description == right.Description
                && left.Provider == right.Provider
+               && left.AccountId == right.AccountId
                && left.CalendarId == right.CalendarId
                && left.CalendarName == right.CalendarName
                && left.DateKey == right.DateKey

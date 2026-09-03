@@ -1618,3 +1618,22 @@ They are historical records; active work remains in the backlog tables above.
   1216/1216, and the Debug x64 app build completes with zero warnings and zero
   errors. M1-14 is complete; the next packaged-runtime pass should still verify
   an external read-state change while Mail is open and a live toast withdrawal.
+
+### 2026-09-03 Account-Scoped Provider Identity
+
+- Connected agenda accounts now receive a stable account ID. Existing single
+  Google, Microsoft, and iCloud records migrate to deterministic legacy IDs,
+  while additional records receive opaque IDs without replacing the first
+  account.
+- Sync providers expose an account-scoped routing key. Agenda items, cache
+  ranges, provider health, optimistic mutations, deduplication, and notification
+  action targets retain that identity so equal remote item IDs from two accounts
+  cannot read, overwrite, complete, or delete one another.
+- Google credentials now use an account-specific protected SQLite scope. The
+  former single Google token is copied once into the legacy account namespace,
+  and clearing one namespaced provider no longer clears future sibling accounts.
+- Account identity and notification-action tests pass 9/9, the complete managed
+  suite passes 1224/1224, and the Debug x64 app build completes with zero
+  warnings and zero errors. M3-09 remains in progress for provider hydration,
+  interactive account selection, per-account Gmail linkage, and account-aware UI
+  add/remove/reconnect flows.

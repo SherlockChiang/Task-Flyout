@@ -32,6 +32,16 @@ namespace Task_Flyout.Models
     public class ConnectedAccountInfo : INotifyPropertyChanged
     {
         public string ProviderName { get; set; } = "";
+        public string AccountId { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+
+        [JsonIgnore]
+        public string ProviderKey
+            => Task_Flyout.Services.AccountIdentityPolicy.CreateProviderKey(ProviderName, AccountId);
+
+        [JsonIgnore]
+        public string DisplayTitle
+            => string.IsNullOrWhiteSpace(DisplayName) ? ProviderName : DisplayName;
 
         private bool _showEvents = true;
         public bool ShowEvents
