@@ -111,7 +111,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M1-11 | DONE | Reliability/Startup | Keep tray-triggered Flyout construction behind stable account hydration. | The click path records request diagnostics and restores efficiency state on failure; the Flyout never enumerates the account collection while startup hydration is mutating it. | `fix(flyout): serialize account hydration before opening` |
 | M1-12 | DONE | Reliability/Calendar | Refresh agenda data while the Flyout remains hidden. | The app heartbeat force-refreshes the shared agenda range at the configured interval after account hydration, throttles failed attempts, invalidates the reminder snapshot, and checks upcoming events against the refreshed cache. | `fix(calendar): refresh agenda while flyout is hidden` |
 | M1-13 | DONE | Reliability/Mail | Open new-mail notification targets directly after background-only polling. | Polling keeps a bounded body-free unread metadata slice without presenting it as a complete folder window; activation resolves explicit Inbox aliases, falls back across folders only for Google/Outlook identities, and never treats IMAP UIDs as cross-folder identities. | `fix(mail): open notification targets reliably` |
-| M1-14 | IN PROGRESS | Data integrity/Mail | Keep unread state coherent across provider, folder views, cache, notifications, and background polling. | Read/unread mutations update every cached identity for the account, reconcile authoritative provider state after refresh, and cannot resurrect stale unread badges or notifications. | `fix(mail): converge mutable state by provider identity`, `fix(mail): reconcile authoritative unread snapshots` |
+| M1-14 | DONE | Data integrity/Mail | Keep unread state coherent across provider, folder views, cache, notifications, and background polling. | Read/unread mutations update every cached identity for the account, reconcile authoritative provider state after refresh, and cannot resurrect stale unread badges or notifications. | `fix(mail): converge mutable state by provider identity`, `fix(mail): reconcile authoritative unread snapshots`, `fix(mail): synchronize unread UI and notifications` |
 | M1-15 | DONE | Reliability/Calendar | Correct event editor times, timeline duration, date-strip overflow, and automatic refresh. | Existing events hydrate both start and end controls; the day timeline renders the complete interval; the date header has no unintended horizontal scrollbar; foreground and hidden refresh paths reliably publish fresh data without overlap or stale replacement. | `fix(calendar): align event times and timeline`, `fix(calendar): publish background refreshes to open views`, `fix(google): route mutations to source calendar` |
 | M1-16 | DONE | Reliability/Flyout | Reliably dismiss an unpinned Flyout when focus moves elsewhere. | A focus loss during either the opening transition or the fully open state closes the Flyout exactly once; pinned behavior is preserved; rapid tray toggles cannot strand a visible Flyout. | `fix(flyout): close reliably on focus loss` |
 
@@ -1598,3 +1598,23 @@ They are historical records; active work remains in the backlog tables above.
   completes with zero warnings and zero errors. M1-14 remains in progress for
   open-page cache publication, forced folder-count refresh, and deterministic
   mail-toast withdrawal.
+
+### 2026-09-03 Mail Unread UI And Notification Convergence
+
+- Mail folder and message cache commits now publish monotonic versions with an
+  account/folder refresh scope. A loaded Mail page coalesces those callbacks onto
+  its dispatcher, copies folder counts, and reconciles the selected cached
+  message window in place without issuing another provider request or discarding
+  the open message body and selection.
+- Scheduled polling force-refreshes provider folder metadata before reading the
+  Inbox unread slice, so cached badges no longer hide remote count changes for
+  another ten-minute cache lifetime. The refresh button also requests folder
+  counts and the selected message window together.
+- Mail toasts use a stable 16-character account/provider identity tag in the
+  `mail` group. Gmail and Outlook identities remain stable across folder copies;
+  IMAP identities retain folder and UIDVALIDITY scope. Optimistic mark-read
+  actions and authoritative unread removals withdraw the matching toast.
+- Notification identity tests pass 5/5, the complete managed suite passes
+  1216/1216, and the Debug x64 app build completes with zero warnings and zero
+  errors. M1-14 is complete; the next packaged-runtime pass should still verify
+  an external read-state change while Mail is open and a live toast withdrawal.

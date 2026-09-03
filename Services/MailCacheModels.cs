@@ -5,6 +5,31 @@ using System.Runtime.CompilerServices;
 
 namespace Task_Flyout.Services
 {
+    [Flags]
+    internal enum MailCacheRefreshKind
+    {
+        None = 0,
+        Folders = 1,
+        Messages = 2
+    }
+
+    internal readonly record struct MailCacheRefreshScope(
+        string AccountId,
+        string? FolderId,
+        MailCacheRefreshKind Kind);
+
+    internal sealed class MailCachePublishedEventArgs : EventArgs
+    {
+        public MailCachePublishedEventArgs(long version, MailCacheRefreshScope scope)
+        {
+            Version = version;
+            Scope = scope;
+        }
+
+        public long Version { get; }
+        public MailCacheRefreshScope Scope { get; }
+    }
+
     public class MailFolder
     {
         public string AccountId { get; set; } = "";

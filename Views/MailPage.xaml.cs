@@ -75,6 +75,8 @@ namespace Task_Flyout.Views
         private CancellationTokenSource? _searchCts;
         private string _searchText = "";
         private bool _suppressSearchRefresh;
+        private readonly VersionedUiRefreshGate _cacheRefreshGate = new();
+        private bool _isPageLoaded;
         private bool _isSendingMail;
         private bool _isOnlineMailAction;
         private bool _suppressDraftChanges;
@@ -121,6 +123,9 @@ namespace Task_Flyout.Views
 
         public void DisposeLikeCleanup()
         {
+            _isPageLoaded = false;
+            if (_mailService != null)
+                _mailService.CachePublished -= MailService_CachePublished;
             _pageRequestCts.Cancel();
             _messageLoadCts?.Cancel();
             _bodyLoadCts?.Cancel();
@@ -179,6 +184,12 @@ namespace Task_Flyout.Views
                 _pageRequestCts = new CancellationTokenSource();
             }
             _mailService = (App.Current as App)?.MailService;
+            _isPageLoaded = true;
+            if (_mailService != null)
+            {
+                _mailService.CachePublished -= MailService_CachePublished;
+                _mailService.CachePublished += MailService_CachePublished;
+            }
             MailListView.ItemsSource = _displayedItems;
             UpdateResponsiveLayout(LayoutRoot.ActualWidth, LayoutRoot.ActualHeight);
             _isInitializing = false;
@@ -196,6 +207,23 @@ namespace Task_Flyout.Views
         {
             if (_selectedItem != null && DetailPanel.Visibility == Visibility.Visible)
                 await RenderMailBodyAsync(_selectedItem);
+        }
+
+        private void MailService_CachePublished(object? sender, MailCachePublishedEventArgs e)
+        {
+            if (!_cacheRefreshGate.TryQueue(e.Version)) return;
+            if (!DispatcherQueue.TryEnqueue(ApplyPublishedMailCacheUpdate))
+                _cacheRefreshGate.CancelQueuedDispatch();
+        }
+
+        private void ApplyPublishedMailCacheUpdate()
+        {
+            if (!_cacheRefreshGate.TryBeginApply(out _) || !_isPageLoaded || _mailService == null)
+                return;
+
+            ApplyCachedFolderSnapshots();
+            if (!_isLoadingMessages)
+                ApplyCachedSelectedMessageWindow();
         }
 
         private async Task RefreshAccountsAsync(bool autoSelect = true)
@@ -275,6 +303,51 @@ namespace Task_Flyout.Views
             return string.IsNullOrWhiteSpace(folder.CountText)
                 ? folder.DisplayName
                 : $"{folder.DisplayName} ({folder.CountText})";
+        }
+
+        private void ApplyCachedFolderSnapshots()
+        {
+            var service = _mailService;
+            if (service == null) return;
+
+            foreach (string accountId in _accountNodes.Values
+                         .Select(account => account.Id)
+                         .Distinct(StringComparer.Ordinal))
+            {
+                ApplyFolderSnapshot(accountId, service.GetCachedFolderSnapshot(accountId));
+            }
+        }
+
+        private void ApplyFolderSnapshot(string accountId, IReadOnlyList<MailFolder> folders)
+        {
+            if (folders.Count == 0) return;
+
+            var byId = folders
+                .GroupBy(folder => folder.Id, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            foreach (var pair in _folderNodes.Where(pair =>
+                         string.Equals(pair.Value.Account.Id, accountId, StringComparison.Ordinal)))
+            {
+                if (!byId.TryGetValue(pair.Value.Folder.Id, out var snapshot)) continue;
+                CopyFolderMetadata(pair.Value.Folder, snapshot);
+                pair.Key.Content = FormatFolderContent(pair.Value.Folder);
+            }
+
+            if (_selectedFolder != null &&
+                string.Equals(_selectedFolder.AccountId, accountId, StringComparison.Ordinal) &&
+                byId.TryGetValue(_selectedFolder.Id, out var selectedSnapshot))
+            {
+                CopyFolderMetadata(_selectedFolder, selectedSnapshot);
+                MessageListTitle.Text = _selectedFolder.DisplayName;
+            }
+        }
+
+        private static void CopyFolderMetadata(MailFolder target, MailFolder source)
+        {
+            target.DisplayName = source.DisplayName;
+            target.UnreadCount = source.UnreadCount;
+            target.IsPlaceholder = source.IsPlaceholder;
+            target.IsUserLabel = source.IsUserLabel;
         }
 
         private async void AccountTree_Expanding(TreeView sender, TreeViewExpandingEventArgs args)
@@ -711,6 +784,131 @@ namespace Task_Flyout.Views
             }
         }
 
+        private void ApplyCachedSelectedMessageWindow()
+        {
+            var service = _mailService;
+            var account = _selectedAccount;
+            var folder = _selectedFolder;
+            if (service == null || account == null || folder == null ||
+                !service.TryGetCachedMessageWindowSnapshot(
+                    account.Id,
+                    folder.Id,
+                    UnreadOnlyToggle.IsOn,
+                    out var window))
+                return;
+
+            string? selectedKey = MailListView.SelectedItem is MailItem selected
+                ? GetPageMessageIdentity(account.Kind, selected)
+                : null;
+            string? detailKey = _selectedItem == null
+                ? null
+                : GetPageMessageIdentity(account.Kind, _selectedItem);
+            var existingByKey = _items
+                .GroupBy(item => GetPageMessageIdentity(account.Kind, item), StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            var desiredItems = new List<MailItem>();
+            foreach (var snapshot in window.Items
+                         .OrderByDescending(item => item.RawReceivedTime)
+                         .GroupBy(item => GetPageMessageIdentity(account.Kind, item), StringComparer.Ordinal)
+                         .Select(group => group.First()))
+            {
+                string key = GetPageMessageIdentity(account.Kind, snapshot);
+                if (existingByKey.TryGetValue(key, out var existing))
+                {
+                    CopyCachedMailMetadata(existing, snapshot);
+                    desiredItems.Add(existing);
+                }
+                else
+                {
+                    desiredItems.Add(snapshot);
+                }
+            }
+
+            _suppressSearchRefresh = true;
+            _suppressSelectionClear = true;
+            try
+            {
+                for (int index = 0; index < desiredItems.Count; index++)
+                {
+                    var desired = desiredItems[index];
+                    if (index < _items.Count && ReferenceEquals(_items[index], desired)) continue;
+
+                    int existingIndex = _items.IndexOf(desired);
+                    if (existingIndex >= 0)
+                        _items.Move(existingIndex, index);
+                    else
+                        _items.Insert(index, desired);
+                }
+                while (_items.Count > desiredItems.Count)
+                    _items.RemoveAt(_items.Count - 1);
+
+                _suppressSearchRefresh = false;
+                ApplyMailSearch();
+
+                string? selectionKey = selectedKey ?? detailKey;
+                MailListView.SelectedItem = selectionKey == null
+                    ? null
+                    : _displayedItems.FirstOrDefault(item =>
+                        string.Equals(
+                            GetPageMessageIdentity(account.Kind, item),
+                            selectionKey,
+                            StringComparison.Ordinal));
+
+                if (detailKey != null)
+                {
+                    var detailItem = _items.FirstOrDefault(item =>
+                        string.Equals(
+                            GetPageMessageIdentity(account.Kind, item),
+                            detailKey,
+                            StringComparison.Ordinal));
+                    if (detailItem == null)
+                    {
+                        ClearDetail();
+                    }
+                    else
+                    {
+                        _selectedItem = detailItem;
+                        DetailSubject.Text = detailItem.Subject;
+                        DetailSender.Text = detailItem.Sender;
+                        DetailTime.Text = detailItem.RawReceivedTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+                            ?? detailItem.ReceivedTime;
+                        OpenInBrowserButton.IsEnabled = !string.IsNullOrWhiteSpace(detailItem.WebLink);
+                    }
+                }
+            }
+            finally
+            {
+                _suppressSearchRefresh = false;
+                _suppressSelectionClear = false;
+            }
+
+            LoadMoreButton.Visibility = window.HasMore ? Visibility.Visible : Visibility.Collapsed;
+            SetMessageListStatus(
+                $"{account.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}");
+            UpdateProviderMoveCommands();
+        }
+
+        private static string GetPageMessageIdentity(MailAccountKind providerKind, MailItem item)
+            => providerKind == MailAccountKind.Imap
+                ? $"{item.AccountId}\u001f{item.FolderId}\u001f{item.ImapUidValidity?.ToString() ?? "?"}\u001f{item.Id}"
+                : $"{item.AccountId}\u001f{item.Id}";
+
+        private static void CopyCachedMailMetadata(MailItem target, MailItem source)
+        {
+            target.Subject = source.Subject;
+            target.Sender = source.Sender;
+            target.SenderAddress = source.SenderAddress;
+            target.Recipient = source.Recipient;
+            target.Preview = source.Preview;
+            target.ReceivedTime = source.ReceivedTime;
+            target.RawReceivedTime = source.RawReceivedTime;
+            target.IsRead = source.IsRead;
+            target.IsFlagged = source.IsFlagged;
+            target.HasAttachments = source.HasAttachments;
+            target.Importance = source.Importance;
+            target.WebLink = source.WebLink;
+        }
+
         private async void MailSearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
         {
             if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
@@ -809,6 +1007,29 @@ namespace Task_Flyout.Views
             }
         }
 
+        private async Task RefreshFolderCountsAsync(MailAccount account)
+        {
+            var service = _mailService;
+            if (service == null) return;
+
+            var cancellationToken = _pageRequestCts.Token;
+            try
+            {
+                var folders = await service.FetchFoldersAsync(
+                    account,
+                    forceRefresh: true,
+                    cancellationToken);
+                if (!_isPageLoaded || !string.Equals(_selectedAccount?.Id, account.Id, StringComparison.Ordinal))
+                    return;
+                ApplyFolderSnapshot(account.Id, folders);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Refresh mail folder counts failed: {ex.Message}");
+            }
+        }
+
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
             if (_isLoadingMessages || _refreshAccountsTask != null) return;
@@ -819,7 +1040,12 @@ namespace Task_Flyout.Views
                 return;
             }
 
-            await LoadMessagesAsync(forceRefresh: true);
+            var folderRefresh = _selectedAccount == null
+                ? Task.CompletedTask
+                : RefreshFolderCountsAsync(_selectedAccount);
+            await Task.WhenAll(
+                folderRefresh,
+                LoadMessagesAsync(forceRefresh: true));
         }
 
         private void AddMailButton_Click(object sender, RoutedEventArgs e)

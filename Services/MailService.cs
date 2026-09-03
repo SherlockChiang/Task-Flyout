@@ -173,6 +173,7 @@ namespace Task_Flyout.Services
         private CancellationTokenSource? _persistentCacheSaveCts;
         private long _persistentCacheVersion;
         private long _lastPersistedCacheVersion;
+        private long _publishedCacheVersion;
         private readonly object _accountSaveQueueLock = new();
         private Task _accountSaveQueue = Task.CompletedTask;
         private readonly object _bodyCacheLock = new();
@@ -190,6 +191,7 @@ namespace Task_Flyout.Services
         private const int MaxConcurrentGoogleMessageMetadataRequests = 6;
         private const int PersistentCacheSaveDebounceMs = 1500;
         public event EventHandler<NewMailNotificationEventArgs>? NewMailArrived;
+        internal event EventHandler<MailCachePublishedEventArgs>? CachePublished;
 
         private sealed class CacheEntry<T>
         {
@@ -2171,7 +2173,7 @@ namespace Task_Flyout.Services
                     try
                     {
                         await RetryPendingMutationsAsync(account);
-                        var folders = await FetchFoldersAsync(account, forceRefresh: false);
+                        var folders = await FetchFoldersAsync(account, forceRefresh: true);
                         var inbox = folders.FirstOrDefault(folder => IsInboxName(folder.Id) || IsInboxName(folder.DisplayName))
                                     ?? folders.FirstOrDefault(folder => !folder.IsPlaceholder);
                         if (inbox == null)
@@ -2190,7 +2192,7 @@ namespace Task_Flyout.Services
 
                         foreach (var item in unreadItems)
                         {
-                            string key = GetMailNotificationKey(item);
+                            string key = GetMailNotificationKey(account.Kind, item);
                             currentUnreadIds.Add(key);
                             long itemTicks = GetMailReceivedTicks(item);
                             if (itemTicks > newestTicks)
@@ -3211,6 +3213,23 @@ namespace Task_Flyout.Services
             return false;
         }
 
+        internal IReadOnlyList<MailFolder> GetCachedFolderSnapshot(string accountId)
+        {
+            EnsurePersistentCacheLoaded();
+            lock (_mailCacheLock)
+            {
+                IEnumerable<MailFolder>? folders = null;
+                if (_persistentCache?.Folders.TryGetValue(accountId, out var persistentFolders) == true)
+                    folders = persistentFolders;
+                else if (_folderCache.TryGetValue(accountId, out var entry))
+                    folders = entry.Value;
+
+                return folders == null
+                    ? Array.Empty<MailFolder>()
+                    : ApplyFolderOrder(accountId, folders).Select(CloneMailFolder).ToArray();
+            }
+        }
+
         private bool TryGetCachedMessages(string key, out MailMessageWindow window)
         {
             lock (_mailCacheLock)
@@ -3260,6 +3279,35 @@ namespace Task_Flyout.Services
 
             window = new MailMessageWindow();
             return false;
+        }
+
+        internal bool TryGetCachedMessageWindowSnapshot(
+            string accountId,
+            string folderId,
+            bool unreadOnly,
+            out MailMessageWindow window)
+        {
+            EnsurePersistentCacheLoaded();
+            string key = GetMessageCacheKey(accountId, folderId, unreadOnly);
+            lock (_mailCacheLock)
+            {
+                var cache = _persistentCache;
+                if (cache == null ||
+                    !cache.Messages.TryGetValue(key, out var messages) ||
+                    messages == null ||
+                    !cache.MessageHasMore.TryGetValue(key, out var hasMore))
+                {
+                    window = new MailMessageWindow();
+                    return false;
+                }
+
+                window = new MailMessageWindow
+                {
+                    Items = CloneMailItems(messages, includeBodies: false),
+                    HasMore = hasMore
+                };
+                return true;
+            }
         }
 
         private void ClearAccountCache(string accountId)
@@ -3340,6 +3388,14 @@ namespace Task_Flyout.Services
                 }
             }
             SavePersistentCache();
+            if (kind == MailMutationKind.SetReadState && value)
+                QueueMailNotificationRemoval(providerKind, new[] { item });
+            PublishCacheUpdate(
+                item.AccountId,
+                item.FolderId,
+                kind == MailMutationKind.SetReadState
+                    ? MailCacheRefreshKind.Folders | MailCacheRefreshKind.Messages
+                    : MailCacheRefreshKind.Messages);
         }
 
         private static string GetMessageCacheKey(string accountId, string folderId, bool unreadOnly)
@@ -3536,6 +3592,7 @@ namespace Task_Flyout.Services
             }
 
             SavePersistentCache();
+            PublishCacheUpdate(key, null, MailCacheRefreshKind.Folders);
         }
 
         private List<MailAccount> ApplyAccountOrder(IEnumerable<MailAccount> accounts)
@@ -3572,6 +3629,7 @@ namespace Task_Flyout.Services
         {
             EnsurePersistentCacheLoaded();
             List<MailItem> windowItems;
+            IReadOnlyCollection<MailItem> removedNotifications = Array.Empty<MailItem>();
             bool hasMore;
             var fetchedAt = DateTimeOffset.UtcNow;
             lock (_mailCacheLock)
@@ -3593,7 +3651,7 @@ namespace Task_Flyout.Services
                                        !item.IsRead)
                         .ToList();
                     var providerItems = append ? currentItems.Concat(page.Items) : page.Items;
-                    windowItems = MailUnreadSnapshotPolicy.Reconcile(
+                    var reconciliation = MailUnreadSnapshotPolicy.Reconcile(
                         existingUnreadItems,
                         providerItems,
                         isComplete: !append && !page.HasMore,
@@ -3601,7 +3659,9 @@ namespace Task_Flyout.Services
                         account.Id,
                         folder.Id,
                         pending,
-                        MaxPageSize).Items;
+                        MaxPageSize);
+                    windowItems = reconciliation.Items;
+                    removedNotifications = reconciliation.RemovedItems;
                 }
                 else
                 {
@@ -3625,6 +3685,8 @@ namespace Task_Flyout.Services
                 _messageCache[key] = new CacheEntry<List<MailItem>> { CreatedAt = fetchedAt, Value = StripBodies(windowItems) };
             }
             SavePersistentCache();
+            QueueMailNotificationRemoval(account.Kind, removedNotifications);
+            PublishCacheUpdate(account.Id, folder.Id, MailCacheRefreshKind.Messages);
             return new MailMessageWindow
             {
                 Items = CloneMailItems(windowItems, includeBodies: false),
@@ -3681,6 +3743,7 @@ namespace Task_Flyout.Services
             EnsurePersistentCacheLoaded();
             var strippedProviderItems = StripBodies(page.Items);
             var currentProviderItems = new List<MailItem>();
+            var removedNotifications = new List<MailItem>();
             bool changed = false;
             lock (_mailCacheLock)
             {
@@ -3727,7 +3790,7 @@ namespace Task_Flyout.Services
                                            string.Equals(item.FolderId, folder.Id, StringComparison.Ordinal) &&
                                            !item.IsRead)
                             .ToList();
-                        merged = MailUnreadSnapshotPolicy.Reconcile(
+                        var reconciliation = MailUnreadSnapshotPolicy.Reconcile(
                             existingUnreadItems,
                             currentProviderItems,
                             isComplete: !page.HasMore,
@@ -3735,7 +3798,9 @@ namespace Task_Flyout.Services
                             account.Id,
                             folder.Id,
                             pending,
-                            MaxPageSize).Items;
+                            MaxPageSize);
+                        merged = reconciliation.Items;
+                        removedNotifications.AddRange(reconciliation.RemovedItems);
                     }
                     else
                     {
@@ -3770,7 +3835,11 @@ namespace Task_Flyout.Services
             }
 
             if (changed)
+            {
                 SavePersistentCache();
+                QueueMailNotificationRemoval(account.Kind, removedNotifications);
+                PublishCacheUpdate(account.Id, folder.Id, MailCacheRefreshKind.Messages);
+            }
             return currentProviderItems;
         }
 
@@ -3835,6 +3904,17 @@ namespace Task_Flyout.Services
         private static List<MailItem> CloneMailItems(IEnumerable<MailItem> messages, bool includeBodies)
             => messages.Select(item => CloneMailItem(item, includeBodies)).ToList();
 
+        private static MailFolder CloneMailFolder(MailFolder folder)
+            => new()
+            {
+                AccountId = folder.AccountId,
+                Id = folder.Id,
+                DisplayName = folder.DisplayName,
+                UnreadCount = folder.UnreadCount,
+                IsPlaceholder = folder.IsPlaceholder,
+                IsUserLabel = folder.IsUserLabel
+            };
+
         private static MailItem CloneMailItem(MailItem item, bool includeBodies)
             => new()
             {
@@ -3857,6 +3937,25 @@ namespace Task_Flyout.Services
                 Importance = item.Importance,
                 WebLink = item.WebLink
             };
+
+        private void PublishCacheUpdate(string accountId, string? folderId, MailCacheRefreshKind kind)
+        {
+            var handlers = CachePublished;
+            if (handlers == null) return;
+
+            long version = Interlocked.Increment(ref _publishedCacheVersion);
+            var args = new MailCachePublishedEventArgs(
+                version,
+                new MailCacheRefreshScope(accountId, folderId, kind));
+            _ = Task.Run(() =>
+            {
+                foreach (EventHandler<MailCachePublishedEventArgs> handler in handlers.GetInvocationList())
+                {
+                    try { handler(this, args); }
+                    catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Mail cache subscriber failed: {ex.Message}"); }
+                }
+            });
+        }
 
         private void LoadKnownUnreadIds()
         {
@@ -3901,8 +4000,34 @@ namespace Task_Flyout.Services
         private static long GetMailReceivedTicks(MailItem item)
             => item.RawReceivedTime?.UtcTicks ?? 0;
 
-        private static string GetMailNotificationKey(MailItem item)
-            => $"{item.AccountId}|{item.FolderId}|{item.Id}";
+        private static string GetMailNotificationKey(MailAccountKind providerKind, MailItem item)
+            => $"{item.AccountId}|{MailNotificationIdentityPolicy.BuildTag(providerKind, item)}";
+
+        private static void QueueMailNotificationRemoval(
+            MailAccountKind providerKind,
+            IEnumerable<MailItem> items)
+        {
+            foreach (string tag in items
+                         .Select(item => MailNotificationIdentityPolicy.BuildTag(providerKind, item))
+                         .Distinct(StringComparer.Ordinal))
+            {
+                _ = RemoveMailNotificationAsync(tag);
+            }
+        }
+
+        private static async Task RemoveMailNotificationAsync(string tag)
+        {
+            try
+            {
+                await AppNotificationManager.Default.RemoveByTagAndGroupAsync(
+                    tag,
+                    MailNotificationIdentityPolicy.Group);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Remove mail notification failed: {ex.Message}");
+            }
+        }
 
         private void SendNewMailNotification(MailAccount account, MailItem item)
         {
@@ -3938,7 +4063,10 @@ namespace Task_Flyout.Services
                         .AddArgument("codeToken", codeToken));
                 }
 
-                AppNotificationManager.Default.Show(builder.BuildNotification());
+                var notification = builder.BuildNotification();
+                notification.Tag = MailNotificationIdentityPolicy.BuildTag(account.Kind, item);
+                notification.Group = MailNotificationIdentityPolicy.Group;
+                AppNotificationManager.Default.Show(notification);
             }
             catch (Exception ex)
             {
