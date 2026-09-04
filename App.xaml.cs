@@ -269,7 +269,7 @@ namespace Task_Flyout
             _ = SyncManager.WarmCacheAsync();
             QueueBackgroundRefreshStart();
 
-            _trayIcon.LeftClickCommand = new RelayCommand(async () =>
+            var toggleFlyoutCommand = new RelayCommand(async () =>
             {
                 var openRequest = PerformanceDiagnostics.StartSpan("flyout", "tray_click_to_open_request", "tray");
                 try
@@ -290,6 +290,7 @@ namespace Task_Flyout
                     UpdateEfficiencyMode();
                 }
             });
+            _trayIcon.LeftClickCommand = toggleFlyoutCommand;
 
             // Initialize weather bar if enabled
             InitWeatherBar();
@@ -298,7 +299,10 @@ namespace Task_Flyout
             WeatherService.LocationUpdated += OnWeatherLocationUpdated;
             QueueLocationTrackingResume();
 
-            _trayIcon.DoubleClickCommand = new RelayCommand(() => OpenMainWindowInternal());
+            // H.NotifyIcon suppresses its delayed single-click command when it
+            // recognizes a double-click. Use the same action for both gestures
+            // so rapid tray clicks never route into the main Calendar window.
+            _trayIcon.DoubleClickCommand = toggleFlyoutCommand;
 
             if (_trayIcon.ContextFlyout is MenuFlyout menu)
             {

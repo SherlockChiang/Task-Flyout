@@ -119,7 +119,10 @@ namespace Task_Flyout
         private bool _focusNewItemOnOpen;
         private bool _isShuttingDown;
         private bool _suppressSelectedDateChanged;
+        private DispatcherTimer? _activationHandoffTimer;
         private IntPtr _openingForegroundAnchor;
+        private bool _openingFlyoutWasForeground;
+        private int _activationHandoffAttempts;
         private long _isOpenChangedToken;
         private DateTimeOffset? _lastSyncSucceededAt;
         private FlyoutAgendaSurfaceKind _agendaSurfaceKind = FlyoutAgendaSurfaceKind.Content;
@@ -131,6 +134,8 @@ namespace Task_Flyout
         private long _weatherRefreshGeneration;
 
         private static readonly TimeSpan BackgroundRefreshCooldown = TimeSpan.FromMinutes(1);
+        private static readonly TimeSpan ActivationHandoffInterval = TimeSpan.FromMilliseconds(16);
+        private const int MaxActivationHandoffAttempts = 16;
 
         private readonly record struct DotSpec(double Left, double Top, SolidColorBrush Fill);
 
@@ -1001,13 +1006,13 @@ namespace Task_Flyout
                 _desiredOpen = !_desiredOpen;
                 if (_desiredOpen && _flyoutContentLoaded && !_openRequestIssued)
                 {
-                    _openingForegroundAnchor = FlyoutForegroundProbe.CaptureForegroundAnchor();
+                    PrepareOpeningActivationHandoff();
                     OpenPreparedFlyout();
                 }
                 else if (!_desiredOpen && !_openRequestIssued)
                 {
                     _showPending = false;
-                    _openingForegroundAnchor = IntPtr.Zero;
+                    ResetOpeningActivationHandoff();
                 }
             }
             else
@@ -1021,7 +1026,7 @@ namespace Task_Flyout
             if (_isShuttingDown || IsOpen) return;
             // A tray click can leave Explorer (or the previously active app) in
             // the foreground until the DesktopFlyouts activation handoff finishes.
-            _openingForegroundAnchor = FlyoutForegroundProbe.CaptureForegroundAnchor();
+            PrepareOpeningActivationHandoff();
             _desiredOpen = true;
             _showPending = true;
             if (!_flyoutContentLoaded) return;
@@ -1045,6 +1050,90 @@ namespace Task_Flyout
             ApplyConfiguredTheme(App.GetConfiguredTheme());
             _openRequestIssued = true;
             Show();
+            StartActivationHandoffMonitor();
+        }
+
+        private void PrepareOpeningActivationHandoff()
+        {
+            ResetOpeningActivationHandoff();
+            _openingForegroundAnchor = FlyoutForegroundProbe.CaptureForegroundAnchor();
+        }
+
+        private void StartActivationHandoffMonitor()
+        {
+            if (_activationHandoffTimer == null)
+            {
+                _activationHandoffTimer = new DispatcherTimer
+                {
+                    Interval = ActivationHandoffInterval
+                };
+                _activationHandoffTimer.Tick += ActivationHandoffTimer_Tick;
+            }
+
+            if (!_activationHandoffTimer.IsEnabled)
+                _activationHandoffTimer.Start();
+        }
+
+        private void StopActivationHandoffMonitor()
+        {
+            _activationHandoffTimer?.Stop();
+            _activationHandoffAttempts = 0;
+        }
+
+        private void ResetOpeningActivationHandoff()
+        {
+            StopActivationHandoffMonitor();
+            _openingForegroundAnchor = IntPtr.Zero;
+            _openingFlyoutWasForeground = false;
+        }
+
+        private void ActivationHandoffTimer_Tick(object? sender, object e)
+        {
+            if (_isShuttingDown || !_desiredOpen || (!IsOpen && !_openRequestIssued))
+            {
+                StopActivationHandoffMonitor();
+                return;
+            }
+
+            bool focusStateKnown = FlyoutForegroundProbe.TryGetCurrentForegroundState(
+                _openingForegroundAnchor,
+                out bool isFlyoutForeground,
+                out bool isOpeningForegroundStillActive);
+            if (isFlyoutForeground)
+            {
+                _openingFlyoutWasForeground = true;
+                StopActivationHandoffMonitor();
+                return;
+            }
+
+            if (focusStateKnown &&
+                (_openingFlyoutWasForeground || !isOpeningForegroundStillActive))
+            {
+                StopActivationHandoffMonitor();
+                if (IsOpen && FlyoutDismissalPolicy.ShouldDismissAfterOpening(
+                        _isPinned,
+                        HideOnLostFocus,
+                        focusStateKnown,
+                        isFlyoutForeground,
+                        isOpeningForegroundStillActive,
+                        _openingFlyoutWasForeground))
+                {
+                    HideFlyout(autoHide: true);
+                }
+                return;
+            }
+
+            if (_activationHandoffAttempts >= MaxActivationHandoffAttempts)
+            {
+                StopActivationHandoffMonitor();
+                return;
+            }
+
+            _activationHandoffAttempts++;
+            if (FlyoutForegroundProbe.TryActivateCurrentProcessFlyoutHost())
+            {
+                NavigateFocus();
+            }
         }
 
         private void OnIsOpenChanged(DependencyObject sender, DependencyProperty property)
@@ -1055,13 +1144,17 @@ namespace Task_Flyout
                     _openingForegroundAnchor,
                     out bool isFlyoutForeground,
                     out bool isOpeningForegroundStillActive);
+                if (isFlyoutForeground)
+                    _openingFlyoutWasForeground = true;
                 if (FlyoutDismissalPolicy.ShouldDismissAfterOpening(
                         _isPinned,
                         HideOnLostFocus,
                         focusStateKnown,
                         isFlyoutForeground,
-                        isOpeningForegroundStillActive))
+                        isOpeningForegroundStillActive,
+                        _openingFlyoutWasForeground))
                 {
+                    StopActivationHandoffMonitor();
                     HideFlyout(autoHide: true);
                     return;
                 }
@@ -1072,6 +1165,18 @@ namespace Task_Flyout
                 {
                     Hide();
                     return;
+                }
+
+                if (isFlyoutForeground ||
+                    (focusStateKnown && !isOpeningForegroundStillActive))
+                {
+                    StopActivationHandoffMonitor();
+                }
+                else
+                {
+                    if (FlyoutForegroundProbe.TryActivateCurrentProcessFlyoutHost())
+                        NavigateFocus();
+                    StartActivationHandoffMonitor();
                 }
 
                 ApplyConfiguredTheme(App.GetConfiguredTheme());
@@ -1107,7 +1212,7 @@ namespace Task_Flyout
             _showPending = false;
             _openRequestIssued = false;
             _desiredOpen = false;
-            _openingForegroundAnchor = IntPtr.Zero;
+            ResetOpeningActivationHandoff();
             _clockTimer?.Stop();
             _syncTimer?.Stop();
             CancelBackgroundRefresh();
@@ -1735,6 +1840,12 @@ namespace Task_Flyout
             _syncTimer?.Stop();
             _clockTimer?.Stop();
             _dotRefreshTimer?.Stop();
+            if (_activationHandoffTimer != null)
+            {
+                _activationHandoffTimer.Stop();
+                _activationHandoffTimer.Tick -= ActivationHandoffTimer_Tick;
+                _activationHandoffTimer = null;
+            }
             CancelBackgroundRefresh();
             CancelWeatherRefresh();
             if (_activeScrollViewer != null)

@@ -113,7 +113,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M1-13 | DONE | Reliability/Mail | Open new-mail notification targets directly after background-only polling. | Polling keeps a bounded body-free unread metadata slice without presenting it as a complete folder window; activation resolves explicit Inbox aliases, falls back across folders only for Google/Outlook identities, and never treats IMAP UIDs as cross-folder identities. | `fix(mail): open notification targets reliably` |
 | M1-14 | DONE | Data integrity/Mail | Keep unread state coherent across provider, folder views, cache, notifications, and background polling. | Read/unread mutations update every cached identity for the account, reconcile authoritative provider state after refresh, and cannot resurrect stale unread badges or notifications. | `fix(mail): converge mutable state by provider identity`, `fix(mail): reconcile authoritative unread snapshots`, `fix(mail): synchronize unread UI and notifications` |
 | M1-15 | DONE | Reliability/Calendar | Correct event editor times, timeline duration, date-strip overflow, and automatic refresh. | Existing events hydrate both start and end controls; the day timeline renders the complete interval; the date header has no unintended horizontal scrollbar; foreground and hidden refresh paths reliably publish fresh data without overlap or stale replacement. | `fix(calendar): align event times and timeline`, `fix(calendar): publish background refreshes to open views`, `fix(google): route mutations to source calendar` |
-| M1-16 | DONE | Reliability/Flyout | Reliably dismiss an unpinned Flyout when focus moves elsewhere. | A focus loss during either the opening transition or the fully open state closes the Flyout exactly once; the normal tray activation handoff remains open; pinned behavior is preserved; rapid tray toggles cannot strand a visible Flyout. | `fix(flyout): close reliably on focus loss`, `fix(flyout): preserve tray activation handoff` |
+| M1-16 | DONE | Reliability/Flyout | Reliably dismiss an unpinned Flyout when focus moves elsewhere. | A focus loss during either the opening transition or the fully open state closes the Flyout exactly once; the normal tray activation handoff remains open; pinned behavior is preserved; rapid tray gestures toggle only the Flyout and cannot strand it or open the main Calendar window. | `fix(flyout): close reliably on focus loss`, `fix(flyout): preserve tray activation handoff`, `fix(flyout): complete tray activation handoff` |
 
 ### P2 - Long-Running Efficiency, Architecture, And UI Quality
 
@@ -1704,3 +1704,20 @@ They are historical records; active work remains in the backlog tables above.
 - The focused dismissal-policy tests pass 6/6, the complete managed suite passes
   1250/1250, and the Debug x64 app build completes with zero warnings and zero
   errors. Packaged-runtime confirmation remains pending.
+
+### 2026-09-04 Flyout Host Activation Completion
+
+- Packaged follow-up testing showed that the first tray open could remain owned
+  by the previously foreground window. Light dismiss therefore did not become
+  active until the user clicked inside the Flyout once.
+- The opening handoff now observes the real DesktopFlyouts host throughout the
+  transition, actively foregrounds its visible current-process host, and records
+  whether that host ever owned the foreground. A later external click is still
+  honored after the dependency finishes its animation, including a click back
+  to the same window that was active before the tray gesture.
+- Dynamic host classes such as `DesktopFlyoutHostClass.<guid>` are recognized by
+  prefix. Tray double-click uses the same delayed Flyout toggle command as a
+  single click, so a rapid gesture no longer opens the main Calendar window.
+- Focused activation/dismissal tests pass 11/11, the complete managed suite
+  passes 1255/1255, and the Debug x64 app build completes with zero warnings and
+  zero errors. Signed packaged-runtime confirmation remains pending.

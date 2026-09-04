@@ -73,6 +73,7 @@
     <Compile Include="..\..\Services\FlyoutResidencyPolicy.cs" Link="Source\FlyoutResidencyPolicy.cs" />
     <Compile Include="..\..\Services\FlyoutAgendaSurfacePolicy.cs" Link="Source\FlyoutAgendaSurfacePolicy.cs" />
     <Compile Include="..\..\Services\FlyoutDismissalPolicy.cs" Link="Source\FlyoutDismissalPolicy.cs" />
+    <Compile Include="..\..\Services\FlyoutForegroundProbe.cs" Link="Source\FlyoutForegroundProbe.cs" />
     <Compile Include="..\..\Services\IncrementalBucketSnapshot.cs" Link="Source\IncrementalBucketSnapshot.cs" />
     <Compile Include="..\..\Services\VersionedBucketSlicePolicy.cs" Link="Source\VersionedBucketSlicePolicy.cs" />
     <Compile Include="..\..\Services\VersionedUiRefreshGate.cs" Link="Source\VersionedUiRefreshGate.cs" />
