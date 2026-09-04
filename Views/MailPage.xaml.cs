@@ -1083,7 +1083,9 @@ namespace Task_Flyout.Views
             {
                 try
                 {
-                    await app.DisconnectProviderCompletelyAsync(account.ProviderName);
+                    await app.DisconnectProviderCompletelyAsync(
+                        account.ProviderName,
+                        account.ProviderAccountId);
                 }
                 catch (Exception ex)
                 {
@@ -1519,9 +1521,9 @@ namespace Task_Flyout.Views
 
             try
             {
-                if (App.Current is App app && app.SyncManager.GetProvider("Google") is ISyncProvider provider)
-                    await provider.ConnectInteractivelyAsync(authCts.Token);
-                var account = await _mailService.AddGoogleAccountAsync(authCts.Token);
+                if (App.Current is not App app)
+                    throw new InvalidOperationException("The application account service is unavailable.");
+                var account = await app.ConnectNewGoogleAccountAsync(authCts.Token);
                 AddStatusText.Text = string.Format(_loader.GetStringOrDefault("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
                 await RefreshAccountsAsync();
             }

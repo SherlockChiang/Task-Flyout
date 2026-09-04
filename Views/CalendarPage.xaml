@@ -77,9 +77,9 @@
                                         <FontIcon Grid.Column="0" Glyph="{Binding IconGlyph}" FontSize="15" Margin="0,0,12,0"
                                                   Foreground="{ThemeResource SystemAccentColor}" VerticalAlignment="Center"/>
                                         <TextBlock Grid.Column="1" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"
-                                                   Text="{Binding ProviderName}" TextTrimming="CharacterEllipsis"/>
+                                                   Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis"/>
                                         <Button Grid.Column="2" x:Uid="CalendarPage_BtnRemoveAccount" Width="40" Height="40" Padding="0" Background="Transparent" BorderThickness="0"
-                                                Tag="{Binding ProviderName}" Click="BtnRemoveAccount_Click" VerticalAlignment="Center">
+                                                Tag="{Binding AccountId}" Click="BtnRemoveAccount_Click" VerticalAlignment="Center">
                                             <FontIcon Glyph="&#xE711;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
                                         </Button>
                                     </Grid>
@@ -128,7 +128,7 @@
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                             <ToggleSwitch x:Uid="CalendarPage_TaskVisibilityToggle" Grid.Column="2" IsOn="{Binding ShowTasks, Mode=TwoWay}"
                                                            OffContent="" OnContent="" MinWidth="0" Margin="0"
-                                                           Toggled="AccountToggle_Toggled" Tag="{Binding ProviderName}" VerticalAlignment="Center"/>
+                                                           Toggled="AccountToggle_Toggled" Tag="{Binding AccountId}" VerticalAlignment="Center"/>
                                         </Grid>
                                     </StackPanel>
                                 </Expander.Content>

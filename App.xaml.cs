@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System.Linq;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Windows.Storage;
@@ -84,23 +85,77 @@ namespace Task_Flyout
         internal TaskMutationCoordinator TaskMutations { get; } = new();
         internal ComposeDraftCoordinator ComposeDrafts { get; } = new();
 
-        public async Task DisconnectProviderCompletelyAsync(string providerName)
+        public async Task<MailAccount> ConnectNewGoogleAccountAsync(
+            CancellationToken cancellationToken = default)
+        {
+            await EnsureAccountsHydratedAsync();
+            var provider = SyncManager.RegisterGoogleProviderForNewAccount();
+            bool connected = false;
+            try
+            {
+                await provider.ConnectInteractivelyAsync(selectAccount: true, cancellationToken);
+                var account = await MailService.AddGoogleAccountAsync(provider, cancellationToken);
+                connected = true;
+                return account;
+            }
+            finally
+            {
+                if (!connected)
+                {
+                    try { await provider.ClearLocalAuthorizationAsync(); }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Temporary Google authorization cleanup failed: {ex.Message}");
+                    }
+                    SyncManager.UnregisterProvider(provider.ProviderName, provider.AccountId);
+                }
+            }
+        }
+
+        public async Task DisconnectProviderCompletelyAsync(
+            string providerName,
+            string? accountId)
         {
             providerName = ProviderAuthorizationLifecycle.NormalizeProviderName(providerName);
+            var agendaAccount = SyncManager.AccountManager.GetAccount(providerName, accountId);
+            string? resolvedAccountId = agendaAccount?.AccountId;
+            if (string.IsNullOrWhiteSpace(resolvedAccountId) && !string.IsNullOrWhiteSpace(accountId))
+                resolvedAccountId = AccountIdentityPolicy.ResolveAccountId(providerName, accountId);
+
+            if (string.Equals(providerName, "Google", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(resolvedAccountId))
+            {
+                var linkedMailAccount = MailService
+                    .GetAccountsForProviderAccount(providerName, resolvedAccountId)
+                    .FirstOrDefault();
+                SyncManager.EnsureGoogleProvider(
+                    resolvedAccountId,
+                    agendaAccount?.DisplayName ?? linkedMailAccount?.Address);
+            }
+
             await ProviderAuthorizationLifecycle.DisconnectCompletelyAsync(
-                () => SyncManager.ClearProviderAuthorizationForDisconnectAsync(providerName),
-                () => SyncManager.RemoveAgendaAccountAsync(providerName),
+                () => SyncManager.ClearProviderAuthorizationForDisconnectAsync(providerName, resolvedAccountId),
+                () => SyncManager.RemoveAgendaAccountAsync(providerName, resolvedAccountId),
                 async () =>
                 {
-                    var affectedIds = MailService.GetAccounts()
-                        .Where(account => ProviderAuthorizationLifecycle.NormalizeProviderName(account.ProviderName) == providerName)
+                    var affectedAccounts = string.IsNullOrWhiteSpace(resolvedAccountId)
+                        ? MailService.GetAccounts()
+                            .Where(account => ProviderAuthorizationLifecycle.NormalizeProviderName(account.ProviderName) == providerName)
+                            .ToList()
+                        : MailService.GetAccountsForProviderAccount(providerName, resolvedAccountId).ToList();
+                    var affectedIds = affectedAccounts
                         .Select(account => account.Id)
                         .ToList();
                     foreach (var accountId in affectedIds)
                         await ComposeDrafts.DiscardForAccountAsync(accountId);
-                    MailService.RemoveAccountsForProvider(providerName);
+                    MailService.RemoveAccountsForProvider(providerName, resolvedAccountId);
                 },
                 WebView2RuntimeService.ClearSensitiveBrowsingDataAsync);
+            if (string.Equals(providerName, "Google", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(resolvedAccountId))
+            {
+                SyncManager.UnregisterProvider(providerName, resolvedAccountId);
+            }
             if (MyMainWindow != null)
                 await MyMainWindow.RefreshAccountListAsync();
             MyFlyoutWindow?.ReloadFilters();
@@ -133,7 +188,6 @@ namespace Task_Flyout
                 }
                 catch { }
             };
-            SyncManager.RegisterProvider(new GoogleSyncProvider());
             SyncManager.RegisterProvider(new Services.MicrosoftSyncProvider());
             SyncManager.RegisterProvider(new Services.ICloudSyncProvider());
         }
@@ -524,6 +578,7 @@ namespace Task_Flyout
                 try
                 {
                     SyncManager.AccountManager.Load();
+                    MailService.SynchronizeAgendaAccountDisplayNames(SyncManager.AccountManager);
                     SyncManager.HydrateAccountProviders();
                 }
                 catch (Exception ex)

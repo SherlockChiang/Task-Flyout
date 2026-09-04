@@ -905,12 +905,10 @@ namespace Task_Flyout
             AccountManager accountManager)
         {
             return accountManager.Accounts
-                .Select(account => account.ProviderName)
-                .Where(name => !string.IsNullOrWhiteSpace(name))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(account => !string.IsNullOrWhiteSpace(account.ProviderName))
                 .ToDictionary(
-                    name => name,
-                    name => _syncManager.GetProviderHealth(name),
+                    account => account.ProviderKey,
+                    account => _syncManager.GetProviderHealth(account.ProviderName, account.AccountId),
                     StringComparer.OrdinalIgnoreCase);
         }
 
@@ -920,11 +918,16 @@ namespace Task_Flyout
             => before
                 .Select(entry =>
                 {
-                    var after = _syncManager.GetProviderHealth(entry.Key);
+                    var after = _syncManager.GetProviderHealth(
+                        entry.Value.ProviderName,
+                        entry.Value.AccountId);
                     bool attempted = HasProviderAttempted(entry.Value, after, refreshStartedAt);
                     bool succeeded = HasProviderSucceeded(entry.Value, after, attempted);
+                    string accountTitle = _syncManager.AccountManager
+                        .GetAccount(entry.Value.ProviderName, entry.Value.AccountId)
+                        ?.DisplayTitle ?? entry.Value.ProviderName;
                     return (
-                        ProviderName: entry.Key,
+                        ProviderName: accountTitle,
                         Attempt: new FlyoutProviderSyncAttempt(attempted, succeeded, after.HasCachedData));
                 })
                 .OrderBy(entry => entry.ProviderName, StringComparer.OrdinalIgnoreCase)
@@ -1402,6 +1405,8 @@ namespace Task_Flyout
 
             TxtLocation.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
             TimePickerEnd.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
+            if (CmbAddProvider != null)
+                SetupFlyoutProviderComboBox();
 
             TimePickerStart.Header = isEvent ? (_loader.GetStringOrDefault("TextStartTime") ?? "Start time") : (_loader.GetStringOrDefault("TextDueTime") ?? "Due time");
 
@@ -1751,7 +1756,17 @@ namespace Task_Flyout
             if (accountMgr != null)
             {
                 foreach (var acct in accountMgr.Accounts)
-                    CmbAddProvider.Items.Add(new ComboBoxItem { Content = acct.ProviderName, Tag = acct.ProviderName });
+                {
+                    var capabilities = SyncProviderCapabilityPolicy.ForProvider(acct.ProviderName);
+                    if (RadioTypeTask?.IsChecked == true && !capabilities.SupportsTasks) continue;
+                    if (RadioTypeEvent?.IsChecked == true && !capabilities.SupportsEvents) continue;
+                    CmbAddProvider.Items.Add(new ComboBoxItem
+                    {
+                        Content = acct.DisplayTitle,
+                        Tag = acct.AccountId,
+                        DataContext = acct
+                    });
+                }
             }
 
             if (CmbAddProvider.Items.Count > 1)
@@ -1806,7 +1821,10 @@ namespace Task_Flyout
             bool isEvent = RadioTypeEvent.IsChecked == true;
             bool isAllDay = ChkAllDay.IsChecked == true;
             string location = TxtLocation.Text;
-            string providerName = (CmbAddProvider.SelectedItem as ComboBoxItem)?.Tag.ToString() ?? "Google";
+            var selectedOption = CmbAddProvider.SelectedItem as ComboBoxItem;
+            var selectedAccount = selectedOption?.DataContext as ConnectedAccountInfo;
+            string providerName = selectedAccount?.ProviderName ?? "Google";
+            string? accountId = selectedOption?.Tag?.ToString();
 
             TimeSpan startTime = TimePickerStart.Time;
             TimeSpan endTime = TimePickerEnd.Time;
@@ -1826,7 +1844,16 @@ namespace Task_Flyout
                 AddItemStatusText.Visibility = Visibility.Visible;
                 AdjustWindowHeight();
 
-                await _syncManager.CreateItemAsync(title, isEvent, isAllDay, targetDate, startTime, endTime, location, providerName);
+                await _syncManager.CreateItemAsync(
+                    title,
+                    isEvent,
+                    isAllDay,
+                    targetDate,
+                    startTime,
+                    endTime,
+                    location,
+                    providerName,
+                    accountId);
                 TxtNewTitle.Text = string.Empty;
                 TxtLocation.Text = string.Empty;
                 AddItemStatusText.Text = string.Empty;

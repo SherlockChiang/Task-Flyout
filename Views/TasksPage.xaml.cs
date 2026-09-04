@@ -308,13 +308,11 @@ namespace Task_Flyout.Views
         {
             if (_syncManager == null) return;
 
-            var providerNames = _syncManager.Providers
-                .Where(provider => _syncManager.AccountManager.IsConnected(provider.ProviderName))
-                .Where(provider => SyncProviderCapabilityPolicy.ForProvider(provider.ProviderName).SupportsTasks)
-                .Select(provider => provider.ProviderName)
+            var providerAccounts = _syncManager.AccountManager.Accounts
+                .Where(account => SyncProviderCapabilityPolicy.ForProvider(account.ProviderName).SupportsTasks)
                 .ToList();
 
-            if (providerNames.Count == 0)
+            if (providerAccounts.Count == 0)
             {
                 await new ContentDialog
                 {
@@ -334,10 +332,18 @@ namespace Task_Flyout.Views
             var providerBox = new ComboBox
             {
                 Header = _loader.GetStringOrDefault("TextAccount") ?? "Account",
-                ItemsSource = providerNames,
-                SelectedIndex = 0,
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
+            foreach (var account in providerAccounts)
+            {
+                providerBox.Items.Add(new ComboBoxItem
+                {
+                    Content = account.DisplayTitle,
+                    Tag = account.AccountId,
+                    DataContext = account
+                });
+            }
+            providerBox.SelectedIndex = 0;
             var datePicker = new DatePicker
             {
                 Header = _loader.GetStringOrDefault("TextDate") ?? "Date",
@@ -378,9 +384,19 @@ namespace Task_Flyout.Views
                 var deferral = args.GetDeferral();
                 try
                 {
-                    var providerName = providerBox.SelectedItem?.ToString();
+                    var selectedOption = providerBox.SelectedItem as ComboBoxItem;
+                    var selectedAccount = selectedOption?.DataContext as ConnectedAccountInfo;
                     var targetDate = datePicker.Date.DateTime.Date;
-                    await _syncManager.CreateItemAsync(title, isEvent: false, isAllDay: false, targetDate, timePicker.Time, timePicker.Time, "", providerName);
+                    await _syncManager.CreateItemAsync(
+                        title,
+                        isEvent: false,
+                        isAllDay: false,
+                        targetDate,
+                        timePicker.Time,
+                        timePicker.Time,
+                        "",
+                        selectedAccount?.ProviderName,
+                        selectedOption?.Tag?.ToString());
                     await SyncTasksAsync(forceRefresh: true, fullRange: true);
                     App.MyFlyoutWindow?.ReloadFilters();
                 }
@@ -514,13 +530,17 @@ namespace Task_Flyout.Views
 
         private async void BtnRemoveAccount_Click(object sender, RoutedEventArgs e)
         {
-            if (_syncManager == null || sender is not Button btn || btn.Tag is not string providerName)
+            if (_syncManager == null || sender is not Button btn || btn.Tag is not string accountId ||
+                _syncManager.AccountManager.GetAccountById(accountId) is not ConnectedAccountInfo account)
                 return;
+
+            string providerName = account.ProviderName;
+            string accountTitle = account.DisplayTitle;
 
             var dialog = new ContentDialog
             {
                 Title = _loader.GetStringOrDefault("TextRemoveAccount") ?? "Remove Account",
-                Content = string.Format(_loader.GetStringOrDefault("TextProviderRemovalContent") ?? "Remove {0} from Calendar and Tasks only, or disconnect it completely from Calendar, Tasks, and Mail?", providerName),
+                Content = string.Format(_loader.GetStringOrDefault("TextProviderRemovalContent") ?? "Remove {0} from Calendar and Tasks only, or disconnect it completely from Calendar, Tasks, and Mail?", accountTitle),
                 PrimaryButtonText = _loader.GetStringOrDefault("TextRemoveAgendaOnly") ?? "Remove Calendar/Tasks only",
                 SecondaryButtonText = _loader.GetStringOrDefault("TextDisconnectProvider") ?? "Disconnect completely",
                 CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
@@ -534,9 +554,9 @@ namespace Task_Flyout.Views
             try
             {
                 if (result == ContentDialogResult.Secondary && App.Current is App app)
-                    await app.DisconnectProviderCompletelyAsync(providerName);
+                    await app.DisconnectProviderCompletelyAsync(providerName, accountId);
                 else
-                    await _syncManager.RemoveAgendaAccountAsync(providerName);
+                    await _syncManager.RemoveAgendaAccountAsync(providerName, accountId);
             }
             catch (Exception ex)
             {

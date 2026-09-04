@@ -43,6 +43,7 @@ namespace Task_Flyout.Services
         public MailAccountKind Kind { get; set; } = MailAccountKind.Outlook;
         public string DisplayName { get; set; } = "";
         public string Address { get; set; } = "";
+        public string ProviderAccountId { get; set; } = "";
         public bool IsSetupComplete { get; set; }
         public string ImapHost { get; set; } = "";
         public int ImapPort { get; set; } = 993;
@@ -108,6 +109,17 @@ namespace Task_Flyout.Services
     {
         public GmailActionOutcomeUnknownException(Exception innerException)
             : base("Gmail may have completed the action before the connection was interrupted.", innerException) { }
+    }
+
+    public sealed class GoogleAccountAlreadyConnectedException : InvalidOperationException
+    {
+        public string Address { get; }
+
+        public GoogleAccountAlreadyConnectedException(string address)
+            : base($"The Google account {address} is already connected.")
+        {
+            Address = address;
+        }
     }
 
     public sealed class ImapMoveOutcomeUnknownException : Exception
@@ -236,6 +248,57 @@ namespace Task_Flyout.Services
         {
             EnsureAccountsLoaded();
             return ApplyAccountOrder(_accounts);
+        }
+
+        public IReadOnlyList<MailAccount> GetAccountsForProviderAccount(
+            string providerName,
+            string? providerAccountId)
+        {
+            EnsureAccountsLoaded();
+            return ApplyAccountOrder(_accounts.Where(account =>
+                MailProviderAccountLinkPolicy.MatchesProviderAccount(
+                    account.Kind,
+                    account.ProviderAccountId,
+                    providerName,
+                    providerAccountId)));
+        }
+
+        public bool SynchronizeAgendaAccountDisplayNames(AccountManager accountManager)
+        {
+            ArgumentNullException.ThrowIfNull(accountManager);
+            EnsureAccountsLoaded();
+
+            bool changed = false;
+            foreach (var mailAccount in _accounts)
+            {
+                string providerName = MailProviderAccountLinkPolicy.GetProviderName(mailAccount.Kind);
+                if (string.IsNullOrWhiteSpace(providerName)) continue;
+
+                string providerAccountId = MailProviderAccountLinkPolicy.ResolveProviderAccountId(
+                    mailAccount.Kind,
+                    mailAccount.ProviderAccountId);
+                var agendaAccount = accountManager.GetAccount(providerName, providerAccountId);
+                if (agendaAccount == null ||
+                    !MailProviderAccountLinkPolicy.ShouldHydrateAgendaDisplayName(
+                        agendaAccount.DisplayName,
+                        providerName))
+                {
+                    continue;
+                }
+
+                string displayName = MailProviderAccountLinkPolicy.GetPreferredAgendaDisplayName(
+                    mailAccount.Kind,
+                    mailAccount.DisplayName,
+                    mailAccount.Address);
+                if (string.IsNullOrWhiteSpace(displayName)) continue;
+
+                agendaAccount.DisplayName = displayName;
+                changed = true;
+            }
+
+            if (changed)
+                accountManager.Save();
+            return changed;
         }
 
         public bool HasSetupCompleteAccounts()
@@ -461,7 +524,10 @@ namespace Task_Flyout.Services
                 string.Equals(a.Address, address, StringComparison.OrdinalIgnoreCase));
             if (existing != null)
             {
-                await EnsureProviderAgendaAccountAsync("Microsoft");
+                await EnsureProviderAgendaAccountAsync(
+                    "Microsoft",
+                    existing.ProviderAccountId,
+                    existing.DisplayTitle);
                 return existing;
             }
 
@@ -470,13 +536,17 @@ namespace Task_Flyout.Services
                 Kind = MailAccountKind.Outlook,
                 DisplayName = string.IsNullOrWhiteSpace(me?.DisplayName) ? "Outlook" : me.DisplayName,
                 Address = address,
+                ProviderAccountId = AccountIdentityPolicy.CreateLegacyAccountId("Microsoft"),
                 IsSetupComplete = true
             };
 
             _accounts.Add(account);
             SaveAccounts();
             UpdateMailPollingSettings();
-            await EnsureProviderAgendaAccountAsync("Microsoft");
+            await EnsureProviderAgendaAccountAsync(
+                "Microsoft",
+                account.ProviderAccountId,
+                account.DisplayTitle);
             return account;
         }
 
@@ -561,35 +631,60 @@ namespace Task_Flyout.Services
             return account;
         }
 
-        public async Task<MailAccount> AddGoogleAccountAsync(CancellationToken cancellationToken = default)
+        public async Task<MailAccount> AddGoogleAccountAsync(
+            GoogleSyncProvider provider,
+            CancellationToken cancellationToken = default)
         {
+            ArgumentNullException.ThrowIfNull(provider);
             EnsureAccountsLoaded();
-            var gmail = await EnsureGoogleMailReadAuthorizedAsync(cancellationToken);
+            var gmail = await provider.EnsureGmailAuthorizedAsync(cancellationToken: cancellationToken);
             var profile = await gmail.Users.GetProfile("me").ExecuteAsync(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            var address = profile?.EmailAddress ?? "";
+            var address = profile?.EmailAddress?.Trim() ?? "";
+            if (string.IsNullOrWhiteSpace(address))
+                throw new InvalidOperationException("Google did not return an email address for the connected account.");
 
             var existing = _accounts.FirstOrDefault(a =>
                 a.Kind == MailAccountKind.Google &&
                 string.Equals(a.Address, address, StringComparison.OrdinalIgnoreCase));
             if (existing != null)
             {
-                await EnsureProviderAgendaAccountAsync("Google");
+                if (!MailProviderAccountLinkPolicy.MatchesProviderAccount(
+                    existing.Kind,
+                    existing.ProviderAccountId,
+                    provider.ProviderName,
+                    provider.AccountId))
+                {
+                    throw new GoogleAccountAlreadyConnectedException(address);
+                }
+
+                provider.SetAccountDisplayName(address);
+                await EnsureProviderAgendaAccountAsync(
+                    provider.ProviderName,
+                    provider.AccountId,
+                    address,
+                    provider);
                 return existing;
             }
 
+            provider.SetAccountDisplayName(address);
             var account = new MailAccount
             {
                 Kind = MailAccountKind.Google,
                 DisplayName = "Gmail",
                 Address = address,
+                ProviderAccountId = provider.AccountId,
                 IsSetupComplete = true
             };
 
             _accounts.Add(account);
             SaveAccounts();
             UpdateMailPollingSettings();
-            await EnsureProviderAgendaAccountAsync("Google");
+            await EnsureProviderAgendaAccountAsync(
+                provider.ProviderName,
+                provider.AccountId,
+                address,
+                provider);
             return account;
         }
 
@@ -955,7 +1050,7 @@ namespace Task_Flyout.Services
             CancellationToken cancellationToken = default)
         {
             if (account.Kind != MailAccountKind.Google) throw new NotSupportedException("Only Gmail labels are supported.");
-            var gmail = await EnsureGoogleMailModifyAuthorizedAsync(cancellationToken);
+            var gmail = await EnsureGoogleMailModifyAuthorizedAsync(account, cancellationToken);
             var response = await gmail.Users.Labels.List("me").ExecuteAsync(cancellationToken);
             return GmailLabelMutationPolicy.Destinations(
                 response?.Labels?.Where(label => label != null).Select(label => new GmailLabelDestination
@@ -993,7 +1088,7 @@ namespace Task_Flyout.Services
             if (kind == GmailOnlineActionKind.Trash && string.Equals(item.FolderId, "TRASH", StringComparison.Ordinal))
                 throw new InvalidOperationException("The message is already in trash.");
 
-            var gmail = await EnsureGoogleMailModifyAuthorizedAsync(cancellationToken);
+            var gmail = await EnsureGoogleMailModifyAuthorizedAsync(account, cancellationToken);
             var labelsResponse = await gmail.Users.Labels.List("me").ExecuteAsync(cancellationToken);
             var labels = labelsResponse?.Labels ?? new List<Label>();
             bool sourceIsUser = labels.Any(label => string.Equals(label.Id, item.FolderId, StringComparison.Ordinal) &&
@@ -1074,7 +1169,7 @@ namespace Task_Flyout.Services
         {
             if (account.Kind != MailAccountKind.Google || !string.Equals(account.Id, forward.Item.AccountId, StringComparison.Ordinal))
                 throw new InvalidOperationException("The Gmail undo does not belong to the selected account.");
-            var gmail = await EnsureGoogleMailModifyAuthorizedAsync(cancellationToken);
+            var gmail = await EnsureGoogleMailModifyAuthorizedAsync(account, cancellationToken);
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
             using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
             GmailMessage? restored;
@@ -1437,7 +1532,7 @@ namespace Task_Flyout.Services
             }
             else if (account.Kind == MailAccountKind.Google)
             {
-                var gmail = await EnsureGoogleMailModifyAuthorizedAsync(operationToken);
+                var gmail = await EnsureGoogleMailModifyAuthorizedAsync(account, operationToken);
                 string label = kind == MailMutationKind.SetReadState ? "UNREAD" : "STARRED";
                 bool addLabel = kind == MailMutationKind.SetReadState ? !value : value;
                 await gmail.Users.Messages.Modify(new ModifyMessageRequest
@@ -1504,7 +1599,7 @@ namespace Task_Flyout.Services
             return true;
         }
 
-        public int RemoveAccountsForProvider(string providerName)
+        public int RemoveAccountsForProvider(string providerName, string? providerAccountId = null)
         {
             EnsureAccountsLoaded();
             providerName = ProviderAuthorizationLifecycle.NormalizeProviderName(providerName);
@@ -1519,7 +1614,15 @@ namespace Task_Flyout.Services
             if (kind.Value == MailAccountKind.Outlook)
                 _outlookClient = null;
 
-            var accounts = _accounts.Where(account => account.Kind == kind.Value).ToList();
+            var accounts = _accounts.Where(account =>
+                account.Kind == kind.Value &&
+                (string.IsNullOrWhiteSpace(providerAccountId) ||
+                 MailProviderAccountLinkPolicy.MatchesProviderAccount(
+                     account.Kind,
+                     account.ProviderAccountId,
+                     providerName,
+                     providerAccountId)))
+                .ToList();
             foreach (var account in accounts)
             {
                 DisconnectPollImapClient(account.Id);
@@ -1565,7 +1668,7 @@ namespace Task_Flyout.Services
             }
             else if (account.Kind == MailAccountKind.Google)
             {
-                var gmail = await EnsureGoogleMailReadAuthorizedAsync(cancellationToken);
+                var gmail = await EnsureGoogleMailReadAuthorizedAsync(account, cancellationToken);
                 var get = gmail.Users.Messages.Get("me", item.Id);
                 get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Full;
                 var full = await get.ExecuteAsync(cancellationToken);
@@ -1894,7 +1997,7 @@ namespace Task_Flyout.Services
 
         private async Task SendGoogleMailAsync(MailAccount account, string to, string subject, string body, IReadOnlyList<MailAttachmentData> attachments, IProgress<MailSendProgress>? progress, CancellationToken cancellationToken)
         {
-            var gmail = await EnsureGoogleMailSendAuthorizedAsync(cancellationToken);
+            var gmail = await EnsureGoogleMailSendAuthorizedAsync(account, cancellationToken);
             var mime = CreateMimeMessage(account, to, subject, body, attachments);
             using var stream = new MemoryStream();
             await mime.WriteToAsync(stream, cancellationToken);
@@ -2392,28 +2495,45 @@ namespace Task_Flyout.Services
             };
         }
 
-        private async Task<GmailService> EnsureGoogleMailReadAuthorizedAsync(CancellationToken cancellationToken = default)
+        private async Task<GmailService> EnsureGoogleMailReadAuthorizedAsync(
+            MailAccount account,
+            CancellationToken cancellationToken = default)
         {
-            return await EnsureGoogleMailAuthorizedAsync(requireModify: false, requireSend: false, cancellationToken);
+            return await EnsureGoogleMailAuthorizedAsync(account, requireModify: false, requireSend: false, cancellationToken);
         }
 
-        private async Task<GmailService> EnsureGoogleMailModifyAuthorizedAsync(CancellationToken cancellationToken = default)
+        private async Task<GmailService> EnsureGoogleMailModifyAuthorizedAsync(
+            MailAccount account,
+            CancellationToken cancellationToken = default)
         {
-            return await EnsureGoogleMailAuthorizedAsync(requireModify: true, requireSend: false, cancellationToken);
+            return await EnsureGoogleMailAuthorizedAsync(account, requireModify: true, requireSend: false, cancellationToken);
         }
 
-        private async Task<GmailService> EnsureGoogleMailSendAuthorizedAsync(CancellationToken cancellationToken = default)
+        private async Task<GmailService> EnsureGoogleMailSendAuthorizedAsync(
+            MailAccount account,
+            CancellationToken cancellationToken = default)
         {
-            return await EnsureGoogleMailAuthorizedAsync(requireModify: false, requireSend: true, cancellationToken);
+            return await EnsureGoogleMailAuthorizedAsync(account, requireModify: false, requireSend: true, cancellationToken);
         }
 
-        private async Task<GmailService> EnsureGoogleMailAuthorizedAsync(bool requireModify, bool requireSend, CancellationToken cancellationToken = default)
+        private async Task<GmailService> EnsureGoogleMailAuthorizedAsync(
+            MailAccount account,
+            bool requireModify,
+            bool requireSend,
+            CancellationToken cancellationToken = default)
         {
             EnsureAccountsLoaded();
+            if (account.Kind != MailAccountKind.Google)
+                throw new InvalidOperationException("The selected mail account is not a Google account.");
 
-            if (App.Current is App app &&
-                app.SyncManager.GetProvider("Google") is GoogleSyncProvider googleProvider)
+            string providerAccountId = MailProviderAccountLinkPolicy.ResolveProviderAccountId(
+                account.Kind,
+                account.ProviderAccountId);
+
+            if (App.Current is App app)
             {
+                var googleProvider = app.SyncManager.GetProvider("Google", providerAccountId) as GoogleSyncProvider
+                    ?? app.SyncManager.EnsureGoogleProvider(providerAccountId, account.Address);
                 return await googleProvider.EnsureGmailAuthorizedAsync(requireModify, requireSend, cancellationToken);
             }
 
@@ -2690,7 +2810,7 @@ namespace Task_Flyout.Services
 
         private async Task<List<MailFolder>> FetchGoogleFoldersAsync(MailAccount account, CancellationToken cancellationToken)
         {
-            var gmail = await EnsureGoogleMailReadAuthorizedAsync(cancellationToken);
+            var gmail = await EnsureGoogleMailReadAuthorizedAsync(account, cancellationToken);
             var labels = await gmail.Users.Labels.List("me").ExecuteAsync(cancellationToken);
 
             return labels?.Labels?
@@ -2716,7 +2836,7 @@ namespace Task_Flyout.Services
             if (cursor != null && cursor.ProviderKind != MailAccountKind.Google)
                 throw new InvalidOperationException("Mail continuation does not match the account provider.");
 
-            var gmail = await EnsureGoogleMailReadAuthorizedAsync(cancellationToken);
+            var gmail = await EnsureGoogleMailReadAuthorizedAsync(account, cancellationToken);
             int top = Math.Clamp(pageSize ?? PageSize, MinPageSize, MaxPageSize);
 
             var listRequest = gmail.Users.Messages.List("me");
@@ -2869,16 +2989,37 @@ namespace Task_Flyout.Services
                 throw new InvalidOperationException("Microsoft provider is not available.");
         }
 
-        private async Task EnsureProviderAgendaAccountAsync(string providerName)
+        private async Task EnsureProviderAgendaAccountAsync(
+            string providerName,
+            string? providerAccountId,
+            string? displayName,
+            ISyncProvider? provider = null)
         {
             if (App.Current is not App app) return;
 
             var accountManager = app.SyncManager.AccountManager;
-            if (accountManager.IsConnected(providerName)) return;
+            string resolvedAccountId = AccountIdentityPolicy.ResolveAccountId(providerName, providerAccountId);
+            var existing = accountManager.GetAccount(providerName, resolvedAccountId);
+            if (existing != null)
+            {
+                if (!string.IsNullOrWhiteSpace(displayName) &&
+                    !string.Equals(existing.DisplayName, displayName.Trim(), StringComparison.Ordinal))
+                {
+                    existing.DisplayName = displayName.Trim();
+                    accountManager.Save();
+                }
+                return;
+            }
 
-            if (app.SyncManager.GetProvider(providerName) is not ISyncProvider provider) return;
+            provider ??= app.SyncManager.GetProvider(providerName, resolvedAccountId);
+            if (provider == null) return;
 
-            var connected = new ConnectedAccountInfo { ProviderName = providerName };
+            var connected = new ConnectedAccountInfo
+            {
+                ProviderName = provider.ProviderName,
+                AccountId = provider.AccountId,
+                DisplayName = displayName?.Trim() ?? provider.AccountDisplayName
+            };
             try
             {
                 var calendars = await provider.FetchCalendarListAsync();
@@ -2902,6 +3043,27 @@ namespace Task_Flyout.Services
                     json,
                     value => JsonSerializer.Deserialize(value, AppJsonContext.Default.ListMailAccount),
                     () => new List<MailAccount>());
+
+                bool linksChanged = false;
+                foreach (var account in _accounts)
+                {
+                    string resolvedProviderAccountId = MailProviderAccountLinkPolicy.ResolveProviderAccountId(
+                        account.Kind,
+                        account.ProviderAccountId);
+                    if (string.Equals(
+                        account.ProviderAccountId,
+                        resolvedProviderAccountId,
+                        StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    account.ProviderAccountId = resolvedProviderAccountId;
+                    linksChanged = true;
+                }
+
+                if (linksChanged)
+                    SaveAccounts();
             }
             catch
             {

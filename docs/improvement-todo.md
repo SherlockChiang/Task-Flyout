@@ -1653,3 +1653,21 @@ They are historical records; active work remains in the backlog tables above.
 - M3-09 remains in progress for connecting the new provider from both account
   entry points, linking each Gmail mailbox to its provider account ID, and
   making create/remove/reconnect UI actions account-aware.
+
+### 2026-09-04 Multi-Google Account Routing
+
+- Both Google add-account entry points now allocate an isolated provider,
+  require explicit account selection, reject duplicate Gmail identities, and
+  clean only the temporary authorization namespace after cancellation or
+  failure.
+- Gmail folders, messages, bodies, mutations, label moves, undo, and sending
+  resolve the provider linked to the selected mailbox. Calendar, Tasks, and
+  Flyout create/remove actions carry the selected account ID instead of routing
+  through the first Google provider.
+- Legacy Gmail and Outlook records acquire their deterministic provider account
+  IDs, and a legacy Google agenda label is hydrated from its Gmail address.
+  Per-account Flyout health no longer collapses sibling Google providers.
+- Link-policy tests pass 15/15 and the Debug x64 app build completes with zero
+  warnings and zero errors. M3-09 remains in progress for per-account reconnect
+  controls, localized account actions, the complete managed suite, and packaged
+  multi-account runtime validation.

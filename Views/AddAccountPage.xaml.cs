@@ -70,7 +70,7 @@ namespace Task_Flyout.Views
 
             if (mgr.IsConnected("Google"))
                 BtnGoogle.Content = CreateDisabledContent("Google", "#EA4335",
-                    _loader.GetStringOrDefault("AddAccount_Reconnect") ?? "Reconnect all Google features");
+                    _loader.GetStringOrDefault("AddAccount_AddAnotherGoogle") ?? "Add another Google account");
             if (mgr.IsConnected("Microsoft"))
                 BtnMicrosoft.Content = CreateDisabledContent("Microsoft", "#0078D4",
                     _loader.GetStringOrDefault("AddAccount_Reconnect") ?? "Reconnect all Microsoft features");
@@ -221,7 +221,7 @@ namespace Task_Flyout.Views
 
         private async void BtnGoogle_Click(object sender, RoutedEventArgs e)
         {
-            await ConnectAccountAsync("Google");
+            await ConnectGoogleAccountAsync();
         }
 
         private async void BtnMicrosoft_Click(object sender, RoutedEventArgs e)
@@ -322,6 +322,38 @@ namespace Task_Flyout.Views
             return (accountName, password);
         }
 
+        private async Task ConnectGoogleAccountAsync()
+        {
+            if (App.Current is not App app) return;
+
+            AuthProgress.IsActive = true;
+            StatusText.Text = _loader.GetStringOrDefault("TextAuthorizing") ?? "Authorizing...";
+            BtnGoogle.IsEnabled = false;
+            BtnMicrosoft.IsEnabled = false;
+            BtnICloud.IsEnabled = false;
+
+            try
+            {
+                var mailAccount = await app.ConnectNewGoogleAccountAsync();
+                StatusText.Text = string.Format(
+                    _loader.GetStringOrDefault("TextAccountAdded") ?? "Added {0}",
+                    mailAccount.Subtitle);
+                CompleteAccountConnection();
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = UserSafeErrorMessage.FromException(
+                    ex,
+                    _loader.GetStringOrDefault("TextAuthFailed") ?? "Authentication failed.");
+                System.Diagnostics.Debug.WriteLine($"Google account connection failed: {ex}");
+            }
+            finally
+            {
+                AuthProgress.IsActive = false;
+                UpdateButtonStates();
+            }
+        }
+
         private async Task ConnectAccountAsync(string providerName, Func<ISyncProvider, Task>? connect = null)
         {
             var mgr = GetAccountManager();
@@ -336,7 +368,7 @@ namespace Task_Flyout.Views
 
             try
             {
-                var provider = syncManager.Providers.FirstOrDefault(p => p.ProviderName == providerName);
+                var provider = syncManager.GetProvider(providerName);
                 if (provider == null) throw new Exception($"Provider {providerName} not registered");
 
                 if (connect != null)
@@ -346,14 +378,17 @@ namespace Task_Flyout.Views
 
                 if (App.Current is App app)
                 {
-                    if (providerName == "Google")
-                        await app.MailService.AddGoogleAccountAsync();
-                    else if (providerName == "Microsoft")
+                    if (providerName == "Microsoft")
                         await app.MailService.AddOutlookAccountAsync();
                 }
 
                 // Create account entry
-                var account = mgr.GetAccount(providerName) ?? new ConnectedAccountInfo { ProviderName = providerName };
+                var account = mgr.GetAccount(providerName, provider.AccountId) ?? new ConnectedAccountInfo
+                {
+                    ProviderName = provider.ProviderName,
+                    AccountId = provider.AccountId,
+                    DisplayName = provider.AccountDisplayName
+                };
                 var capabilities = SyncProviderCapabilityPolicy.ForProvider(providerName);
                 account.ShowEvents = capabilities.SupportsEvents;
                 account.ShowTasks = capabilities.SupportsTasks;
@@ -375,33 +410,8 @@ namespace Task_Flyout.Views
                     System.Diagnostics.Debug.WriteLine($"Failed to fetch calendar list for {providerName}: {ex.Message}");
                 }
 
-                if (!mgr.IsConnected(providerName)) mgr.AddAccount(account); else mgr.Save();
-                Windows.Storage.ApplicationData.Current.LocalSettings.Values[OnboardingPolicy.CompletedVersionKey] = OnboardingPolicy.CurrentVersion;
-
-                // Refresh the MainWindow pane
-                if (App.MyMainWindow is MainWindow mainWin)
-                {
-                    _ = mainWin.RefreshAccountListAsync();
-
-                    // Navigate back to calendar
-                    var frame = mainWin.Content is Grid grid
-                        ? grid.FindName("ContentFrame") as Frame
-                        : null;
-
-                    // Use the MainWindow's navigation
-                    mainWin.DispatcherQueue.TryEnqueue(() =>
-                    {
-                        if (this.Frame != null)
-                        {
-                            this.Frame.Navigate(typeof(CalendarPage));
-                            // Force sync to load data from new account
-                            mainWin.DispatcherQueue.TryEnqueue(() =>
-                            {
-                                if (this.Frame?.Content is CalendarPage page) page.ForceSync();
-                            });
-                        }
-                    });
-                }
+                if (!mgr.IsConnected(providerName, provider.AccountId)) mgr.AddAccount(account); else mgr.Save();
+                CompleteAccountConnection();
             }
             catch (Exception ex)
             {
@@ -415,6 +425,24 @@ namespace Task_Flyout.Views
                 AuthProgress.IsActive = false;
                 UpdateButtonStates();
             }
+        }
+
+        private void CompleteAccountConnection()
+        {
+            Windows.Storage.ApplicationData.Current.LocalSettings.Values[OnboardingPolicy.CompletedVersionKey] = OnboardingPolicy.CurrentVersion;
+            if (App.MyMainWindow is not MainWindow mainWin) return;
+
+            _ = mainWin.RefreshAccountListAsync();
+            mainWin.DispatcherQueue.TryEnqueue(() =>
+            {
+                if (Frame == null) return;
+
+                Frame.Navigate(typeof(CalendarPage));
+                mainWin.DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (Frame?.Content is CalendarPage page) page.ForceSync();
+                });
+            });
         }
 
         private static AccountManager? GetAccountManager()
