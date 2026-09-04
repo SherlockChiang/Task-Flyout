@@ -6,7 +6,12 @@ namespace Task_Flyout.Services
             bool isPinned,
             bool hideOnLostFocus,
             bool focusStateKnown,
-            bool isFlyoutForeground)
-            => !isPinned && hideOnLostFocus && focusStateKnown && !isFlyoutForeground;
+            bool isFlyoutForeground,
+            bool isOpeningForegroundStillActive)
+            => !isPinned &&
+               hideOnLostFocus &&
+               focusStateKnown &&
+               !isFlyoutForeground &&
+               !isOpeningForegroundStillActive;
     }
 }

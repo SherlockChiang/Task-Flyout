@@ -119,6 +119,7 @@ namespace Task_Flyout
         private bool _focusNewItemOnOpen;
         private bool _isShuttingDown;
         private bool _suppressSelectedDateChanged;
+        private IntPtr _openingForegroundAnchor;
         private long _isOpenChangedToken;
         private DateTimeOffset? _lastSyncSucceededAt;
         private FlyoutAgendaSurfaceKind _agendaSurfaceKind = FlyoutAgendaSurfaceKind.Content;
@@ -999,9 +1000,15 @@ namespace Task_Flyout
                 if (_openRequestIssued) return;
                 _desiredOpen = !_desiredOpen;
                 if (_desiredOpen && _flyoutContentLoaded && !_openRequestIssued)
+                {
+                    _openingForegroundAnchor = FlyoutForegroundProbe.CaptureForegroundAnchor();
                     OpenPreparedFlyout();
+                }
                 else if (!_desiredOpen && !_openRequestIssued)
+                {
                     _showPending = false;
+                    _openingForegroundAnchor = IntPtr.Zero;
+                }
             }
             else
             {
@@ -1012,6 +1019,9 @@ namespace Task_Flyout
         private void ShowFlyout()
         {
             if (_isShuttingDown || IsOpen) return;
+            // A tray click can leave Explorer (or the previously active app) in
+            // the foreground until the DesktopFlyouts activation handoff finishes.
+            _openingForegroundAnchor = FlyoutForegroundProbe.CaptureForegroundAnchor();
             _desiredOpen = true;
             _showPending = true;
             if (!_flyoutContentLoaded) return;
@@ -1041,13 +1051,16 @@ namespace Task_Flyout
         {
             if (IsOpen)
             {
-                bool focusStateKnown = FlyoutForegroundProbe.TryIsCurrentFlyoutForeground(
-                    out bool isFlyoutForeground);
+                bool focusStateKnown = FlyoutForegroundProbe.TryGetCurrentForegroundState(
+                    _openingForegroundAnchor,
+                    out bool isFlyoutForeground,
+                    out bool isOpeningForegroundStillActive);
                 if (FlyoutDismissalPolicy.ShouldDismissAfterOpening(
                         _isPinned,
                         HideOnLostFocus,
                         focusStateKnown,
-                        isFlyoutForeground))
+                        isFlyoutForeground,
+                        isOpeningForegroundStillActive))
                 {
                     HideFlyout(autoHide: true);
                     return;
@@ -1094,6 +1107,7 @@ namespace Task_Flyout
             _showPending = false;
             _openRequestIssued = false;
             _desiredOpen = false;
+            _openingForegroundAnchor = IntPtr.Zero;
             _clockTimer?.Stop();
             _syncTimer?.Stop();
             CancelBackgroundRefresh();
