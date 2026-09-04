@@ -1703,7 +1703,8 @@ They are historical records; active work remains in the backlog tables above.
   class and title and continues to fail open when Windows exposes no handle.
 - The focused dismissal-policy tests pass 6/6, the complete managed suite passes
   1250/1250, and the Debug x64 app build completes with zero warnings and zero
-  errors. Packaged-runtime confirmation remains pending.
+  errors. The first packaged pass exposed the remaining host-activation gap
+  recorded and resolved in the follow-up below.
 
 ### 2026-09-04 Flyout Host Activation Completion
 
@@ -1720,4 +1721,11 @@ They are historical records; active work remains in the backlog tables above.
   single click, so a rapid gesture no longer opens the main Calendar window.
 - Focused activation/dismissal tests pass 11/11, the complete managed suite
   passes 1255/1255, and the Debug x64 app build completes with zero warnings and
-  zero errors. Signed packaged-runtime confirmation remains pending.
+  zero errors.
+- Signed package `1.4.4.3` was installed over `1.4.4.2` and manually validated:
+  the first tray open dismisses when another window is clicked without requiring
+  an initial click inside the Flyout, and rapid double-click no longer opens the
+  main Calendar surface. The installed package reports healthy and the final
+  MSIX SHA-256 is
+  `8306D427FEDD4B93A76C4E937DBB652A0FAA78B486630EEFFBE175C433B37469`.
+  M1-16 is archived as complete.
