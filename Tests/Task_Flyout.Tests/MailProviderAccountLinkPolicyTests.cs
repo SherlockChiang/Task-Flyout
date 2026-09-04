@@ -69,4 +69,20 @@ public sealed class MailProviderAccountLinkPolicyTests
             MailProviderAccountLinkPolicy.ShouldHydrateAgendaDisplayName(
                 currentDisplayName,
                 providerName));
+
+    [Theory]
+    [InlineData(null, "person@example.com", true)]
+    [InlineData("", "person@example.com", true)]
+    [InlineData(" PERSON@example.com ", "person@example.com", true)]
+    [InlineData("person@example.com", "other@example.com", false)]
+    [InlineData("person@example.com", null, false)]
+    public void ReconnectAddressValidationPreventsCrossAccountBinding(
+        string? expectedAddress,
+        string? actualAddress,
+        bool expected)
+        => Assert.Equal(
+            expected,
+            MailProviderAccountLinkPolicy.MatchesExpectedMailboxAddress(
+                expectedAddress,
+                actualAddress));
 }

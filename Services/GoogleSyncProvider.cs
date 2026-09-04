@@ -53,11 +53,7 @@ namespace Task_Flyout.Services
 
         public async Task ClearLocalAuthorizationAsync()
         {
-            CalendarSvc = null;
-            TasksSvc = null;
-            GmailSvc = null;
-            _cachedCalendarList = null;
-            _calendarListCacheExpiresAt = DateTimeOffset.MinValue;
+            ResetServices();
 
             await new ProtectedGoogleDataStore(AccountId).ClearAsync();
 
@@ -90,6 +86,87 @@ namespace Task_Flyout.Services
                 if (!ProviderAuthorizationScopePolicy.HasAllScopes(GetGrantedScopes(credential.Token), AllFeatureScopes))
                     throw new AuthorizationInteractionRequiredException(ProviderName, "Google did not grant all requested Task Flyout permissions.");
                 InitializeServices(credential);
+            }
+            finally
+            {
+                _authorizationLock.Release();
+            }
+        }
+
+        public async Task<string> ReconnectInteractivelyAsync(
+            string? expectedAddress,
+            CancellationToken cancellationToken = default)
+        {
+            await _authorizationLock.WaitAsync(cancellationToken);
+            try
+            {
+                var dataStore = new ProtectedGoogleDataStore(AccountId);
+                if (OwnsLegacyAuthorization)
+                    await TryMigrateLegacyTokenStoreAsync(ProviderAuthCleanup.GoogleLegacyTokenPath, dataStore);
+
+                var previousToken = await dataStore.GetAsync<TokenResponse>("user");
+                try
+                {
+                    ResetServices();
+                    await dataStore.ClearAsync();
+                    var credential = await AuthorizeAsync(
+                        dataStore,
+                        AllFeatureScopes,
+                        "select_account",
+                        cancellationToken);
+                    if (!ProviderAuthorizationScopePolicy.HasAllScopes(
+                        GetGrantedScopes(credential.Token),
+                        AllFeatureScopes))
+                    {
+                        await dataStore.ClearAsync();
+                        credential = await AuthorizeAsync(
+                            dataStore,
+                            AllFeatureScopes,
+                            "consent",
+                            cancellationToken);
+                    }
+                    if (!ProviderAuthorizationScopePolicy.HasAllScopes(
+                        GetGrantedScopes(credential.Token),
+                        AllFeatureScopes))
+                    {
+                        throw new AuthorizationInteractionRequiredException(
+                            ProviderName,
+                            "Google did not grant all requested Task Flyout permissions.");
+                    }
+
+                    InitializeServices(credential);
+                    var profile = await GmailSvc!.Users.GetProfile("me").ExecuteAsync(cancellationToken);
+                    string actualAddress = profile?.EmailAddress?.Trim() ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(actualAddress))
+                        throw new InvalidOperationException("Google did not return an email address for the connected account.");
+                    if (!MailProviderAccountLinkPolicy.MatchesExpectedMailboxAddress(
+                        expectedAddress,
+                        actualAddress))
+                    {
+                        throw new GoogleAccountMismatchException(
+                            expectedAddress!.Trim(),
+                            actualAddress);
+                    }
+
+                    SetAccountDisplayName(actualAddress);
+                    return actualAddress;
+                }
+                catch
+                {
+                    ResetServices();
+                    try
+                    {
+                        await dataStore.ClearAsync();
+                        if (previousToken != null)
+                            await dataStore.StoreAsync("user", previousToken);
+                    }
+                    catch (Exception restoreEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"Google authorization rollback failed: {restoreEx.Message}");
+                    }
+                    throw;
+                }
             }
             finally
             {
@@ -157,6 +234,15 @@ namespace Task_Flyout.Services
                 DataStore = dataStore,
                 Prompt = prompt
             });
+        }
+
+        private void ResetServices()
+        {
+            CalendarSvc = null;
+            TasksSvc = null;
+            GmailSvc = null;
+            _cachedCalendarList = null;
+            _calendarListCacheExpiresAt = DateTimeOffset.MinValue;
         }
 
         private static string[] GetGrantedScopes(TokenResponse? token)

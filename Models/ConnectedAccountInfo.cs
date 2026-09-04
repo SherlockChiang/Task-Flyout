@@ -33,7 +33,19 @@ namespace Task_Flyout.Models
     {
         public string ProviderName { get; set; } = "";
         public string AccountId { get; set; } = "";
-        public string DisplayName { get; set; } = "";
+
+        private string _displayName = "";
+        public string DisplayName
+        {
+            get => _displayName;
+            set
+            {
+                if (string.Equals(_displayName, value, System.StringComparison.Ordinal)) return;
+                _displayName = value ?? "";
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(DisplayTitle));
+            }
+        }
 
         [JsonIgnore]
         public string ProviderKey

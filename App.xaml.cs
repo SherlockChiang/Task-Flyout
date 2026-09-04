@@ -112,6 +112,48 @@ namespace Task_Flyout
             }
         }
 
+        public async Task<MailAccount> ReconnectGoogleAccountAsync(
+            string accountId,
+            CancellationToken cancellationToken = default)
+        {
+            await EnsureAccountsHydratedAsync();
+            string resolvedAccountId = AccountIdentityPolicy.ResolveAccountId("Google", accountId);
+            var agendaAccount = SyncManager.AccountManager.GetAccount("Google", resolvedAccountId);
+            var linkedMailAccount = MailService
+                .GetAccountsForProviderAccount("Google", resolvedAccountId)
+                .FirstOrDefault();
+            if (agendaAccount == null && linkedMailAccount == null)
+                throw new InvalidOperationException("The selected Google account is no longer connected.");
+
+            string? expectedAddress = linkedMailAccount?.Address;
+            if (string.IsNullOrWhiteSpace(expectedAddress) &&
+                agendaAccount?.DisplayName?.Contains('@') == true)
+            {
+                expectedAddress = agendaAccount.DisplayName;
+            }
+
+            var provider = SyncManager.EnsureGoogleProvider(
+                resolvedAccountId,
+                agendaAccount?.DisplayName ?? linkedMailAccount?.Address);
+            try
+            {
+                await provider.ReconnectInteractivelyAsync(expectedAddress, cancellationToken);
+                return await MailService.AddGoogleAccountAsync(
+                    provider,
+                    cancellationToken,
+                    expectedAddress);
+            }
+            catch (GoogleAccountAlreadyConnectedException)
+            {
+                try { await provider.ClearLocalAuthorizationAsync(); }
+                catch (Exception cleanupEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Mismatched Google authorization cleanup failed: {cleanupEx.Message}");
+                }
+                throw;
+            }
+        }
+
         public async Task DisconnectProviderCompletelyAsync(
             string providerName,
             string? accountId)

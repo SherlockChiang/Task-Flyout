@@ -152,7 +152,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M3-06 | IN PROGRESS | UI/Compatibility | Inject an independent pure-XAML weather button into the Windows 11 taskbar. | The host uses standard `Windows.UI.Xaml` controls and taskbar theme resources, does not require the Windows Widgets entry, reserves a bounded left-side slot, and restores the original XAML tree on disable or unload. | `feat(taskbar): add pure xaml weather view`, `feat(taskbar): inject native xaml weather button` |
 | M3-07 | IN PROGRESS | Integration/UI | Connect the standalone host to Task Flyout weather, activation, settings, and diagnostics. | The existing bounded per-user IPC supplies sanitized immutable snapshots; click opens Task Flyout Weather; a localized experimental switch and privacy-safe diagnostics expose active, unsupported, fallback, and recovery states. | `feat(taskbar): consume weather snapshot pipe`, `feat(taskbar): activate weather button`, `feat(taskbar): acknowledge host control`, `feat(weatherbar): add standalone mode policy`, `feat(taskbar): parse standalone broker responses`, `fix(taskbar): emit broker output as utf8`, `feat(taskbar): add bounded broker client`, `feat(taskbar): define standalone lifecycle states`, `feat(taskbar): coordinate standalone lifecycle`, `feat(taskbar): wire standalone app lifecycle`, `feat(taskbar): own widgets suppression safely`, `feat(taskbar): suppress native widgets for standalone`, `feat(weatherbar): expose standalone taskbar controls`, `feat(taskbar): expose mount readiness`, `feat(taskbar): parse mount status responses`, `feat(taskbar): hand off fallback after mount proof`, `feat(taskbar): authenticate mount lease reports`, `feat(taskbar): renew mount readiness lease`, `refactor(taskbar): isolate mount readiness state`, `test(taskbar): cover mount lease reducer edges`, `diagnostics(taskbar): expose mount pending reasons` |
 | M3-08 | IN PROGRESS | Verification/Distribution | Validate and package the standalone taskbar component. | Compile/import checks prove the native binaries have no WebView dependency; a disposable Explorer session covers enable/disable, crash recovery, DPI, auto-hide, theme, multi-monitor, Explorer restart, unsupported binaries, signed packaging, and rollback before default exposure. | `build(taskbar): stage standalone native artifacts`, `test(taskbar): gate disposable explorer validation`, `test(taskbar): validate standalone weather injection`, `build(taskbar): recover missing local signing key` |
-| M3-09 | IN PROGRESS | Accounts/Architecture | Support multiple isolated Google accounts across Calendar, Tasks, and Gmail. | Each Google identity owns a stable account ID, protected token namespace, provider services, agenda/cache keys, and mail operations; add/remove/reconnect acts on one account without replacing or disconnecting another; migration preserves the existing single account and tests prevent cross-account reads, writes, and notifications. | `refactor(accounts): add account-scoped provider identity`, `feat(google): support multiple connected accounts` |
+| M3-09 | IN PROGRESS | Accounts/Architecture | Support multiple isolated Google accounts across Calendar, Tasks, and Gmail. | Each Google identity owns a stable account ID, protected token namespace, provider services, agenda/cache keys, and mail operations; add/remove/reconnect acts on one account without replacing or disconnecting another; migration preserves the existing single account and tests prevent cross-account reads, writes, and notifications. | `refactor(accounts): add account-scoped provider identity`, `feat(google): support multiple connected accounts`, `feat(accounts): add per-account reconnect controls` |
 
 M3-05 through M3-08 supersede the Windhawk runtime/package work in M3-03.
 M3-03 remains as historical POC scope and must not be installed or enabled. The
@@ -1671,3 +1671,22 @@ They are historical records; active work remains in the backlog tables above.
   warnings and zero errors. M3-09 remains in progress for per-account reconnect
   controls, localized account actions, the complete managed suite, and packaged
   multi-account runtime validation.
+
+### 2026-09-04 Per-Account Health And Reconnect
+
+- The account health center now renders every connected identity separately,
+  including its own cached/reconnect/last-success state and an account-scoped
+  reconnect action. Google, Microsoft, and iCloud reconnects reuse the selected
+  account ID and preserve visibility filters.
+- Google reconnect temporarily removes the selected namespace token to force an
+  interactive account choice. Cancellation, missing scopes, and an email
+  mismatch roll back to the prior token; a mismatched identity is never linked
+  to the selected Calendar, Tasks, or Gmail account.
+- Account display-name bindings now update when a migrated or reconnected email
+  address becomes available. New account, duplicate-account, reconnect, and
+  mismatch text is localized in English, Simplified Chinese, and Traditional
+  Chinese.
+- Account-policy tests pass 20/20, the complete managed suite passes 1249/1249,
+  and the Debug x64 app build completes with zero warnings and zero errors.
+  M3-09 now only needs packaged runtime validation with two real Google test
+  identities before it can be archived as complete.

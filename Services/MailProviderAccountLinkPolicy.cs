@@ -55,6 +55,15 @@ namespace Task_Flyout.Services
                    ProviderAuthorizationLifecycle.NormalizeProviderName(providerName),
                    StringComparison.OrdinalIgnoreCase);
 
+        public static bool MatchesExpectedMailboxAddress(
+            string? expectedAddress,
+            string? actualAddress)
+            => string.IsNullOrWhiteSpace(expectedAddress)
+               || string.Equals(
+                   expectedAddress.Trim(),
+                   actualAddress?.Trim(),
+                   StringComparison.OrdinalIgnoreCase);
+
         public static bool MatchesProviderAccount(
             MailAccountKind kind,
             string? providerAccountId,

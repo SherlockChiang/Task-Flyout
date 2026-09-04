@@ -122,6 +122,19 @@ namespace Task_Flyout.Services
         }
     }
 
+    public sealed class GoogleAccountMismatchException : InvalidOperationException
+    {
+        public string ExpectedAddress { get; }
+        public string ActualAddress { get; }
+
+        public GoogleAccountMismatchException(string expectedAddress, string actualAddress)
+            : base($"Signed in as {actualAddress}, but the selected account is {expectedAddress}.")
+        {
+            ExpectedAddress = expectedAddress;
+            ActualAddress = actualAddress;
+        }
+    }
+
     public sealed class ImapMoveOutcomeUnknownException : Exception
     {
         public ImapMoveOutcomeUnknownException(Exception innerException)
@@ -633,7 +646,8 @@ namespace Task_Flyout.Services
 
         public async Task<MailAccount> AddGoogleAccountAsync(
             GoogleSyncProvider provider,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            string? expectedAddress = null)
         {
             ArgumentNullException.ThrowIfNull(provider);
             EnsureAccountsLoaded();
@@ -643,6 +657,8 @@ namespace Task_Flyout.Services
             var address = profile?.EmailAddress?.Trim() ?? "";
             if (string.IsNullOrWhiteSpace(address))
                 throw new InvalidOperationException("Google did not return an email address for the connected account.");
+            if (!MailProviderAccountLinkPolicy.MatchesExpectedMailboxAddress(expectedAddress, address))
+                throw new GoogleAccountMismatchException(expectedAddress!.Trim(), address);
 
             var existing = _accounts.FirstOrDefault(a =>
                 a.Kind == MailAccountKind.Google &&

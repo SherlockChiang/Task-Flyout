@@ -1528,6 +1528,12 @@ namespace Task_Flyout.Views
                 await RefreshAccountsAsync();
             }
             catch (OperationCanceledException) when (authCts.IsCancellationRequested) { }
+            catch (GoogleAccountAlreadyConnectedException ex)
+            {
+                AddStatusText.Text = string.Format(
+                    _loader.GetStringOrDefault("AddAccount_GoogleAlreadyConnected") ?? "Google account {0} is already connected.",
+                    ex.Address);
+            }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Add Google account failed: {ex.Message}");
