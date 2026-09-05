@@ -32,6 +32,62 @@ The summarizer uses nearest-rank percentiles. It always reports P50, reports P95
 
 ## Metrics
 
+### Planned Responsiveness Pass (2026-09-05)
+
+The user accepted the functional tray behavior in Debug package `1.4.4.4`.
+Keep that artifact as a regression reference, not a Release performance result.
+F0-01 is planned: no timings or frame-pacing measurements have been collected for
+this pass, and the metrics below are requirements, not currently implemented
+diagnostic fields.
+
+Existing instrumentation needs care: `MarkOnce` records a zero-duration milestone
+once per process; `tray_click_to_open_request` ends after requesting a toggle.
+Neither measures repeat-open input-to-visible latency. The current summarizer
+groups only by scenario/metric/source, so do not feed it mixed build versions,
+configurations, cold/warm runs or power settings and call that a comparable P95.
+
+| Scenario | Separate observations | Required regression check |
+| --- | --- | --- |
+| Cold tray / first Flyout | Process-to-tray; command-to-first feedback; command-to-cached-content; remote completion separately. | No immediate close; cold hydration cannot defeat double-click. |
+| Warm Flyout reopen | Repeat after short and long hidden intervals; efficiency transition cost, trim attempts, working set/private bytes, page-fault deltas where available. | Single-click toggles, double-click opens main, outside click dismisses; preserve pinning semantics. |
+| Global search | Command-to-search-shell, immutable snapshot/index cost, last keystroke-to-results, canceled/superseded jobs. | Input and close remain responsive; account isolation and query generation preserved. |
+| Calendar | Month/week navigation, background publication apply, changed-day count, layout work and actual presentation stalls while scrolling. | Keep current date/scroll/editor and both event endpoints; no full rebuild for unchanged data. |
+| Mail list | Folder switch, load more, local filtering and unread-state apply; collection resets and selection changes. | No scroll/selection jump, unread convergence and correct-account notification navigation. |
+| Mail/RSS detail | HTML preparation, WebView environment initialization, navigation-ready and network separately. | No stale selected message/article, unchanged sanitization and remote-image blocking. |
+
+Protocol for F0-01 implementation and subsequent experiments:
+
+1. Build a signed Release control with the accepted source behavior, then a
+   single-change treatment with the same diagnostics. Record both source SHAs,
+   package versions/hashes, data sizes, DPI/refresh rate and power/prewarm settings.
+   Do not overwrite an installed build, alter settings or clear user data just
+   to create a baseline without the corresponding implementation/test step.
+2. Add bounded, opt-in spans for each operation, using monotonic elapsed time and
+   opaque operation generations. UI callbacks only capture timings/counters;
+   file output remains off-thread. Do not log account IDs, titles, text or HTML.
+   Compare diagnostics on/off to detect measurement overhead.
+3. Record physical-input latency separately from command-dispatch latency when
+   collecting input traces. The tray library's double-click recognition delay
+   must not be silently excluded from reported end-to-end response, or changed
+   as a shortcut to a faster metric.
+4. Keep cold and warm scenarios separate. Use at least 20 successful samples per
+   scenario for an initial P95 screen; retain failure/cancel/missing counts and
+   collect more samples before treating small tail differences as reliable.
+   Never pool Debug and Release or different fixtures into one percentile.
+5. Use short UI/CPU/GC/presentation traces for slow cases. Dispatcher queue delay
+   is a responsiveness proxy, not frame rate; actual frame intervals must come
+   from a presentation trace. A proposed first-feedback target is about 100ms
+   after command receipt, with application UI work over 50ms prioritized for
+   investigation. Calibrate these targets after the baseline; network and
+   configured gesture-recognition delays are separate costs.
+6. Compare unchanged control/treatment scenarios as well as the target. Keep
+   normal foreground priority and bounded idle resource use; explicitly report
+   any memory/latency tradeoff. Run the existing idle soak separately, then a
+   bounded repeated-open/navigation scenario to expose churn. No default global
+   WebView prewarm, forced GC or unconditional page caching.
+
+### Existing Measurement Checklist
+
 | Area | How to Measure | Record |
 | --- | --- | --- |
 | Cold startup | Start app after process exit with performance diagnostics enabled. | `startup/tray_interactive` duration. |

@@ -10,7 +10,7 @@ Status values:
 - `BLOCKED`: requires an external decision, credential, service, or environment
 - `PAUSED`: intentionally archived; no further implementation or runtime attempts
 
-## Current Queue - 2026-09-05 Reassessment
+## Current Queue - 2026-09-05 Accepted Candidate And Responsiveness
 
 This queue takes precedence over the older backlog order. The evidence and
 sequencing rationale are in [optimization-roadmap.md](optimization-roadmap.md).
@@ -19,16 +19,19 @@ input behavior, live provider isolation, or private Explorer compatibility.
 
 | Order | ID | Status | Next bounded outcome | Verification / dependency |
 | --- | --- | --- | --- | --- |
-| 1 | M1-16 | IN PROGRESS | Validate restored single-click Flyout / double-click main-window contract. | Implementation `433c171`; 9 focused and 1264 total tests pass, Debug x64 clean. Signed Debug x64 candidate `1.4.4.4` is ready but not installed; tray matrix still pending. |
-| 2 | R1-01 | TODO | Include account identity in global-search agenda deduplication and result keys. | Two accounts with equal remote IDs must both appear and navigate to their own items; single-account behavior unchanged. See `MainWindow.BuildGlobalSearchSnapshot`. |
-| 3 | M3-09 | IN PROGRESS | Complete packaged multi-Google acceptance without changing account architecture. | R1-01 first; add two synthetic accounts, restart, reconnect one, cancel/mismatch reconnect, remove one, verify sibling tokens/cache/tasks/mail/notifications remain correct. |
-| 4 | R1-02 | TODO | Add an application build to PR quality checks and identify the exact tested package revision. | No signing/OAuth secrets in PR jobs; build actual WinUI sources; PR checks must not imply latest-beta smoke covered the PR. |
-| 5 | M1-03 | TODO | Preserve unreadable protected files and version the format before plaintext migration. | Recognized legacy JSON only; truncated/corrupt/foreign-user ciphertext stays byte-identical; atomic writes and migration recovery tested. |
-| 6 | M1-05 / M1-04 | TODO | Migrate device-bound SQLite data safely and bound obsolete notification-token retention. | Separate commits; format/recovery tests first; verified migration with rollback, restart, pruning and account-removal coverage. |
-| 7 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | R1-01 remains intact; delayed old index cannot replace newer query/account state; no eager RSS HTML bodies on UI thread. |
-| 8 | M2-02 / M2-01 | IN PROGRESS | Measure packaged performance and bound long-lived mail coordination state. | Prewarm code already exists; no new prewarm until measurements. At least 20 successful samples for P95; run idle soak separately. |
-| 9 | M1-02 / M2-05 / M2-06 | TODO | Stabilize existing controls, accessibility and regional layouts. | Startup failures restore actual state; 100/150/200% DPI, narrow layout, keyboard and time-range checks; no broad redesign. |
-| 10 | M2-04 / M2-07 | TODO | Incrementally share tested Core code and add targeted quality tooling. | Stabilize behavior first; do not move all services/pages in one refactor or apply whole-repo formatting churn. |
+| Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
+| 1 | F0-01 | TODO | Establish repeatable interaction measurements on a signed Release baseline. | Follow `performance-baseline.md`; correlate each command with first feedback and content-ready, separate cold/warm and network time, sample dispatcher stalls and allocations without treating timers as FPS. Debug `1.4.4.4` is a functional baseline only. |
+| 2 | R1-01 | TODO | Include account identity in global-search agenda deduplication and result keys. | A separate correctness commit before search optimization; equal remote IDs from two accounts remain distinct and navigate correctly. |
+| 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
+| 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
+| 5 | F1-02 | TODO | Apply calendar changes without rebuilding unchanged visible cells/timeline geometry. | Profile publication and manual-sync paths; avoid duplicate application of the same state, preserve end times, source account, date selection, scroll and editing state. |
+| 6 | F1-03 | TODO | Update displayed mail/search results incrementally. | Existing bulk-load suppression already exists; target `_displayedItems.Clear()` and churn in `ApplyMailSearch`, preserve selection/scroll, unread convergence and account-scoped navigation. |
+| 7 | F1-04 | TODO | Profile HTML preparation and page lifetime before adjusting reader caching. | Separate sanitization, WebView initialization, navigation and network; stale account/message work never displays; preserve sanitization/remote-resource restrictions; no default global WebView prewarm. |
+| Release gate | M3-09 / R1-02 | IN PROGRESS | Finish multi-Google acceptance and add PR WinUI build validation. | Multi-account implementation awaits its own two-account matrix; R1-02 remains TODO. Tray acceptance does not approve either. Do not auto-merge or publish. |
+| Data gate | M1-03 | TODO | Preserve unreadable protected files and version the format before plaintext migration. | Still a pre-release requirement and prerequisite for persistence changes; recognized legacy JSON only, unreadable ciphertext stays byte-identical, atomic migration tested. |
+| Later | M1-05 / M1-04 / M1-08 | TODO | Safely migrate storage, prune obsolete tokens and remove measured UI persistence stalls. | M1-03 first for persistence/migration changes; separate rollback-tested commits, not a directory rename or blanket Task.Run on UI-bound collections. |
+| Later | M2-02 / M2-01 | IN PROGRESS | Complete prewarm measurements and bound long-lived mail coordination state. | Prewarm implementation exists but needs F0-01 measurements; M2-01 remains TODO. Measure idle soak separately from interaction latency. |
+| Later | M1-02 / M2-05 / M2-06 / M2-04 / M2-07 | TODO | Improve existing controls/accessibility and incrementally share tested Core code. | Keep current WinUI design; no broad redesign, whole-repo formatting or whole-service extraction in the responsiveness pass. |
 | External | M0-06 | BLOCKED | Resume OAuth submission after core workflows pass packaged validation. | Retain existing Gmail scope/function decisions; latest recorded console audit is 2026-09-02, not a current live claim. Recheck Branding, prepare demo, obtain approval for external submission. |
 | Paused | M3-03 through M3-08 | PAUSED | Preserve experimental taskbar-weather work as an archive. | No Windhawk installation, new Explorer injection or diagnostic rebuild/signing/runtime experiments. Normal candidate packaging may sign the bundled components without running them. |
 
@@ -41,6 +44,9 @@ release gates, not invented claims that they have already passed.
 Only one implementation outcome is active at a time. Each gets its own commit,
 tests/build and pending-or-passed runtime record. Keep PR #3 a draft until the
 candidate acceptance and account-routing gaps are resolved; do not auto-merge.
+The responsiveness items above are planned, not implemented or measured. Retain
+one accepted candidate for comparison and use a focused follow-up performance
+branch/PR for substantive changes instead of indefinitely expanding PR #3.
 
 ## P0 - Release And Data Integrity
 
@@ -146,7 +152,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M1-13 | DONE | Reliability/Mail | Open new-mail notification targets directly after background-only polling. | Polling keeps a bounded body-free unread metadata slice without presenting it as a complete folder window; activation resolves explicit Inbox aliases, falls back across folders only for Google/Outlook identities, and never treats IMAP UIDs as cross-folder identities. | `fix(mail): open notification targets reliably` |
 | M1-14 | DONE | Data integrity/Mail | Keep unread state coherent across provider, folder views, cache, notifications, and background polling. | Read/unread mutations update every cached identity for the account, reconcile authoritative provider state after refresh, and cannot resurrect stale unread badges or notifications. | `fix(mail): converge mutable state by provider identity`, `fix(mail): reconcile authoritative unread snapshots`, `fix(mail): synchronize unread UI and notifications` |
 | M1-15 | DONE | Reliability/Calendar | Correct event editor times, timeline duration, date-strip overflow, and automatic refresh. | Existing events hydrate both start and end controls; the day timeline renders the complete interval; the date header has no unintended horizontal scrollbar; foreground and hidden refresh paths reliably publish fresh data without overlap or stale replacement. | `fix(calendar): align event times and timeline`, `fix(calendar): publish background refreshes to open views`, `fix(google): route mutations to source calendar` |
-| M1-16 | IN PROGRESS | Reliability/Flyout | Reliably dismiss an unpinned Flyout and preserve distinct tray gestures. | Focus loss during opening or fully open closes an unpinned Flyout once; normal tray activation stays open; single-click toggles Flyout; double-click dismisses even a pinned/opening Flyout and opens the main window; late single-click continuations cannot reopen it. Packaged revalidation is required. | `fix(flyout): close reliably on focus loss`, `fix(flyout): preserve tray activation handoff`, `fix(flyout): complete tray activation handoff`, `fix(tray): restore main-window double click` |
+| M1-16 | DONE | Reliability/Flyout | Reliably dismiss an unpinned Flyout and preserve distinct tray gestures. | User accepted `1.4.4.4` single-click, double-click and outside-click behavior. Explicit dismissal cancels pending Flyout work and stale hydration continuations. Preserve pinned/opening/closing/cold-start stress cases as the ongoing regression matrix. | `fix(flyout): close reliably on focus loss`, `fix(flyout): preserve tray activation handoff`, `fix(flyout): complete tray activation handoff`, `433c171` |
 
 ### P2 - Long-Running Efficiency, Architecture, And UI Quality
 
@@ -1807,3 +1813,25 @@ They are historical records; active work remains in the backlog tables above.
 - Restored the user's manifest to `1.4.4.0`; its SHA-256 and the pre-existing
   Windhawk source SHA-256 exactly match the pre-build values. Neither file is
   staged or included in this checkpoint commit.
+
+### 2026-09-05 User Acceptance And Responsiveness Planning
+
+- After receiving candidate `1.4.4.4`, the user reported acceptance passed.
+  M1-16 is complete for the requested single-click, double-click and outside-click
+  flows. This is user-reported runtime evidence, not an agent-observed replay of
+  every cold-start, pinned, animation or DPI scenario.
+- This acceptance does not close multi-Google account, live unread/toast, OAuth,
+  or native taskbar experiment gates. Those retain their individual statuses.
+- The next pass prioritizes interaction latency and stable visible updates.
+  Static inspection identified immediate working-set trimming and per-thread
+  foreground transitions, synchronous pre-display search indexing, calendar
+  tree rebuilds, and displayed-mail collection resets as measurement candidates.
+  Their contribution to the user's perceived stutter is not yet measured.
+- Added F0-01 and F1-01 through F1-04, with per-scenario measurement and regression
+  gates in `performance-baseline.md`. Existing `MarkOnce` timestamps and the tray
+  open-request span cannot stand in for repeated input-to-visible measurements
+  or frame-pacing traces.
+- This checkpoint changes documentation only: no runtime settings, power policy,
+  startup/prewarm behavior, application code, package installation or diagnostics
+  collection were changed. Existing automated results remain 1264/1264 and a
+  clean Debug x64 build; they are historical, not rerun for this documentation.
