@@ -9,6 +9,9 @@ namespace Task_Flyout.Services
     public interface ISyncProvider
     {
         string ProviderName { get; }
+        string AccountId { get; }
+        string ProviderKey { get; }
+        string AccountDisplayName { get; }
         Task ConnectInteractivelyAsync(CancellationToken cancellationToken = default);
         Task EnsureAuthorizedAsync(CancellationToken cancellationToken = default);
         Task<List<AgendaItem>> FetchDataAsync(DateTime min, DateTime max, CancellationToken cancellationToken);

@@ -91,7 +91,18 @@ namespace Task_Flyout.Services
                 .ToList();
 
         public static int RemoveExpired(List<PendingMailMutation> queue, DateTimeOffset now)
-            => queue.RemoveAll(mutation => MailMutationRetryPolicy.IsExpired(mutation.CreatedUtcTicks, now));
+            => RemoveExpiredItems(queue, now).Count;
+
+        public static List<PendingMailMutation> RemoveExpiredItems(List<PendingMailMutation> queue, DateTimeOffset now)
+        {
+            var expired = queue
+                .Where(mutation => MailMutationRetryPolicy.IsExpired(mutation.CreatedUtcTicks, now))
+                .Select(Clone)
+                .ToList();
+            if (expired.Count > 0)
+                queue.RemoveAll(mutation => MailMutationRetryPolicy.IsExpired(mutation.CreatedUtcTicks, now));
+            return expired;
+        }
 
         public static int RemoveAccount(List<PendingMailMutation> queue, string accountId)
             => queue.RemoveAll(mutation => mutation.AccountId == accountId);
@@ -109,8 +120,19 @@ namespace Task_Flyout.Services
             => queue.FirstOrDefault(candidate => IsSame(candidate, mutation));
 
         public static bool IsSame(PendingMailMutation left, PendingMailMutation right)
-            => left.AccountId == right.AccountId && left.FolderId == right.FolderId && left.MessageId == right.MessageId &&
-               EffectiveKind(left) == EffectiveKind(right);
+        {
+            if (!string.Equals(left.AccountId, right.AccountId, StringComparison.Ordinal) ||
+                !string.Equals(left.MessageId, right.MessageId, StringComparison.Ordinal) ||
+                left.ProviderKind != right.ProviderKind ||
+                EffectiveKind(left) != EffectiveKind(right))
+                return false;
+
+            if (left.ProviderKind is MailAccountKind.Google or MailAccountKind.Outlook)
+                return true;
+
+            return string.Equals(left.FolderId, right.FolderId, StringComparison.Ordinal) &&
+                   left.ImapUidValidity == right.ImapUidValidity;
+        }
 
         public static bool IsCurrentIntent(PendingMailMutation current, PendingMailMutation attempted)
             => IsSame(current, attempted) && current.Value == attempted.Value && current.CreatedUtcTicks == attempted.CreatedUtcTicks;
@@ -148,8 +170,10 @@ namespace Task_Flyout.Services
             mutation.Value = true;
         }
 
-        private static string MutationKey(PendingMailMutation mutation)
-            => $"{mutation.AccountId}\u001f{mutation.FolderId}\u001f{mutation.MessageId}\u001f{(int)EffectiveKind(mutation)}";
+        internal static string MutationKey(PendingMailMutation mutation)
+            => mutation.ProviderKind == MailAccountKind.Imap
+                ? $"{mutation.AccountId}\u001f{(int)mutation.ProviderKind}\u001f{mutation.FolderId}\u001f{mutation.ImapUidValidity?.ToString() ?? "?"}\u001f{mutation.MessageId}\u001f{(int)EffectiveKind(mutation)}"
+                : $"{mutation.AccountId}\u001f{(int)mutation.ProviderKind}\u001f{mutation.MessageId}\u001f{(int)EffectiveKind(mutation)}";
 
         public static PendingMailMutation Clone(PendingMailMutation mutation)
             => new()

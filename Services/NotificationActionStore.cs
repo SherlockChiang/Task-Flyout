@@ -13,9 +13,10 @@ namespace Task_Flyout.Services
         string DateKey,
         NotificationActionMask AllowedActions,
         DateTimeOffset ExpiresAt,
-        DateTimeOffset? SnoozedUntil = null)
+        DateTimeOffset? SnoozedUntil = null,
+        string AccountId = "")
     {
-        public const int CurrentSchemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
     }
 
     [JsonSerializable(typeof(NotificationActionTarget))]

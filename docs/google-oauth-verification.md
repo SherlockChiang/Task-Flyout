@@ -99,15 +99,23 @@ A read-only review of the production Google Auth Platform project found:
 
 Required order from the observed console state:
 
-1. Publish the repository's updated `docs/` site from `master`.
-2. In Branding, mark the previous homepage-ownership issue as resolved and
-   request brand re-verification; do not recreate the already verified Search
-   Console property.
+1. Completed on 2026-09-01: PR #2 was merged as `1837427`, master Quality run
+   `33518068424` passed, and Pages deployment `33518065281` published the
+   updated `docs/` site. The live home page and privacy policy expose the
+   Calendar, Tasks, Gmail Modify, data-flow, retention, and Limited Use text.
+2. Current action: in Branding, mark the previous homepage-ownership issue as
+   resolved and request brand re-verification; do not recreate the already
+   verified Search Console property.
 3. Remove Gmail Readonly and Gmail Send from Data Access so the console matches
    the three scopes requested by the current app build.
 4. Enter the scope justifications and unlisted YouTube URL.
 5. Return to Verification Center only after `Prepare for verification` becomes
    enabled.
+
+As of 2026-09-02, step 3 is complete: Data Access was saved with exactly
+Calendar, Tasks, and Gmail Modify. The scope-justification fields and YouTube
+field remain empty, and Verification Center still requires the brand to be
+verified and published before `Prepare for verification` can be used.
 
 ## Paste-Ready Scope Justification
 

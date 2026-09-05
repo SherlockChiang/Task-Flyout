@@ -23,6 +23,9 @@ namespace Task_Flyout.Services
     public class GoogleSyncProvider : ISyncProvider
     {
         public string ProviderName => "Google";
+        public string AccountId { get; }
+        public string ProviderKey => AccountIdentityPolicy.CreateProviderKey(ProviderName, AccountId);
+        public string AccountDisplayName { get; private set; }
         public CalendarService? CalendarSvc { get; private set; }
         public TasksService? TasksSvc { get; private set; }
         public GmailService? GmailSvc { get; private set; }
@@ -33,38 +36,137 @@ namespace Task_Flyout.Services
         private List<SubscribedCalendarInfo>? _cachedCalendarList;
         private DateTimeOffset _calendarListCacheExpiresAt = DateTimeOffset.MinValue;
         private static readonly string[] AllFeatureScopes = ProviderAuthorizationScopePolicy.GoogleAllFeatures;
+        private bool OwnsLegacyAuthorization
+            => GoogleAuthorizationNamespacePolicy.OwnsLegacyAuthorization(AccountId);
+
+        public GoogleSyncProvider(string? accountId = null, string? accountDisplayName = null)
+        {
+            AccountId = AccountIdentityPolicy.ResolveAccountId(ProviderName, accountId);
+            AccountDisplayName = accountDisplayName?.Trim() ?? string.Empty;
+        }
+
+        public void SetAccountDisplayName(string? displayName)
+        {
+            if (!string.IsNullOrWhiteSpace(displayName))
+                AccountDisplayName = displayName.Trim();
+        }
 
         public async Task ClearLocalAuthorizationAsync()
         {
-            CalendarSvc = null;
-            TasksSvc = null;
-            GmailSvc = null;
-            _cachedCalendarList = null;
-            _calendarListCacheExpiresAt = DateTimeOffset.MinValue;
+            ResetServices();
 
-            await new ProtectedGoogleDataStore().ClearAsync();
+            await new ProtectedGoogleDataStore(AccountId).ClearAsync();
 
-            string legacyTokenPath = ProviderAuthCleanup.GoogleLegacyTokenPath;
-            ProviderAuthCleanup.DeleteGoogleLegacyTokenStore(legacyTokenPath);
+            if (OwnsLegacyAuthorization)
+                ProviderAuthCleanup.DeleteGoogleLegacyTokenStore(ProviderAuthCleanup.GoogleLegacyTokenPath);
         }
 
-        public async Task ConnectInteractivelyAsync(CancellationToken cancellationToken = default)
+        public Task ConnectInteractivelyAsync(CancellationToken cancellationToken = default)
+            => ConnectInteractivelyAsync(selectAccount: false, cancellationToken);
+
+        public async Task ConnectInteractivelyAsync(bool selectAccount, CancellationToken cancellationToken = default)
         {
             await _authorizationLock.WaitAsync(cancellationToken);
             try
             {
                 string tokenPath = ProviderAuthCleanup.GoogleLegacyTokenPath;
-                var dataStore = new ProtectedGoogleDataStore();
-                await TryMigrateLegacyTokenStoreAsync(tokenPath, dataStore);
-                UserCredential credential = await AuthorizeAsync(dataStore, AllFeatureScopes, cancellationToken);
+                var dataStore = new ProtectedGoogleDataStore(AccountId);
+                if (OwnsLegacyAuthorization)
+                    await TryMigrateLegacyTokenStoreAsync(tokenPath, dataStore);
+                UserCredential credential = await AuthorizeAsync(
+                    dataStore,
+                    AllFeatureScopes,
+                    selectAccount ? "select_account" : null,
+                    cancellationToken);
                 if (!ProviderAuthorizationScopePolicy.HasAllScopes(GetGrantedScopes(credential.Token), AllFeatureScopes))
                 {
                     await dataStore.ClearAsync();
-                    credential = await AuthorizeAsync(dataStore, AllFeatureScopes, cancellationToken);
+                    credential = await AuthorizeAsync(dataStore, AllFeatureScopes, "consent", cancellationToken);
                 }
                 if (!ProviderAuthorizationScopePolicy.HasAllScopes(GetGrantedScopes(credential.Token), AllFeatureScopes))
                     throw new AuthorizationInteractionRequiredException(ProviderName, "Google did not grant all requested Task Flyout permissions.");
                 InitializeServices(credential);
+            }
+            finally
+            {
+                _authorizationLock.Release();
+            }
+        }
+
+        public async Task<string> ReconnectInteractivelyAsync(
+            string? expectedAddress,
+            CancellationToken cancellationToken = default)
+        {
+            await _authorizationLock.WaitAsync(cancellationToken);
+            try
+            {
+                var dataStore = new ProtectedGoogleDataStore(AccountId);
+                if (OwnsLegacyAuthorization)
+                    await TryMigrateLegacyTokenStoreAsync(ProviderAuthCleanup.GoogleLegacyTokenPath, dataStore);
+
+                var previousToken = await dataStore.GetAsync<TokenResponse>("user");
+                try
+                {
+                    ResetServices();
+                    await dataStore.ClearAsync();
+                    var credential = await AuthorizeAsync(
+                        dataStore,
+                        AllFeatureScopes,
+                        "select_account",
+                        cancellationToken);
+                    if (!ProviderAuthorizationScopePolicy.HasAllScopes(
+                        GetGrantedScopes(credential.Token),
+                        AllFeatureScopes))
+                    {
+                        await dataStore.ClearAsync();
+                        credential = await AuthorizeAsync(
+                            dataStore,
+                            AllFeatureScopes,
+                            "consent",
+                            cancellationToken);
+                    }
+                    if (!ProviderAuthorizationScopePolicy.HasAllScopes(
+                        GetGrantedScopes(credential.Token),
+                        AllFeatureScopes))
+                    {
+                        throw new AuthorizationInteractionRequiredException(
+                            ProviderName,
+                            "Google did not grant all requested Task Flyout permissions.");
+                    }
+
+                    InitializeServices(credential);
+                    var profile = await GmailSvc!.Users.GetProfile("me").ExecuteAsync(cancellationToken);
+                    string actualAddress = profile?.EmailAddress?.Trim() ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(actualAddress))
+                        throw new InvalidOperationException("Google did not return an email address for the connected account.");
+                    if (!MailProviderAccountLinkPolicy.MatchesExpectedMailboxAddress(
+                        expectedAddress,
+                        actualAddress))
+                    {
+                        throw new GoogleAccountMismatchException(
+                            expectedAddress!.Trim(),
+                            actualAddress);
+                    }
+
+                    SetAccountDisplayName(actualAddress);
+                    return actualAddress;
+                }
+                catch
+                {
+                    ResetServices();
+                    try
+                    {
+                        await dataStore.ClearAsync();
+                        if (previousToken != null)
+                            await dataStore.StoreAsync("user", previousToken);
+                    }
+                    catch (Exception restoreEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"Google authorization rollback failed: {restoreEx.Message}");
+                    }
+                    throw;
+                }
             }
             finally
             {
@@ -79,8 +181,9 @@ namespace Task_Flyout.Services
             try
             {
                 if (CalendarSvc != null && TasksSvc != null && GmailSvc != null) return;
-                var dataStore = new ProtectedGoogleDataStore();
-                await TryMigrateLegacyTokenStoreAsync(ProviderAuthCleanup.GoogleLegacyTokenPath, dataStore);
+                var dataStore = new ProtectedGoogleDataStore(AccountId);
+                if (OwnsLegacyAuthorization)
+                    await TryMigrateLegacyTokenStoreAsync(ProviderAuthCleanup.GoogleLegacyTokenPath, dataStore);
                 var token = await dataStore.GetAsync<TokenResponse>("user");
                 if (token == null || string.IsNullOrWhiteSpace(token.RefreshToken)
                     || !ProviderAuthorizationScopePolicy.HasAllScopes(GetGrantedScopes(token), AllFeatureScopes))
@@ -117,34 +220,46 @@ namespace Task_Flyout.Services
             });
         }
 
-        private GoogleAuthorizationCodeFlow CreateAuthorizationFlow(IDataStore dataStore)
+        private GoogleAuthorizationCodeFlow CreateAuthorizationFlow(
+            IDataStore dataStore,
+            IEnumerable<string>? scopes = null,
+            string? prompt = null)
         {
             using var stream = OpenCredentialsStream();
             var secrets = GoogleClientSecrets.FromStream(stream).Secrets;
             return new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
             {
                 ClientSecrets = secrets,
-                Scopes = AllFeatureScopes,
-                DataStore = dataStore
+                Scopes = scopes ?? AllFeatureScopes,
+                DataStore = dataStore,
+                Prompt = prompt
             });
+        }
+
+        private void ResetServices()
+        {
+            CalendarSvc = null;
+            TasksSvc = null;
+            GmailSvc = null;
+            _cachedCalendarList = null;
+            _calendarListCacheExpiresAt = DateTimeOffset.MinValue;
         }
 
         private static string[] GetGrantedScopes(TokenResponse? token)
             => token?.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
 
-        private async Task<UserCredential> AuthorizeAsync(IDataStore dataStore, string[] scopes, CancellationToken cancellationToken = default)
+        private async Task<UserCredential> AuthorizeAsync(
+            IDataStore dataStore,
+            string[] scopes,
+            string? prompt,
+            CancellationToken cancellationToken = default)
         {
             try
             {
-                using (var stream = OpenCredentialsStream())
-                {
-                    return await GoogleWebAuthorizationBroker.AuthorizeAsync(
-                        GoogleClientSecrets.FromStream(stream).Secrets,
-                        scopes,
-                        "user",
-                        cancellationToken,
-                        dataStore);
-                }
+                var installedApp = new AuthorizationCodeInstalledApp(
+                    CreateAuthorizationFlow(dataStore, scopes, prompt),
+                    new LocalServerCodeReceiver());
+                return await installedApp.AuthorizeAsync("user", cancellationToken);
             }
             catch (FileNotFoundException)
             {
@@ -364,7 +479,7 @@ namespace Task_Flyout.Services
                 {
                     Id = mapped.Id, Title = mapped.Title, Subtitle = mapped.Subtitle,
                     Location = mapped.Location, Description = mapped.Description, IsEvent = true,
-                    Provider = mapped.Provider, CalendarId = mapped.CalendarId,
+                    Provider = mapped.Provider, AccountId = AccountId, CalendarId = mapped.CalendarId,
                     CalendarName = mapped.CalendarName, DateKey = mapped.DateKey,
                     StartDateTime = mapped.StartDateTime, EndDateTime = mapped.EndDateTime,
                     IsRecurring = mapped.IsRecurring, RecurringEventId = mapped.RecurringEventId,
@@ -418,6 +533,7 @@ namespace Task_Flyout.Services
                             IsCompleted = mapped.IsCompleted,
                             Description = mapped.Description,
                             Provider = mapped.Provider,
+                            AccountId = AccountId,
                             CalendarId = mapped.CalendarId,
                             CalendarName = mapped.CalendarName,
                             DateKey = mapped.DateKey
@@ -434,7 +550,8 @@ namespace Task_Flyout.Services
             {
                 await EnsureAuthorizedAsync();
                 var calendarSvc = CalendarSvc!;
-                var ev = await calendarSvc.Events.Get("primary", itemId).ExecuteAsync();
+                string calendarId = GoogleItemContainerPolicy.ResolveCalendarId(taskListId);
+                var ev = await calendarSvc.Events.Get(calendarId, itemId).ExecuteAsync();
                 ev.Summary = title;
                 ev.Location = location;
                 ev.Description = description;
@@ -450,13 +567,13 @@ namespace Task_Flyout.Services
                     ev.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = window.Start };
                     ev.End = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = window.End };
                 }
-                await calendarSvc.Events.Update(ev, "primary", itemId).ExecuteAsync();
+                await calendarSvc.Events.Update(ev, calendarId, itemId).ExecuteAsync();
             }
             else
             {
                 await EnsureAuthorizedAsync();
                 var tasksSvc = TasksSvc!;
-                taskListId = string.IsNullOrWhiteSpace(taskListId) ? "@default" : taskListId;
+                taskListId = GoogleItemContainerPolicy.ResolveTaskListId(taskListId);
                 var task = await tasksSvc.Tasks.Get(taskListId, itemId).ExecuteAsync();
                 task.Title = title;
                 task.Notes = description;
@@ -469,7 +586,7 @@ namespace Task_Flyout.Services
         {
             var status = isCompleted ? "completed" : "needsAction";
             await EnsureAuthorizedAsync();
-            taskListId = string.IsNullOrWhiteSpace(taskListId) ? "@default" : taskListId;
+            taskListId = GoogleItemContainerPolicy.ResolveTaskListId(taskListId);
             var updateRequest = TasksSvc!.Tasks.Patch(new Google.Apis.Tasks.v1.Data.Task { Id = taskId, Status = status }, taskListId, taskId);
             await updateRequest.ExecuteAsync();
         }
@@ -518,25 +635,26 @@ namespace Task_Flyout.Services
             {
                 if (CalendarSvc != null)
                 {
+                    string calendarId = GoogleItemContainerPolicy.ResolveCalendarId(taskListId);
                     if (recurringDeleteMode == RecurringDeleteMode.All && !string.IsNullOrWhiteSpace(recurringEventId))
                     {
-                        await CalendarSvc.Events.Delete("primary", recurringEventId).ExecuteAsync();
+                        await CalendarSvc.Events.Delete(calendarId, recurringEventId).ExecuteAsync();
                     }
                     else if (recurringDeleteMode == RecurringDeleteMode.ThisAndFollowing && !string.IsNullOrWhiteSpace(recurringEventId) && occurrenceDate.HasValue)
                     {
-                        var master = await CalendarSvc.Events.Get("primary", recurringEventId).ExecuteAsync();
+                        var master = await CalendarSvc.Events.Get(calendarId, recurringEventId).ExecuteAsync();
                         master.Recurrence = ClampGoogleRecurrence(master.Recurrence, occurrenceDate.Value.AddDays(-1));
-                        await CalendarSvc.Events.Update(master, "primary", recurringEventId).ExecuteAsync();
+                        await CalendarSvc.Events.Update(master, calendarId, recurringEventId).ExecuteAsync();
                     }
                     else
                     {
-                        await CalendarSvc.Events.Delete("primary", itemId).ExecuteAsync();
+                        await CalendarSvc.Events.Delete(calendarId, itemId).ExecuteAsync();
                     }
                 }
             }
             else
             {
-                taskListId = string.IsNullOrWhiteSpace(taskListId) ? "@default" : taskListId;
+                taskListId = GoogleItemContainerPolicy.ResolveTaskListId(taskListId);
                 await TasksSvc!.Tasks.Delete(taskListId, itemId).ExecuteAsync();
             }
         }

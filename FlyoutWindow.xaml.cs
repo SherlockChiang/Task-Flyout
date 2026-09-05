@@ -32,6 +32,7 @@ namespace Task_Flyout
     public class AgendaCacheRange
     {
         public string ProviderName { get; set; } = "";
+        public string AccountId { get; set; } = "";
         public string StartDateKey { get; set; } = "";
         public string EndDateKey { get; set; } = "";
     }
@@ -115,9 +116,14 @@ namespace Task_Flyout
         private bool _showPending;
         private bool _openRequestIssued;
         private bool _desiredOpen;
+        private TaskCompletionSource? _mainWindowDismissal;
         private bool _focusNewItemOnOpen;
         private bool _isShuttingDown;
         private bool _suppressSelectedDateChanged;
+        private DispatcherTimer? _activationHandoffTimer;
+        private IntPtr _openingForegroundAnchor;
+        private bool _openingFlyoutWasForeground;
+        private int _activationHandoffAttempts;
         private long _isOpenChangedToken;
         private DateTimeOffset? _lastSyncSucceededAt;
         private FlyoutAgendaSurfaceKind _agendaSurfaceKind = FlyoutAgendaSurfaceKind.Content;
@@ -129,6 +135,8 @@ namespace Task_Flyout
         private long _weatherRefreshGeneration;
 
         private static readonly TimeSpan BackgroundRefreshCooldown = TimeSpan.FromMinutes(1);
+        private static readonly TimeSpan ActivationHandoffInterval = TimeSpan.FromMilliseconds(16);
+        private const int MaxActivationHandoffAttempts = 16;
 
         private readonly record struct DotSpec(double Left, double Top, SolidColorBrush Fill);
 
@@ -712,6 +720,7 @@ namespace Task_Flyout
                             IsTask = item.IsTask,
                             IsCompleted = item.IsCompleted,
                             Provider = item.Provider,
+                            AccountId = item.AccountId,
                             CalendarId = item.CalendarId,
                             ColorHex = item.ColorHex,
                             DateKey = item.DateKey
@@ -785,6 +794,7 @@ namespace Task_Flyout
                && left.IsTask == right.IsTask
                && left.IsCompleted == right.IsCompleted
                && left.Provider == right.Provider
+               && left.AccountId == right.AccountId
                && left.CalendarId == right.CalendarId
                && left.CalendarName == right.CalendarName
                && left.ColorHex == right.ColorHex
@@ -902,12 +912,10 @@ namespace Task_Flyout
             AccountManager accountManager)
         {
             return accountManager.Accounts
-                .Select(account => account.ProviderName)
-                .Where(name => !string.IsNullOrWhiteSpace(name))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(account => !string.IsNullOrWhiteSpace(account.ProviderName))
                 .ToDictionary(
-                    name => name,
-                    name => _syncManager.GetProviderHealth(name),
+                    account => account.ProviderKey,
+                    account => _syncManager.GetProviderHealth(account.ProviderName, account.AccountId),
                     StringComparer.OrdinalIgnoreCase);
         }
 
@@ -917,11 +925,16 @@ namespace Task_Flyout
             => before
                 .Select(entry =>
                 {
-                    var after = _syncManager.GetProviderHealth(entry.Key);
+                    var after = _syncManager.GetProviderHealth(
+                        entry.Value.ProviderName,
+                        entry.Value.AccountId);
                     bool attempted = HasProviderAttempted(entry.Value, after, refreshStartedAt);
                     bool succeeded = HasProviderSucceeded(entry.Value, after, attempted);
+                    string accountTitle = _syncManager.AccountManager
+                        .GetAccount(entry.Value.ProviderName, entry.Value.AccountId)
+                        ?.DisplayTitle ?? entry.Value.ProviderName;
                     return (
-                        ProviderName: entry.Key,
+                        ProviderName: accountTitle,
                         Attempt: new FlyoutProviderSyncAttempt(attempted, succeeded, after.HasCachedData));
                 })
                 .OrderBy(entry => entry.ProviderName, StringComparer.OrdinalIgnoreCase)
@@ -981,6 +994,7 @@ namespace Task_Flyout
 
         public void ToggleFlyout()
         {
+            if (_mainWindowDismissal != null) return;
             if ((DateTime.Now - _lastHideTime).TotalMilliseconds < 250) return;
 
             if (IsOpen)
@@ -993,9 +1007,15 @@ namespace Task_Flyout
                 if (_openRequestIssued) return;
                 _desiredOpen = !_desiredOpen;
                 if (_desiredOpen && _flyoutContentLoaded && !_openRequestIssued)
+                {
+                    PrepareOpeningActivationHandoff();
                     OpenPreparedFlyout();
+                }
                 else if (!_desiredOpen && !_openRequestIssued)
+                {
                     _showPending = false;
+                    ResetOpeningActivationHandoff();
+                }
             }
             else
             {
@@ -1003,9 +1023,34 @@ namespace Task_Flyout
             }
         }
 
+        public Task DismissForMainWindowAsync()
+        {
+            if (_isShuttingDown) return Task.FromCanceled(new CancellationToken(true));
+            _desiredOpen = false;
+            _focusNewItemOnOpen = false;
+            ResetOpeningActivationHandoff();
+            if (_mainWindowDismissal != null) return _mainWindowDismissal.Task;
+
+            if (!IsOpen && !_openRequestIssued)
+            {
+                _showPending = false;
+                return Task.CompletedTask;
+            }
+
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _mainWindowDismissal = completion;
+            // DesktopFlyouts ignores Hide during its opening animation. The
+            // IsOpen callback below will finish that pending dismissal instead.
+            if (IsOpen) HideFlyout(autoHide: false);
+            return completion.Task;
+        }
+
         private void ShowFlyout()
         {
-            if (_isShuttingDown || IsOpen) return;
+            if (_isShuttingDown || IsOpen || _mainWindowDismissal != null) return;
+            // A tray click can leave Explorer (or the previously active app) in
+            // the foreground until the DesktopFlyouts activation handoff finishes.
+            PrepareOpeningActivationHandoff();
             _desiredOpen = true;
             _showPending = true;
             if (!_flyoutContentLoaded) return;
@@ -1029,6 +1074,90 @@ namespace Task_Flyout
             ApplyConfiguredTheme(App.GetConfiguredTheme());
             _openRequestIssued = true;
             Show();
+            StartActivationHandoffMonitor();
+        }
+
+        private void PrepareOpeningActivationHandoff()
+        {
+            ResetOpeningActivationHandoff();
+            _openingForegroundAnchor = FlyoutForegroundProbe.CaptureForegroundAnchor();
+        }
+
+        private void StartActivationHandoffMonitor()
+        {
+            if (_activationHandoffTimer == null)
+            {
+                _activationHandoffTimer = new DispatcherTimer
+                {
+                    Interval = ActivationHandoffInterval
+                };
+                _activationHandoffTimer.Tick += ActivationHandoffTimer_Tick;
+            }
+
+            if (!_activationHandoffTimer.IsEnabled)
+                _activationHandoffTimer.Start();
+        }
+
+        private void StopActivationHandoffMonitor()
+        {
+            _activationHandoffTimer?.Stop();
+            _activationHandoffAttempts = 0;
+        }
+
+        private void ResetOpeningActivationHandoff()
+        {
+            StopActivationHandoffMonitor();
+            _openingForegroundAnchor = IntPtr.Zero;
+            _openingFlyoutWasForeground = false;
+        }
+
+        private void ActivationHandoffTimer_Tick(object? sender, object e)
+        {
+            if (_isShuttingDown || !_desiredOpen || (!IsOpen && !_openRequestIssued))
+            {
+                StopActivationHandoffMonitor();
+                return;
+            }
+
+            bool focusStateKnown = FlyoutForegroundProbe.TryGetCurrentForegroundState(
+                _openingForegroundAnchor,
+                out bool isFlyoutForeground,
+                out bool isOpeningForegroundStillActive);
+            if (isFlyoutForeground)
+            {
+                _openingFlyoutWasForeground = true;
+                StopActivationHandoffMonitor();
+                return;
+            }
+
+            if (focusStateKnown &&
+                (_openingFlyoutWasForeground || !isOpeningForegroundStillActive))
+            {
+                StopActivationHandoffMonitor();
+                if (IsOpen && FlyoutDismissalPolicy.ShouldDismissAfterOpening(
+                        _isPinned,
+                        HideOnLostFocus,
+                        focusStateKnown,
+                        isFlyoutForeground,
+                        isOpeningForegroundStillActive,
+                        _openingFlyoutWasForeground))
+                {
+                    HideFlyout(autoHide: true);
+                }
+                return;
+            }
+
+            if (_activationHandoffAttempts >= MaxActivationHandoffAttempts)
+            {
+                StopActivationHandoffMonitor();
+                return;
+            }
+
+            _activationHandoffAttempts++;
+            if (FlyoutForegroundProbe.TryActivateCurrentProcessFlyoutHost())
+            {
+                NavigateFocus();
+            }
         }
 
         private void OnIsOpenChanged(DependencyObject sender, DependencyProperty property)
@@ -1039,8 +1168,40 @@ namespace Task_Flyout
                 _openRequestIssued = false;
                 if (!_desiredOpen)
                 {
+                    StopActivationHandoffMonitor();
                     Hide();
                     return;
+                }
+
+                bool focusStateKnown = FlyoutForegroundProbe.TryGetCurrentForegroundState(
+                    _openingForegroundAnchor,
+                    out bool isFlyoutForeground,
+                    out bool isOpeningForegroundStillActive);
+                if (isFlyoutForeground)
+                    _openingFlyoutWasForeground = true;
+                if (FlyoutDismissalPolicy.ShouldDismissAfterOpening(
+                        _isPinned,
+                        HideOnLostFocus,
+                        focusStateKnown,
+                        isFlyoutForeground,
+                        isOpeningForegroundStillActive,
+                        _openingFlyoutWasForeground))
+                {
+                    StopActivationHandoffMonitor();
+                    HideFlyout(autoHide: true);
+                    return;
+                }
+
+                if (isFlyoutForeground ||
+                    (focusStateKnown && !isOpeningForegroundStillActive))
+                {
+                    StopActivationHandoffMonitor();
+                }
+                else
+                {
+                    if (FlyoutForegroundProbe.TryActivateCurrentProcessFlyoutHost())
+                        NavigateFocus();
+                    StartActivationHandoffMonitor();
                 }
 
                 ApplyConfiguredTheme(App.GetConfiguredTheme());
@@ -1076,12 +1237,16 @@ namespace Task_Flyout
             _showPending = false;
             _openRequestIssued = false;
             _desiredOpen = false;
+            ResetOpeningActivationHandoff();
             _clockTimer?.Stop();
             _syncTimer?.Stop();
             CancelBackgroundRefresh();
             CancelWeatherRefresh();
             _lastHideTime = DateTime.Now;
             App.UpdateEfficiencyMode();
+            var dismissal = _mainWindowDismissal;
+            _mainWindowDismissal = null;
+            dismissal?.TrySetResult();
         }
 
         private void QueueBackgroundRefresh()
@@ -1280,10 +1445,10 @@ namespace Task_Flyout
                     item.IsCompleted = newValue;
                     if (App.Current is App app)
                     {
-                        var key = $"{item.Provider}|{item.CalendarId}|{item.Id}";
+                        var key = $"{item.ProviderKey}|{item.CalendarId}|{item.Id}";
                         var result = await app.TaskMutations.ExecuteAsync(
                             key,
-                            () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId),
+                            () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId, item.AccountId),
                             ShowTaskMutationState);
                         if (result.Phase == TaskMutationPhase.Failed)
                         {
@@ -1312,6 +1477,7 @@ namespace Task_Flyout
 
         public void ShowNewItem()
         {
+            if (_isShuttingDown || _mainWindowDismissal != null) return;
             SetupFlyoutProviderComboBox();
             TimePickerStart.Time = new TimeSpan(DateTime.Now.Hour, (DateTime.Now.Minute / 5) * 5, 0);
             TimePickerEnd.Time = TimePickerStart.Time.Add(TimeSpan.FromHours(1));
@@ -1387,6 +1553,8 @@ namespace Task_Flyout
 
             TxtLocation.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
             TimePickerEnd.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
+            if (CmbAddProvider != null)
+                SetupFlyoutProviderComboBox();
 
             TimePickerStart.Header = isEvent ? (_loader.GetStringOrDefault("TextStartTime") ?? "Start time") : (_loader.GetStringOrDefault("TextDueTime") ?? "Due time");
 
@@ -1698,9 +1866,17 @@ namespace Task_Flyout
         {
             if (_isShuttingDown) return;
             _isShuttingDown = true;
+            _mainWindowDismissal?.TrySetCanceled();
+            _mainWindowDismissal = null;
             _syncTimer?.Stop();
             _clockTimer?.Stop();
             _dotRefreshTimer?.Stop();
+            if (_activationHandoffTimer != null)
+            {
+                _activationHandoffTimer.Stop();
+                _activationHandoffTimer.Tick -= ActivationHandoffTimer_Tick;
+                _activationHandoffTimer = null;
+            }
             CancelBackgroundRefresh();
             CancelWeatherRefresh();
             if (_activeScrollViewer != null)
@@ -1736,7 +1912,17 @@ namespace Task_Flyout
             if (accountMgr != null)
             {
                 foreach (var acct in accountMgr.Accounts)
-                    CmbAddProvider.Items.Add(new ComboBoxItem { Content = acct.ProviderName, Tag = acct.ProviderName });
+                {
+                    var capabilities = SyncProviderCapabilityPolicy.ForProvider(acct.ProviderName);
+                    if (RadioTypeTask?.IsChecked == true && !capabilities.SupportsTasks) continue;
+                    if (RadioTypeEvent?.IsChecked == true && !capabilities.SupportsEvents) continue;
+                    CmbAddProvider.Items.Add(new ComboBoxItem
+                    {
+                        Content = acct.DisplayTitle,
+                        Tag = acct.AccountId,
+                        DataContext = acct
+                    });
+                }
             }
 
             if (CmbAddProvider.Items.Count > 1)
@@ -1791,7 +1977,10 @@ namespace Task_Flyout
             bool isEvent = RadioTypeEvent.IsChecked == true;
             bool isAllDay = ChkAllDay.IsChecked == true;
             string location = TxtLocation.Text;
-            string providerName = (CmbAddProvider.SelectedItem as ComboBoxItem)?.Tag.ToString() ?? "Google";
+            var selectedOption = CmbAddProvider.SelectedItem as ComboBoxItem;
+            var selectedAccount = selectedOption?.DataContext as ConnectedAccountInfo;
+            string providerName = selectedAccount?.ProviderName ?? "Google";
+            string? accountId = selectedOption?.Tag?.ToString();
 
             TimeSpan startTime = TimePickerStart.Time;
             TimeSpan endTime = TimePickerEnd.Time;
@@ -1811,7 +2000,16 @@ namespace Task_Flyout
                 AddItemStatusText.Visibility = Visibility.Visible;
                 AdjustWindowHeight();
 
-                await _syncManager.CreateItemAsync(title, isEvent, isAllDay, targetDate, startTime, endTime, location, providerName);
+                await _syncManager.CreateItemAsync(
+                    title,
+                    isEvent,
+                    isAllDay,
+                    targetDate,
+                    startTime,
+                    endTime,
+                    location,
+                    providerName,
+                    accountId);
                 TxtNewTitle.Text = string.Empty;
                 TxtLocation.Text = string.Empty;
                 AddItemStatusText.Text = string.Empty;

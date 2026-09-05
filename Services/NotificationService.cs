@@ -176,7 +176,8 @@ namespace Task_Flyout.Services
                     item.Id,
                     item.DateKey,
                     actions,
-                    DateTimeOffset.UtcNow.AddDays(2));
+                    DateTimeOffset.UtcNow.AddDays(2),
+                    AccountId: item.AccountId);
                 var token = NotificationActionStore.Store(target);
                 builder.AddArgument("action", "openAgenda").AddArgument("token", token);
                 if (actions.HasFlag(NotificationActionMask.Snooze))
@@ -226,7 +227,7 @@ namespace Task_Flyout.Services
         // with a different DateTime.Kind / timezone offset (e.g. roaming laptop) still
         // produces a stable dedupe key for a given local start time.
         private static string BuildNotificationKey(AgendaItem item, string dateKey, DateTime eventStart)
-            => $"{item.Provider}|{item.Id}|{dateKey}|{eventStart:HHmm}";
+            => $"{item.ProviderKey}|{item.Id}|{dateKey}|{eventStart:HHmm}";
 
         private bool PruneNotifiedIds()
         {
@@ -357,12 +358,12 @@ namespace Task_Flyout.Services
 
             if (!item.IsTask || item.IsCompleted
                 || !string.Equals(item.Provider, "Google", StringComparison.OrdinalIgnoreCase)
-                || !_syncManager.AccountManager.IsConnected(item.Provider)) return;
+                || !_syncManager.AccountManager.IsConnected(item.Provider, item.AccountId)) return;
             if (App.Current is not App app) return;
-            var key = $"{item.Provider}|{item.CalendarId}|{item.Id}";
+            var key = $"{item.ProviderKey}|{item.CalendarId}|{item.Id}";
             await app.TaskMutations.ExecuteAsync(key, async () =>
             {
-                await _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, true, item.CalendarId);
+                await _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, true, item.CalendarId, item.AccountId);
                 await _syncManager.SetCachedTaskCompletionAsync(item, true);
             });
             App.OpenMainWindowInternal(window => window.NavigateToTasks());
@@ -371,7 +372,9 @@ namespace Task_Flyout.Services
         private AgendaItem? ResolveTarget(NotificationActionTarget target)
             => _syncManager.GetDayItemsSnapshot(new[] { target.DateKey })
                 .SelectMany(pair => pair.Value)
-                .FirstOrDefault(item => item.Id == target.ItemId && item.Provider == target.Provider && item.DateKey == target.DateKey);
+                .FirstOrDefault(item => item.Id == target.ItemId
+                    && AccountIdentityPolicy.Matches(item.Provider, item.AccountId, target.Provider, target.AccountId)
+                    && item.DateKey == target.DateKey);
 
         private async Task ProcessDueSnoozesAsync(DateTime now)
         {

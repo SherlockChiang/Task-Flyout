@@ -13,12 +13,14 @@ public class NotificationActionStoreTests
         LocalSqliteStore.SetDataPathForTests(root);
         try
         {
-            var target = new NotificationActionTarget(1, "Google", "task", "2026-07-15", NotificationActionMask.Open | NotificationActionMask.Complete, DateTimeOffset.UtcNow.AddMinutes(10));
+            var target = new NotificationActionTarget(NotificationActionTarget.CurrentSchemaVersion, "Google", "task", "2026-07-15", NotificationActionMask.Open | NotificationActionMask.Complete, DateTimeOffset.UtcNow.AddMinutes(10), AccountId: "account-a");
             var token = NotificationActionStore.Store(target);
 
             Assert.True(NotificationActivationParser.IsOpaqueToken(token));
             Assert.Null(await NotificationActionStore.ReadAsync(token, NotificationActionMask.Snooze, consume: false));
-            Assert.NotNull(await NotificationActionStore.ReadAsync(token, NotificationActionMask.Complete, consume: true));
+            var stored = await NotificationActionStore.ReadAsync(token, NotificationActionMask.Complete, consume: true);
+            Assert.NotNull(stored);
+            Assert.Equal("account-a", stored.AccountId);
             Assert.Null(await NotificationActionStore.ReadAsync(token, NotificationActionMask.Complete, consume: true));
         }
         finally

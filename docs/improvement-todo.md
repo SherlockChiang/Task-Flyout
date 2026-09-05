@@ -8,6 +8,39 @@ Status values:
 - `IN PROGRESS`: active work
 - `DONE`: implemented and verified
 - `BLOCKED`: requires an external decision, credential, service, or environment
+- `PAUSED`: intentionally archived; no further implementation or runtime attempts
+
+## Current Queue - 2026-09-05 Reassessment
+
+This queue takes precedence over the older backlog order. The evidence and
+sequencing rationale are in [optimization-roadmap.md](optimization-roadmap.md).
+Do not treat policy-unit-test success as proof of WinUI event wiring, packaged
+input behavior, live provider isolation, or private Explorer compatibility.
+
+| Order | ID | Status | Next bounded outcome | Verification / dependency |
+| --- | --- | --- | --- | --- |
+| 1 | M1-16 | IN PROGRESS | Validate restored single-click Flyout / double-click main-window contract. | Implementation `433c171`; 9 focused and 1264 total tests pass, Debug x64 clean. Signed Debug x64 candidate `1.4.4.4` is ready but not installed; tray matrix still pending. |
+| 2 | R1-01 | TODO | Include account identity in global-search agenda deduplication and result keys. | Two accounts with equal remote IDs must both appear and navigate to their own items; single-account behavior unchanged. See `MainWindow.BuildGlobalSearchSnapshot`. |
+| 3 | M3-09 | IN PROGRESS | Complete packaged multi-Google acceptance without changing account architecture. | R1-01 first; add two synthetic accounts, restart, reconnect one, cancel/mismatch reconnect, remove one, verify sibling tokens/cache/tasks/mail/notifications remain correct. |
+| 4 | R1-02 | TODO | Add an application build to PR quality checks and identify the exact tested package revision. | No signing/OAuth secrets in PR jobs; build actual WinUI sources; PR checks must not imply latest-beta smoke covered the PR. |
+| 5 | M1-03 | TODO | Preserve unreadable protected files and version the format before plaintext migration. | Recognized legacy JSON only; truncated/corrupt/foreign-user ciphertext stays byte-identical; atomic writes and migration recovery tested. |
+| 6 | M1-05 / M1-04 | TODO | Migrate device-bound SQLite data safely and bound obsolete notification-token retention. | Separate commits; format/recovery tests first; verified migration with rollback, restart, pruning and account-removal coverage. |
+| 7 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | R1-01 remains intact; delayed old index cannot replace newer query/account state; no eager RSS HTML bodies on UI thread. |
+| 8 | M2-02 / M2-01 | IN PROGRESS | Measure packaged performance and bound long-lived mail coordination state. | Prewarm code already exists; no new prewarm until measurements. At least 20 successful samples for P95; run idle soak separately. |
+| 9 | M1-02 / M2-05 / M2-06 | TODO | Stabilize existing controls, accessibility and regional layouts. | Startup failures restore actual state; 100/150/200% DPI, narrow layout, keyboard and time-range checks; no broad redesign. |
+| 10 | M2-04 / M2-07 | TODO | Incrementally share tested Core code and add targeted quality tooling. | Stabilize behavior first; do not move all services/pages in one refactor or apply whole-repo formatting churn. |
+| External | M0-06 | BLOCKED | Resume OAuth submission after core workflows pass packaged validation. | Retain existing Gmail scope/function decisions; latest recorded console audit is 2026-09-02, not a current live claim. Recheck Branding, prepare demo, obtain approval for external submission. |
+| Paused | M3-03 through M3-08 | PAUSED | Preserve experimental taskbar-weather work as an archive. | No Windhawk installation, new Explorer injection or diagnostic rebuild/signing/runtime experiments. Normal candidate packaging may sign the bundled components without running them. |
+
+Candidate acceptance must also cover external read/unread changes with Mail open,
+new-mail notification navigation to the correct account/message, automatic agenda
+updates while Flyout is hidden, and editing/rendering both event endpoints.
+M1-14/M1-15 retain their implementation completion records; these live checks are
+release gates, not invented claims that they have already passed.
+
+Only one implementation outcome is active at a time. Each gets its own commit,
+tests/build and pending-or-passed runtime record. Keep PR #3 a draft until the
+candidate acceptance and account-routing gaps are resolved; do not auto-merge.
 
 ## P0 - Release And Data Integrity
 
@@ -111,6 +144,9 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M1-11 | DONE | Reliability/Startup | Keep tray-triggered Flyout construction behind stable account hydration. | The click path records request diagnostics and restores efficiency state on failure; the Flyout never enumerates the account collection while startup hydration is mutating it. | `fix(flyout): serialize account hydration before opening` |
 | M1-12 | DONE | Reliability/Calendar | Refresh agenda data while the Flyout remains hidden. | The app heartbeat force-refreshes the shared agenda range at the configured interval after account hydration, throttles failed attempts, invalidates the reminder snapshot, and checks upcoming events against the refreshed cache. | `fix(calendar): refresh agenda while flyout is hidden` |
 | M1-13 | DONE | Reliability/Mail | Open new-mail notification targets directly after background-only polling. | Polling keeps a bounded body-free unread metadata slice without presenting it as a complete folder window; activation resolves explicit Inbox aliases, falls back across folders only for Google/Outlook identities, and never treats IMAP UIDs as cross-folder identities. | `fix(mail): open notification targets reliably` |
+| M1-14 | DONE | Data integrity/Mail | Keep unread state coherent across provider, folder views, cache, notifications, and background polling. | Read/unread mutations update every cached identity for the account, reconcile authoritative provider state after refresh, and cannot resurrect stale unread badges or notifications. | `fix(mail): converge mutable state by provider identity`, `fix(mail): reconcile authoritative unread snapshots`, `fix(mail): synchronize unread UI and notifications` |
+| M1-15 | DONE | Reliability/Calendar | Correct event editor times, timeline duration, date-strip overflow, and automatic refresh. | Existing events hydrate both start and end controls; the day timeline renders the complete interval; the date header has no unintended horizontal scrollbar; foreground and hidden refresh paths reliably publish fresh data without overlap or stale replacement. | `fix(calendar): align event times and timeline`, `fix(calendar): publish background refreshes to open views`, `fix(google): route mutations to source calendar` |
+| M1-16 | IN PROGRESS | Reliability/Flyout | Reliably dismiss an unpinned Flyout and preserve distinct tray gestures. | Focus loss during opening or fully open closes an unpinned Flyout once; normal tray activation stays open; single-click toggles Flyout; double-click dismisses even a pinned/opening Flyout and opens the main window; late single-click continuations cannot reopen it. Packaged revalidation is required. | `fix(flyout): close reliably on focus loss`, `fix(flyout): preserve tray activation handoff`, `fix(flyout): complete tray activation handoff`, `fix(tray): restore main-window double click` |
 
 ### P2 - Long-Running Efficiency, Architecture, And UI Quality
 
@@ -143,12 +179,13 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | --- | --- | --- | --- | --- | --- |
 | M3-01 | TODO | Distribution | Add stable/beta update-channel support. | Users can discover and install signed updates without repeating manual certificate/package steps; rollback and channel behavior are documented. | `feat: add update channel support` |
 | M3-02 | TODO | Notifications | Add quiet hours and per-calendar notification controls. | Global defaults remain simple; users can suppress selected calendars and configure a quiet interval without losing explicit snoozes. | `feat: add notification quiet hours` |
-| M3-03 | TODO | UI/Compatibility | Runtime-validate and package the experimental Windhawk weather companion. | A disposable Explorer session verifies enable/disable/unload, Luminosity width, hover/click, primary/secondary taskbars, Explorer restart, and fail-closed behavior on an unlisted taskbar binary before any user-facing enable switch is added. | `test(windhawk): validate native weather shell` |
-| M3-04 | IN PROGRESS | Integration | Feed Task Flyout weather and activation into the native-shell companion. | A versioned, length-bounded per-user channel performs no blocking I/O on Explorer's UI thread; stale/unavailable app state fails open; native-shell click activation opens Task Flyout Weather; shutdown, reconnect, and Explorer restart leave no callbacks or handles behind. | `feat(weatherbar): define companion IPC protocol`, `feat(weatherbar): host companion weather snapshots`, `feat(windhawk): bridge weather snapshots`, `feat(windhawk): activate Task Flyout weather` |
-| M3-05 | IN PROGRESS | Architecture/Security | Replace the Windhawk runtime dependency with a standalone per-user taskbar broker and Explorer host. | The x64 broker and host build without Windhawk or WebView libraries; exact OS and `Taskbar.View.dll` fingerprints gate all private ABI use; unsupported systems fail closed before Explorer memory or XAML is changed. | `feat(taskbar): scaffold standalone weather host` |
-| M3-06 | IN PROGRESS | UI/Compatibility | Inject an independent pure-XAML weather button into the Windows 11 taskbar. | The host uses standard `Windows.UI.Xaml` controls and taskbar theme resources, does not require the Windows Widgets entry, reserves a bounded left-side slot, and restores the original XAML tree on disable or unload. | `feat(taskbar): add pure xaml weather view`, `feat(taskbar): inject native xaml weather button` |
-| M3-07 | IN PROGRESS | Integration/UI | Connect the standalone host to Task Flyout weather, activation, settings, and diagnostics. | The existing bounded per-user IPC supplies sanitized immutable snapshots; click opens Task Flyout Weather; a localized experimental switch and privacy-safe diagnostics expose active, unsupported, fallback, and recovery states. | `feat(taskbar): consume weather snapshot pipe`, `feat(taskbar): activate weather button`, `feat(taskbar): acknowledge host control`, `feat(weatherbar): add standalone mode policy`, `feat(taskbar): parse standalone broker responses`, `fix(taskbar): emit broker output as utf8`, `feat(taskbar): add bounded broker client`, `feat(taskbar): define standalone lifecycle states`, `feat(taskbar): coordinate standalone lifecycle`, `feat(taskbar): wire standalone app lifecycle`, `feat(taskbar): own widgets suppression safely`, `feat(taskbar): suppress native widgets for standalone`, `feat(weatherbar): expose standalone taskbar controls`, `feat(taskbar): expose mount readiness`, `feat(taskbar): parse mount status responses`, `feat(taskbar): hand off fallback after mount proof`, `feat(taskbar): authenticate mount lease reports`, `feat(taskbar): renew mount readiness lease`, `refactor(taskbar): isolate mount readiness state`, `test(taskbar): cover mount lease reducer edges`, `diagnostics(taskbar): expose mount pending reasons` |
-| M3-08 | IN PROGRESS | Verification/Distribution | Validate and package the standalone taskbar component. | Compile/import checks prove the native binaries have no WebView dependency; a disposable Explorer session covers enable/disable, crash recovery, DPI, auto-hide, theme, multi-monitor, Explorer restart, unsupported binaries, signed packaging, and rollback before default exposure. | `build(taskbar): stage standalone native artifacts`, `test(taskbar): gate disposable explorer validation`, `test(taskbar): validate standalone weather injection`, `build(taskbar): recover missing local signing key` |
+| M3-03 | PAUSED | UI/Compatibility | Runtime-validate and package the experimental Windhawk weather companion. | A disposable Explorer session verifies enable/disable/unload, Luminosity width, hover/click, primary/secondary taskbars, Explorer restart, and fail-closed behavior on an unlisted taskbar binary before any user-facing enable switch is added. | `test(windhawk): validate native weather shell` |
+| M3-04 | PAUSED | Integration | Feed Task Flyout weather and activation into the native-shell companion. | A versioned, length-bounded per-user channel performs no blocking I/O on Explorer's UI thread; stale/unavailable app state fails open; native-shell click activation opens Task Flyout Weather; shutdown, reconnect, and Explorer restart leave no callbacks or handles behind. | `feat(weatherbar): define companion IPC protocol`, `feat(weatherbar): host companion weather snapshots`, `feat(windhawk): bridge weather snapshots`, `feat(windhawk): activate Task Flyout weather` |
+| M3-05 | PAUSED | Architecture/Security | Replace the Windhawk runtime dependency with a standalone per-user taskbar broker and Explorer host. | The x64 broker and host build without Windhawk or WebView libraries; exact OS and `Taskbar.View.dll` fingerprints gate all private ABI use; unsupported systems fail closed before Explorer memory or XAML is changed. | `feat(taskbar): scaffold standalone weather host` |
+| M3-06 | PAUSED | UI/Compatibility | Inject an independent pure-XAML weather button into the Windows 11 taskbar. | The host uses standard `Windows.UI.Xaml` controls and taskbar theme resources, does not require the Windows Widgets entry, reserves a bounded left-side slot, and restores the original XAML tree on disable or unload. | `feat(taskbar): add pure xaml weather view`, `feat(taskbar): inject native xaml weather button` |
+| M3-07 | PAUSED | Integration/UI | Connect the standalone host to Task Flyout weather, activation, settings, and diagnostics. | The existing bounded per-user IPC supplies sanitized immutable snapshots; click opens Task Flyout Weather; a localized experimental switch and privacy-safe diagnostics expose active, unsupported, fallback, and recovery states. | `feat(taskbar): consume weather snapshot pipe`, `feat(taskbar): activate weather button`, `feat(taskbar): acknowledge host control`, `feat(weatherbar): add standalone mode policy`, `feat(taskbar): parse standalone broker responses`, `fix(taskbar): emit broker output as utf8`, `feat(taskbar): add bounded broker client`, `feat(taskbar): define standalone lifecycle states`, `feat(taskbar): coordinate standalone lifecycle`, `feat(taskbar): wire standalone app lifecycle`, `feat(taskbar): own widgets suppression safely`, `feat(taskbar): suppress native widgets for standalone`, `feat(weatherbar): expose standalone taskbar controls`, `feat(taskbar): expose mount readiness`, `feat(taskbar): parse mount status responses`, `feat(taskbar): hand off fallback after mount proof`, `feat(taskbar): authenticate mount lease reports`, `feat(taskbar): renew mount readiness lease`, `refactor(taskbar): isolate mount readiness state`, `test(taskbar): cover mount lease reducer edges`, `diagnostics(taskbar): expose mount pending reasons` |
+| M3-08 | PAUSED | Verification/Distribution | Validate and package the standalone taskbar component. | Compile/import checks prove the native binaries have no WebView dependency; a disposable Explorer session covers enable/disable, crash recovery, DPI, auto-hide, theme, multi-monitor, Explorer restart, unsupported binaries, signed packaging, and rollback before default exposure. | `build(taskbar): stage standalone native artifacts`, `test(taskbar): gate disposable explorer validation`, `test(taskbar): validate standalone weather injection`, `build(taskbar): recover missing local signing key` |
+| M3-09 | IN PROGRESS | Accounts/Architecture | Support multiple isolated Google accounts across Calendar, Tasks, and Gmail. | Each Google identity owns a stable account ID, protected token namespace, provider services, agenda/cache keys, and mail operations; add/remove/reconnect acts on one account without replacing or disconnecting another; migration preserves the existing single account and tests prevent cross-account reads, writes, and notifications. | `refactor(accounts): add account-scoped provider identity`, `feat(google): support multiple connected accounts`, `feat(accounts): add per-account reconnect controls` |
 
 M3-05 through M3-08 supersede the Windhawk runtime/package work in M3-03.
 M3-03 remains as historical POC scope and must not be installed or enabled. The
@@ -1500,3 +1537,273 @@ They are historical records; active work remains in the backlog tables above.
   updated `master:/docs` site, resubmit and publish Branding, reduce Data Access
   to the three current scopes, add the justification/video/reviewer material,
   and then resubmit.
+
+### 2026-09-01 OAuth Publication Checkpoint
+
+- PR #2 was merged with merge commit `1837427`, preserving the maintenance
+  branch's focused history. Master Quality run `33518068424` and Pages
+  deployment `33518065281` both completed successfully.
+- The live home page and privacy policy now return the published September 2026
+  content. The home page visibly describes Google Calendar, Google Tasks, and
+  Gmail; the privacy policy identifies Gmail Modify, excludes redundant Gmail
+  Readonly/Gmail Send consent, and contains the data-flow, retention, deletion,
+  and Limited Use disclosures.
+- The publication prerequisite for M0-06 is complete. M0-06 remains `BLOCKED`
+  on the external steps: resubmit the stale Branding ownership issue as
+  resolved, publish the verified brand, reduce Data Access to the three current
+  scopes, provide the unlisted English demo and synthetic reviewer account, and
+  submit the new Verification Center request.
+
+### 2026-09-02 Google Data Access Scope Reduction
+
+- In the `mytaskflyout` project, `gmail.readonly` and `gmail.send` were removed
+  and the change was saved. Data Access now contains exactly Calendar, Tasks,
+  and Gmail Modify, matching the current build and public disclosures.
+- Verification Center still reports that the brand is not displayed and keeps
+  `Prepare for verification` disabled. Scope justifications, the YouTube demo,
+  reviewer instructions, and synthetic credentials remain pending external
+  submission work. M0-06 remains `BLOCKED` until Branding is published.
+
+### 2026-09-02 Flyout Focus-Loss Dismissal
+
+- The Flyout now rechecks the actual foreground host when its opening
+  transition completes. If focus moved elsewhere while the dependency's open
+  animation was suppressing `Hide()`, an unpinned Flyout closes instead of
+  allowing the completion path to reclaim focus.
+- The foreground probe recognizes only this process's DesktopFlyout host and
+  fails open when Windows cannot provide a foreground handle. Pinned mode and
+  an explicitly disabled `HideOnLostFocus` remain unaffected.
+- `FlyoutDismissalPolicyTests` cover focused, unfocused, pinned, disabled, and
+  unknown-focus cases. The Debug x64 app build completes with zero warnings and
+  zero errors; packaged-runtime rapid-click validation remains in the final
+  four-item test pass.
+
+### 2026-09-02 Calendar Time And Refresh Consistency
+
+- Existing event dialogs now hydrate their controls from structured start and
+  end values instead of reconstructing them from display text. Legacy cache
+  entries retain a narrow parser fallback, and optimistic updates persist both
+  endpoints so reopening an edited event preserves its complete interval.
+- The right-side agenda renders start and end times, the toolbar no longer
+  exposes a horizontal scrollbar, and the cache content signature includes the
+  event end time so end-only provider changes are persisted.
+- Shared agenda-cache publications carry a monotonic version. A loaded Calendar
+  page coalesces notifications onto its dispatcher and redraws the current
+  month, week, year, and upcoming range without issuing another network fetch;
+  stale or reordered callbacks cannot replace a newer view.
+- Google mutations now target the source `CalendarId` for single events and all
+  recurring deletion modes, falling back to `primary` only for legacy records
+  without an ID. The managed suite passes 1193/1193 and the Debug x64 app build
+  completes with zero warnings and zero errors. The final packaged test pass
+  should still exercise an event from a non-primary Google calendar and
+  background refresh while the page is open.
+
+### 2026-09-03 Mail Unread Consistency (In Progress)
+
+- The first M1-14 slice makes optimistic read and flag mutations converge by
+  provider identity across every in-memory and persistent message window.
+  Google and Outlook IDs are account-scoped across folders; IMAP identities
+  remain scoped to account, folder, UIDVALIDITY, and UID.
+- Read-state changes collect unique affected folder IDs before invalidating
+  unread-only windows and adjusting each cached folder representation once.
+  Open-page publications and notification withdrawal remain in the final
+  M1-14 slice.
+- The focused cache-policy tests pass 8/8, the complete managed suite passes
+  1197/1197, and the Debug x64 app build completes with zero warnings and zero
+  errors. Existing user-owned manifest and Windhawk changes remain excluded.
+
+### 2026-09-03 Mail Authoritative Unread Reconciliation
+
+- Provider pages now retain their continuation state through background polls.
+  A complete unread snapshot replaces the cached unread set, including an
+  empty result; a truncated five-message poll only merges its known prefix and
+  cannot delete unknown older unread mail.
+- Current queued read and flag intents are applied before provider results enter
+  memory or persistent caches. Google and Outlook pending intents converge by
+  account-scoped provider identity, while IMAP retry identity includes folder,
+  UIDVALIDITY, and UID. Expired or permanently failed retries invalidate their
+  optimistic message and folder windows so stale state must be refetched.
+- Folder and message windows persist their actual provider-fetch timestamps.
+  Missing, expired, future, or orphaned timestamps cannot grant a restored
+  cache a fresh ten-minute lifetime, and partial background merges do not renew
+  an existing window's age.
+- The complete managed suite passes 1211/1211 and the Debug x64 app build
+  completes with zero warnings and zero errors. M1-14 remains in progress for
+  open-page cache publication, forced folder-count refresh, and deterministic
+  mail-toast withdrawal.
+
+### 2026-09-03 Mail Unread UI And Notification Convergence
+
+- Mail folder and message cache commits now publish monotonic versions with an
+  account/folder refresh scope. A loaded Mail page coalesces those callbacks onto
+  its dispatcher, copies folder counts, and reconciles the selected cached
+  message window in place without issuing another provider request or discarding
+  the open message body and selection.
+- Scheduled polling force-refreshes provider folder metadata before reading the
+  Inbox unread slice, so cached badges no longer hide remote count changes for
+  another ten-minute cache lifetime. The refresh button also requests folder
+  counts and the selected message window together.
+- Mail toasts use a stable 16-character account/provider identity tag in the
+  `mail` group. Gmail and Outlook identities remain stable across folder copies;
+  IMAP identities retain folder and UIDVALIDITY scope. Optimistic mark-read
+  actions and authoritative unread removals withdraw the matching toast.
+- Notification identity tests pass 5/5, the complete managed suite passes
+  1216/1216, and the Debug x64 app build completes with zero warnings and zero
+  errors. M1-14 is complete; the next packaged-runtime pass should still verify
+  an external read-state change while Mail is open and a live toast withdrawal.
+
+### 2026-09-03 Account-Scoped Provider Identity
+
+- Connected agenda accounts now receive a stable account ID. Existing single
+  Google, Microsoft, and iCloud records migrate to deterministic legacy IDs,
+  while additional records receive opaque IDs without replacing the first
+  account.
+- Sync providers expose an account-scoped routing key. Agenda items, cache
+  ranges, provider health, optimistic mutations, deduplication, and notification
+  action targets retain that identity so equal remote item IDs from two accounts
+  cannot read, overwrite, complete, or delete one another.
+- Google credentials now use an account-specific protected SQLite scope. The
+  former single Google token is copied once into the legacy account namespace,
+  and clearing one namespaced provider no longer clears future sibling accounts.
+- Account identity and notification-action tests pass 9/9, the complete managed
+  suite passes 1224/1224, and the Debug x64 app build completes with zero
+  warnings and zero errors. M3-09 remains in progress for provider hydration,
+  interactive account selection, per-account Gmail linkage, and account-aware UI
+  add/remove/reconnect flows.
+
+### 2026-09-04 Google Provider Hydration And Account Selection
+
+- Deferred account hydration now restores one `GoogleSyncProvider` for every
+  saved Google account ID. Provider registration and removal use locked
+  snapshots so account changes cannot invalidate an in-flight sync enumeration.
+- New Google account flows can allocate an opaque provider identity and request
+  Google's `select_account` prompt. A missing-scope retry explicitly requests
+  consent while keeping the account-specific protected token store.
+- Only `legacy-google` may migrate or clear the former shared Google token.
+  Newly allocated accounts can no longer absorb an old credential and bypass
+  the account picker. Namespace-policy tests pass 13/13 and the Debug x64 app
+  build completes with zero warnings and zero errors.
+- M3-09 remains in progress for connecting the new provider from both account
+  entry points, linking each Gmail mailbox to its provider account ID, and
+  making create/remove/reconnect UI actions account-aware.
+
+### 2026-09-04 Multi-Google Account Routing
+
+- Both Google add-account entry points now allocate an isolated provider,
+  require explicit account selection, reject duplicate Gmail identities, and
+  clean only the temporary authorization namespace after cancellation or
+  failure.
+- Gmail folders, messages, bodies, mutations, label moves, undo, and sending
+  resolve the provider linked to the selected mailbox. Calendar, Tasks, and
+  Flyout create/remove actions carry the selected account ID instead of routing
+  through the first Google provider.
+- Legacy Gmail and Outlook records acquire their deterministic provider account
+  IDs, and a legacy Google agenda label is hydrated from its Gmail address.
+  Per-account Flyout health no longer collapses sibling Google providers.
+- Link-policy tests pass 15/15 and the Debug x64 app build completes with zero
+  warnings and zero errors. M3-09 remains in progress for per-account reconnect
+  controls, localized account actions, the complete managed suite, and packaged
+  multi-account runtime validation.
+
+### 2026-09-04 Per-Account Health And Reconnect
+
+- The account health center now renders every connected identity separately,
+  including its own cached/reconnect/last-success state and an account-scoped
+  reconnect action. Google, Microsoft, and iCloud reconnects reuse the selected
+  account ID and preserve visibility filters.
+- Google reconnect temporarily removes the selected namespace token to force an
+  interactive account choice. Cancellation, missing scopes, and an email
+  mismatch roll back to the prior token; a mismatched identity is never linked
+  to the selected Calendar, Tasks, or Gmail account.
+- Account display-name bindings now update when a migrated or reconnected email
+  address becomes available. New account, duplicate-account, reconnect, and
+  mismatch text is localized in English, Simplified Chinese, and Traditional
+  Chinese.
+- Account-policy tests pass 20/20, the complete managed suite passes 1249/1249,
+  and the Debug x64 app build completes with zero warnings and zero errors.
+  M3-09 now only needs packaged runtime validation with two real Google test
+  identities before it can be archived as complete.
+
+### 2026-09-04 Flyout Activation-Handoff Regression
+
+- Packaged runtime testing found that the post-transition focus check could
+  mistake the taskbar or previously active window for a real focus loss and
+  immediately close the Flyout after a tray click.
+- Each open request now captures the foreground root-owner anchor. When the
+  transition completes, the Flyout stays open if that same activation source is
+  still foreground, but still closes if focus moved to a different window.
+  The foreground probe recognizes the DesktopFlyouts host by both its window
+  class and title and continues to fail open when Windows exposes no handle.
+- The focused dismissal-policy tests pass 6/6, the complete managed suite passes
+  1250/1250, and the Debug x64 app build completes with zero warnings and zero
+  errors. The first packaged pass exposed the remaining host-activation gap
+  recorded and resolved in the follow-up below.
+
+### 2026-09-04 Flyout Host Activation Completion
+
+- Packaged follow-up testing showed that the first tray open could remain owned
+  by the previously foreground window. Light dismiss therefore did not become
+  active until the user clicked inside the Flyout once.
+- The opening handoff now observes the real DesktopFlyouts host throughout the
+  transition, actively foregrounds its visible current-process host, and records
+  whether that host ever owned the foreground. A later external click is still
+  honored after the dependency finishes its animation, including a click back
+  to the same window that was active before the tray gesture.
+- Dynamic host classes such as `DesktopFlyoutHostClass.<guid>` are recognized by
+  prefix. Tray double-click uses the same delayed Flyout toggle command as a
+  single click, so a rapid gesture no longer opens the main Calendar window.
+- Focused activation/dismissal tests pass 11/11, the complete managed suite
+  passes 1255/1255, and the Debug x64 app build completes with zero warnings and
+  zero errors.
+- Signed package `1.4.4.3` was installed over `1.4.4.2` and manually validated:
+  the first tray open dismisses when another window is clicked without requiring
+  an initial click inside the Flyout, and rapid double-click no longer opens the
+  main Calendar surface. The installed package reports healthy and the final
+  MSIX SHA-256 is
+  `8306D427FEDD4B93A76C4E937DBB652A0FAA78B486630EEFFBE175C433B37469`.
+  M1-16 was archived as complete at that checkpoint; the corrected gesture
+  requirement below reopens its packaged acceptance gate.
+
+### 2026-09-05 Tray Double-Click Regression Correction
+
+- The user confirmed the intended contract: single-click toggles Flyout;
+  double-click opens the main application. The shared toggle binding added in
+  `1f19378` changed that contract and was a regression, not a desired behavior.
+- Separate commands now use a UI-dispatcher interaction coordinator. A main-window
+  request invalidates single clicks still waiting for account hydration and
+  suppresses toggles during the Flyout-to-main-window handoff.
+- Explicit dismissal cancels a prepared-but-not-shown Flyout, stops activation
+  retries, and waits for an in-progress open/close animation to close before
+  opening the main window. Pinning does not block this explicit command;
+  shutdown cancels the handoff. Existing external-click dismissal remains intact.
+- Focused coordinator tests pass 9/9; the complete managed suite passes
+  1264/1264; Debug x64 builds with zero warnings and zero errors.
+- Runtime acceptance is still pending, not inferred from those tests: cold/warm
+  single-click, double-click while hidden/open/opening/closing/pinned, double-click
+  while hydration is delayed, outside click without first clicking inside Flyout,
+  and a subsequent single-click after returning from the main window.
+
+### 2026-09-05 Signed Tray Regression Candidate
+
+- Generated Debug x64 candidate `1.4.4.4` from `b1fa8e6`, including the tray
+  interaction fix `433c171`. The MSIX build passed with zero warnings/errors.
+  This is a local test build, not a published release or a Release performance
+  baseline.
+- Artifact:
+  `AppPackages/LocalLatest_1.4.4.4_20260905/Task_Flyout_1.4.4.4_x64_Debug_Test/Task_Flyout_1.4.4.4_x64_Debug.msix`.
+  SHA-256:
+  `3795F298CCCB5844692DC5D9C20BF37C207F3FE015D87DB679F4974D8B33452F`.
+- Reused certificate `15303040F7CEECFDE9C023F15481D15C39CCDB46`. The normal
+  sideload-build hook signed the bundled broker/host, and the MSIX was then
+  signed with the same key. No certificate was created or exported and no
+  trust-store changes were made. SignTool and Authenticode validation passed;
+  this local signature has no timestamp.
+- Read the packaged manifest as XML and verified version `1.4.4.4`, x64 and the
+  expected publisher. The packaged application DLL and both native components
+  are byte-identical to the verified build outputs.
+- No installation, application restart, compatibility probe or Explorer
+  injection was performed. M1-16 remains in progress for the runtime matrix;
+  native taskbar experiments remain paused.
+- Restored the user's manifest to `1.4.4.0`; its SHA-256 and the pre-existing
+  Windhawk source SHA-256 exactly match the pre-build values. Neither file is
+  staged or included in this checkpoint commit.

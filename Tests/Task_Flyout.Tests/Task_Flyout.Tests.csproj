@@ -41,6 +41,7 @@
     <Compile Include="..\..\Services\RssOpmlService.cs" Link="Source\RssOpmlService.cs" />
     <Compile Include="..\..\Services\LocalSearchMatcher.cs" Link="Source\LocalSearchMatcher.cs" />
     <Compile Include="..\..\Services\TrayStatusPolicy.cs" Link="Source\TrayStatusPolicy.cs" />
+    <Compile Include="..\..\Services\TrayInteractionCoordinator.cs" Link="Source\TrayInteractionCoordinator.cs" />
     <Compile Include="..\..\Services\TaskbarSelectionPolicy.cs" Link="Source\TaskbarSelectionPolicy.cs" />
     <Compile Include="..\..\Services\WeatherBarTaskbarStylePolicy.cs" Link="Source\WeatherBarTaskbarStylePolicy.cs" />
     <Compile Include="..\..\Services\WeatherBarModePolicy.cs" Link="Source\WeatherBarModePolicy.cs" />
@@ -72,8 +73,11 @@
     <Compile Include="..\..\Services\DeferredStartupWork.cs" Link="Source\DeferredStartupWork.cs" />
     <Compile Include="..\..\Services\FlyoutResidencyPolicy.cs" Link="Source\FlyoutResidencyPolicy.cs" />
     <Compile Include="..\..\Services\FlyoutAgendaSurfacePolicy.cs" Link="Source\FlyoutAgendaSurfacePolicy.cs" />
+    <Compile Include="..\..\Services\FlyoutDismissalPolicy.cs" Link="Source\FlyoutDismissalPolicy.cs" />
+    <Compile Include="..\..\Services\FlyoutForegroundProbe.cs" Link="Source\FlyoutForegroundProbe.cs" />
     <Compile Include="..\..\Services\IncrementalBucketSnapshot.cs" Link="Source\IncrementalBucketSnapshot.cs" />
     <Compile Include="..\..\Services\VersionedBucketSlicePolicy.cs" Link="Source\VersionedBucketSlicePolicy.cs" />
+    <Compile Include="..\..\Services\VersionedUiRefreshGate.cs" Link="Source\VersionedUiRefreshGate.cs" />
     <Compile Include="..\..\Services\TaskMutationCoordinator.cs" Link="Source\TaskMutationCoordinator.cs" />
     <Compile Include="..\..\Services\TaskMutationStatusPolicy.cs" Link="Source\TaskMutationStatusPolicy.cs" />
     <Compile Include="..\..\Services\TaskEditCapabilityPolicy.cs" Link="Source\TaskEditCapabilityPolicy.cs" />
@@ -89,6 +93,9 @@
     <Compile Include="..\..\Services\StatusMessageFormatter.cs" Link="Source\StatusMessageFormatter.cs" />
     <Compile Include="..\..\Services\ProviderAuthCleanup.cs" Link="Source\ProviderAuthCleanup.cs" />
     <Compile Include="..\..\Services\ProviderAuthorizationLifecycle.cs" Link="Source\ProviderAuthorizationLifecycle.cs" />
+    <Compile Include="..\..\Services\AccountIdentityPolicy.cs" Link="Source\AccountIdentityPolicy.cs" />
+    <Compile Include="..\..\Services\GoogleAuthorizationNamespacePolicy.cs" Link="Source\GoogleAuthorizationNamespacePolicy.cs" />
+    <Compile Include="..\..\Services\MailProviderAccountLinkPolicy.cs" Link="Source\MailProviderAccountLinkPolicy.cs" />
     <Compile Include="..\..\Services\ProviderAuthorizationScopePolicy.cs" Link="Source\ProviderAuthorizationScopePolicy.cs" />
     <Compile Include="..\..\Services\AuthorizationInteractionRequiredException.cs" Link="Source\AuthorizationInteractionRequiredException.cs" />
     <Compile Include="..\..\Services\OnboardingPolicy.cs" Link="Source\OnboardingPolicy.cs" />
@@ -126,18 +133,22 @@
     <Compile Include="..\..\Services\MailPendingMutationPolicy.cs" Link="Source\MailPendingMutationPolicy.cs" />
     <Compile Include="..\..\Services\MailMutationCapabilityPolicy.cs" Link="Source\MailMutationCapabilityPolicy.cs" />
     <Compile Include="..\..\Services\MailMutationCachePolicy.cs" Link="Source\MailMutationCachePolicy.cs" />
+    <Compile Include="..\..\Services\MailUnreadSnapshotPolicy.cs" Link="Source\MailUnreadSnapshotPolicy.cs" />
     <Compile Include="..\..\Services\MailMoveCachePolicy.cs" Link="Source\MailMoveCachePolicy.cs" />
     <Compile Include="..\..\Services\GmailLabelMutationPolicy.cs" Link="Source\GmailLabelMutationPolicy.cs" />
+    <Compile Include="..\..\Services\GoogleItemContainerPolicy.cs" Link="Source\GoogleItemContainerPolicy.cs" />
     <Compile Include="..\..\Services\ImapMovePolicy.cs" Link="Source\ImapMovePolicy.cs" />
     <Compile Include="..\..\Services\MailBulkMutationPolicy.cs" Link="Source\MailBulkMutationPolicy.cs" />
     <Compile Include="..\..\Services\MailCacheRepository.cs" Link="Source\MailCacheRepository.cs" />
     <Compile Include="..\..\Services\MailCacheModels.cs" Link="Source\MailCacheModels.cs" />
     <Compile Include="..\..\Services\MailNotificationNavigationPolicy.cs" Link="Source\MailNotificationNavigationPolicy.cs" />
+    <Compile Include="..\..\Services\MailNotificationIdentityPolicy.cs" Link="Source\MailNotificationIdentityPolicy.cs" />
     <Compile Include="..\..\Services\MailPersistentCachePolicy.cs" Link="Source\MailPersistentCachePolicy.cs" />
     <Compile Include="..\..\Services\MailSendConfirmationPolicy.cs" Link="Source\MailSendConfirmationPolicy.cs" />
     <Compile Include="..\..\Services\MailBodyCachePolicy.cs" Link="Source\MailBodyCachePolicy.cs" />
     <Compile Include="..\..\Services\PerformanceDiagnosticsPolicy.cs" Link="Source\PerformanceDiagnosticsPolicy.cs" />
     <Compile Include="..\..\Services\CalendarDotRenderPolicy.cs" Link="Source\CalendarDotRenderPolicy.cs" />
+    <Compile Include="..\..\Services\CalendarEventTimePolicy.cs" Link="Source\CalendarEventTimePolicy.cs" />
     <Compile Include="..\..\Services\CalendarMonthRangePolicy.cs" Link="Source\CalendarMonthRangePolicy.cs" />
     <Compile Include="..\..\Services\CalendarWeekLayoutPolicy.cs" Link="Source\CalendarWeekLayoutPolicy.cs" />
     <Compile Include="..\..\Services\WeatherBarLayoutPolicy.cs" Link="Source\WeatherBarLayoutPolicy.cs" />
