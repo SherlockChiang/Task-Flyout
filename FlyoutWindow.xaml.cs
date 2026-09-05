@@ -116,6 +116,7 @@ namespace Task_Flyout
         private bool _showPending;
         private bool _openRequestIssued;
         private bool _desiredOpen;
+        private TaskCompletionSource? _mainWindowDismissal;
         private bool _focusNewItemOnOpen;
         private bool _isShuttingDown;
         private bool _suppressSelectedDateChanged;
@@ -993,6 +994,7 @@ namespace Task_Flyout
 
         public void ToggleFlyout()
         {
+            if (_mainWindowDismissal != null) return;
             if ((DateTime.Now - _lastHideTime).TotalMilliseconds < 250) return;
 
             if (IsOpen)
@@ -1021,9 +1023,31 @@ namespace Task_Flyout
             }
         }
 
+        public Task DismissForMainWindowAsync()
+        {
+            if (_isShuttingDown) return Task.FromCanceled(new CancellationToken(true));
+            _desiredOpen = false;
+            _focusNewItemOnOpen = false;
+            ResetOpeningActivationHandoff();
+            if (_mainWindowDismissal != null) return _mainWindowDismissal.Task;
+
+            if (!IsOpen && !_openRequestIssued)
+            {
+                _showPending = false;
+                return Task.CompletedTask;
+            }
+
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _mainWindowDismissal = completion;
+            // DesktopFlyouts ignores Hide during its opening animation. The
+            // IsOpen callback below will finish that pending dismissal instead.
+            if (IsOpen) HideFlyout(autoHide: false);
+            return completion.Task;
+        }
+
         private void ShowFlyout()
         {
-            if (_isShuttingDown || IsOpen) return;
+            if (_isShuttingDown || IsOpen || _mainWindowDismissal != null) return;
             // A tray click can leave Explorer (or the previously active app) in
             // the foreground until the DesktopFlyouts activation handoff finishes.
             PrepareOpeningActivationHandoff();
@@ -1140,6 +1164,15 @@ namespace Task_Flyout
         {
             if (IsOpen)
             {
+                _showPending = false;
+                _openRequestIssued = false;
+                if (!_desiredOpen)
+                {
+                    StopActivationHandoffMonitor();
+                    Hide();
+                    return;
+                }
+
                 bool focusStateKnown = FlyoutForegroundProbe.TryGetCurrentForegroundState(
                     _openingForegroundAnchor,
                     out bool isFlyoutForeground,
@@ -1156,14 +1189,6 @@ namespace Task_Flyout
                 {
                     StopActivationHandoffMonitor();
                     HideFlyout(autoHide: true);
-                    return;
-                }
-
-                _showPending = false;
-                _openRequestIssued = false;
-                if (!_desiredOpen)
-                {
-                    Hide();
                     return;
                 }
 
@@ -1219,6 +1244,9 @@ namespace Task_Flyout
             CancelWeatherRefresh();
             _lastHideTime = DateTime.Now;
             App.UpdateEfficiencyMode();
+            var dismissal = _mainWindowDismissal;
+            _mainWindowDismissal = null;
+            dismissal?.TrySetResult();
         }
 
         private void QueueBackgroundRefresh()
@@ -1449,6 +1477,7 @@ namespace Task_Flyout
 
         public void ShowNewItem()
         {
+            if (_isShuttingDown || _mainWindowDismissal != null) return;
             SetupFlyoutProviderComboBox();
             TimePickerStart.Time = new TimeSpan(DateTime.Now.Hour, (DateTime.Now.Minute / 5) * 5, 0);
             TimePickerEnd.Time = TimePickerStart.Time.Add(TimeSpan.FromHours(1));
@@ -1837,6 +1866,8 @@ namespace Task_Flyout
         {
             if (_isShuttingDown) return;
             _isShuttingDown = true;
+            _mainWindowDismissal?.TrySetCanceled();
+            _mainWindowDismissal = null;
             _syncTimer?.Stop();
             _clockTimer?.Stop();
             _dotRefreshTimer?.Stop();

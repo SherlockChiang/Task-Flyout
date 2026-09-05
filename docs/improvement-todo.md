@@ -113,7 +113,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M1-13 | DONE | Reliability/Mail | Open new-mail notification targets directly after background-only polling. | Polling keeps a bounded body-free unread metadata slice without presenting it as a complete folder window; activation resolves explicit Inbox aliases, falls back across folders only for Google/Outlook identities, and never treats IMAP UIDs as cross-folder identities. | `fix(mail): open notification targets reliably` |
 | M1-14 | DONE | Data integrity/Mail | Keep unread state coherent across provider, folder views, cache, notifications, and background polling. | Read/unread mutations update every cached identity for the account, reconcile authoritative provider state after refresh, and cannot resurrect stale unread badges or notifications. | `fix(mail): converge mutable state by provider identity`, `fix(mail): reconcile authoritative unread snapshots`, `fix(mail): synchronize unread UI and notifications` |
 | M1-15 | DONE | Reliability/Calendar | Correct event editor times, timeline duration, date-strip overflow, and automatic refresh. | Existing events hydrate both start and end controls; the day timeline renders the complete interval; the date header has no unintended horizontal scrollbar; foreground and hidden refresh paths reliably publish fresh data without overlap or stale replacement. | `fix(calendar): align event times and timeline`, `fix(calendar): publish background refreshes to open views`, `fix(google): route mutations to source calendar` |
-| M1-16 | DONE | Reliability/Flyout | Reliably dismiss an unpinned Flyout when focus moves elsewhere. | A focus loss during either the opening transition or the fully open state closes the Flyout exactly once; the normal tray activation handoff remains open; pinned behavior is preserved; rapid tray gestures toggle only the Flyout and cannot strand it or open the main Calendar window. | `fix(flyout): close reliably on focus loss`, `fix(flyout): preserve tray activation handoff`, `fix(flyout): complete tray activation handoff` |
+| M1-16 | IN PROGRESS | Reliability/Flyout | Reliably dismiss an unpinned Flyout and preserve distinct tray gestures. | Focus loss during opening or fully open closes an unpinned Flyout once; normal tray activation stays open; single-click toggles Flyout; double-click dismisses even a pinned/opening Flyout and opens the main window; late single-click continuations cannot reopen it. Packaged revalidation is required. | `fix(flyout): close reliably on focus loss`, `fix(flyout): preserve tray activation handoff`, `fix(flyout): complete tray activation handoff`, `fix(tray): restore main-window double click` |
 
 ### P2 - Long-Running Efficiency, Architecture, And UI Quality
 
@@ -1728,4 +1728,24 @@ They are historical records; active work remains in the backlog tables above.
   main Calendar surface. The installed package reports healthy and the final
   MSIX SHA-256 is
   `8306D427FEDD4B93A76C4E937DBB652A0FAA78B486630EEFFBE175C433B37469`.
-  M1-16 is archived as complete.
+  M1-16 was archived as complete at that checkpoint; the corrected gesture
+  requirement below reopens its packaged acceptance gate.
+
+### 2026-09-05 Tray Double-Click Regression Correction
+
+- The user confirmed the intended contract: single-click toggles Flyout;
+  double-click opens the main application. The shared toggle binding added in
+  `1f19378` changed that contract and was a regression, not a desired behavior.
+- Separate commands now use a UI-dispatcher interaction coordinator. A main-window
+  request invalidates single clicks still waiting for account hydration and
+  suppresses toggles during the Flyout-to-main-window handoff.
+- Explicit dismissal cancels a prepared-but-not-shown Flyout, stops activation
+  retries, and waits for an in-progress open/close animation to close before
+  opening the main window. Pinning does not block this explicit command;
+  shutdown cancels the handoff. Existing external-click dismissal remains intact.
+- Focused coordinator tests pass 9/9; the complete managed suite passes
+  1264/1264; Debug x64 builds with zero warnings and zero errors.
+- Runtime acceptance is still pending, not inferred from those tests: cold/warm
+  single-click, double-click while hidden/open/opening/closing/pinned, double-click
+  while hydration is delayed, outside click without first clicking inside Flyout,
+  and a subsequent single-click after returning from the main window.

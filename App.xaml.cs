@@ -269,7 +269,12 @@ namespace Task_Flyout
             _ = SyncManager.WarmCacheAsync();
             QueueBackgroundRefreshStart();
 
-            var toggleFlyoutCommand = new RelayCommand(async () =>
+            var trayInteraction = new TrayInteractionCoordinator(
+                EnsureAccountsHydratedAsync,
+                () => EnsureFlyoutWindow().ToggleFlyout(),
+                () => MyFlyoutWindow?.DismissForMainWindowAsync() ?? Task.CompletedTask,
+                () => OpenMainWindowInternal());
+            _trayIcon.LeftClickCommand = new RelayCommand(async () =>
             {
                 var openRequest = PerformanceDiagnostics.StartSpan("flyout", "tray_click_to_open_request", "tray");
                 try
@@ -278,19 +283,17 @@ namespace Task_Flyout
                     // AccountManager.Load populates an ObservableCollection. Complete
                     // hydration before Flyout construction so its initial filter pass
                     // observes a stable account snapshot.
-                    await EnsureAccountsHydratedAsync();
-                    var flyout = EnsureFlyoutWindow();
-                    flyout.ToggleFlyout();
-                    openRequest.Complete();
+                    bool applied = await trayInteraction.ToggleFlyoutAsync();
+                    openRequest.Complete(applied ? "success" : "superseded");
+                    if (!applied) UpdateEfficiencyMode();
                 }
                 catch (Exception ex)
                 {
-                    openRequest.Complete("failed");
+                    openRequest.Complete("failure");
                     System.Diagnostics.Debug.WriteLine($"Opening tray flyout failed: {ex.Message}");
                     UpdateEfficiencyMode();
                 }
             });
-            _trayIcon.LeftClickCommand = toggleFlyoutCommand;
 
             // Initialize weather bar if enabled
             InitWeatherBar();
@@ -299,10 +302,21 @@ namespace Task_Flyout
             WeatherService.LocationUpdated += OnWeatherLocationUpdated;
             QueueLocationTrackingResume();
 
-            // H.NotifyIcon suppresses its delayed single-click command when it
-            // recognizes a double-click. Use the same action for both gestures
-            // so rapid tray clicks never route into the main Calendar window.
-            _trayIcon.DoubleClickCommand = toggleFlyoutCommand;
+            // H.NotifyIcon suppresses a pending single click on double click.
+            // Also invalidate any single click already awaiting account hydration.
+            _trayIcon.DoubleClickCommand = new RelayCommand(async () =>
+            {
+                try
+                {
+                    EfficiencyModeService.SetEfficiencyMode(false);
+                    await trayInteraction.OpenMainWindowAsync();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Opening main window from tray failed: {ex.Message}");
+                    UpdateEfficiencyMode();
+                }
+            });
 
             if (_trayIcon.ContextFlyout is MenuFlyout menu)
             {
