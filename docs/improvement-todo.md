@@ -19,7 +19,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 
 | Order | ID | Status | Next bounded outcome | Verification / dependency |
 | --- | --- | --- | --- | --- |
-| 1 | M1-16 | IN PROGRESS | Validate restored single-click Flyout / double-click main-window contract. | Implementation `433c171`; 9 focused and 1264 total tests pass, Debug x64 clean. Signed-package tray matrix still pending. |
+| 1 | M1-16 | IN PROGRESS | Validate restored single-click Flyout / double-click main-window contract. | Implementation `433c171`; 9 focused and 1264 total tests pass, Debug x64 clean. Signed Debug x64 candidate `1.4.4.4` is ready but not installed; tray matrix still pending. |
 | 2 | R1-01 | TODO | Include account identity in global-search agenda deduplication and result keys. | Two accounts with equal remote IDs must both appear and navigate to their own items; single-account behavior unchanged. See `MainWindow.BuildGlobalSearchSnapshot`. |
 | 3 | M3-09 | IN PROGRESS | Complete packaged multi-Google acceptance without changing account architecture. | R1-01 first; add two synthetic accounts, restart, reconnect one, cancel/mismatch reconnect, remove one, verify sibling tokens/cache/tasks/mail/notifications remain correct. |
 | 4 | R1-02 | TODO | Add an application build to PR quality checks and identify the exact tested package revision. | No signing/OAuth secrets in PR jobs; build actual WinUI sources; PR checks must not imply latest-beta smoke covered the PR. |
@@ -30,7 +30,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | 9 | M1-02 / M2-05 / M2-06 | TODO | Stabilize existing controls, accessibility and regional layouts. | Startup failures restore actual state; 100/150/200% DPI, narrow layout, keyboard and time-range checks; no broad redesign. |
 | 10 | M2-04 / M2-07 | TODO | Incrementally share tested Core code and add targeted quality tooling. | Stabilize behavior first; do not move all services/pages in one refactor or apply whole-repo formatting churn. |
 | External | M0-06 | BLOCKED | Resume OAuth submission after core workflows pass packaged validation. | Retain existing Gmail scope/function decisions; latest recorded console audit is 2026-09-02, not a current live claim. Recheck Branding, prepare demo, obtain approval for external submission. |
-| Paused | M3-03 through M3-08 | PAUSED | Preserve experimental taskbar-weather work as an archive. | No Windhawk installation, new Explorer injection, native-host re-signing or runtime experiments in this iteration. |
+| Paused | M3-03 through M3-08 | PAUSED | Preserve experimental taskbar-weather work as an archive. | No Windhawk installation, new Explorer injection or diagnostic rebuild/signing/runtime experiments. Normal candidate packaging may sign the bundled components without running them. |
 
 Candidate acceptance must also cover external read/unread changes with Mail open,
 new-mail notification navigation to the correct account/message, automatic agenda
@@ -1782,3 +1782,28 @@ They are historical records; active work remains in the backlog tables above.
   single-click, double-click while hidden/open/opening/closing/pinned, double-click
   while hydration is delayed, outside click without first clicking inside Flyout,
   and a subsequent single-click after returning from the main window.
+
+### 2026-09-05 Signed Tray Regression Candidate
+
+- Generated Debug x64 candidate `1.4.4.4` from `b1fa8e6`, including the tray
+  interaction fix `433c171`. The MSIX build passed with zero warnings/errors.
+  This is a local test build, not a published release or a Release performance
+  baseline.
+- Artifact:
+  `AppPackages/LocalLatest_1.4.4.4_20260905/Task_Flyout_1.4.4.4_x64_Debug_Test/Task_Flyout_1.4.4.4_x64_Debug.msix`.
+  SHA-256:
+  `3795F298CCCB5844692DC5D9C20BF37C207F3FE015D87DB679F4974D8B33452F`.
+- Reused certificate `15303040F7CEECFDE9C023F15481D15C39CCDB46`. The normal
+  sideload-build hook signed the bundled broker/host, and the MSIX was then
+  signed with the same key. No certificate was created or exported and no
+  trust-store changes were made. SignTool and Authenticode validation passed;
+  this local signature has no timestamp.
+- Read the packaged manifest as XML and verified version `1.4.4.4`, x64 and the
+  expected publisher. The packaged application DLL and both native components
+  are byte-identical to the verified build outputs.
+- No installation, application restart, compatibility probe or Explorer
+  injection was performed. M1-16 remains in progress for the runtime matrix;
+  native taskbar experiments remain paused.
+- Restored the user's manifest to `1.4.4.0`; its SHA-256 and the pre-existing
+  Windhawk source SHA-256 exactly match the pre-build values. Neither file is
+  staged or included in this checkpoint commit.
