@@ -28,6 +28,10 @@ namespace Task_Flyout
         private IReadOnlyList<GlobalSearchCandidate> _globalSearchSnapshot = Array.Empty<GlobalSearchCandidate>();
         private readonly Dictionary<string, object> _globalSearchPayloads = new(StringComparer.Ordinal);
         private DependencyObject? _globalSearchPreviousFocus;
+        private PerformanceOperation? _searchOpenMeasurement;
+        private PerformanceOperation? _searchQueryMeasurement;
+        private IDisposable? _searchOpenRendering;
+        private IDisposable? _searchQueryRendering;
 
         public MainWindow()
         {
@@ -48,6 +52,7 @@ namespace Task_Flyout
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(null);
             this.AppWindow.Closing += AppWindow_Closing;
+            this.Closed += (_, _) => CancelSearchMeasurements();
             SizeToCurrentWorkArea();
 
             ContentFrame.Navigated += ContentFrame_Navigated;
@@ -277,6 +282,7 @@ namespace Task_Flyout
 
         private void ReleaseContentForBackground()
         {
+            CancelSearchMeasurements();
             if (ContentFrame.Content == null) return;
 
             if (ContentFrame.SourcePageType != null)
@@ -524,19 +530,41 @@ namespace Task_Flyout
 
         private void OpenGlobalSearch()
         {
-            EnsureContentLoaded();
-            _globalSearchPreviousFocus = FocusManager.GetFocusedElement(RootGrid.XamlRoot) as DependencyObject;
-            BuildGlobalSearchSnapshot();
-            GlobalSearchBox.Text = "";
-            ApplyGlobalSearch("");
-            MainNav.IsEnabled = false;
-            GlobalSearchOverlay.Visibility = Visibility.Visible;
-            UpdateGlobalSearchSize(RootGrid.ActualWidth, RootGrid.ActualHeight);
-            DispatcherQueue.TryEnqueue(() => GlobalSearchBox.Focus(FocusState.Programmatic));
+            CancelSearchMeasurements("superseded");
+            var measurement = PerformanceDiagnostics.StartInteraction("search_open", "command_to_rendering", "ui");
+            _searchOpenMeasurement = measurement;
+            try
+            {
+                EnsureContentLoaded();
+                _globalSearchPreviousFocus = FocusManager.GetFocusedElement(RootGrid.XamlRoot) as DependencyObject;
+                BuildGlobalSearchSnapshot();
+                measurement?.Checkpoint("command_to_snapshot_ready");
+                GlobalSearchBox.Text = "";
+                ApplyGlobalSearch("");
+                measurement?.Checkpoint("command_to_results_applied");
+                MainNav.IsEnabled = false;
+                GlobalSearchOverlay.Visibility = Visibility.Visible;
+                UpdateGlobalSearchSize(RootGrid.ActualWidth, RootGrid.ActualHeight);
+                DispatcherQueue.TryEnqueue(() => GlobalSearchBox.Focus(FocusState.Programmatic));
+                if (measurement != null)
+                    _searchOpenRendering = NextRenderHelper.RunOnce(() =>
+                    {
+                        if (!ReferenceEquals(_searchOpenMeasurement, measurement)) return;
+                        measurement.Complete(AppWindow.IsVisible && GlobalSearchOverlay.Visibility == Visibility.Visible ? "success" : "cancelled");
+                        _searchOpenMeasurement = null;
+                        _searchOpenRendering = null;
+                    });
+            }
+            catch
+            {
+                CancelSearchMeasurements("failure");
+                throw;
+            }
         }
 
         private void CloseGlobalSearch()
         {
+            CancelSearchMeasurements();
             if (GlobalSearchOverlay.Visibility != Visibility.Visible) return;
             GlobalSearchOverlay.Visibility = Visibility.Collapsed;
             MainNav.IsEnabled = true;
@@ -546,6 +574,16 @@ namespace Task_Flyout
             else
                 MainNav.Focus(FocusState.Programmatic);
             _globalSearchPreviousFocus = null;
+        }
+
+        internal void CancelSearchMeasurements(string outcome = "cancelled")
+        {
+            _searchOpenRendering?.Dispose();
+            _searchQueryRendering?.Dispose();
+            _searchOpenRendering = _searchQueryRendering = null;
+            _searchOpenMeasurement?.Complete(outcome);
+            _searchQueryMeasurement?.Complete(outcome);
+            _searchOpenMeasurement = _searchQueryMeasurement = null;
         }
 
         private void BuildGlobalSearchSnapshot()
@@ -644,8 +682,31 @@ namespace Task_Flyout
 
         private void GlobalSearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
         {
-            if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
+            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
+            _searchQueryRendering?.Dispose();
+            _searchQueryRendering = null;
+            _searchQueryMeasurement?.Complete("superseded");
+            var measurement = PerformanceDiagnostics.StartInteraction("search_query", "input_to_rendering", "ui");
+            _searchQueryMeasurement = measurement;
+            try
+            {
                 ApplyGlobalSearch(sender.Text);
+                measurement?.Checkpoint("input_to_results_applied");
+                if (measurement != null)
+                    _searchQueryRendering = NextRenderHelper.RunOnce(() =>
+                    {
+                        if (!ReferenceEquals(_searchQueryMeasurement, measurement)) return;
+                        measurement.Complete(AppWindow.IsVisible && GlobalSearchOverlay.Visibility == Visibility.Visible ? "success" : "cancelled");
+                        _searchQueryMeasurement = null;
+                        _searchQueryRendering = null;
+                    });
+            }
+            catch
+            {
+                measurement?.Complete("failure");
+                _searchQueryMeasurement = null;
+                throw;
+            }
         }
 
         private void ApplyGlobalSearch(string query)

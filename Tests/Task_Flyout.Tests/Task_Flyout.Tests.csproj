@@ -147,6 +147,9 @@
     <Compile Include="..\..\Services\MailSendConfirmationPolicy.cs" Link="Source\MailSendConfirmationPolicy.cs" />
     <Compile Include="..\..\Services\MailBodyCachePolicy.cs" Link="Source\MailBodyCachePolicy.cs" />
     <Compile Include="..\..\Services\PerformanceDiagnosticsPolicy.cs" Link="Source\PerformanceDiagnosticsPolicy.cs" />
+    <Compile Include="..\..\Services\PerformanceDiagnostics.cs" Link="Source\PerformanceDiagnostics.cs" />
+    <Compile Include="..\..\Services\PerformanceOperation.cs" Link="Source\PerformanceOperation.cs" />
+    <Compile Include="..\..\Services\BoundedDiagnosticWriter.cs" Link="Source\BoundedDiagnosticWriter.cs" />
     <Compile Include="..\..\Services\CalendarDotRenderPolicy.cs" Link="Source\CalendarDotRenderPolicy.cs" />
     <Compile Include="..\..\Services\CalendarEventTimePolicy.cs" Link="Source\CalendarEventTimePolicy.cs" />
     <Compile Include="..\..\Services\CalendarMonthRangePolicy.cs" Link="Source\CalendarMonthRangePolicy.cs" />

@@ -20,7 +20,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | Order | ID | Status | Next bounded outcome | Verification / dependency |
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
-| 1 | F0-01 | TODO | Establish repeatable interaction measurements on a signed Release baseline. | Follow `performance-baseline.md`; correlate each command with first feedback and content-ready, separate cold/warm and network time, sample dispatcher stalls and allocations without treating timers as FPS. Debug `1.4.4.4` is a functional baseline only. |
+| 1 | F0-01 | IN PROGRESS | Establish repeatable interaction measurements on a signed Release baseline. | First slice: bounded v2 logging and correlated Flyout/search command-to-rendering observations implemented; see 2026-09-06 entry. Signed Release control, runtime samples, presentation traces and measurement-overhead checks remain pending. Debug `1.4.4.4` is a functional baseline only. |
 | 2 | R1-01 | TODO | Include account identity in global-search agenda deduplication and result keys. | A separate correctness commit before search optimization; equal remote IDs from two accounts remain distinct and navigate correctly. |
 | 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
 | 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
@@ -44,7 +44,8 @@ release gates, not invented claims that they have already passed.
 Only one implementation outcome is active at a time. Each gets its own commit,
 tests/build and pending-or-passed runtime record. Keep PR #3 a draft until the
 candidate acceptance and account-routing gaps are resolved; do not auto-merge.
-The responsiveness items above are planned, not implemented or measured. Retain
+Except for the explicitly recorded F0-01 instrumentation slice, the responsiveness
+items above remain planned and unmeasured. Retain
 one accepted candidate for comparison and use a focused follow-up performance
 branch/PR for substantive changes instead of indefinitely expanding PR #3.
 
@@ -1835,3 +1836,42 @@ They are historical records; active work remains in the backlog tables above.
   startup/prewarm behavior, application code, package installation or diagnostics
   collection were changed. Existing automated results remain 1264/1264 and a
   clean Debug x64 build; they are historical, not rerun for this documentation.
+
+### 2026-09-06 F0-01 Interaction Diagnostics, First Slice
+
+- Implementation on `codex/interaction-performance`, based on the accepted
+  behavior and planning checkpoint `fb3f464`. This is instrumentation only;
+  no efficiency/trim, prewarm, synchronous-search or animation policy changes.
+- New `performance-diagnostics-v2.csv` records monotonic elapsed durations,
+  random operation IDs, first/subsequent command attempts, assembly MVID/version,
+  configuration and architecture. Legacy logs are not rewritten. Process-start
+  timing remains explicitly labeled `process_wall_estimate`.
+- Flyout spans begin at single-click command dispatch, before efficiency restore,
+  hydration and construction. Checkpoints mark cached-content application and
+  open-state handling, followed by a guarded one-shot Rendering observation.
+  Physical-input/gesture-recognition delay and actual frame presentation are
+  not measured by this callback. Search open and user-input handling use the
+  same approach without recording the query or indexed content.
+- Closing, superseding or handing off to the main window cancels observations;
+  disposed/finished operations cannot later report success. Started records
+  expose operations without a terminal record. This does not prove packaged
+  lifecycle wiring under every timing or DPI condition.
+- Background writes have a 256-entry pending cap with cumulative loss/failure
+  counters and best-effort flush status. Summaries isolate builds/configurations,
+  cold/warm attempts and timing bases, default to separate runs, retain
+  non-success outcomes, deduplicate log inputs, and suppress percentiles for
+  incomplete groups. Cross-run combination requires explicit `-CombineRuns`.
+- Verification: 1283/1283 unit tests passed; Debug x64 build passed with zero
+  warnings/errors. The 19 added tests include monotonic-clock jumps, terminal
+  outcome races, bounded writer backpressure/recovery, real CSV opt-in output,
+  and the tray coordinator's per-command callback/hydration handoff.
+  All 20 synthetic summary checks passed under both PowerShell 7 and Windows
+  PowerShell. These fixtures are not application performance measurements.
+- Remaining F0-01 work:
+  signed Release control and reproducible runtime sampling, diagnostic overhead,
+  short/long hidden intervals, power/prewarm context, dispatcher/allocation/GC
+  observations and presentation traces. No performance gain is claimed.
+- Commit: `diagnostics: measure correlated Flyout and search interactions`.
+  The user's manifest and Windhawk edits remain outside this change. No package
+  installation, trust-store mutation, OAuth action, Explorer injection, remote
+  push or public release is part of this checkpoint.

@@ -117,6 +117,8 @@ namespace Task_Flyout
         private bool _openRequestIssued;
         private bool _desiredOpen;
         private TaskCompletionSource? _mainWindowDismissal;
+        private PerformanceOperation? _openMeasurement;
+        private IDisposable? _openRenderObservation;
         private bool _focusNewItemOnOpen;
         private bool _isShuttingDown;
         private bool _suppressSelectedDateChanged;
@@ -992,20 +994,33 @@ namespace Task_Flyout
             SyncProgress.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        public void ToggleFlyout()
+        public void ToggleFlyout() => ToggleFlyout(null);
+
+        internal void ToggleFlyout(PerformanceOperation? measurement)
         {
-            if (_mainWindowDismissal != null) return;
-            if ((DateTime.Now - _lastHideTime).TotalMilliseconds < 250) return;
+            if (_mainWindowDismissal != null || (DateTime.Now - _lastHideTime).TotalMilliseconds < 250)
+            {
+                measurement?.Complete("ignored");
+                return;
+            }
 
             if (IsOpen)
             {
+                measurement?.Complete("not_opening");
                 _desiredOpen = false;
                 HideFlyout(autoHide: false);
             }
             else if (_showPending)
             {
-                if (_openRequestIssued) return;
+                if (_openRequestIssued)
+                {
+                    measurement?.Complete("ignored");
+                    return;
+                }
                 _desiredOpen = !_desiredOpen;
+                FinishOpenMeasurement("superseded");
+                if (_desiredOpen) _openMeasurement = measurement;
+                else measurement?.Complete("not_opening");
                 if (_desiredOpen && _flyoutContentLoaded && !_openRequestIssued)
                 {
                     PrepareOpeningActivationHandoff();
@@ -1019,12 +1034,23 @@ namespace Task_Flyout
             }
             else
             {
+                FinishOpenMeasurement("superseded");
+                _openMeasurement = measurement;
                 ShowFlyout();
             }
         }
 
+        internal void FinishOpenMeasurement(string outcome = "cancelled")
+        {
+            _openRenderObservation?.Dispose();
+            _openRenderObservation = null;
+            _openMeasurement?.Complete(outcome);
+            _openMeasurement = null;
+        }
+
         public Task DismissForMainWindowAsync()
         {
+            FinishOpenMeasurement("superseded");
             if (_isShuttingDown) return Task.FromCanceled(new CancellationToken(true));
             _desiredOpen = false;
             _focusNewItemOnOpen = false;
@@ -1047,7 +1073,11 @@ namespace Task_Flyout
 
         private void ShowFlyout()
         {
-            if (_isShuttingDown || IsOpen || _mainWindowDismissal != null) return;
+            if (_isShuttingDown || IsOpen || _mainWindowDismissal != null)
+            {
+                FinishOpenMeasurement();
+                return;
+            }
             // A tray click can leave Explorer (or the previously active app) in
             // the foreground until the DesktopFlyouts activation handoff finishes.
             PrepareOpeningActivationHandoff();
@@ -1073,6 +1103,7 @@ namespace Task_Flyout
             UpdateSelectedDateHeader();
             ApplyConfiguredTheme(App.GetConfiguredTheme());
             _openRequestIssued = true;
+            _openMeasurement?.Checkpoint("command_to_cached_content_applied");
             Show();
             StartActivationHandoffMonitor();
         }
@@ -1208,8 +1239,20 @@ namespace Task_Flyout
                 _clockTimer?.Start();
                 _syncTimer?.Start();
                 App.UpdateEfficiencyMode();
-                NextRenderHelper.RunOnce(() =>
-                    PerformanceDiagnostics.MarkOnce("flyout.visible", "flyout", "first_visible", source: "ui"));
+                _openMeasurement?.Checkpoint("command_to_open_state");
+                if (PerformanceDiagnostics.IsEnabled)
+                {
+                    _openRenderObservation?.Dispose();
+                    var measurement = _openMeasurement;
+                    _openRenderObservation = NextRenderHelper.RunOnce(() =>
+                    {
+                        if (!ReferenceEquals(_openMeasurement, measurement)) return;
+                        bool stillOpen = IsOpen && _desiredOpen && !_isShuttingDown;
+                        if (stillOpen)
+                            PerformanceDiagnostics.MarkOnce("flyout.visible", "flyout", "first_visible", source: "ui");
+                        FinishOpenMeasurement(stillOpen ? "success" : "cancelled");
+                    });
+                }
                 DispatcherQueue.TryEnqueue(() =>
                 {
                     if (!IsOpen) return;
@@ -1234,6 +1277,7 @@ namespace Task_Flyout
                 return;
             }
 
+            FinishOpenMeasurement();
             _showPending = false;
             _openRequestIssued = false;
             _desiredOpen = false;
@@ -1416,6 +1460,7 @@ namespace Task_Flyout
         private void HideFlyout(bool autoHide)
         {
             if (autoHide && _isPinned) return;
+            FinishOpenMeasurement();
             _desiredOpen = false;
             Hide();
         }
@@ -1864,6 +1909,7 @@ namespace Task_Flyout
 
         public void Shutdown()
         {
+            FinishOpenMeasurement();
             if (_isShuttingDown) return;
             _isShuttingDown = true;
             _mainWindowDismissal?.TrySetCanceled();

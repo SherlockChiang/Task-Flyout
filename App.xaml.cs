@@ -277,19 +277,27 @@ namespace Task_Flyout
             _trayIcon.LeftClickCommand = new RelayCommand(async () =>
             {
                 var openRequest = PerformanceDiagnostics.StartSpan("flyout", "tray_click_to_open_request", "tray");
+                var interaction = PerformanceDiagnostics.StartInteraction("flyout_open", "command_to_rendering", "tray");
                 try
                 {
                     EfficiencyModeService.SetEfficiencyMode(false);
+                    interaction?.Checkpoint("command_to_efficiency_restored");
                     // AccountManager.Load populates an ObservableCollection. Complete
                     // hydration before Flyout construction so its initial filter pass
                     // observes a stable account snapshot.
-                    bool applied = await trayInteraction.ToggleFlyoutAsync();
+                    bool applied = await trayInteraction.ToggleFlyoutAsync(() =>
+                    {
+                        interaction?.Checkpoint("command_to_accounts_ready");
+                        EnsureFlyoutWindow().ToggleFlyout(interaction);
+                    });
                     openRequest.Complete(applied ? "success" : "superseded");
+                    if (!applied) interaction?.Complete("superseded");
                     if (!applied) UpdateEfficiencyMode();
                 }
                 catch (Exception ex)
                 {
                     openRequest.Complete("failure");
+                    interaction?.Complete("failure");
                     System.Diagnostics.Debug.WriteLine($"Opening tray flyout failed: {ex.Message}");
                     UpdateEfficiencyMode();
                 }
@@ -2208,6 +2216,8 @@ namespace Task_Flyout
             MailService.StopPendingMutationRetryScheduler();
             MemoryDiagnostics.Stop();
             Windows.System.MemoryManager.AppMemoryUsageIncreased -= MemoryManager_AppMemoryUsageIncreased;
+            MyFlyoutWindow?.FinishOpenMeasurement();
+            MyMainWindow?.CancelSearchMeasurements();
             await PerformanceDiagnostics.FlushAsync();
             MailService.NewMailArrived -= MailService_NewMailArrived;
             await FlushPendingSavesBeforeExitAsync();

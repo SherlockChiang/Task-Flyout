@@ -16,19 +16,45 @@ Performance diagnostics are off by default. Enable them with the local setting `
 
 Flyout preloading is off by default and can be enabled under **Settings > System & General**. The preload runs after startup only when the app is below the memory-usage ceiling and has sufficient headroom; memory pressure skips it.
 
-Each process gets a random `run_id`. Records are appended in the background to `%LOCALAPPDATA%\TaskFlyout\Logs\performance-diagnostics.csv` (or the corresponding packaged local app-data location). The log rotates to one `.1` backup at 2 MB. Exit performs a best-effort two-second flush.
+Each process gets a random `run_id`. New records are appended in the background to `%LOCALAPPDATA%\TaskFlyout\Logs\performance-diagnostics-v2.csv` (or the corresponding packaged local app-data location). The log rotates to one `.1` backup at 2 MB. Pending writes, including the active write, are capped at 256; overflow drops new records without waiting for disk. Exit performs a best-effort two-second flush with a final writer-health record. Abrupt exit or unavailable storage can still lose the tail.
 
-The long-form CSV schema is `run_id,sequence,timestamp,scenario,metric,start,end,duration,outcome,source`. These fields contain fixed diagnostic identifiers and timings only. Do not add account names, message/feed/calendar content, URLs, locations, identifiers, or arbitrary content fields.
+The v2 CSV retains `run_id,sequence,timestamp,scenario,metric,start,end,duration,outcome,source` and adds `schema_version,build_id,build_version,configuration,architecture,operation_id,sample_kind,timing_basis,dropped_before,write_failures_before`. `build_id` is the application assembly MVID, not just the source SHA, so locally changed binaries are not assumed identical. Archive the source SHA and signed-package hash separately. Operation IDs are random diagnostic correlations, never provider/user IDs. Do not add account names, message/feed/calendar content, query text, URLs, locations, tokens, or arbitrary content fields.
 
 Captured milestones include process start to interactive tray, first flyout display, Calendar cached display and actual remote completion, Mail folders and successful HTML render, RSS successful article display, process-wide WebView2 initialization, and Weather Bar attachment/display. Calendar cache short-circuits are intentionally excluded from the remote-sync metric.
 
-Collect at least 20 independent runs, then summarize one or more current/rotated files:
+The summarizer reads both original ten-column logs and v2 logs; old files are not rewritten. By default runs stay separate. After confirming identical fixture, display, power, prewarm and diagnostic settings, use `-CombineRuns` to combine matching v2 build/configuration/architecture/scenario/source/sample-kind/timing-basis groups. Legacy records always stay per-run because their build identity is unknown. For initial P95 screening, collect at least 20 successful samples per comparable group (independent process runs for first attempts):
 
 ```powershell
-.\scripts\summarize-performance.ps1 "$env:LOCALAPPDATA\TaskFlyout\Logs\performance-diagnostics.csv"
+.\scripts\summarize-performance.ps1 "$env:LOCALAPPDATA\TaskFlyout\Logs\performance-diagnostics-v2.csv"
+# Only for verified comparable runs; include the .1 file when needed:
+.\scripts\summarize-performance.ps1 -Path "$env:LOCALAPPDATA\TaskFlyout\Logs\performance-diagnostics-v2.csv" -CombineRuns -AsObject
 ```
 
-The summarizer uses nearest-rank percentiles. It always reports P50, reports P95 only with at least 20 successful samples, and includes success, failure, and per-run missing counts where the log permits them.
+The summarizer uses nearest-rank percentiles; P95 requires at least 20 successful samples. Started/cancelled/superseded/ignored/failed operations do not enter successful-duration percentiles. Unfinished operations, sequence gaps or reported writer losses suppress percentiles for affected groups. It does not infer that every process must perform every action. It rejects invalid durations/conflicting duplicate rows, deduplicates repeated input files, and does not assign duration percentiles to v2 milestones/status records. The `-AsObject` output retains all grouping fields and outcome counts. Run `scripts/test-performance-summary.ps1` for synthetic regression checks, not runtime performance results.
+
+### Implemented Interaction Slice (2026-09-06)
+
+| Scenario | Cumulative observations from command/input-handler entry | Terminal observation |
+| --- | --- | --- |
+| `flyout_open` | `command_to_efficiency_restored`, `command_to_accounts_ready`, `command_to_cached_content_applied`, `command_to_open_state` | `command_to_rendering` |
+| `search_open` | `command_to_snapshot_ready`, `command_to_results_applied` | `command_to_rendering` |
+| `search_query` | `input_to_results_applied` | `input_to_rendering` |
+
+Checkpoints share an operation ID and monotonic start; they are cumulative,
+not individual phase durations. Each operation records `started`, then at most
+one terminal outcome. First attempts per scenario/process are `cold_attempt`,
+subsequent attempts `warm_attempt`, even if the first was cancelled. These labels
+do not assert a cold disk cache or successful prewarm. Hidden interval and power
+conditions must still be recorded separately in the measurement protocol.
+
+`Rendering` callbacks are pre-presentation observations, not evidence that a
+particular frame reached the screen. Visibility/lifecycle guards reject closed
+or superseded observations; closing releases the event subscription. The Flyout
+command begins before efficiency restore, account hydration and construction,
+but after the tray library's gesture-recognition wait. Search input starts at
+the user TextChanged handler, not the physical keystroke. Actual input-to-photon
+latency, independent shell feedback, cached visual presentation, remote sync,
+UI stalls, allocations/GC and frame pacing still need the remaining F0-01 work.
 
 ## Metrics
 
@@ -36,15 +62,15 @@ The summarizer uses nearest-rank percentiles. It always reports P50, reports P95
 
 The user accepted the functional tray behavior in Debug package `1.4.4.4`.
 Keep that artifact as a regression reference, not a Release performance result.
-F0-01 is planned: no timings or frame-pacing measurements have been collected for
-this pass, and the metrics below are requirements, not currently implemented
-diagnostic fields.
+F0-01 is in progress: the first instrumentation slice above exists, but no runtime
+timings or frame-pacing measurements have been collected for this pass. The
+metrics below remain requirements beyond the explicitly implemented fields.
 
 Existing instrumentation needs care: `MarkOnce` records a zero-duration milestone
 once per process; `tray_click_to_open_request` ends after requesting a toggle.
-Neither measures repeat-open input-to-visible latency. The current summarizer
-groups only by scenario/metric/source, so do not feed it mixed build versions,
-configurations, cold/warm runs or power settings and call that a comparable P95.
+Neither measures repeat-open input-to-visible latency. The v2 observations add
+command correlation and separate build/sample groups, but still cannot be
+treated as actual frame presentation or pooled across differing power/fixtures.
 
 | Scenario | Separate observations | Required regression check |
 | --- | --- | --- |

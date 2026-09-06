@@ -13,7 +13,9 @@ namespace Task_Flyout.Services
         private long _mainWindowGeneration;
         private bool _openingMainWindow;
 
-        public async Task<bool> ToggleFlyoutAsync()
+        public Task<bool> ToggleFlyoutAsync() => ToggleFlyoutAsync(toggleFlyout);
+
+        public async Task<bool> ToggleFlyoutAsync(Action applyToggle)
         {
             if (_openingMainWindow) return false;
             long generation = _mainWindowGeneration;
@@ -21,7 +23,7 @@ namespace Task_Flyout.Services
             if (generation != _mainWindowGeneration || _openingMainWindow)
                 return false;
 
-            toggleFlyout();
+            applyToggle();
             return true;
         }
 

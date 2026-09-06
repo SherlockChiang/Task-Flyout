@@ -5,15 +5,32 @@ namespace Task_Flyout.Services
 {
     internal static class NextRenderHelper
     {
-        public static void RunOnce(Action action)
+        // Subscribe and dispose on the UI thread. Rendering is not a presentation fence.
+        public static IDisposable RunOnce(Action action) => new RenderSubscription(action);
+
+        private sealed class RenderSubscription : IDisposable
         {
-            EventHandler<object>? handler = null;
-            handler = (_, _) =>
+            private Action? _action;
+
+            public RenderSubscription(Action action)
             {
-                CompositionTarget.Rendering -= handler;
-                action();
-            };
-            CompositionTarget.Rendering += handler;
+                _action = action;
+                CompositionTarget.Rendering += OnRendering;
+            }
+
+            private void OnRendering(object? sender, object args)
+            {
+                var action = _action;
+                Dispose();
+                action?.Invoke();
+            }
+
+            public void Dispose()
+            {
+                if (_action == null) return;
+                CompositionTarget.Rendering -= OnRendering;
+                _action = null;
+            }
         }
     }
 }

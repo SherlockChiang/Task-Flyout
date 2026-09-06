@@ -2,6 +2,8 @@ using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,30 +12,46 @@ namespace Task_Flyout.Services
 {
     internal static class PerformanceDiagnostics
     {
-        internal const string Header = "run_id,sequence,timestamp,scenario,metric,start,end,duration,outcome,source";
+        internal const string Header = "run_id,sequence,timestamp,scenario,metric,start,end,duration,outcome,source,schema_version,build_id,build_version,configuration,architecture,operation_id,sample_kind,timing_basis,dropped_before,write_failures_before";
         private static readonly PerformanceOncePolicy Once = new();
-        private static readonly object WriteLock = new();
+        private static readonly object InitializeLock = new();
         private static readonly string RunId = Guid.NewGuid().ToString("N");
         private static readonly DateTimeOffset ProcessStartedAt = GetProcessStart();
-        private static Task _pendingWrite = Task.CompletedTask;
+        private static readonly Assembly BuildAssembly = typeof(PerformanceDiagnostics).Assembly;
+        private static readonly string BuildId = BuildAssembly.ManifestModule.ModuleVersionId.ToString("N");
+        private static readonly string BuildVersion = BuildAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
+        private static readonly string Configuration = BuildAssembly.GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration ?? "unknown";
+        private static readonly BoundedDiagnosticWriter<PerformanceSample> Writer = new(Append);
         private static string? _path;
-        private static long _sequence;
         private static int _enabled;
 
         public static bool IsEnabled => Volatile.Read(ref _enabled) != 0;
 
         public static void Initialize(bool enabled, string? path = null)
         {
-            if (!enabled || Interlocked.Exchange(ref _enabled, 1) != 0) return;
-            _path = path ?? AppDataPathHelper.ResolveLocal("Logs", "performance-diagnostics.csv");
+            if (!enabled) return;
+            lock (InitializeLock)
+            {
+                if (IsEnabled) return;
+                try
+                {
+                    _path = path ?? AppDataPathHelper.ResolveLocal("Logs", "performance-diagnostics-v2.csv");
+                    Volatile.Write(ref _enabled, 1);
+                }
+                catch { Debug.WriteLine("Performance diagnostics could not initialize."); }
+            }
         }
 
         public static void MarkOnce(string key, string scenario, string metric, string outcome = "success", string source = "app")
         {
             if (!IsEnabled || !Once.TryClaim(key)) return;
             var now = DateTimeOffset.UtcNow;
-            Queue(new Entry(now, scenario, metric, now, now, outcome, source));
+            Queue(new PerformanceSample("", scenario, metric, source, "milestone", now, now, 0, outcome));
         }
+
+        public static PerformanceOperation? StartInteraction(string scenario, string metric, string source)
+            => IsEnabled ? new PerformanceOperation(scenario, metric, source,
+                Once.TryClaim("interaction." + scenario) ? "cold_attempt" : "warm_attempt", Queue) : null;
 
         public static Span StartSpan(string scenario, string metric, string source = "app")
             => IsEnabled ? new Span(scenario, metric, source, DateTimeOffset.UtcNow) : Span.Disabled;
@@ -50,76 +68,67 @@ namespace Task_Flyout.Services
 
         public static Span StartProcessSpanOnce(string key, string scenario, string metric, string source = "app")
             => IsEnabled && Once.TryClaim(key)
-                ? new Span(scenario, metric, source, ProcessStartedAt)
+                ? new Span(scenario, metric, source, ProcessStartedAt, processEstimate: true)
                 : Span.Disabled;
 
         public static async Task FlushAsync(TimeSpan? timeout = null)
         {
-            Task pending;
-            lock (WriteLock) pending = _pendingWrite;
-            try { await pending.WaitAsync(timeout ?? TimeSpan.FromSeconds(2)); }
+            if (!IsEnabled) return;
+            try { await FlushCoreAsync().WaitAsync(timeout ?? TimeSpan.FromSeconds(2)); }
             catch { }
         }
 
-        private static void Queue(Entry entry)
+        private static async Task FlushCoreAsync()
         {
-            var path = _path;
-            if (string.IsNullOrWhiteSpace(path)) return;
-            lock (WriteLock)
-            {
-                long sequence = Interlocked.Increment(ref _sequence);
-                _pendingWrite = _pendingWrite.ContinueWith(
-                    _ => Append(path, sequence, entry),
-                    CancellationToken.None,
-                    TaskContinuationOptions.None,
-                    TaskScheduler.Default);
-            }
+            await Writer.DrainAsync().ConfigureAwait(false);
+            var now = DateTimeOffset.UtcNow;
+            Queue(new PerformanceSample("", "diagnostics", "writer_health", "logger", "status", now, now, 0, "success"));
+            await Writer.DrainAsync().ConfigureAwait(false);
         }
 
-        private static void Append(string path, long sequence, Entry entry)
+        private static void Queue(PerformanceSample entry) => Writer.TryEnqueue(entry);
+
+        private static void Append(long sequence, PerformanceSample entry)
         {
-            try
+            var path = _path!;
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+            DiagnosticLogRetention.RotateIfNeeded(path);
+            bool headerRequired = !File.Exists(path) || new FileInfo(path).Length == 0;
+            if (!headerRequired)
             {
-                var directory = Path.GetDirectoryName(path);
-                if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
-                DiagnosticLogRetention.RotateIfNeeded(path);
-                bool headerRequired = !File.Exists(path);
-                using var writer = new StreamWriter(path, append: true, encoding: new UTF8Encoding(false));
-                if (headerRequired) writer.WriteLine(Header);
-                writer.WriteLine(string.Join(",",
-                    Csv(RunId),
-                    sequence.ToString(CultureInfo.InvariantCulture),
-                    Csv(entry.Timestamp.ToString("O", CultureInfo.InvariantCulture)),
-                    Csv(entry.Scenario),
-                    Csv(entry.Metric),
-                    Csv(entry.Start.ToString("O", CultureInfo.InvariantCulture)),
-                    Csv(entry.End.ToString("O", CultureInfo.InvariantCulture)),
-                    Math.Max(0, (entry.End - entry.Start).TotalMilliseconds).ToString("0.###", CultureInfo.InvariantCulture),
-                    Csv(entry.Outcome),
-                    Csv(entry.Source)));
+                using var reader = new StreamReader(path);
+                if (!string.Equals(reader.ReadLine(), Header, StringComparison.Ordinal))
+                    throw new InvalidDataException("Performance diagnostics schema mismatch.");
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Writing performance diagnostics failed: {ex.Message}");
-            }
+            using var writer = new StreamWriter(path, append: true, encoding: new UTF8Encoding(false));
+            if (headerRequired) writer.WriteLine(Header);
+            writer.WriteLine(string.Join(",",
+                Csv(RunId), sequence.ToString(CultureInfo.InvariantCulture),
+                Csv(entry.End.ToString("O", CultureInfo.InvariantCulture)),
+                Csv(entry.Scenario), Csv(entry.Metric),
+                Csv(entry.Start.ToString("O", CultureInfo.InvariantCulture)),
+                Csv(entry.End.ToString("O", CultureInfo.InvariantCulture)),
+                entry.Duration.ToString("0.###", CultureInfo.InvariantCulture),
+                Csv(entry.Outcome), Csv(entry.Source), "2",
+                Csv(BuildId), Csv(BuildVersion), Csv(Configuration),
+                Csv(RuntimeInformation.ProcessArchitecture.ToString()),
+                Csv(entry.OperationId), Csv(entry.SampleKind), Csv(entry.TimingBasis),
+                Writer.Dropped.ToString(CultureInfo.InvariantCulture),
+                Writer.Failures.ToString(CultureInfo.InvariantCulture)));
         }
 
         private static DateTimeOffset GetProcessStart()
         {
-            try { return Process.GetCurrentProcess().StartTime.ToUniversalTime(); }
+            try
+            {
+                using var process = Process.GetCurrentProcess();
+                return process.StartTime.ToUniversalTime();
+            }
             catch { return DateTimeOffset.UtcNow; }
         }
 
         private static string Csv(string value) => "\"" + value.Replace("\"", "\"\"") + "\"";
-
-        private readonly record struct Entry(
-            DateTimeOffset Timestamp,
-            string Scenario,
-            string Metric,
-            DateTimeOffset Start,
-            DateTimeOffset End,
-            string Outcome,
-            string Source);
 
         internal sealed class Span : IDisposable
         {
@@ -128,6 +137,8 @@ namespace Task_Flyout.Services
             private readonly string? _metric;
             private readonly string? _source;
             private readonly DateTimeOffset _start;
+            private readonly long _startedAt = Stopwatch.GetTimestamp();
+            private readonly bool _processEstimate;
             private readonly string? _successKey;
             private int _completed;
 
@@ -137,13 +148,15 @@ namespace Task_Flyout.Services
                 string? source,
                 DateTimeOffset start,
                 bool disabled = false,
-                string? successKey = null)
+                string? successKey = null,
+                bool processEstimate = false)
             {
                 _scenario = scenario;
                 _metric = metric;
                 _source = source;
                 _start = start;
                 _successKey = successKey;
+                _processEstimate = processEstimate;
                 _completed = disabled ? 1 : 0;
             }
 
@@ -154,7 +167,9 @@ namespace Task_Flyout.Services
                     && _successKey != null
                     && !Once.TryClaim(_successKey)) return;
                 var end = DateTimeOffset.UtcNow;
-                Queue(new Entry(end, _scenario!, _metric!, _start, end, outcome, _source!));
+                Queue(new PerformanceSample("", _scenario!, _metric!, _source!, "span", _start, end,
+                    _processEstimate ? Math.Max(0, (end - _start).TotalMilliseconds) : Stopwatch.GetElapsedTime(_startedAt).TotalMilliseconds,
+                    outcome, _processEstimate ? "process_wall_estimate" : "monotonic"));
             }
 
             public void Dispose() => Complete("cancelled");

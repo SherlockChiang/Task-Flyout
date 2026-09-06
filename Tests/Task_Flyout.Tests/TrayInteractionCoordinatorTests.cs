@@ -131,6 +131,32 @@ public sealed class TrayInteractionCoordinatorTests
         Assert.Equal(new[] { "dismiss", "main" }, calls);
     }
 
+    [Fact]
+    public async Task Per_command_callback_runs_only_after_hydration()
+    {
+        var ready = new TaskCompletionSource();
+        var calls = new List<string>();
+        var coordinator = Create(calls, prepare: () => ready.Task);
+        Task<bool> click = coordinator.ToggleFlyoutAsync(() => calls.Add("measured-toggle"));
+        Assert.Empty(calls);
+        ready.SetResult();
+        Assert.True(await click);
+        Assert.Equal(new[] { "measured-toggle" }, calls);
+    }
+
+    [Fact]
+    public async Task Superseded_command_cannot_deliver_its_measurement_to_a_later_window()
+    {
+        var ready = new TaskCompletionSource();
+        var calls = new List<string>();
+        var coordinator = Create(calls, prepare: () => ready.Task);
+        Task<bool> click = coordinator.ToggleFlyoutAsync(() => calls.Add("stale-toggle"));
+        await coordinator.OpenMainWindowAsync();
+        ready.SetResult();
+        Assert.False(await click);
+        Assert.Equal(new[] { "dismiss", "main" }, calls);
+    }
+
     private static TrayInteractionCoordinator Create(
         List<string> calls,
         Func<Task>? prepare = null,
