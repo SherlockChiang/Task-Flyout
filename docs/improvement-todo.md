@@ -1917,3 +1917,14 @@ They are historical records; active work remains in the backlog tables above.
   or reconfigured. F0-01 remains IN PROGRESS for approved installation, packaged
   regression checks, comparable sampling and the remaining trace work.
 - Commit: `docs: archive signed Release performance control`.
+
+### 2026-09-06 F0-01 Installation Preflight
+
+- The user approved installation/restart. Read-only checks found the healthy
+  `1.4.4.4` package still running; the new `1.4.4.5` MSIX hash is unchanged.
+- Computer Use did not expose a Task Flyout window or tray menu. A normal exit
+  and inspection for unsaved editing could not be completed. Installation is
+  paused pending the user's tray-menu Exit; no forced termination, duplicate
+  launch, installation or runtime measurement occurred.
+- F0-01 remains IN PROGRESS. The next action is to confirm the old process has
+  exited and install the already-approved artifact, not to repeat packaging.

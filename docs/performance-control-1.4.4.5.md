@@ -88,4 +88,16 @@ use this exact artifact, not whichever package has the newest file timestamp.
    pacing still require separate traces. GC/allocations/dispatcher stalls and
    memory-after-hide observations remain pending parts of F0-01.
 
-No runtime step above has been performed as part of this artifact archive.
+## Installation Preflight
+
+- The user approved installing this control and restarting for regression/sampling.
+- Read-only preflight found installed `1.4.4.4` with package status `Ok`, still
+  running from its installed WindowsApps directory. The target MSIX hash still
+  matches the artifact identity above.
+- Windows Computer Use returned no Task Flyout window or tray surface, so the
+  app's normal tray Exit command could not be invoked or unsaved UI state
+  inspected. No second app instance was launched to work around the hidden UI.
+- Installation is paused until the user exits Task Flyout through its tray menu.
+  No force-stop, installation, restart, setting change or timing collection was
+  performed. Resume by confirming the old process has exited, then install the
+  already-approved exact artifact. Do not treat this preflight as UI acceptance.
