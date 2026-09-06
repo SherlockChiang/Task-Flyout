@@ -20,7 +20,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | Order | ID | Status | Next bounded outcome | Verification / dependency |
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
-| 1 | F0-01 | IN PROGRESS | Establish repeatable interaction measurements on a signed Release baseline. | First slice: bounded v2 logging and correlated Flyout/search command-to-rendering observations implemented; see 2026-09-06 entry. Signed Release control, runtime samples, presentation traces and measurement-overhead checks remain pending. Debug `1.4.4.4` is a functional baseline only. |
+| 1 | F0-01 | IN PROGRESS | Establish repeatable interaction measurements on a signed Release baseline. | Bounded v2 logging and Flyout/search observations implemented. Signed Release control `1.4.4.5` from `38ce240` is packaged and statically verified; see `performance-control-1.4.4.5.md`. Installation/runtime samples, presentation traces and measurement-overhead checks remain pending. Debug `1.4.4.4` is a functional baseline only. |
 | 2 | R1-01 | TODO | Include account identity in global-search agenda deduplication and result keys. | A separate correctness commit before search optimization; equal remote IDs from two accounts remain distinct and navigate correctly. |
 | 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
 | 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
@@ -1893,3 +1893,27 @@ They are historical records; active work remains in the backlog tables above.
   tooling checkpoint so the artifact can refer to an exact source commit.
 - Commit: `build: isolate local Release control manifest`. F0-01 remains active;
   neither a package build nor the planning checks establish performance results.
+
+### 2026-09-06 F0-01 Signed Release Control Archive
+
+- Built local Release x64 control `1.4.4.5` from
+  `38ce24032c981a36f10cfa2fbf2b8d1ede8d0fd2`, with the diagnostics from `107a82d`.
+  Exact artifact, package/payload hashes and pending runtime protocol are in
+  [performance-control-1.4.4.5.md](performance-control-1.4.4.5.md).
+- MSIX SHA-256:
+  `A655EC4F2D6DFBF0E196E144BA99C3053F469F0CFD584AFE723DD36254B6D9C4`.
+  Verified packaged manifest `1.4.4.5`/x64/publisher, Release assembly metadata,
+  exact source informational version and build ID
+  `0af25b29bbde4fb7932910b4f774e409`. Main DLL matches the ReadyToRun package-map
+  input; native DLL/EXE match the signed Release outputs.
+- Reused `15303040F7CEECFDE9C023F15481D15C39CCDB46`; MSIX and both native
+  signatures are valid. No timestamp was applied. No certificate creation,
+  key export, trust change, native execution or Explorer injection occurred.
+- Release tests passed 1283/1283; Debug x64 build passed with zero warnings/errors.
+  All 13 package-plan checks passed in both PowerShell implementations, and all
+  20 synthetic summary checks passed. These are not runtime timing results.
+- The user's manifest stays byte-identical at `1.4.4.0`; Windhawk changes are also
+  untouched and unstaged. The installed app was not replaced, started, stopped
+  or reconfigured. F0-01 remains IN PROGRESS for approved installation, packaged
+  regression checks, comparable sampling and the remaining trace work.
+- Commit: `docs: archive signed Release performance control`.

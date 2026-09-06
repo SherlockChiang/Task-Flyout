@@ -60,6 +60,9 @@ UI stalls, allocations/GC and frame pacing still need the remaining F0-01 work.
 
 ### Local Release Control Builder
 
+The first signed control is ready: [1.4.4.5 artifact and pending runtime protocol](performance-control-1.4.4.5.md).
+It has not been installed or measured by this pass.
+
 Use a committed implementation with the existing current-user signing certificate:
 
 ```powershell
