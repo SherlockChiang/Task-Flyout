@@ -58,6 +58,37 @@ UI stalls, allocations/GC and frame pacing still need the remaining F0-01 work.
 
 ## Metrics
 
+### Local Release Control Builder
+
+Use a committed implementation with the existing current-user signing certificate:
+
+```powershell
+.\scripts\build-performance-control.ps1 -Version 1.4.4.5 -CertificateThumbprint 15303040F7CEECFDE9C023F15481D15C39CCDB46 -DescribeOnly
+.\scripts\build-performance-control.ps1 -Version 1.4.4.5 -CertificateThumbprint 15303040F7CEECFDE9C023F15481D15C39CCDB46
+```
+
+The builder generates a separate manifest under `.testbuild`, selects it through
+the opt-in `TaskFlyoutPackageManifest` project property, and verifies the evaluated
+manifest before building. Normal builds retain the original manifest and SDK
+import chain. Each output directory includes the requested version and source
+commit; existing output is never overwritten. The only permitted tracked local
+differences are the user's manifest and archived Windhawk companion, which are
+hash-checked for preservation. Ignored local OAuth build inputs remain local and
+must not be copied into measurement notes.
+
+This is a Release x64, self-contained .NET, non-trimmed control with the project's
+existing ReadyToRun setting. The normal sideload hook signs bundled native
+components; it does not run them or probe Explorer. Package signing uses only the
+specified existing certificate. There is no certificate creation, private-key
+export, trust-store change, installation, running-process termination or setting
+change. Diagnostics remain opt-in in the resulting package.
+
+`scripts/test-performance-package-plan.ps1` checks the read-only plan, invalid
+inputs, alternate/default manifest selection, SDK import chain and source
+manifest preservation without signing or installing. Actual package signature,
+manifest version, build identity and payload hashes require separate verification
+after the build finishes.
+
 ### Planned Responsiveness Pass (2026-09-05)
 
 The user accepted the functional tray behavior in Debug package `1.4.4.4`.

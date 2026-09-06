@@ -54,6 +54,13 @@
         <Manifest Include="$(ApplicationManifest)" />
     </ItemGroup>
 
+    <!-- Explicit local-package override; normal builds still use Package.appxmanifest. -->
+    <ItemGroup Condition="'$(TaskFlyoutPackageManifest)' != ''">
+        <AppxManifest Include="$(TaskFlyoutPackageManifest)">
+            <SubType>Designer</SubType>
+        </AppxManifest>
+    </ItemGroup>
+
     <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
         <ProjectCapability Include="Msix" />
     </ItemGroup>

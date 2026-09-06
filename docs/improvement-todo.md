@@ -1875,3 +1875,21 @@ They are historical records; active work remains in the backlog tables above.
   The user's manifest and Windhawk edits remain outside this change. No package
   installation, trust-store mutation, OAuth action, Explorer injection, remote
   push or public release is part of this checkpoint.
+
+### 2026-09-06 F0-01 Local Release Packaging Tooling
+
+- Added `scripts/build-performance-control.ps1` to build an exact committed
+  Release control with an existing certificate and a separate generated manifest.
+  The opt-in project property leaves normal Debug/Release manifest selection
+  unchanged; it does not override the SDK's existing BeforeCommon import chain.
+- Read-only preflight checks require a valid four-component version and exact
+  source commit; actual packaging rejects unrelated tracked/untracked source
+  changes and existing output directories. It preserves the user-owned manifest
+  and Windhawk file, never creates/exports keys or changes trust, and never
+  installs the package or changes running application state.
+- All 13 package-plan checks pass under PowerShell 7 and Windows PowerShell,
+  including evaluated alternate/default manifest identity and SDK import-chain
+  validation. Actual Release packaging/signature verification follows this
+  tooling checkpoint so the artifact can refer to an exact source commit.
+- Commit: `build: isolate local Release control manifest`. F0-01 remains active;
+  neither a package build nor the planning checks establish performance results.
