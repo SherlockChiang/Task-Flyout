@@ -20,7 +20,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | Order | ID | Status | Next bounded outcome | Verification / dependency |
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
-| 1 | F0-01 | IN PROGRESS | Establish repeatable interaction measurements on a signed Release baseline. | Bounded v2 logging and Flyout/search observations implemented. Signed Release control `1.4.4.5` from `38ce240` is packaged and statically verified; see `performance-control-1.4.4.5.md`. Installation/runtime samples, presentation traces and measurement-overhead checks remain pending. Debug `1.4.4.4` is a functional baseline only. |
+| 1 | F0-01 | IN PROGRESS | Establish repeatable interaction measurements on a signed Release baseline. | Signed Release control `1.4.4.5` from `38ce240` is verified and its deferred update request succeeded; observed registration/process remains `1.4.4.4`. Await normal exit/reactivation, then exact-build verification and runtime samples. See `performance-control-1.4.4.5.md`; presentation traces and overhead checks remain pending. |
 | 2 | R1-01 | TODO | Include account identity in global-search agenda deduplication and result keys. | A separate correctness commit before search optimization; equal remote IDs from two accounts remain distinct and navigate correctly. |
 | 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
 | 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
@@ -1928,3 +1928,15 @@ They are historical records; active work remains in the backlog tables above.
   launch, installation or runtime measurement occurred.
 - F0-01 remains IN PROGRESS. The next action is to confirm the old process has
   exited and install the already-approved artifact, not to repeat packaging.
+
+### 2026-09-06 F0-01 Deferred Update Accepted
+
+- The old `1.4.4.4` process remained active on recheck. Submitted the verified
+  `1.4.4.5` MSIX and bundled x64 runtime dependency using Windows' deferred
+  registration option. The command succeeded without force-shutdown flags.
+- Registered version and running process were still `1.4.4.4` immediately after
+  submission. Update preparation has progressed, but new-version activation,
+  UI regression and performance sampling have not occurred.
+- Next: normal tray-menu Exit, reactivate the registered app, confirm version
+  and process path `1.4.4.5`, then test. Do not repeat installation or claim the
+  pending update is already running. No process was forcibly terminated.

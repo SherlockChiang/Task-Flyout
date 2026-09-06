@@ -1,7 +1,9 @@
 # Release Control 1.4.4.5
 
-Status: packaged and statically verified; not installed or runtime-tested in
-this pass. No interaction percentiles or performance improvement are claimed.
+Status: packaged, statically verified, and submitted successfully to Windows
+for deferred registration. The observed registered/running version remains
+`1.4.4.4`; new-version activation and runtime tests are pending normal exit and
+restart. No interaction percentiles or performance improvement are claimed.
 The accepted Debug `1.4.4.4` remains a functional reference, not a comparable
 Release timing baseline.
 
@@ -58,6 +60,13 @@ run the generic latest-package installer as a measurement step: it may sign,
 change trust and force-stop an existing process. Preserve user data/settings and
 use this exact artifact, not whichever package has the newest file timestamp.
 
+Current resume point: Windows has accepted the exact package with
+`Add-AppxPackage -DeferRegistrationWhenPackagesAreInUse` and its bundled x64
+runtime dependency. Wait for normal exit, reactivate through the registered
+application identity (not the old executable path), and verify both registered
+version and process path are `1.4.4.5`. Do not repeat installation or call the
+old process's measurements Release-control results.
+
 1. After installation is approved, exit Task Flyout normally and install this
    exact package. Record the installed version before testing. Keep the accepted
    Debug package available for functional comparison; do not pool its timings.
@@ -101,3 +110,17 @@ use this exact artifact, not whichever package has the newest file timestamp.
   No force-stop, installation, restart, setting change or timing collection was
   performed. Resume by confirming the old process has exited, then install the
   already-approved exact artifact. Do not treat this preflight as UI acceptance.
+
+## Deferred Update Checkpoint
+
+- A subsequent check found the same old process still running. After rechecking
+  package hash and signer, the exact MSIX and bundled runtime dependency were
+  submitted with `-DeferRegistrationWhenPackagesAreInUse`. Windows returned
+  success; no force-shutdown option was supplied.
+- Immediately afterward the registered package was still `1.4.4.4`, status `Ok`,
+  with the same running process and start time. This is a pending update, not
+  confirmation that new code is running. The original preflight above is a
+  historical record; this checkpoint supersedes its installation resume step.
+- No certificate/trust change, forced termination, new process launch, diagnostic
+  setting change or performance sampling occurred. Next: normal exit and package
+  reactivation, then verify the exact version/build before testing.
