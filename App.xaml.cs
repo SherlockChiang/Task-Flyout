@@ -277,7 +277,7 @@ namespace Task_Flyout
             _trayIcon.LeftClickCommand = new RelayCommand(async () =>
             {
                 var openRequest = PerformanceDiagnostics.StartSpan("flyout", "tray_click_to_open_request", "tray");
-                var interaction = PerformanceDiagnostics.StartInteraction("flyout_open", "command_to_rendering", "tray");
+                var interaction = PerformanceDiagnostics.StartInteraction("flyout_open", "command_to_open_completed_rendering", "tray");
                 try
                 {
                     EfficiencyModeService.SetEfficiencyMode(false);

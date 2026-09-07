@@ -84,6 +84,21 @@ public sealed class PerformanceOperationTests
         Assert.NotEqual(samples[0].OperationId, samples[1].OperationId);
     }
 
+    [Theory]
+    [InlineData("timeout")]
+    [InlineData("unavailable")]
+    [InlineData("not_observed")]
+    [InlineData("cancelled")]
+    public void Unobserved_checkpoint_is_not_overwritten_by_late_success(string outcome)
+    {
+        var samples = new List<PerformanceSample>();
+        using var operation = Create(samples);
+        operation.Checkpoint("host_visible", outcome);
+        operation.Checkpoint("host_visible");
+        operation.Complete();
+        Assert.Equal(outcome, samples.Single(sample => sample.Metric == "host_visible").Outcome);
+    }
+
     private static PerformanceOperation Create(List<PerformanceSample> samples, TimeProvider? clock = null)
         => new("flyout_open", "command_to_rendering", "tray", "cold_attempt", samples.Add, clock);
 

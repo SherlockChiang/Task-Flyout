@@ -38,12 +38,12 @@ namespace Task_Flyout.Services
             _record(_sample with { End = _sample.Start, Outcome = "started" });
         }
 
-        public void Checkpoint(string metric)
+        public void Checkpoint(string metric, string outcome = "success")
         {
             lock (_gate)
             {
                 if (_completed || metric == _sample.Metric || !_checkpoints.Add(metric)) return;
-                Record(metric, "success");
+                Record(metric, outcome);
             }
         }
 

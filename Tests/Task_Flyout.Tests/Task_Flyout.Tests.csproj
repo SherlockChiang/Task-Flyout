@@ -150,6 +150,7 @@
     <Compile Include="..\..\Services\PerformanceDiagnosticsPolicy.cs" Link="Source\PerformanceDiagnosticsPolicy.cs" />
     <Compile Include="..\..\Services\PerformanceDiagnostics.cs" Link="Source\PerformanceDiagnostics.cs" />
     <Compile Include="..\..\Services\PerformanceOperation.cs" Link="Source\PerformanceOperation.cs" />
+    <Compile Include="..\..\Services\NextRenderHelper.cs" Link="Source\NextRenderHelper.cs" />
     <Compile Include="..\..\Services\BoundedDiagnosticWriter.cs" Link="Source\BoundedDiagnosticWriter.cs" />
     <Compile Include="..\..\Services\CalendarDotRenderPolicy.cs" Link="Source\CalendarDotRenderPolicy.cs" />
     <Compile Include="..\..\Services\CalendarEventTimePolicy.cs" Link="Source\CalendarEventTimePolicy.cs" />

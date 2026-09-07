@@ -21,7 +21,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
 | Accepted | R1-03 | DONE | Preserve repaired mail-notification activation. | User reports the original symptom resolved on installed/running `1.4.4.6`; fix `0d4dad8`. This does not independently validate every cold-start or multi-account scenario. |
-| 1 | F0-01 | IN PROGRESS | Validate capture coverage before interpreting interaction measurements. | Run `807dd548099940499c2d3f5277409e19` has one successful first-open observation (616.138 ms to a pre-presentation callback), but no warm attempts after the user's completion report. Same process, unchanged log across rereads; resolve input/capture/writer coverage before asking for another batch. No P95 or policy change is justified. |
+| 1 | F0-01 | IN PROGRESS | Separate visible-host feedback observations from opening completion. | Two later warm commands now log successfully (372.836/373.840 ms to the old endpoint). The pinned library sets IsOpen after animation; updated source separates host-visible Rendering from completion. 1331 tests and clean Debug build pass; candidate and runtime validation remain pending. No P95 or policy change is justified. |
 | 2 | R1-01 | DONE | Preserve account identity in global-search agenda deduplication and result keys. | Both operations use one structural identity, including account and item kind. Two-account collisions and original payload lookup are tested; 15 new tests, 1322 total, clean Debug x64 build. Not yet packaged or live-tested with two accounts. |
 | 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
 | 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
@@ -2104,3 +2104,36 @@ They are historical records; active work remains in the backlog tables above.
   Do not change efficiency/trim or animation policy based on this single sample.
 - This checkpoint is observation only; no application code, runtime setting or
   user data was changed. Commit: `docs: flag incomplete Flyout capture`.
+
+### 2026-09-07 F0-01 Reopen Capture And Endpoint Correction
+
+- After the user identified the taskbar icon and opened again, the same log grew
+  from 4851 to 10084 bytes and contains two successful warm attempts, with
+  terminal durations 372.836 and 373.840 ms. Their efficiency-restored markers
+  are 10.647/6.076 ms; cached-content-applied markers 12.254/7.484 ms; open-state
+  markers 367.020/366.329 ms. Last emitted loss/failure counters remain zero.
+  Current input and writing work; the earlier missing batch is still unexplained,
+  not proof of user error or a permanently broken logger. Two samples cannot
+  produce a meaningful P95.
+- The Computer Use window list did not expose this popup. No window was activated,
+  clicked or captured, no alternate UI-control path was used, and no duplicate
+  app was launched. Analysis used the correlated log and exact dependency source.
+- DesktopFlyouts.WinUI 1.4.0's nuspec pins
+  `bf5f4cf1e6bb23aff4bf4893f0de05635153eb3a`. At that revision, Show starts the
+  storyboard and CompleteOpen sets IsOpen after its completion. BottomToTop is
+  configured as 267 ms. The old command_to_rendering point was post-animation;
+  it cannot establish first-feedback latency or prove an efficiency/trim stall.
+- Updated the source to observe a desired opening's Rendering callback only
+  when its own XamlRoot reports the host visible, separately from the renamed
+  command_to_open_completed_rendering endpoint. Added a show-request-returned
+  checkpoint. Cancellation, timeout, probe failure and unobserved early renders
+  are explicit; callbacks unsubscribe and have a five-second timeout. These are
+  still pre-presentation observations, not actual on-screen pixels or FPS.
+- Verification: 1331/1331 unit tests pass, including nine new callback/timeout/
+  checkpoint cases; Debug x64 build has zero warnings/errors. The callback tests
+  use manual framework-event stubs, not real WinUI rendering. No animation,
+  tray gesture, activation handoff, efficiency or memory-trim policy was changed.
+  The running `1.4.4.6` instance and user data were left untouched.
+- Commit: `diagnostics: separate opening feedback from completion`. Bundle this
+  with the already-tested R1-01 search identity fix, then validate one new early
+  observation before asking the user for another repeated-open batch.

@@ -119,6 +119,8 @@ namespace Task_Flyout
         private TaskCompletionSource? _mainWindowDismissal;
         private PerformanceOperation? _openMeasurement;
         private IDisposable? _openRenderObservation;
+        private IDisposable? _openingRenderObservation;
+        private const string HostVisibleRenderMetric = "command_to_host_visible_rendering";
         private bool _focusNewItemOnOpen;
         private bool _isShuttingDown;
         private bool _suppressSelectedDateChanged;
@@ -1042,8 +1044,11 @@ namespace Task_Flyout
 
         internal void FinishOpenMeasurement(string outcome = "cancelled")
         {
+            _openingRenderObservation?.Dispose();
+            _openingRenderObservation = null;
             _openRenderObservation?.Dispose();
             _openRenderObservation = null;
+            _openMeasurement?.Checkpoint(HostVisibleRenderMetric, outcome == "success" ? "not_observed" : outcome);
             _openMeasurement?.Complete(outcome);
             _openMeasurement = null;
         }
@@ -1104,8 +1109,22 @@ namespace Task_Flyout
             ApplyConfiguredTheme(App.GetConfiguredTheme());
             _openRequestIssued = true;
             _openMeasurement?.Checkpoint("command_to_cached_content_applied");
+            ObserveOpeningRender();
             Show();
+            _openMeasurement?.Checkpoint("command_to_show_request_returned");
             StartActivationHandoffMonitor();
+        }
+
+        private void ObserveOpeningRender()
+        {
+            var measurement = _openMeasurement;
+            if (measurement == null) return;
+            _openingRenderObservation?.Dispose();
+            _openingRenderObservation = NextRenderHelper.RunOnceWhen(
+                () => ReferenceEquals(_openMeasurement, measurement) && _desiredOpen && !_isShuttingDown &&
+                    (_openRequestIssued || IsOpen) && RootGrid.XamlRoot?.IsHostVisible == true,
+                () => measurement.Checkpoint(HostVisibleRenderMetric),
+                reason => measurement.Checkpoint(HostVisibleRenderMetric, reason));
         }
 
         private void PrepareOpeningActivationHandoff()
@@ -1249,7 +1268,7 @@ namespace Task_Flyout
                         if (!ReferenceEquals(_openMeasurement, measurement)) return;
                         bool stillOpen = IsOpen && _desiredOpen && !_isShuttingDown;
                         if (stillOpen)
-                            PerformanceDiagnostics.MarkOnce("flyout.visible", "flyout", "first_visible", source: "ui");
+                            PerformanceDiagnostics.MarkOnce("flyout.open_completed", "flyout", "first_open_completed_rendering", source: "ui");
                         FinishOpenMeasurement(stillOpen ? "success" : "cancelled");
                     });
                 }

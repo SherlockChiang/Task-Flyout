@@ -76,9 +76,29 @@ sides instead of counting a changed result set as an optimization.
 
 | Scenario | Cumulative observations from command/input-handler entry | Terminal observation |
 | --- | --- | --- |
-| `flyout_open` | `command_to_efficiency_restored`, `command_to_accounts_ready`, `command_to_cached_content_applied`, `command_to_open_state` | `command_to_rendering` |
+| `flyout_open` (updated instrumentation) | `command_to_efficiency_restored`, `command_to_accounts_ready`, `command_to_cached_content_applied`, `command_to_show_request_returned`, `command_to_host_visible_rendering`, `command_to_open_state` | `command_to_open_completed_rendering` |
 | `search_open` | `command_to_snapshot_ready`, `command_to_results_applied` | `command_to_rendering` |
 | `search_query` | `input_to_results_applied` | `input_to_rendering` |
+
+The installed `1.4.4.6` Flyout metric `command_to_rendering` (and its zero-duration
+`first_visible` milestone) runs only after `IsOpen` becomes true. DesktopFlyouts
+1.4.0's pinned source (`bf5f4cf1e6bb23aff4bf4893f0de05635153eb3a`,
+`src/DesktopFlyouts.Shared/DesktopFlyout.cs`) sets IsOpen in CompleteOpen after
+the opening storyboard completes. Its BottomToTop transition is configured for
+267 ms in `Helpers/TransitionHelpers.cs`. Do not interpret the old terminal
+duration as first visible feedback, or subtract 267 ms to manufacture such a
+measurement. Scheduling/layout and actual frame presentation are separate.
+
+Updated instrumentation observes the first Rendering callback for which this
+Flyout's `XamlRoot.IsHostVisible` reports true while the same open request is
+still desired. It is bounded by a five-second dispatcher timeout and detached
+on success/close/supersession/shutdown. Timeout, unavailable visibility probes,
+or a missing observation at operation completion receive non-success outcomes;
+they are not silently treated as early renders. This is still only a visible-host
+pre-presentation observation: the content may be clipped or transitioning, and
+it is not a screen-pixel or frame-present fence. Check its real XAML-island
+behavior and diagnostics overhead before using it for comparisons. Do not pool
+these metrics with the old post-transition endpoint.
 
 Checkpoints share an operation ID and monotonic start; they are cumulative,
 not individual phase durations. Each operation records `started`, then at most
