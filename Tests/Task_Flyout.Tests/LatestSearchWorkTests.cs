@@ -5,6 +5,29 @@ namespace Task_Flyout.Tests;
 public sealed class LatestSearchWorkTests
 {
     [Fact]
+    public void Query_on_old_snapshot_cannot_adopt_a_newer_source_revision()
+    {
+        var work = new LatestSearchWork();
+        var query = work.Begin();
+        const long snapshotVersion = 7;
+        Assert.True(work.CanPublish(query, snapshotVersion, 7));
+        Assert.False(work.CanPublish(query, snapshotVersion, 8));
+        work.Cancel();
+    }
+
+    [Fact]
+    public void Matching_source_revision_does_not_revive_a_closed_or_superseded_query()
+    {
+        var work = new LatestSearchWork();
+        var first = work.Begin();
+        var latest = work.Begin();
+        Assert.False(work.CanPublish(first, 9, 9));
+        Assert.True(work.CanPublish(latest, 9, 9));
+        work.Cancel();
+        Assert.False(work.CanPublish(latest, 9, 9));
+    }
+
+    [Fact]
     public void Close_and_reopen_reject_prior_session_and_default_request()
     {
         var work = new LatestSearchWork();

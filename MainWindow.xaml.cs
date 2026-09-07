@@ -561,6 +561,7 @@ namespace Task_Flyout
                 _searchCommands.Clear();
                 AddGlobalSearchCommands(_searchCommands);
                 _globalSearchSnapshot = _searchCommands.ToArray();
+                _searchAppliedSourceVersion = Volatile.Read(ref _searchSourceVersion);
                 GlobalSearchBox.Text = "";
                 ApplyGlobalSearchResults(GlobalSearchPolicy.Search(_globalSearchSnapshot, ""));
                 measurement?.Checkpoint("command_to_results_applied");
@@ -669,7 +670,7 @@ namespace Task_Flyout
             {
                 if (session != _searchSessionVersion) return;
                 Interlocked.Exchange(ref _searchRebuildQueued, 0);
-                if (_globalSearchActive) _ = BuildGlobalSearchSnapshotAsync();
+                if (_globalSearchActive && _searchShellPresented) _ = BuildGlobalSearchSnapshotAsync();
             })) Interlocked.Exchange(ref _searchRebuildQueued, 0);
         }
 
@@ -693,6 +694,7 @@ namespace Task_Flyout
                 new SearchEntry(candidate, _globalSearchPayloads[candidate.Id])).ToArray();
             _globalSearchSnapshot = commands.Select(entry => entry.Candidate).ToArray();
             _globalSearchPayloads = commands.ToDictionary(entry => entry.Candidate.Id, entry => entry.Payload, StringComparer.Ordinal);
+            _searchAppliedSourceVersion = sourceVersion;
             _ = ApplyGlobalSearchAsync(GlobalSearchBox.Text, debounce: false);
             try
             {
@@ -705,8 +707,8 @@ namespace Task_Flyout
                 string untitled = GetSafeString("GlobalSearch_Untitled", "Untitled");
                 var snapshot = await _searchIndexWork.RunAsync(request, token =>
                     BuildSearchSnapshot(app, rss, commands, isVisible, mailIds, untitled, token));
-                if (!_globalSearchActive || !_searchIndexWork.IsCurrent(request) ||
-                    sourceVersion != Volatile.Read(ref _searchSourceVersion)) return;
+                if (!_globalSearchActive || !_searchIndexWork.CanPublish(request,
+                    sourceVersion, Volatile.Read(ref _searchSourceVersion))) return;
                 _globalSearchPayloads = snapshot.Payloads;
                 _globalSearchSnapshot = snapshot.Candidates;
                 _searchAppliedSourceVersion = sourceVersion;
@@ -820,7 +822,9 @@ namespace Task_Flyout
             if (!_globalSearchActive) return;
             var request = _searchQueryWork.Begin();
             var snapshot = _globalSearchSnapshot;
-            long sourceVersion = Volatile.Read(ref _searchSourceVersion);
+            // Keep the source revision paired with the captured data, even if a
+            // background publication arrived between index validation and use.
+            long sourceVersion = _searchAppliedSourceVersion;
             string? selectedId = (GlobalSearchResultsList.SelectedItem as GlobalSearchResultViewModel)?.Candidate.Id;
             _searchQueryRendering?.Dispose();
             _searchQueryRendering = null;
@@ -839,8 +843,8 @@ namespace Task_Flyout
                 if (debounce && !string.IsNullOrWhiteSpace(query))
                     await Task.Delay(120, request.Token);
                 var results = await _searchQueryWork.RunAsync(request, token => GlobalSearchPolicy.Search(snapshot, query, token));
-                if (!_globalSearchActive || !_searchQueryWork.IsCurrent(request) ||
-                    !ReferenceEquals(snapshot, _globalSearchSnapshot) || sourceVersion != Volatile.Read(ref _searchSourceVersion))
+                if (!_globalSearchActive || !_searchQueryWork.CanPublish(request,
+                    sourceVersion, Volatile.Read(ref _searchSourceVersion)) || !ReferenceEquals(snapshot, _globalSearchSnapshot))
                 {
                     measurement?.Complete("superseded");
                     return;

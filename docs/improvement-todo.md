@@ -24,7 +24,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | Archived | F0-01 | PAUSED | Preserve the partial observations; no further benchmark runs requested. | User ended benchmarking on 2026-09-08. No complete P95, controlled prewarm comparison, frame trace or improvement claim. Retain the corrected toggle-without-restart annotation; do not ask for more samples. |
 | 2 | R1-01 | DONE | Preserve account identity in global-search agenda deduplication and result keys. | Both operations use one structural identity, including account and item kind. Two-account collisions and original payload lookup are tested; 15 new tests, 1322 total, clean Debug x64 build. Not yet packaged or live-tested with two accounts. |
 | Deferred | F1-01 | PAUSED | Keep existing efficiency and working-set policy. | Current observations do not justify a policy change; user ended the benchmark pass. No new trim or animation experiment. |
-| Now | M1-07 | IN PROGRESS | Functionally verify the asynchronous search implementation. | Source implementation complete: shell/commands precede indexing; bounded cancellable workers, source/session/query guards, detached account visibility and body-free RSS records. 1340 Debug/Release tests and clean Debug x64 build pass. Normal UI acceptance remains; no more benchmarks requested. |
+| Now | M1-07 | IN PROGRESS | Prepare a normal functional candidate for asynchronous search. | Index/query workers, source/session guards and body-free RSS records are implemented. Follow-up pairs each query with its snapshot's revision and rechecks shell readiness on queued rebuilds. 1342 Debug/Release tests pass; ordinary UI acceptance remains, not more benchmarks. |
 | 5 | F1-02 | TODO | Apply calendar changes without rebuilding unchanged visible cells/timeline geometry. | Profile publication and manual-sync paths; avoid duplicate application of the same state, preserve end times, source account, date selection, scroll and editing state. |
 | 6 | F1-03 | TODO | Update displayed mail/search results incrementally. | Existing bulk-load suppression already exists; target `_displayedItems.Clear()` and churn in `ApplyMailSearch`, preserve selection/scroll, unread convergence and account-scoped navigation. |
 | 7 | F1-04 | TODO | Profile HTML preparation and page lifetime before adjusting reader caching. | Separate sanitization, WebView initialization, navigation and network; stale account/message work never displays; preserve sanitization/remote-resource restrictions; no default global WebView prewarm. |
@@ -2323,3 +2323,19 @@ They are historical records; active work remains in the backlog tables above.
   live WinUI interaction, account mutation or remote push was performed. The
   original manifest and Windhawk source changes remain untouched/unstaged.
   M1-07 remains open for ordinary functional UI acceptance, not more timing runs.
+
+### 2026-09-08 M1-07 Publication Boundary Follow-Up
+
+- Pre-package review found that a query could capture a newer live source
+  revision while still using an older snapshot. Queries now retain the revision
+  assigned to their actual snapshot; index and query publication share the
+  current-request/source-revision guard. Two regression tests cover mismatched
+  source revisions and superseded/closed requests with matching revisions.
+- A queued rebuild rechecks shell readiness when dispatched, so a late source
+  callback cannot start cache preparation before a newly opened shell is ready.
+- Debug and Release unit suites pass 1342/1342. This is functional race coverage,
+  not a benchmark. No running app, power/prewarm setting, account or user cache
+  was changed; original manifest and Windhawk source changes remain excluded.
+- Commit: `fix(search): bind query results to snapshot revision`. A normal signed
+  functional package follows; no diagnostic launcher or repeated timing request
+  will be added to its acceptance steps.

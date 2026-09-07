@@ -24,6 +24,9 @@ namespace Task_Flyout.Services
         public bool IsCurrent(SearchWorkRequest request)
             => _cancellation != null && request.Generation == _generation && !request.Token.IsCancellationRequested;
 
+        public bool CanPublish(SearchWorkRequest request, long snapshotVersion, long currentVersion)
+            => IsCurrent(request) && snapshotVersion == currentVersion;
+
         public void Cancel()
         {
             _generation++;
