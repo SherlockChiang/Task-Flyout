@@ -1,5 +1,11 @@
 # Performance Baseline
 
+The user ended this benchmark pass on 2026-09-08. Everything below is retained
+as protocol/history, not a request for additional runs. The available first-use
+and reopen observations are incomplete; no controlled prewarm comparison, P95,
+frame-pacing result or measured optimization gain is claimed. Resume ordinary
+implementation and functional tests; leave efficiency/trim policy unchanged.
+
 Use this checklist before and after performance-sensitive changes. Record results in the PR or release notes so optimizations have comparable numbers.
 
 ## Environment
@@ -186,10 +192,12 @@ The toggle is read at startup, followed by an eight-second delay and memory
 gates; changing it does not prewarm the current process. Keep its value recorded
 per run and do not combine differently configured sessions into one percentile.
 
-The user subsequently confirmed the setting off in this session. There are now
-seven valid reopens, with the last three early callbacks at 70.324, 68.499 and
-67.800 ms. The planned on-state comparison requires enabling the existing toggle,
-normal Exit, the same 1.4.4.7 diagnostic launcher, and at least fifteen seconds
+The user clarified that they enabled the setting before the last three tests,
+but did not restart. There are seven valid reopens, with the last three early
+callbacks at 70.324, 68.499 and 67.800 ms. These are already-initialized reopens,
+not an enabled-startup treatment: the toggle handler only saves the preference.
+The planned on-state comparison requires leaving it enabled, normal Exit,
+the same 1.4.4.7 diagnostic launcher, and at least fifteen seconds
 without opening any app surface. Record the new run and pre-first-open memory
 before testing one first open. This wait allows the startup delay but does not
 prove the memory gates admitted prewarm; retain skip/delay uncertainty and avoid

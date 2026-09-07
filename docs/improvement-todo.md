@@ -10,7 +10,7 @@ Status values:
 - `BLOCKED`: requires an external decision, credential, service, or environment
 - `PAUSED`: intentionally archived; no further implementation or runtime attempts
 
-## Current Queue - 2026-09-07 Responsiveness Resumed
+## Current Queue - 2026-09-08 Implementation Resumed
 
 This queue takes precedence over the older backlog order. The evidence and
 sequencing rationale are in [optimization-roadmap.md](optimization-roadmap.md).
@@ -21,10 +21,10 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
 | Accepted | R1-03 | DONE | Preserve repaired mail-notification activation. | User reports the original symptom resolved on installed/running `1.4.4.6`; fix `0d4dad8`. This does not independently validate every cold-start or multi-account scenario. |
-| 1 | F0-01 | IN PROGRESS | Compare first use with the existing prewarm setting enabled. | User confirms prewarm currently off; the same run now contains 7 successful reopens, latest three early callbacks 70.324/68.499/67.800 ms. Keep this off-state record separate. Next enable the existing setting, restart the same 1.4.4.7 diagnostic build, wait without opening and record the new run before its first open. No P95/gain claim. |
+| Archived | F0-01 | PAUSED | Preserve the partial observations; no further benchmark runs requested. | User ended benchmarking on 2026-09-08. No complete P95, controlled prewarm comparison, frame trace or improvement claim. Retain the corrected toggle-without-restart annotation; do not ask for more samples. |
 | 2 | R1-01 | DONE | Preserve account identity in global-search agenda deduplication and result keys. | Both operations use one structural identity, including account and item kind. Two-account collisions and original payload lookup are tested; 15 new tests, 1322 total, clean Debug x64 build. Not yet packaged or live-tested with two accounts. |
-| 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
-| 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
+| Deferred | F1-01 | PAUSED | Keep existing efficiency and working-set policy. | Current observations do not justify a policy change; user ended the benchmark pass. No new trim or animation experiment. |
+| Now | M1-07 | IN PROGRESS | Render global search before building a cancellable metadata-only index. | R1-01 is implemented. Proceed using concrete synchronous-I/O evidence, without more benchmarks or quantified speed claims. Preserve cancellation, source/account validity and selected-item routing. |
 | 5 | F1-02 | TODO | Apply calendar changes without rebuilding unchanged visible cells/timeline geometry. | Profile publication and manual-sync paths; avoid duplicate application of the same state, preserve end times, source account, date selection, scroll and editing state. |
 | 6 | F1-03 | TODO | Update displayed mail/search results incrementally. | Existing bulk-load suppression already exists; target `_displayedItems.Clear()` and churn in `ApplyMailSearch`, preserve selection/scroll, unread convergence and account-scoped navigation. |
 | 7 | F1-04 | TODO | Profile HTML preparation and page lifetime before adjusting reader caching. | Separate sanitization, WebView initialization, navigation and network; stale account/message work never displays; preserve sanitization/remote-resource restrictions; no default global WebView prewarm. |
@@ -2235,29 +2235,42 @@ They are historical records; active work remains in the backlog tables above.
 - F0-01 remains IN PROGRESS; frame tracing, measurement overhead and a larger
   comparable sample remain outstanding. Commit: `docs: record warm reopen observations`.
 
-### 2026-09-07 F0-01 Prewarm-Off State Confirmed
+### 2026-09-07 F0-01 Prewarm Preference Report (Corrected)
 
-- The user confirms 'Preload tray flyout after startup' is currently off and
-  reports three additional tests. The same process/run remains active; no
-  settings or process changes were made by the agent.
+- The initial message was interpreted as off during the three additional tests.
+  The user then clarified that they enabled the toggle before those tests.
+  Read-only recheck confirms the same process 10584, started at 15:36:38 local,
+  remains active: no restart occurred. No setting change was made by the agent.
 - The log contains four new completed reopens since the preceding read, seven
   total. The intervening extra operation's early callback is 66.674 ms; the
   latest three are 70.324, 68.499 and 67.800 ms. Their content-applied checkpoints
   are 8.610, 8.089 and 8.539 ms, and open-completed callbacks 379.843, 374.554
   and 382.698 ms. All have complete successful endpoints, with no reported
   failures, loss or cancellation. Exact hide times are still not recorded.
-- Annotate this session with the user's reported off-state; the log itself does
-  not expose the captured startup preference. Do not silently infer or mix
-  configuration changes. Seven samples still do not qualify for P95.
+- Annotate the latest tests as 'toggle enabled without restart, existing Flyout
+  already initialized'. Do not label them a clean off-state batch or an enabled
+  startup-prewarm treatment. The log does not expose the captured startup
+  preference. Seven samples still do not qualify for P95.
 - Next controlled step uses the existing option, not a new package or default
-  policy: enable prewarm in Settings > System & General, exit normally, restart
+  policy: keep prewarm enabled in Settings > System & General, exit normally, restart
   through the 1.4.4.7 sidecar launcher, wait at least fifteen seconds without
   opening Flyout or the main window, and provide the new StartedAndLogging run.
   Inspect its pre-first-open footprint before requesting one first open.
 - Enabled preference does not prove prewarm ran: memory gates and cache hydration
   can skip/delay it. Record that uncertainty and verify the new observations.
   The memory snapshot will describe that state, not a precisely attributed
-  increase over unmatched earlier snapshots. Preserve the off-state run and
+  increase over unmatched earlier snapshots. Preserve the original run and
   existing settings context; do not combine on/off runs for a percentile.
-- Commit: `docs: record confirmed prewarm-off sample`. F0-01 remains IN PROGRESS;
-  no performance improvement or runtime setting change is claimed by this update.
+- The initial interpretation was committed as `docs: record confirmed prewarm-off sample`;
+  this correction supersedes that configuration label. F0-01 remains IN PROGRESS.
+
+### 2026-09-07 F0-01 Toggle Timing Clarification
+
+- `FlyoutPrewarmToggle_Toggled` only saves the preference; prewarm is scheduled
+  from OnLaunched. Changing the toggle does not construct/prewarm the current
+  process again. The latest three measurements are still valid reopen data,
+  but cannot show the benefit of prewarming before a fresh process's first use.
+- Next: normal Exit with the preference left on, restart through the same 1.4.4.7
+  sidecar, wait at least fifteen seconds without opening an app surface, then
+  inspect the new run and first-open path. No retest/repackage is needed just
+  to correct this annotation. Commit: `docs: correct prewarm toggle timing`.
