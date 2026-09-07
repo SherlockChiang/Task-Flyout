@@ -107,6 +107,13 @@ guarded launcher with the candidate's exact version/hash/MVID, leaving the main
 launcher's accepted `1.4.4.6` defaults unchanged. Validate one operation before
 collecting another batch. Candidate identity is recorded in the local todo.
 
+On 2026-09-07, installed `1.4.4.7` emitted both checkpoints for one real first
+open: host-visible Rendering at 1100.630 ms and open-completed Rendering at
+1408.427 ms, in run `826586eb218b4de1ba182cca22d11fab`. This validates the
+observation path on this host, not its overhead or a performance improvement.
+The first open spent most of its recorded time before cached-content application;
+warm samples are required to distinguish initial setup from repeat-open cost.
+
 Checkpoints share an operation ID and monotonic start; they are cumulative,
 not individual phase durations. Each operation records `started`, then at most
 one terminal outcome. First attempts per scenario/process are `cold_attempt`,

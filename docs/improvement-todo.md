@@ -21,7 +21,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
 | Accepted | R1-03 | DONE | Preserve repaired mail-notification activation. | User reports the original symptom resolved on installed/running `1.4.4.6`; fix `0d4dad8`. This does not independently validate every cold-start or multi-account scenario. |
-| 1 | F0-01 | IN PROGRESS | Validate the new early observation before collecting more cycles. | Two warm commands logged (~373 ms, post-transition). Fix `f394bb0` separates visible-host Rendering from completion; signed `1.4.4.7` candidate is ready with R1-01 included. 1331 tests pass in Debug/Release; install and one-operation runtime check remain pending. No P95 or performance gain is claimed. |
+| 1 | F0-01 | IN PROGRESS | Compare first-open and repeated-open preparation with the corrected endpoints. | Installed/running `1.4.4.7`, run `826586eb218b4de1ba182cca22d11fab`, now emitted both early host-visible and open-completed records successfully. One first-open observation: 1100.630/1408.427 ms, with content-applied at 1010.061 ms. Collect three warm checks before another batch; no P95 or regression/gain claim from one sample. |
 | 2 | R1-01 | DONE | Preserve account identity in global-search agenda deduplication and result keys. | Both operations use one structural identity, including account and item kind. Two-account collisions and original payload lookup are tested; 15 new tests, 1322 total, clean Debug x64 build. Not yet packaged or live-tested with two accounts. |
 | 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
 | 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
@@ -2167,3 +2167,32 @@ They are historical records; active work remains in the backlog tables above.
   Do not request another full batch until that point and the retained tray/mail
   behaviors are checked. Actual frame presentation and observer overhead remain
   pending. Commit: `docs: archive split-endpoint measurement candidate`.
+
+### 2026-09-07 F0-01 Early Endpoint Validated On The Installed App
+
+- The user started the version-specific launcher. Process `10584` runs installed
+  `1.4.4.7`, run `826586eb218b4de1ba182cca22d11fab`, build
+  `194eb8db62d24a46a8332cef1212a47c`. Initial startup recorded 493.529 ms
+  (process wall-clock estimate) and the first remote-sync operation 2868.881 ms
+  (monotonic, includes remote work), one observation each.
+- After the requested single open/close, operation
+  `5708d109449744d78ad1974a2d48c3a2` has successful cumulative checkpoints:
+  efficiency-restored 14.264 ms; accounts-ready 14.677 ms; cached-content-applied
+  1010.061 ms; Show-returned 1018.875 ms; host-visible Rendering 1100.630 ms;
+  open-state handling 1405.621 ms; open-completed Rendering 1408.427 ms.
+- Both rendering observations fired on the real XAML-island host, in the intended
+  order. No timeout/cancel/unobserved outcome, sequence gap or reported write
+  loss is present in this snapshot. These remain pre-presentation observations,
+  not a direct measurement of the first visible screen pixels.
+- This first-open operation spent 995.384 ms between accounts-ready and content
+  application, which includes window construction, XAML loading/layout, content
+  work and dispatch waits. It is not a measurement of cache I/O alone. The new
+  observer is not enough evidence to attribute that interval to any one cause.
+- Do not compare this single first-open observation to the two earlier warm
+  samples or conclude the new build is slower. Next collect three warm open/close
+  operations with one-second dwell and two-second hidden intervals in this same
+  process, before requesting a larger sample. No settings changes or additional
+  installation are needed. P95 still requires at least twenty valid comparable
+  samples; frame pacing and observer overhead remain unmeasured.
+- No application code or user data was changed during this log inspection.
+  Commit: `docs: verify early-render endpoint on installed candidate`.
