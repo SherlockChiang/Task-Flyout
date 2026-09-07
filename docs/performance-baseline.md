@@ -20,7 +20,7 @@ Each process gets a random `run_id`. New records are appended in the background 
 
 The v2 CSV retains `run_id,sequence,timestamp,scenario,metric,start,end,duration,outcome,source` and adds `schema_version,build_id,build_version,configuration,architecture,operation_id,sample_kind,timing_basis,dropped_before,write_failures_before`. `build_id` is the application assembly MVID, not just the source SHA, so locally changed binaries are not assumed identical. Archive the source SHA and signed-package hash separately. Operation IDs are random diagnostic correlations, never provider/user IDs. Do not add account names, message/feed/calendar content, query text, URLs, locations, tokens, or arbitrary content fields.
 
-Captured milestones include process start to interactive tray, first flyout display, Calendar cached display and actual remote completion, Mail folders and successful HTML render, RSS successful article display, process-wide WebView2 initialization, and Weather Bar attachment/display. Calendar cache short-circuits are intentionally excluded from the remote-sync metric.
+Captured milestones include process start to interactive tray, first flyout open completion, Calendar cached display and actual remote completion, Mail folders and successful HTML render, RSS successful article display, process-wide WebView2 initialization, and Weather Bar attachment/display. Calendar cache short-circuits are intentionally excluded from the remote-sync metric.
 
 The summarizer reads both original ten-column logs and v2 logs; old files are not rewritten. By default runs stay separate. After confirming identical fixture, display, power, prewarm and diagnostic settings, use `-CombineRuns` to combine matching v2 build/configuration/architecture/scenario/source/sample-kind/timing-basis groups. Legacy records always stay per-run because their build identity is unknown. For initial P95 screening, collect at least 20 successful samples per comparable group (independent process runs for first attempts):
 
@@ -99,6 +99,13 @@ pre-presentation observation: the content may be clipped or transitioning, and
 it is not a screen-pixel or frame-present fence. Check its real XAML-island
 behavior and diagnostics overhead before using it for comparisons. Do not pool
 these metrics with the old post-transition endpoint.
+
+Candidate `1.4.4.7` packages this split observation and the R1-01 search identity
+fix. Its version-specific `Start-Performance.ps1` is next to the MSIX; use it only
+after installation and normal Exit of any existing process. It delegates to the
+guarded launcher with the candidate's exact version/hash/MVID, leaving the main
+launcher's accepted `1.4.4.6` defaults unchanged. Validate one operation before
+collecting another batch. Candidate identity is recorded in the local todo.
 
 Checkpoints share an operation ID and monotonic start; they are cumulative,
 not individual phase durations. Each operation records `started`, then at most

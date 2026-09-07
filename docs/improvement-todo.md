@@ -21,7 +21,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
 | Accepted | R1-03 | DONE | Preserve repaired mail-notification activation. | User reports the original symptom resolved on installed/running `1.4.4.6`; fix `0d4dad8`. This does not independently validate every cold-start or multi-account scenario. |
-| 1 | F0-01 | IN PROGRESS | Separate visible-host feedback observations from opening completion. | Two later warm commands now log successfully (372.836/373.840 ms to the old endpoint). The pinned library sets IsOpen after animation; updated source separates host-visible Rendering from completion. 1331 tests and clean Debug build pass; candidate and runtime validation remain pending. No P95 or policy change is justified. |
+| 1 | F0-01 | IN PROGRESS | Validate the new early observation before collecting more cycles. | Two warm commands logged (~373 ms, post-transition). Fix `f394bb0` separates visible-host Rendering from completion; signed `1.4.4.7` candidate is ready with R1-01 included. 1331 tests pass in Debug/Release; install and one-operation runtime check remain pending. No P95 or performance gain is claimed. |
 | 2 | R1-01 | DONE | Preserve account identity in global-search agenda deduplication and result keys. | Both operations use one structural identity, including account and item kind. Two-account collisions and original payload lookup are tested; 15 new tests, 1322 total, clean Debug x64 build. Not yet packaged or live-tested with two accounts. |
 | 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
 | 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
@@ -2137,3 +2137,33 @@ They are historical records; active work remains in the backlog tables above.
 - Commit: `diagnostics: separate opening feedback from completion`. Bundle this
   with the already-tested R1-01 search identity fix, then validate one new early
   observation before asking the user for another repeated-open batch.
+
+### 2026-09-07 F0-01 Split-Endpoint Candidate
+
+- Built/signed Release x64 `1.4.4.7` from
+  `f394bb01cb4355aa5d50044d1fda522b7fb7cbff`, including R1-01 search identity
+  and the split opening observations. Existing certificate
+  `15303040F7CEECFDE9C023F15481D15C39CCDB46` reused; no trust change or timestamp.
+- Artifact:
+  `AppPackages/PerformanceControl_1.4.4.7_f394bb0/Task_Flyout_1.4.4.7_x64_Test/Task_Flyout_1.4.4.7_x64.msix`.
+  SHA-256:
+  `5EBF601438FC076AF990AF6B4BFAFE7CD41ACB4218DE14F83A064C52426BC86B`.
+  Package manifest/signature verified. The packaged DLL matches its R2R output,
+  with Release informational version pointing to the exact source above.
+- DLL SHA-256:
+  `19188D26AEA4671152078FA3D46696C6AFDD219B51F25F4118C6BB0B7A11F98F`.
+  Build ID: `194eb8db62d24a46a8332cef1212a47c`.
+  `Start-Performance.ps1` beside the package delegates to the existing guarded
+  launcher with these exact identifiers; the default launcher still pins 1.4.4.6.
+  Its syntax and rejection of the still-installed old version were checked
+  without starting or stopping an application.
+- Debug/Release tests: 1331/1331 each; Debug build: zero warnings/errors; signed
+  Release packaging passed. No installed app was replaced or stopped. The same
+  `1.4.4.6` process remains running; manifest and Windhawk source hashes are
+  unchanged. No UI input, screenshot or private-memory dump was taken.
+- After normal tray Exit and installing the candidate, use its sidecar launcher
+  to start diagnostics. Verify only one open/close first: the early visible-host
+  callback may still report unavailable/not_observed on this XAML-island host.
+  Do not request another full batch until that point and the retained tray/mail
+  behaviors are checked. Actual frame presentation and observer overhead remain
+  pending. Commit: `docs: archive split-endpoint measurement candidate`.
