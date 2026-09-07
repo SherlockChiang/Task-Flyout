@@ -172,9 +172,19 @@ after the build finishes.
 
 The user accepted the functional tray behavior in Debug package `1.4.4.4`.
 Keep that artifact as a regression reference, not a Release performance result.
-F0-01 is in progress: the first instrumentation slice above exists, but no runtime
-timings or frame-pacing measurements have been collected for this pass. The
-metrics below remain requirements beyond the explicitly implemented fields.
+F0-01 is in progress: limited live first-use/reopen observations are now recorded
+in the local todo, but a complete comparative baseline, observer-overhead check
+and frame-pacing trace remain outstanding. The metrics below remain requirements
+beyond the explicitly implemented fields and verified observations.
+
+The current `1.4.4.7` run has one first-use early callback at 1100.630 ms and
+three subsequent callbacks at 97.342, 65.281 and 66.637 ms. This small sample
+supports investigating first-use setup; it does not establish tail latency or
+justify changing trim/animation policy. Before an existing-prewarm on/off
+comparison, confirm the actual settings toggle rather than assuming its default.
+The toggle is read at startup, followed by an eight-second delay and memory
+gates; changing it does not prewarm the current process. Keep its value recorded
+per run and do not combine differently configured sessions into one percentile.
 
 Existing instrumentation needs care: `MarkOnce` records a zero-duration milestone
 once per process; `tray_click_to_open_request` ends after requesting a toggle.

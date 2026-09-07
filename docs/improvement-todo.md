@@ -21,7 +21,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
 | Accepted | R1-03 | DONE | Preserve repaired mail-notification activation. | User reports the original symptom resolved on installed/running `1.4.4.6`; fix `0d4dad8`. This does not independently validate every cold-start or multi-account scenario. |
-| 1 | F0-01 | IN PROGRESS | Compare first-open and repeated-open preparation with the corrected endpoints. | Installed/running `1.4.4.7`, run `826586eb218b4de1ba182cca22d11fab`, now emitted both early host-visible and open-completed records successfully. One first-open observation: 1100.630/1408.427 ms, with content-applied at 1010.061 ms. Collect three warm checks before another batch; no P95 or regression/gain claim from one sample. |
+| 1 | F0-01 | IN PROGRESS | Investigate first-use setup with the existing prewarm option before policy changes. | Run `826586eb218b4de1ba182cca22d11fab`: one first-use host-visible callback at 1100.630 ms; three successful reopens at 97.342/65.281/66.637 ms. Capture works; first-use setup is the current investigation target. Confirm the actual prewarm setting before comparing sessions on the same build. No P95/gain claim. |
 | 2 | R1-01 | DONE | Preserve account identity in global-search agenda deduplication and result keys. | Both operations use one structural identity, including account and item kind. Two-account collisions and original payload lookup are tested; 15 new tests, 1322 total, clean Debug x64 build. Not yet packaged or live-tested with two accounts. |
 | 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
 | 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
@@ -2196,3 +2196,41 @@ They are historical records; active work remains in the backlog tables above.
   samples; frame pacing and observer overhead remain unmeasured.
 - No application code or user data was changed during this log inspection.
   Commit: `docs: verify early-render endpoint on installed candidate`.
+
+### 2026-09-07 F0-01 Three Reopens And Prewarm Follow-Up
+
+- All three requested reopen operations in the same `1.4.4.7` run produced
+  complete successful checkpoints. No cancelled, superseded, timeout, missing
+  early observation, sequence gap or reported loss appeared in this snapshot.
+  Per-operation cumulative timings (milliseconds, in observed order):
+
+| Checkpoint | Reopen 1 | Reopen 2 | Reopen 3 |
+| --- | --- | --- | --- |
+| Efficiency restored | 14.460 | 7.000 | 7.012 |
+| Cached content applied | 22.606 | 8.366 | 8.393 |
+| Show returned | 31.179 | 12.506 | 12.308 |
+| Host-visible Rendering | 97.342 | 65.281 | 66.637 |
+| Open-completed Rendering | 405.287 | 365.279 | 378.116 |
+
+- The earlier first-use content/early-render checkpoints were 1010.061/1100.630 ms.
+  This points to initial window/content setup as a useful investigation target,
+  not proof of a particular expensive method or a measured optimization gain.
+  Keep the efficiency/trim and animation policies unchanged for now.
+- The first reopen's command was roughly 36 minutes after the previous command;
+  subsequent command-to-command gaps were about 8.506 and 7.433 seconds. Exact
+  hidden intervals are not logged. Do not treat all three as a precisely timed
+  two-second-hidden cohort, calculate P95 from three samples, or equate Rendering
+  with physical presentation/physical click latency.
+- Read-only inspection confirms an existing opt-in prewarm path: startup waits
+  eight seconds, checks memory pressure/512 MiB usage ceiling/768 MiB headroom,
+  waits for account/cache hydration, then constructs/prepares the hidden Flyout.
+  The settings toggle only saves the preference; it applies on the next startup.
+  Its actual value and whether the gates allowed it in this run are unknown.
+- Next confirm the current 'Preload tray flyout after startup' setting before
+  proposing an on/off comparison using the same installed build and diagnostic
+  launcher. No new package is required for that existing option. Record the
+  preference per run and keep unlike sessions separate; verify memory costs and
+  cold-first feedback before changing defaults. No setting or runtime behavior
+  was changed during this inspection.
+- F0-01 remains IN PROGRESS; frame tracing, measurement overhead and a larger
+  comparable sample remain outstanding. Commit: `docs: record warm reopen observations`.
