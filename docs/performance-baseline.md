@@ -60,9 +60,11 @@ DLL to hash it, so this is process-cold, not a cold filesystem-cache experiment.
 
 `scripts/test-performance-session.ps1` validates the plan and guards without
 launching the app. All 14 checks passed in both PowerShell implementations while
-the real app was running. The actual launch/log-confirmation branch has not yet
-been exercised in this pass because normal exit is still required. Do not claim
-runtime timings from these preflight checks.
+the real app was running. On 2026-09-07 the user successfully exercised the actual
+launch branch; run `807dd548099940499c2d3f5277409e19` and its expected Release
+build were independently confirmed in the log. Its initial snapshot contains
+only one startup and one remote-sync observation, not an interaction baseline.
+Do not claim runtime timings from the preflight checks themselves.
 
 After `StartedAndLogging`, use the fixed short/long hidden intervals and separate
 search sessions from the protocol below. Accumulate 20 successful comparable

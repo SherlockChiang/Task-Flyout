@@ -21,7 +21,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
 | Accepted | R1-03 | DONE | Preserve repaired mail-notification activation. | User reports the original symptom resolved on installed/running `1.4.4.6`; fix `0d4dad8`. This does not independently validate every cold-start or multi-account scenario. |
-| 1 | F0-01 | IN PROGRESS | Collect comparable interaction measurements on the accepted Release build. | Installed/running `1.4.4.6` confirmed; no samples found. `start-performance-session.ps1` is ready and its 14 preflight/guard checks pass in both PowerShell versions. Await normal Exit, actual diagnostic launch and verified fresh run ID; no timings or gains are claimed. |
+| 1 | F0-01 | IN PROGRESS | Collect comparable interaction measurements on the accepted Release build. | User launched `1.4.4.6` with diagnostics; run `807dd548099940499c2d3f5277409e19` and Release build identity verified in the log. Initial snapshot has one startup and one remote-sync observation, no Flyout/search samples. Collect short-hidden reopen samples next; no P95 or optimization gain is claimed. |
 | 2 | R1-01 | DONE | Preserve account identity in global-search agenda deduplication and result keys. | Both operations use one structural identity, including account and item kind. Two-account collisions and original payload lookup are tested; 15 new tests, 1322 total, clean Debug x64 build. Not yet packaged or live-tested with two accounts. |
 | 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
 | 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
@@ -2051,3 +2051,32 @@ They are historical records; active work remains in the backlog tables above.
   claimed. Instructions are in `performance-baseline.md`.
 - Commit: `test: add guarded performance session launcher`. F0-01 remains active;
   the next step is an actual diagnostic session, not another baseline rebuild.
+
+### 2026-09-07 F0-01 First Diagnostic Run Confirmed
+
+- The user ran `start-performance-session.ps1` successfully. Read-only process
+  and log inspection confirmed process `35240` executing installed `1.4.4.6`,
+  run `807dd548099940499c2d3f5277409e19`, Release build
+  `baa8f3b20cd14ae2ab0518a1050732a3`, and the packaged LocalCache log location.
+  The user-run launcher reported `StandaloneTaskbarSuppressed=True`.
+- Initial snapshot: sequences 1-2, no recorded drops/write failures and no
+  incomplete operations. `startup/tray_interactive`: 475.120 ms, one observation,
+  explicitly a process wall-clock estimate. `calendar/first_remote_sync_completion`:
+  3559.615 ms, one monotonic remote-operation observation including network work.
+  Neither is a repeated Flyout-open measurement. No interaction P95 is available.
+- Environment snapshot: Intel Core Ultra 7 155H, 16 cores/22 logical processors;
+  Windows build 26200; reported visible memory 33,215,864 KiB; active power scheme
+  Balanced. The Windows power-mode slider, DPI/refresh, prewarm preference and
+  fixture sizes are not yet recorded, so these are provisional observations,
+  not a complete comparative benchmark or proof of a performance gain.
+- No Flyout or search operations appeared in this initial run snapshot. Next
+  manual slice: single-click open, dwell about one second, click outside to
+  dismiss, wait two seconds, repeat 21 times to target one first attempt and
+  twenty subsequent successful opens. Keep settings unchanged and avoid mixing
+  main-window/search operations into this first slice. Actual valid counts and
+  cancellation/failure outcomes must be checked afterward.
+- The launch/log-confirmation branch is now verified through the user's run plus
+  matching log reads. F0-01 remains IN PROGRESS for interaction samples and the
+  outstanding frame/GC/allocation/overhead work. No app setting, process or file
+  in the user's data store was changed by this inspection; no raw log was added
+  to Git. Commit: `docs: record first verified diagnostic run`.
