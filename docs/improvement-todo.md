@@ -21,7 +21,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
 | Accepted | R1-03 | DONE | Preserve repaired mail-notification activation. | User reports the original symptom resolved on installed/running `1.4.4.6`; fix `0d4dad8`. This does not independently validate every cold-start or multi-account scenario. |
-| 1 | F0-01 | IN PROGRESS | Collect comparable interaction measurements on the accepted Release build. | User launched `1.4.4.6` with diagnostics; run `807dd548099940499c2d3f5277409e19` and Release build identity verified in the log. Initial snapshot has one startup and one remote-sync observation, no Flyout/search samples. Collect short-hidden reopen samples next; no P95 or optimization gain is claimed. |
+| 1 | F0-01 | IN PROGRESS | Validate capture coverage before interpreting interaction measurements. | Run `807dd548099940499c2d3f5277409e19` has one successful first-open observation (616.138 ms to a pre-presentation callback), but no warm attempts after the user's completion report. Same process, unchanged log across rereads; resolve input/capture/writer coverage before asking for another batch. No P95 or policy change is justified. |
 | 2 | R1-01 | DONE | Preserve account identity in global-search agenda deduplication and result keys. | Both operations use one structural identity, including account and item kind. Two-account collisions and original payload lookup are tested; 15 new tests, 1322 total, clean Debug x64 build. Not yet packaged or live-tested with two accounts. |
 | 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
 | 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
@@ -2080,3 +2080,27 @@ They are historical records; active work remains in the backlog tables above.
   outstanding frame/GC/allocation/overhead work. No app setting, process or file
   in the user's data store was changed by this inspection; no raw log was added
   to Git. Commit: `docs: record first verified diagnostic run`.
+
+### 2026-09-07 F0-01 Incomplete Reopen Capture
+
+- After the user reported the requested operations complete, two fresh reads of
+  both known log locations still found only one Flyout command/operation in run
+  `807dd548099940499c2d3f5277409e19`. The same `1.4.4.6` process remains active;
+  the log is 4851 bytes and its last recorded timestamp is 14:20:57 local time.
+  No warm attempt, cancellation or ignored command was recorded. Do not infer
+  that the user did not perform the operations or that unlogged attempts passed.
+- The one first-open operation reached efficiency-restored at 5.831 ms,
+  accounts-ready at 6.198 ms, cached-content-applied at 221.392 ms, open-state
+  handling at 612.766 ms and the Rendering callback at 616.138 ms. These are
+  cumulative command-relative observations, not physical-input or frame-present
+  timings. The 391.374 ms between cached-content and open-state markers includes
+  the show/transition/dispatch path, not a proven CPU or animation-only cost.
+- Last emitted loss/failure counters are zero, but an unchanged log cannot rule
+  out later write failures. Source inspection found no once-only gate on
+  StartInteraction and no code that disables logging after initialization.
+  No concrete cause for the missing repeats has been established.
+- Pause the 21-cycle request. Next verify one known tray invocation and whether
+  its log grows, confirming the actual entry/window before further collection.
+  Do not change efficiency/trim or animation policy based on this single sample.
+- This checkpoint is observation only; no application code, runtime setting or
+  user data was changed. Commit: `docs: flag incomplete Flyout capture`.
