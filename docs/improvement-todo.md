@@ -20,7 +20,8 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | Order | ID | Status | Next bounded outcome | Verification / dependency |
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
-| 1 | F0-01 | IN PROGRESS | Establish repeatable interaction measurements on a signed Release baseline. | Signed Release control `1.4.4.5` from `38ce240` is verified and its deferred update request succeeded; observed registration/process remains `1.4.4.4`. Await normal exit/reactivation, then exact-build verification and runtime samples. See `performance-control-1.4.4.5.md`; presentation traces and overhead checks remain pending. |
+| Now | R1-03 | IN PROGRESS | Fix native mail-notification activation falling back to Calendar. | Reproduced SDK semicolon transport being rejected by the query-only parser. Parser/router fix and 13 actual-SDK synthetic contract checks pass; signed candidate and real notification-click acceptance remain pending. |
+| 1 | F0-01 | PAUSED | Resume repeatable interaction measurements after the notification regression is accepted. | `1.4.4.5` is now observed running from its installed directory. Hold performance sampling while R1-03 is active; no timings or gains are claimed. Preserve the control artifact and pending trace/overhead work. |
 | 2 | R1-01 | TODO | Include account identity in global-search agenda deduplication and result keys. | A separate correctness commit before search optimization; equal remote IDs from two accounts remain distinct and navigate correctly. |
 | 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
 | 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
@@ -150,7 +151,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M1-10 | DONE | Reliability/UI | Recover the taskbar weather bar after Explorer restarts. | Taskbar recreation triggers prompt reattachment or a throttled rebuild; disabled/re-enabled bars cannot reuse a dead native window; polling remains a fallback and the recovery matrix is tested. | `fix(weatherbar): recover after Explorer restarts` |
 | M1-11 | DONE | Reliability/Startup | Keep tray-triggered Flyout construction behind stable account hydration. | The click path records request diagnostics and restores efficiency state on failure; the Flyout never enumerates the account collection while startup hydration is mutating it. | `fix(flyout): serialize account hydration before opening` |
 | M1-12 | DONE | Reliability/Calendar | Refresh agenda data while the Flyout remains hidden. | The app heartbeat force-refreshes the shared agenda range at the configured interval after account hydration, throttles failed attempts, invalidates the reminder snapshot, and checks upcoming events against the refreshed cache. | `fix(calendar): refresh agenda while flyout is hidden` |
-| M1-13 | DONE | Reliability/Mail | Open new-mail notification targets directly after background-only polling. | Polling keeps a bounded body-free unread metadata slice without presenting it as a complete folder window; activation resolves explicit Inbox aliases, falls back across folders only for Google/Outlook identities, and never treats IMAP UIDs as cross-folder identities. | `fix(mail): open notification targets reliably` |
+| M1-13 | IN PROGRESS | Reliability/Mail | Open new-mail notification targets directly after background-only polling. | Prior cache/folder-identity work is retained. Reopened for R1-03: actual SDK activation transport was rejected before mail navigation; live click acceptance is required after the parser fix. | `fix(mail): open notification targets reliably`; R1-03 follow-up |
 | M1-14 | DONE | Data integrity/Mail | Keep unread state coherent across provider, folder views, cache, notifications, and background polling. | Read/unread mutations update every cached identity for the account, reconcile authoritative provider state after refresh, and cannot resurrect stale unread badges or notifications. | `fix(mail): converge mutable state by provider identity`, `fix(mail): reconcile authoritative unread snapshots`, `fix(mail): synchronize unread UI and notifications` |
 | M1-15 | DONE | Reliability/Calendar | Correct event editor times, timeline duration, date-strip overflow, and automatic refresh. | Existing events hydrate both start and end controls; the day timeline renders the complete interval; the date header has no unintended horizontal scrollbar; foreground and hidden refresh paths reliably publish fresh data without overlap or stale replacement. | `fix(calendar): align event times and timeline`, `fix(calendar): publish background refreshes to open views`, `fix(google): route mutations to source calendar` |
 | M1-16 | DONE | Reliability/Flyout | Reliably dismiss an unpinned Flyout and preserve distinct tray gestures. | User accepted `1.4.4.4` single-click, double-click and outside-click behavior. Explicit dismissal cancels pending Flyout work and stale hydration continuations. Preserve pinned/opening/closing/cold-start stress cases as the ongoing regression matrix. | `fix(flyout): close reliably on focus loss`, `fix(flyout): preserve tray activation handoff`, `fix(flyout): complete tray activation handoff`, `433c171` |
@@ -1940,3 +1941,33 @@ They are historical records; active work remains in the backlog tables above.
 - Next: normal tray-menu Exit, reactivate the registered app, confirm version
   and process path `1.4.4.5`, then test. Do not repeat installation or claim the
   pending update is already running. No process was forcibly terminated.
+
+### 2026-09-07 R1-03 Mail Notification Transport Regression
+
+- The user reports that a Windows mail notification still opens Calendar.
+  Read-only process inspection now confirms installed `1.4.4.5` is running;
+  this is not dismissed as an unactivated old `1.4.4.4` process. F0-01 sampling
+  is paused while the user-visible regression is addressed.
+- Root cause: MailService uses SDK `AppNotificationBuilder.AddArgument`, whose
+  payload separates arguments with semicolons. `NotificationActivationParser`
+  explicitly rejected every semicolon and only split on ampersands. The service
+  then interpreted rejected mail payloads as a generic main-window activation,
+  causing the default Calendar page to appear. Prior tests used hand-written
+  ampersand examples and did not exercise the SDK-generated wire format.
+- Fixed SDK parsing and its limited percent encoding, preserving literal `+`
+  in Outlook base64 IDs. Native warm/cold activation paths identify SDK input;
+  legacy query-string callers remain supported. Validated routes now drive the
+  dispatch switch; invalid mail/agenda/copy payloads are ignored instead of
+  opening Calendar. Account/folder/message validation and agenda capability
+  checks remain in place; no broad provider-ID character expansion was made.
+- Shared startup suppression accepts only the exact `action=smoke` schema;
+  extra arguments do not alter taskbar suppression after semicolon support.
+  No native taskbar experiment was resumed and the manifest/Windhawk edits are
+  preserved outside this work.
+- Verification: 1307/1307 unit tests passed in both Debug and Release; the final
+  Debug x64 application build passed with zero warnings/errors.
+  The separate actual-SDK synthetic probe passed all 13 checks in the normal
+  user runtime, without displaying notifications or accessing mailbox data.
+  Signed candidate preparation follows; a real toast click
+  remains a pending runtime check, not an inferred success from these tests.
+- Commit: `fix: parse SDK notification arguments before routing`.

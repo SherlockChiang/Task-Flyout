@@ -1,9 +1,9 @@
 # Release Control 1.4.4.5
 
-Status: packaged, statically verified, and submitted successfully to Windows
-for deferred registration. The observed registered/running version remains
-`1.4.4.4`; new-version activation and runtime tests are pending normal exit and
-restart. No interaction percentiles or performance improvement are claimed.
+Status: `1.4.4.5` is now observed running from its installed WindowsApps directory.
+The user reports mail notification clicks still land on Calendar. Performance
+sampling is paused for R1-03 activation-routing repair; this control has not
+passed that functional gate. No interaction percentiles or gains are claimed.
 The accepted Debug `1.4.4.4` remains a functional reference, not a comparable
 Release timing baseline.
 
@@ -66,6 +66,11 @@ runtime dependency. Wait for normal exit, reactivate through the registered
 application identity (not the old executable path), and verify both registered
 version and process path are `1.4.4.5`. Do not repeat installation or call the
 old process's measurements Release-control results.
+
+Update on 2026-09-07: the process path now confirms `1.4.4.5`. The deferred-update
+resume instruction above is historical; do not reinstall this control. Resolve
+the reported mail-notification regression and obtain fresh candidate acceptance
+before resuming the measurement sequence.
 
 1. After installation is approved, exit Task Flyout normally and install this
    exact package. Record the installed version before testing. Keep the accepted

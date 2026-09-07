@@ -32,6 +32,16 @@ public class NotificationActivationParserTests
         Assert.Empty(result);
     }
 
+    [Fact]
+    public void Sdk_values_are_decoded_once_without_html_or_url_reinterpretation()
+    {
+        var values = NotificationActivationParser.ParseArguments(
+            "first=A+B/C%3D;second=%253B%3B%3D;third=literal&amp%3Btext", sdkEncoded: true);
+        Assert.Equal("A+B/C=", values["first"]);
+        Assert.Equal("%3B;=", values["second"]);
+        Assert.Equal("literal&amp;text", values["third"]);
+    }
+
     [Theory]
     [InlineData("abc-DEF_123.@/+=", true)]
     [InlineData("abc:123", false)]
@@ -62,7 +72,7 @@ public class NotificationActivationParserTests
     [InlineData("action=completeTask&token=0123456789abcdef0123456789abcdef&provider=Google", false)]
     [InlineData("action=completeTask&action=openAgenda&token=0123456789abcdef0123456789abcdef", false)]
     [InlineData("prefix----AppNotificationActivated:action=openAgenda&token=0123456789abcdef0123456789abcdef", false)]
-    [InlineData("action=openAgenda;token=0123456789abcdef0123456789abcdef", false)]
+    [InlineData("action=openAgenda;token=0123456789abcdef0123456789abcdef", true)]
     [InlineData("action=openAgenda&token=%GG", false)]
     public void Agenda_actions_require_exact_strict_schema(string value, bool expected)
     {

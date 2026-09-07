@@ -21,7 +21,7 @@ internal static class StandaloneTaskbarLaunchPolicy
 
         var arguments = NotificationActivationParser.ParseArguments(
             activationArgument);
-        return arguments.TryGetValue("action", out string? action) &&
+        return arguments.Count == 1 && arguments.TryGetValue("action", out string? action) &&
             string.Equals(action, "smoke", StringComparison.Ordinal);
     }
 }

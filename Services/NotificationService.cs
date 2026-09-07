@@ -282,47 +282,32 @@ namespace Task_Flyout.Services
 
         private void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)
         {
-            OpenFromActivationArguments(args.Argument);
+            OpenFromActivationArguments(args.Argument, sdkEncoded: true);
         }
 
-        public static void OpenFromActivationArguments(string argument)
+        public static void OpenFromActivationArguments(string argument, bool sdkEncoded = false)
         {
-            var arguments = NotificationActivationParser.ParseArguments(argument);
+            var route = NotificationActivationRouter.Parse(argument, sdkEncoded);
+            if (route.Kind == NotificationActivationKind.Ignore) return;
             App.MainDispatcherQueue?.TryEnqueue(async () =>
             {
-                if (NotificationActivationParser.TryParseAgendaAction(argument, out var agendaAction, out var agendaToken))
+                switch (route.Kind)
                 {
-                    if (App.Current is App app)
-                        await app.NotificationService.HandleAgendaActionAsync(agendaAction, agendaToken);
-                    return;
-                }
-                if (argument.Contains("openAgenda", StringComparison.Ordinal)
-                    || argument.Contains("snoozeAgenda", StringComparison.Ordinal)
-                    || argument.Contains("completeTask", StringComparison.Ordinal))
-                    return;
-                if (arguments.TryGetValue("action", out var copyAction) &&
-                    copyAction == "copyCode" &&
-                    arguments.TryGetValue("codeToken", out var codeToken) &&
-                    await VerificationCodeStore.TakeAsync(codeToken) is { } code)
-                {
-                    CopyVerificationCodeToClipboard(code);
-                    return;
-                }
-
-                if (arguments.TryGetValue("action", out var action) &&
-                    action == "openMail" &&
-                    arguments.TryGetValue("accountId", out var accountId) &&
-                    arguments.TryGetValue("folderId", out var folderId) &&
-                    arguments.TryGetValue("messageId", out var messageId) &&
-                    NotificationActivationParser.IsSafeIdToken(accountId) &&
-                    NotificationActivationParser.IsSafeIdToken(folderId) &&
-                    NotificationActivationParser.IsSafeIdToken(messageId))
-                {
-                    App.OpenMainWindowInternal(window => window.NavigateToMailMessage(accountId, folderId, messageId));
-                }
-                else
-                {
-                    App.OpenMainWindowInternal();
+                    case NotificationActivationKind.AgendaAction:
+                        if (App.Current is App app)
+                            await app.NotificationService.HandleAgendaActionAsync(route.Action, route.Token);
+                        break;
+                    case NotificationActivationKind.CopyCode:
+                        if (await VerificationCodeStore.TakeAsync(route.Token) is { } code)
+                            CopyVerificationCodeToClipboard(code);
+                        break;
+                    case NotificationActivationKind.OpenMail:
+                        App.OpenMainWindowInternal(window => window.NavigateToMailMessage(
+                            route.AccountId, route.FolderId, route.MessageId));
+                        break;
+                    case NotificationActivationKind.OpenMain:
+                        App.OpenMainWindowInternal();
+                        break;
                 }
             });
         }

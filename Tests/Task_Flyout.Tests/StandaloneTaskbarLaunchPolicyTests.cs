@@ -9,6 +9,7 @@ public class StandaloneTaskbarLaunchPolicyTests
     [InlineData("action=smoke", null, true)]
     [InlineData("action=openWeather", null, false)]
     [InlineData("action=smoke;invalid=true", null, false)]
+    [InlineData("action=smoke&invalid=true", null, false)]
     [InlineData(null, "1", true)]
     [InlineData("action=openWeather", " 1 ", true)]
     [InlineData("action=smoke", "0", true)]

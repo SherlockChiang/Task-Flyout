@@ -458,7 +458,7 @@ namespace Task_Flyout
                 if (activationArgs.Kind == Microsoft.Windows.AppLifecycle.ExtendedActivationKind.AppNotification &&
                     activationArgs.Data is Microsoft.Windows.AppNotifications.AppNotificationActivatedEventArgs notificationArgs)
                 {
-                    NotificationService.OpenFromActivationArguments(notificationArgs.Argument);
+                    NotificationService.OpenFromActivationArguments(notificationArgs.Argument, sdkEncoded: true);
                     return;
                 }
             }
