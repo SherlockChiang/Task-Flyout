@@ -24,14 +24,14 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | Archived | F0-01 | PAUSED | Preserve the partial observations; no further benchmark runs requested. | User ended benchmarking on 2026-09-08. No complete P95, controlled prewarm comparison, frame trace or improvement claim. Retain the corrected toggle-without-restart annotation; do not ask for more samples. |
 | 2 | R1-01 | DONE | Preserve account identity in global-search agenda deduplication and result keys. | Both operations use one structural identity, including account and item kind. Two-account collisions and original payload lookup are tested; 15 new tests, 1322 total, clean Debug x64 build. Not yet packaged or live-tested with two accounts. |
 | Deferred | F1-01 | PAUSED | Keep existing efficiency and working-set policy. | Current observations do not justify a policy change; user ended the benchmark pass. No new trim or animation experiment. |
-| Now | M1-07 | IN PROGRESS | Render global search before building a cancellable metadata-only index. | R1-01 is implemented. Proceed using concrete synchronous-I/O evidence, without more benchmarks or quantified speed claims. Preserve cancellation, source/account validity and selected-item routing. |
+| Now | M1-07 | IN PROGRESS | Functionally verify the asynchronous search implementation. | Source implementation complete: shell/commands precede indexing; bounded cancellable workers, source/session/query guards, detached account visibility and body-free RSS records. 1340 Debug/Release tests and clean Debug x64 build pass. Normal UI acceptance remains; no more benchmarks requested. |
 | 5 | F1-02 | TODO | Apply calendar changes without rebuilding unchanged visible cells/timeline geometry. | Profile publication and manual-sync paths; avoid duplicate application of the same state, preserve end times, source account, date selection, scroll and editing state. |
 | 6 | F1-03 | TODO | Update displayed mail/search results incrementally. | Existing bulk-load suppression already exists; target `_displayedItems.Clear()` and churn in `ApplyMailSearch`, preserve selection/scroll, unread convergence and account-scoped navigation. |
 | 7 | F1-04 | TODO | Profile HTML preparation and page lifetime before adjusting reader caching. | Separate sanitization, WebView initialization, navigation and network; stale account/message work never displays; preserve sanitization/remote-resource restrictions; no default global WebView prewarm. |
 | Release gate | M3-09 / R1-02 | IN PROGRESS | Finish multi-Google acceptance and add PR WinUI build validation. | Multi-account implementation awaits its own two-account matrix; R1-02 remains TODO. Tray acceptance does not approve either. Do not auto-merge or publish. |
 | Data gate | M1-03 | TODO | Preserve unreadable protected files and version the format before plaintext migration. | Still a pre-release requirement and prerequisite for persistence changes; recognized legacy JSON only, unreadable ciphertext stays byte-identical, atomic migration tested. |
 | Later | M1-05 / M1-04 / M1-08 | TODO | Safely migrate storage, prune obsolete tokens and remove measured UI persistence stalls. | M1-03 first for persistence/migration changes; separate rollback-tested commits, not a directory rename or blanket Task.Run on UI-bound collections. |
-| Later | M2-02 / M2-01 | IN PROGRESS | Complete prewarm measurements and bound long-lived mail coordination state. | Prewarm implementation exists but needs F0-01 measurements; M2-01 remains TODO. Measure idle soak separately from interaction latency. |
+| Later | M2-02 / M2-01 | PAUSED / TODO | Retain prewarm as-is; mail coordination remains a later implementation item. | User ended benchmark work; do not request more prewarm/idle samples. No default or power-policy change is justified by the partial observations. |
 | Later | M1-02 / M2-05 / M2-06 / M2-04 / M2-07 | TODO | Improve existing controls/accessibility and incrementally share tested Core code. | Keep current WinUI design; no broad redesign, whole-repo formatting or whole-service extraction in the responsiveness pass. |
 | External | M0-06 | BLOCKED | Resume OAuth submission after core workflows pass packaged validation. | Retain existing Gmail scope/function decisions; latest recorded console audit is 2026-09-02, not a current live claim. Recheck Branding, prepare demo, obtain approval for external submission. |
 | Paused | M3-03 through M3-08 | PAUSED | Preserve experimental taskbar-weather work as an archive. | No Windhawk installation, new Explorer injection or diagnostic rebuild/signing/runtime experiments. Normal candidate packaging may sign the bundled components without running them. |
@@ -145,7 +145,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M1-04 | TODO | Privacy/Lifecycle | Bound notification-action and verification-code retention. | Expired/invalid tokens are deleted on read and during bounded startup/heartbeat pruning; per-scope row counts remain bounded across restart. | `privacy: prune expired notification tokens` |
 | M1-05 | TODO | Storage | Move device-local protected SQLite data from roaming to local app data. | Upgrade performs an atomic, verified, restart-safe migration with rollback; caches and device-bound DPAPI ciphertext no longer live under `%APPDATA%`. | `fix: migrate protected store to local app data` |
 | M1-06 | TODO | Reliability | Propagate cancellation and timeout semantics through calendar/task mutations. | Provider list/CRUD APIs accept cancellation; page unload and exit release pending operations; ambiguous remote outcomes instruct the user to refresh. | `reliability: bound provider mutations` |
-| M1-07 | TODO | Performance | Remove synchronous cache/decryption work from global-search opening. | The search shell appears before indexing; index construction is asynchronous, cancellable, generation-safe, and uses lightweight searchable DTOs. | `perf: build global search index asynchronously` |
+| M1-07 | IN PROGRESS | Performance | Remove synchronous cache/decryption work from global-search opening. | Implemented and build/unit-verified; shell/commands first, cancellable background index/query, source invalidation and body-free RSS payloads. Real WinUI functional acceptance remains pending, not a benchmark requirement. | `perf: build global search index asynchronously` |
 | M1-08 | TODO | Performance | Move SQLite, DPAPI, and full-cache serialization off visible UI paths. | Locks contain memory-only changes/snapshot creation; a versioned background writer performs persistence; slow-disk tests show no long dispatcher stalls. | `perf: move cache persistence off ui thread` |
 | M1-09 | TODO | Reliability | Replace blanket handling of unknown UI exceptions with scoped async boundaries. | Fire-and-forget operations use a named safe runner and restore flags/state; unknown global failures log and terminate or recover explicitly instead of always setting `Handled`. | `reliability: add scoped async exception boundaries` |
 | M1-10 | DONE | Reliability/UI | Recover the taskbar weather bar after Explorer restarts. | Taskbar recreation triggers prompt reattachment or a throttled rebuild; disabled/re-enabled bars cannot reuse a dead native window; polling remains a fallback and the recovery matrix is tested. | `fix(weatherbar): recover after Explorer restarts` |
@@ -2274,3 +2274,52 @@ They are historical records; active work remains in the backlog tables above.
   sidecar, wait at least fifteen seconds without opening an app surface, then
   inspect the new run and first-open path. No retest/repackage is needed just
   to correct this annotation. Commit: `docs: correct prewarm toggle timing`.
+
+### 2026-09-08 Benchmark Pass Closed By User
+
+- The user explicitly ended baseline testing and asked to continue implementation.
+  Preserve the corrected toggle-without-restart history and partial observations;
+  do not request another warm/cold/prewarm run or claim a completed P95/trace.
+- F0-01/F1-01 are paused; efficiency, working-set trimming, animations and the
+  existing prewarm default remain unchanged. No diagnostic app was launched,
+  stopped or reconfigured and no runtime log was collected during this change.
+- Continue with the independent synchronous-search issue. The earlier audit's
+  RSS description needed refinement: normal SQL paging already excluded HTML;
+  synchronous pre-display queries/decryption and the broad article payload type
+  were the remaining problems, not an unconditional SQL body read.
+
+### 2026-09-08 M1-07 Asynchronous Global Search
+
+- Open displays the search shell and local commands without first building a
+  cache snapshot or loading an unrelated content page. Index work is queued only
+  after the shell's initial Rendering callback; cache-source invalidations cannot
+  bypass that ordering. This is not a physical frame-presentation measurement.
+- Cache cloning, protected mail-cache reads, RSS metadata queries, candidate
+  construction and nonempty query matching run on background workers. UI-owned
+  account visibility is copied into a private detached filter using existing
+  account rules; mail account IDs and localized labels are captured on the UI
+  thread. Live ObservableCollections and UI controls are not read by workers.
+- Each index/query worker admits at most one synchronous reader/matcher. New
+  requests cancel older work; generation, session, snapshot and source-version
+  checks reject stale publication. Text matching is cancellable and debounced;
+  empty queries keep commands immediate. Closing/hiding/exiting cancels work,
+  unsubscribes source events, clears payloads and restores navigation state.
+- Agenda/mail publication, account changes and RSS metadata changes invalidate
+  the snapshot. Activation checks current source/account validity and retains
+  original account-scoped agenda/mail targets. RSS search holds typed metadata
+  records with no HTML field; the existing reader loads only the selected body.
+  Normal SQL paging remains body-free, now with cancellation between rows/pages.
+  Existing one-time storage initialization/migration behavior was not rewritten.
+- Added a restrained loading indicator and localized unavailable-cache feedback.
+  A failed reader leaves commands usable; subsequent opens/source updates retry.
+  Existing ranking, per-group limits, 1000-article cap and reader privacy rules
+  are preserved. Blocking SQLite calls may still finish before cancellation is
+  observed, but they no longer run in the UI opening path or publish stale data.
+- Verification: 1340/1340 unit tests passed in Debug and Release; final Debug x64
+  app build has zero warnings/errors. Nine new cases cover cancelled/superseded
+  workers, queued-work bounds, failure recovery, search cancellation and SQL
+  metadata queries with the body column removed. No benchmark was performed.
+- Commit: `perf: build global search index asynchronously`. No package installation,
+  live WinUI interaction, account mutation or remote push was performed. The
+  original manifest and Windhawk source changes remain untouched/unstaged.
+  M1-07 remains open for ordinary functional UI acceptance, not more timing runs.

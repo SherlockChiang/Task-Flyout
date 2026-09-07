@@ -8,6 +8,31 @@ public class RssSqliteRepositoryTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "TaskFlyoutRssRepositoryTests", Guid.NewGuid().ToString("N"));
 
     [Fact]
+    public void Cancelled_metadata_query_does_not_initialize_storage()
+    {
+        string path = Path.Combine(_root, "cancelled.db");
+        var repository = new RssSqliteRepository(path);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(() => repository.QueryArticlesPage(
+            null, null, 0, 100, cancellationToken: cancellation.Token));
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
+    public void List_metadata_does_not_read_the_article_body_column()
+    {
+        var repository = new RssSqliteRepository(Path.Combine(_root, "metadata.db"));
+        repository.UpsertArticle(new RssArticleWriteRecord("article", "feed", "Feed", "Title", "", "Summary", "Body", "", "", 20));
+        using (var connection = repository.OpenConnection())
+            Execute(connection, "ALTER TABLE rss_articles DROP COLUMN html_content;");
+        var item = Assert.Single(repository.QueryArticlesPage(null, null, 0, 100));
+        Assert.Equal("Title", item.Title);
+        Assert.Equal("Summary", item.Summary);
+        Assert.Null(typeof(RssArticleRecord).GetProperty("HtmlContent"));
+    }
+
+    [Fact]
     public void Initialize_creates_schema_and_secure_delete_setting()
     {
         var databasePath = Path.Combine(_root, "rss.db");

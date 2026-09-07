@@ -158,11 +158,12 @@ CREATE TABLE IF NOT EXISTS rss_articles (
             }
         }
 
-        public List<RssArticleRecord> QueryArticlesPage(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter = RssArticleFilter.All, string? searchText = null)
+        public List<RssArticleRecord> QueryArticlesPage(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter = RssArticleFilter.All, string? searchText = null, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             Initialize();
             using var connection = OpenConnection();
-            return ReadArticles(connection, subscriptionId, folderId, skip, take, filter, searchText);
+            return ReadArticles(connection, subscriptionId, folderId, skip, take, filter, searchText, cancellationToken);
         }
 
         public RssRepositorySnapshot LoadSnapshot(int maximumArticleCount)
@@ -570,7 +571,7 @@ ON CONFLICT(id) DO UPDATE SET
             int skip,
             int take,
             RssArticleFilter filter,
-            string? searchText)
+            string? searchText, CancellationToken cancellationToken = default)
         {
             if (take <= 0) return new List<RssArticleRecord>();
             bool hasSubscription = !string.IsNullOrWhiteSpace(subscriptionId);
@@ -605,6 +606,7 @@ ORDER BY a.published_ticks DESC
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var article = new RssArticleRecord(
                     reader.GetString(0),
                     reader.GetString(1),

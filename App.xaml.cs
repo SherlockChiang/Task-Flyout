@@ -2217,6 +2217,7 @@ namespace Task_Flyout
             MemoryDiagnostics.Stop();
             Windows.System.MemoryManager.AppMemoryUsageIncreased -= MemoryManager_AppMemoryUsageIncreased;
             MyFlyoutWindow?.FinishOpenMeasurement();
+            MyMainWindow?.EndGlobalSearchSession();
             MyMainWindow?.CancelSearchMeasurements();
             await PerformanceDiagnostics.FlushAsync();
             MailService.NewMailArrived -= MailService_NewMailArrived;

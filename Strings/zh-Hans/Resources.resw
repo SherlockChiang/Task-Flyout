@@ -2049,4 +2049,5 @@ Widgets 抑制：就绪 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="WeatherWind_W" xml:space="preserve"><value>西</value></data>
   <data name="WeatherWind_NW" xml:space="preserve"><value>西北</value></data>
   <data name="TextRainHour" xml:space="preserve"><value>{0}小时</value></data>
+  <data name="GlobalSearch_LoadFailed" xml:space="preserve"><value>部分本地缓存结果暂时无法加载。</value></data>
 </root>

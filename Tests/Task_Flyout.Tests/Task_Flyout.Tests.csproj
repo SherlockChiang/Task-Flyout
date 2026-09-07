@@ -158,6 +158,7 @@
     <Compile Include="..\..\Services\CalendarWeekLayoutPolicy.cs" Link="Source\CalendarWeekLayoutPolicy.cs" />
     <Compile Include="..\..\Services\WeatherBarLayoutPolicy.cs" Link="Source\WeatherBarLayoutPolicy.cs" />
     <Compile Include="..\..\Services\GlobalSearchPolicy.cs" Link="Source\GlobalSearchPolicy.cs" />
+    <Compile Include="..\..\Services\LatestSearchWork.cs" Link="Source\LatestSearchWork.cs" />
   </ItemGroup>
 
 </Project>

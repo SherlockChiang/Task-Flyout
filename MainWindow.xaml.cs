@@ -8,6 +8,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Threading;
+using System.Collections.Specialized;
 using Task_Flyout.Models;
 using Task_Flyout.Services;
 using Task_Flyout.Views;
@@ -26,12 +28,26 @@ namespace Task_Flyout
         private Type _lastContentPageType = typeof(Views.CalendarPage);
         private readonly ObservableCollection<GlobalSearchResultGroup> _globalSearchGroups = new();
         private IReadOnlyList<GlobalSearchCandidate> _globalSearchSnapshot = Array.Empty<GlobalSearchCandidate>();
-        private readonly Dictionary<string, object> _globalSearchPayloads = new(StringComparer.Ordinal);
+        private Dictionary<string, object> _globalSearchPayloads = new(StringComparer.Ordinal);
         private DependencyObject? _globalSearchPreviousFocus;
         private PerformanceOperation? _searchOpenMeasurement;
         private PerformanceOperation? _searchQueryMeasurement;
         private IDisposable? _searchOpenRendering;
         private IDisposable? _searchQueryRendering;
+        private readonly LatestSearchWork _searchIndexWork = new();
+        private readonly LatestSearchWork _searchQueryWork = new();
+        private readonly List<GlobalSearchCandidate> _searchCommands = new();
+        private RssService? _globalSearchRss;
+        private App? _searchApp;
+        private volatile bool _globalSearchActive;
+        private volatile bool _searchShellPresented;
+        private long _searchSourceVersion;
+        private long _searchAppliedSourceVersion;
+        private int _searchRebuildQueued;
+        private long _searchSessionVersion;
+        private string? _searchDefaultHint;
+        private sealed record SearchEntry(GlobalSearchCandidate Candidate, object Payload);
+        private sealed record SearchSnapshot(IReadOnlyList<GlobalSearchCandidate> Candidates, Dictionary<string, object> Payloads, bool Partial);
 
         public MainWindow()
         {
@@ -52,7 +68,7 @@ namespace Task_Flyout
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(null);
             this.AppWindow.Closing += AppWindow_Closing;
-            this.Closed += (_, _) => CancelSearchMeasurements();
+            this.Closed += (_, _) => { EndGlobalSearchSession(); CancelSearchMeasurements(); };
             SizeToCurrentWorkArea();
 
             ContentFrame.Navigated += ContentFrame_Navigated;
@@ -282,6 +298,7 @@ namespace Task_Flyout
 
         private void ReleaseContentForBackground()
         {
+            EndGlobalSearchSession();
             CancelSearchMeasurements();
             if (ContentFrame.Content == null) return;
 
@@ -530,33 +547,41 @@ namespace Task_Flyout
 
         private void OpenGlobalSearch()
         {
+            EndGlobalSearchSession();
             CancelSearchMeasurements("superseded");
             var measurement = PerformanceDiagnostics.StartInteraction("search_open", "command_to_rendering", "ui");
             _searchOpenMeasurement = measurement;
             try
             {
-                EnsureContentLoaded();
                 _globalSearchPreviousFocus = FocusManager.GetFocusedElement(RootGrid.XamlRoot) as DependencyObject;
-                BuildGlobalSearchSnapshot();
-                measurement?.Checkpoint("command_to_snapshot_ready");
+                _globalSearchActive = true;
+                long session = _searchSessionVersion;
+                _searchDefaultHint ??= GlobalSearchHint.Text;
+                GlobalSearchHint.Text = _searchDefaultHint;
+                _searchCommands.Clear();
+                AddGlobalSearchCommands(_searchCommands);
+                _globalSearchSnapshot = _searchCommands.ToArray();
                 GlobalSearchBox.Text = "";
-                ApplyGlobalSearch("");
+                ApplyGlobalSearchResults(GlobalSearchPolicy.Search(_globalSearchSnapshot, ""));
                 measurement?.Checkpoint("command_to_results_applied");
                 MainNav.IsEnabled = false;
                 GlobalSearchOverlay.Visibility = Visibility.Visible;
                 UpdateGlobalSearchSize(RootGrid.ActualWidth, RootGrid.ActualHeight);
-                DispatcherQueue.TryEnqueue(() => GlobalSearchBox.Focus(FocusState.Programmatic));
-                if (measurement != null)
-                    _searchOpenRendering = NextRenderHelper.RunOnce(() =>
+                DispatcherQueue.TryEnqueue(() => { if (_globalSearchActive && session == _searchSessionVersion) GlobalSearchBox.Focus(FocusState.Programmatic); });
+                SubscribeSearchSources();
+                _searchOpenRendering = NextRenderHelper.RunOnce(() =>
                     {
-                        if (!ReferenceEquals(_searchOpenMeasurement, measurement)) return;
-                        measurement.Complete(AppWindow.IsVisible && GlobalSearchOverlay.Visibility == Visibility.Visible ? "success" : "cancelled");
+                        if (!_globalSearchActive || session != _searchSessionVersion || !ReferenceEquals(_searchOpenMeasurement, measurement)) return;
+                        measurement?.Complete(AppWindow.IsVisible ? "success" : "cancelled");
                         _searchOpenMeasurement = null;
                         _searchOpenRendering = null;
+                        _searchShellPresented = true;
+                        QueueSearchRebuild();
                     });
             }
             catch
             {
+                EndGlobalSearchSession();
                 CancelSearchMeasurements("failure");
                 throw;
             }
@@ -564,16 +589,88 @@ namespace Task_Flyout
 
         private void CloseGlobalSearch()
         {
+            bool wasVisible = GlobalSearchOverlay.Visibility == Visibility.Visible;
+            var previousFocus = _globalSearchPreviousFocus;
+            EndGlobalSearchSession();
             CancelSearchMeasurements();
-            if (GlobalSearchOverlay.Visibility != Visibility.Visible) return;
-            GlobalSearchOverlay.Visibility = Visibility.Collapsed;
-            MainNav.IsEnabled = true;
+            if (!wasVisible) return;
             GlobalSearchResultsList.SelectedItem = null;
-            if (_globalSearchPreviousFocus is Control control && control.IsEnabled && control.Visibility == Visibility.Visible)
+            if (previousFocus is Control control && control.IsEnabled && control.Visibility == Visibility.Visible)
                 control.Focus(FocusState.Programmatic);
             else
                 MainNav.Focus(FocusState.Programmatic);
             _globalSearchPreviousFocus = null;
+        }
+
+        internal void EndGlobalSearchSession()
+        {
+            _globalSearchActive = false;
+            _searchShellPresented = false;
+            GlobalSearchOverlay.Visibility = Visibility.Collapsed;
+            MainNav.IsEnabled = true;
+            _searchSessionVersion++;
+            Interlocked.Exchange(ref _searchRebuildQueued, 0);
+            _searchIndexWork.Cancel();
+            _searchQueryWork.Cancel();
+            UnsubscribeSearchSources();
+            _globalSearchSnapshot = Array.Empty<GlobalSearchCandidate>();
+            _globalSearchPreviousFocus = null;
+            _globalSearchPayloads.Clear();
+            _searchCommands.Clear();
+            _globalSearchGroups.Clear();
+            GlobalSearchIndexProgress.IsActive = false;
+        }
+
+        private void SubscribeSearchSources()
+        {
+            _searchApp = App.Current as App;
+            if (_searchApp != null)
+            {
+                _searchApp.SyncManager.CachePublished += SearchAgendaPublished;
+                _searchApp.SyncManager.AccountManager.Changed += SearchSourcesChanged;
+                _searchApp.SyncManager.AccountManager.Accounts.CollectionChanged += SearchAccountsChanged;
+                _searchApp.MailService.CachePublished += SearchMailPublished;
+                _searchApp.MailService.AccountsChanged += SearchSourcesChanged;
+            }
+            RssService.LocalDataCleared += SearchSourcesChanged;
+            RssService.SearchMetadataChanged += SearchSourcesChanged;
+        }
+
+        private void UnsubscribeSearchSources()
+        {
+            if (_searchApp != null)
+            {
+                _searchApp.SyncManager.CachePublished -= SearchAgendaPublished;
+                _searchApp.SyncManager.AccountManager.Changed -= SearchSourcesChanged;
+                _searchApp.SyncManager.AccountManager.Accounts.CollectionChanged -= SearchAccountsChanged;
+                _searchApp.MailService.CachePublished -= SearchMailPublished;
+                _searchApp.MailService.AccountsChanged -= SearchSourcesChanged;
+                _searchApp = null;
+            }
+            RssService.LocalDataCleared -= SearchSourcesChanged;
+            RssService.SearchMetadataChanged -= SearchSourcesChanged;
+        }
+
+        private void SearchAgendaPublished(object? sender, AgendaCachePublishedEventArgs args) => SearchSourcesChanged(sender, args);
+        private void SearchMailPublished(object? sender, MailCachePublishedEventArgs args) => SearchSourcesChanged(sender, args);
+        private void SearchAccountsChanged(object? sender, NotifyCollectionChangedEventArgs args) => SearchSourcesChanged(sender, args);
+
+        private void SearchSourcesChanged(object? sender, EventArgs args)
+        {
+            Interlocked.Increment(ref _searchSourceVersion);
+            QueueSearchRebuild();
+        }
+
+        private void QueueSearchRebuild()
+        {
+            if (!_globalSearchActive || !_searchShellPresented || Interlocked.Exchange(ref _searchRebuildQueued, 1) != 0) return;
+            long session = _searchSessionVersion;
+            if (!DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                if (session != _searchSessionVersion) return;
+                Interlocked.Exchange(ref _searchRebuildQueued, 0);
+                if (_globalSearchActive) _ = BuildGlobalSearchSnapshotAsync();
+            })) Interlocked.Exchange(ref _searchRebuildQueued, 0);
         }
 
         internal void CancelSearchMeasurements(string outcome = "cancelled")
@@ -586,75 +683,105 @@ namespace Task_Flyout
             _searchOpenMeasurement = _searchQueryMeasurement = null;
         }
 
-        private void BuildGlobalSearchSnapshot()
+        private async Task BuildGlobalSearchSnapshotAsync()
         {
-            _globalSearchPayloads.Clear();
+            var request = _searchIndexWork.Begin();
+            long sourceVersion = Volatile.Read(ref _searchSourceVersion);
+            GlobalSearchIndexProgress.IsActive = true;
+            if (_searchDefaultHint != null) GlobalSearchHint.Text = _searchDefaultHint;
+            var commands = _searchCommands.Select(candidate =>
+                new SearchEntry(candidate, _globalSearchPayloads[candidate.Id])).ToArray();
+            _globalSearchSnapshot = commands.Select(entry => entry.Candidate).ToArray();
+            _globalSearchPayloads = commands.ToDictionary(entry => entry.Candidate.Id, entry => entry.Payload, StringComparer.Ordinal);
+            _ = ApplyGlobalSearchAsync(GlobalSearchBox.Text, debounce: false);
+            try
+            {
+                var app = _searchApp;
+                if (app == null) return;
+                // These are the only UI-owned inputs handed to the worker.
+                var isVisible = app.SyncManager.AccountManager.CaptureSearchVisibility();
+                var mailIds = app.MailService.GetAccounts().Where(account => account.IsSetupComplete).Select(account => account.Id).ToArray();
+                var rss = _globalSearchRss ??= new RssService();
+                string untitled = GetSafeString("GlobalSearch_Untitled", "Untitled");
+                var snapshot = await _searchIndexWork.RunAsync(request, token =>
+                    BuildSearchSnapshot(app, rss, commands, isVisible, mailIds, untitled, token));
+                if (!_globalSearchActive || !_searchIndexWork.IsCurrent(request) ||
+                    sourceVersion != Volatile.Read(ref _searchSourceVersion)) return;
+                _globalSearchPayloads = snapshot.Payloads;
+                _globalSearchSnapshot = snapshot.Candidates;
+                _searchAppliedSourceVersion = sourceVersion;
+                if (snapshot.Partial) GlobalSearchHint.Text = GetSafeString("GlobalSearch_LoadFailed", "Some cached results could not be loaded.");
+                _ = ApplyGlobalSearchAsync(GlobalSearchBox.Text, debounce: false);
+            }
+            catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { }
+            catch (Exception)
+            {
+                // Commands remain usable when a local cache is unavailable.
+                System.Diagnostics.Debug.WriteLine("Global search snapshot unavailable.");
+                if (_globalSearchActive && _searchIndexWork.IsCurrent(request))
+                    GlobalSearchHint.Text = GetSafeString("GlobalSearch_LoadFailed", "Some cached results could not be loaded.");
+            }
+            finally
+            {
+                if (_globalSearchActive && _searchIndexWork.IsCurrent(request))
+                    GlobalSearchIndexProgress.IsActive = false;
+            }
+        }
+
+        private static SearchSnapshot BuildSearchSnapshot(
+            App app, RssService rss, IReadOnlyList<SearchEntry> commands,
+            Func<AgendaItem, bool> isVisible, IReadOnlyCollection<string> mailIds,
+            string untitled, CancellationToken token)
+        {
             var candidates = new List<GlobalSearchCandidate>();
-            AddGlobalSearchCommands(candidates);
-
-            if (App.Current is App app)
+            var payloads = new Dictionary<string, object>(StringComparer.Ordinal);
+            bool partial = false;
+            void Add(GlobalSearchCandidate candidate, object payload)
             {
-                var accountManager = app.SyncManager.AccountManager;
-                foreach (var identityGroup in app.SyncManager.GetLocalCache().DayItems.Values.SelectMany(items => items)
-                             .Where(accountManager.IsItemVisible)
-                             .GroupBy(item => GlobalSearchPolicy.CreateAgendaId(
-                                 item.Provider, item.AccountId, item.CalendarId, item.Id, item.DateKey, item.IsTask),
-                                 StringComparer.Ordinal))
+                token.ThrowIfCancellationRequested();
+                if (payloads.TryAdd(candidate.Id, payload)) candidates.Add(candidate);
+            }
+            foreach (var command in commands) Add(command.Candidate, command.Payload);
+            foreach (var item in app.SyncManager.GetLocalCache().DayItems.Values.SelectMany(items => items))
+            {
+                token.ThrowIfCancellationRequested();
+                if (!isVisible(item)) continue;
+                var group = item.IsTask ? GlobalSearchGroupKind.Tasks : GlobalSearchGroupKind.Calendar;
+                var id = GlobalSearchPolicy.CreateAgendaId(item.Provider, item.AccountId, item.CalendarId, item.Id, item.DateKey, item.IsTask);
+                Add(new GlobalSearchCandidate(id, group, item.Title,
+                    string.Join(" · ", new[] { item.DateKey, item.Location, item.Provider }.Where(value => !string.IsNullOrWhiteSpace(value))),
+                    $"{item.Title} {item.Description} {item.Subtitle} {item.DateKey} {item.Location}",
+                    item.StartDateTime.HasValue ? new DateTimeOffset(item.StartDateTime.Value) : null), item);
+            }
+            token.ThrowIfCancellationRequested();
+            foreach (var mail in app.MailService.GetCachedMetadataSnapshot(mailIds))
+            {
+                var id = $"mail:{mail.AccountId}:{mail.FolderId}:{mail.MessageId}";
+                Add(new GlobalSearchCandidate(id, GlobalSearchGroupKind.Mail,
+                    string.IsNullOrWhiteSpace(mail.Subject) ? untitled : mail.Subject,
+                    string.Join(" · ", new[] { mail.Sender, mail.ReceivedTime }.Where(value => !string.IsNullOrWhiteSpace(value))),
+                    $"{mail.Subject} {mail.Sender} {mail.SenderAddress} {mail.Preview} {mail.ReceivedTime}", mail.ReceivedAt), mail);
+            }
+            try
+            {
+                foreach (var article in rss.GetSearchMetadata(token))
                 {
-                    var item = identityGroup.First();
-                    var group = item.IsTask ? GlobalSearchGroupKind.Tasks : GlobalSearchGroupKind.Calendar;
-                    var id = identityGroup.Key;
-                    _globalSearchPayloads[id] = item;
-                    candidates.Add(new GlobalSearchCandidate(id, group, item.Title,
-                        string.Join(" · ", new[] { item.DateKey, item.Location, item.Provider }.Where(value => !string.IsNullOrWhiteSpace(value))),
-                        $"{item.Title} {item.Description} {item.Subtitle} {item.DateKey} {item.Location}",
-                        item.StartDateTime.HasValue ? new DateTimeOffset(item.StartDateTime.Value) : null));
+                    var published = article.PublishedUtcTicks > 0 && article.PublishedUtcTicks <= DateTime.MaxValue.Ticks
+                        ? new DateTimeOffset(article.PublishedUtcTicks, TimeSpan.Zero) : default;
+                    var id = $"rss:{article.SubscriptionId}:{article.Id}";
+                    Add(new GlobalSearchCandidate(id, GlobalSearchGroupKind.Rss, article.Title,
+                        $"{article.FeedTitle} · {(published == default ? "" : published.ToLocalTime().ToString("yyyy-MM-dd HH:mm"))}",
+                        $"{article.Title} {article.Summary} {article.FeedTitle}", published), article);
                 }
-
-                foreach (var mail in app.MailService.GetCachedMetadataSnapshot())
-                {
-                    var id = $"mail:{mail.AccountId}:{mail.FolderId}:{mail.MessageId}";
-                    _globalSearchPayloads[id] = mail;
-                    candidates.Add(new GlobalSearchCandidate(id, GlobalSearchGroupKind.Mail,
-                        string.IsNullOrWhiteSpace(mail.Subject) ? GetSafeString("GlobalSearch_Untitled", "Untitled") : mail.Subject,
-                        string.Join(" · ", new[] { mail.Sender, mail.ReceivedTime }.Where(value => !string.IsNullOrWhiteSpace(value))),
-                        $"{mail.Subject} {mail.Sender} {mail.SenderAddress} {mail.Preview} {mail.ReceivedTime}", mail.ReceivedAt));
-                }
             }
-
-            var rssService = new RssService();
-            var cachedArticles = new List<RssArticle>();
-            for (int skip = 0; skip < 1_000; skip += 100)
+            catch (OperationCanceledException) { throw; }
+            catch (Exception)
             {
-                var page = rssService.GetCachedArticlesPage(null, null, skip, 100);
-                cachedArticles.AddRange(page);
-                if (page.Count < 100) break;
+                partial = true;
+                System.Diagnostics.Debug.WriteLine("RSS global search metadata unavailable.");
             }
-            foreach (var source in cachedArticles)
-            {
-                var article = new RssArticle
-                {
-                    Id = source.Id,
-                    SubscriptionId = source.SubscriptionId,
-                    FeedTitle = source.FeedTitle,
-                    Title = source.Title,
-                    Link = source.Link,
-                    Summary = source.Summary,
-                    HtmlContent = source.HtmlContent,
-                    ImageUrl = source.ImageUrl,
-                    LocalImagePath = source.LocalImagePath,
-                    PublishedAt = source.PublishedAt,
-                    IsRead = source.IsRead,
-                    IsStarred = source.IsStarred
-                };
-                var id = $"rss:{article.SubscriptionId}:{article.Id}";
-                _globalSearchPayloads[id] = article;
-                candidates.Add(new GlobalSearchCandidate(id, GlobalSearchGroupKind.Rss, article.Title,
-                    $"{article.FeedTitle} · {article.PublishedText}",
-                    $"{article.Title} {article.Summary} {article.FeedTitle}", article.PublishedAt));
-            }
-
-            _globalSearchSnapshot = candidates;
+            token.ThrowIfCancellationRequested();
+            return new(candidates.AsReadOnly(), payloads, partial);
         }
 
         private void AddGlobalSearchCommands(List<GlobalSearchCandidate> candidates)
@@ -685,14 +812,40 @@ namespace Task_Flyout
         private void GlobalSearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
         {
             if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
+            _ = ApplyGlobalSearchAsync(sender.Text);
+        }
+
+        private async Task ApplyGlobalSearchAsync(string query, bool debounce = true)
+        {
+            if (!_globalSearchActive) return;
+            var request = _searchQueryWork.Begin();
+            var snapshot = _globalSearchSnapshot;
+            long sourceVersion = Volatile.Read(ref _searchSourceVersion);
+            string? selectedId = (GlobalSearchResultsList.SelectedItem as GlobalSearchResultViewModel)?.Candidate.Id;
             _searchQueryRendering?.Dispose();
             _searchQueryRendering = null;
             _searchQueryMeasurement?.Complete("superseded");
-            var measurement = PerformanceDiagnostics.StartInteraction("search_query", "input_to_rendering", "ui");
+            _searchQueryMeasurement = null;
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                ApplyGlobalSearchResults(GlobalSearchPolicy.Search(_searchCommands, ""), selectedId);
+                return;
+            }
+            _globalSearchGroups.Clear();
+            var measurement = PerformanceDiagnostics.StartInteraction("search_query", "input_to_rendering", debounce ? "ui" : "index");
             _searchQueryMeasurement = measurement;
             try
             {
-                ApplyGlobalSearch(sender.Text);
+                if (debounce && !string.IsNullOrWhiteSpace(query))
+                    await Task.Delay(120, request.Token);
+                var results = await _searchQueryWork.RunAsync(request, token => GlobalSearchPolicy.Search(snapshot, query, token));
+                if (!_globalSearchActive || !_searchQueryWork.IsCurrent(request) ||
+                    !ReferenceEquals(snapshot, _globalSearchSnapshot) || sourceVersion != Volatile.Read(ref _searchSourceVersion))
+                {
+                    measurement?.Complete("superseded");
+                    return;
+                }
+                ApplyGlobalSearchResults(results, debounce ? null : selectedId);
                 measurement?.Checkpoint("input_to_results_applied");
                 if (measurement != null)
                     _searchQueryRendering = NextRenderHelper.RunOnce(() =>
@@ -703,18 +856,19 @@ namespace Task_Flyout
                         _searchQueryRendering = null;
                     });
             }
+            catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { measurement?.Complete("cancelled"); }
             catch
             {
                 measurement?.Complete("failure");
-                _searchQueryMeasurement = null;
-                throw;
+                if (_searchQueryWork.IsCurrent(request)) _searchQueryMeasurement = null;
+                System.Diagnostics.Debug.WriteLine("Global search matching unavailable.");
             }
         }
 
-        private void ApplyGlobalSearch(string query)
+        private void ApplyGlobalSearchResults(IReadOnlyList<GlobalSearchCandidate> results, string? preferredId = null)
         {
             _globalSearchGroups.Clear();
-            foreach (var group in GlobalSearchPolicy.Search(_globalSearchSnapshot, query).GroupBy(item => item.Group))
+            foreach (var group in results.GroupBy(item => item.Group))
             {
                 var resultGroup = new GlobalSearchResultGroup(GetGlobalSearchGroupName(group.Key));
                 foreach (var item in group)
@@ -726,7 +880,9 @@ namespace Task_Flyout
                 }
                 _globalSearchGroups.Add(resultGroup);
             }
-            GlobalSearchResultsList.SelectedItem = _globalSearchGroups.SelectMany(group => group).FirstOrDefault();
+            var displayed = _globalSearchGroups.SelectMany(group => group).ToArray();
+            GlobalSearchResultsList.SelectedItem = displayed.FirstOrDefault(item => item.Candidate.Id == preferredId)
+                ?? displayed.FirstOrDefault();
         }
 
         private string GetGlobalSearchGroupName(GlobalSearchGroupKind group) => group switch
@@ -797,14 +953,20 @@ namespace Task_Flyout
 
         private void ActivateGlobalSearchResult(GlobalSearchResultViewModel result)
         {
-            CloseGlobalSearch();
+            if (!_globalSearchActive || !_globalSearchGroups.SelectMany(group => group).Contains(result)) return;
             var item = result.Candidate;
             if (item.Group == GlobalSearchGroupKind.Commands)
             {
+                CloseGlobalSearch();
                 ExecuteGlobalSearchCommand(item.Id);
                 return;
             }
+            if (_searchAppliedSourceVersion != Volatile.Read(ref _searchSourceVersion)) { QueueSearchRebuild(); return; }
             if (!_globalSearchPayloads.TryGetValue(item.Id, out var payload)) return;
+            if (payload is AgendaItem target && _searchApp?.SyncManager.AccountManager.IsItemVisible(target) != true) return;
+            if (payload is CachedMailMetadata mailTarget && _searchApp?.MailService.GetAccounts()
+                    .Any(account => account.Id == mailTarget.AccountId && account.IsSetupComplete) != true) return;
+            CloseGlobalSearch();
 
             if (payload is AgendaItem agenda)
             {
@@ -814,9 +976,9 @@ namespace Task_Flyout
             {
                 NavigateToCachedMailMessage(mail.AccountId, mail.FolderId, mail.MessageId);
             }
-            else if (payload is RssArticle article)
+            else if (payload is RssArticleRecord article)
             {
-                NavigateToCachedRssArticle(article);
+                NavigateToCachedRssArticle(RssService.ToArticleListItem(article));
             }
         }
 

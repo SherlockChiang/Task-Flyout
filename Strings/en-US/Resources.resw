@@ -2049,4 +2049,5 @@ Widgets suppression: ready {8}; snapshot {9}; notification pending {10}</value><
   <data name="WeatherWind_W" xml:space="preserve"><value>W</value></data>
   <data name="WeatherWind_NW" xml:space="preserve"><value>NW</value></data>
   <data name="TextRainHour" xml:space="preserve"><value>{0}h</value></data>
+  <data name="GlobalSearch_LoadFailed" xml:space="preserve"><value>Some cached results could not be loaded.</value></data>
 </root>

@@ -18,6 +18,7 @@ namespace Task_Flyout.Services
         private Task _saveQueue = Task.CompletedTask;
 
         public ObservableCollection<ConnectedAccountInfo> Accounts { get; } = new();
+        internal event EventHandler? Changed;
 
         public void Load()
         {
@@ -77,6 +78,29 @@ namespace Task_Flyout.Services
             var json = JsonSerializer.Serialize(Accounts.ToList(), AppJsonContext.Default.ListConnectedAccountInfo);
             SyncToLegacySettings();
             QueueProtectedStoreWrite(json);
+            var handlers = Changed;
+            if (handlers != null)
+                foreach (EventHandler handler in handlers.GetInvocationList())
+                {
+                    try { handler(this, EventArgs.Empty); }
+                    catch { System.Diagnostics.Debug.WriteLine("Account change subscriber failed."); }
+                }
+        }
+
+        internal Func<AgendaItem, bool> CaptureSearchVisibility()
+        {
+            // Detached, privately owned metadata. Never Load/Save this manager;
+            // use the same visibility rules without reading live UI collections.
+            var snapshot = new AccountManager();
+            foreach (var account in Accounts)
+                snapshot.Accounts.Add(new ConnectedAccountInfo
+                {
+                    ProviderName = account.ProviderName, AccountId = account.AccountId,
+                    ShowEvents = account.ShowEvents, ShowTasks = account.ShowTasks,
+                    Calendars = new ObservableCollection<SubscribedCalendarInfo>(account.Calendars.Select(calendar =>
+                        new SubscribedCalendarInfo { Id = calendar.Id, IsVisible = calendar.IsVisible }))
+                });
+            return snapshot.IsItemVisible;
         }
 
         private void QueueProtectedStoreWrite(string json)

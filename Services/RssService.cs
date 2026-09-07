@@ -194,6 +194,36 @@ namespace Task_Flyout.Services
         private readonly RssDataLifecycle _dataLifecycle = new();
 
         public static event EventHandler? LocalDataCleared;
+        internal static event EventHandler? SearchMetadataChanged;
+
+        private static void NotifySearchMetadataChanged()
+        {
+            var handlers = SearchMetadataChanged;
+            if (handlers == null) return;
+            foreach (EventHandler handler in handlers.GetInvocationList())
+            {
+                try { handler(null, EventArgs.Empty); }
+                catch { System.Diagnostics.Debug.WriteLine("RSS search subscriber failed."); }
+            }
+        }
+
+        internal IReadOnlyList<RssArticleRecord> GetSearchMetadata(CancellationToken cancellationToken)
+        {
+            var lease = _dataLifecycle.Capture();
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lease.CancellationToken);
+            linked.Token.ThrowIfCancellationRequested();
+            EnsureLoaded();
+            var records = new List<RssArticleRecord>();
+            for (int skip = 0; skip < 1000; skip += 100)
+            {
+                linked.Token.ThrowIfCancellationRequested();
+                var page = Repository.QueryArticlesPage(null, null, skip, 100, cancellationToken: linked.Token);
+                records.AddRange(page);
+                if (page.Count < 100) break;
+            }
+            linked.Token.ThrowIfCancellationRequested();
+            return records.AsReadOnly();
+        }
 
         public RssService()
         {
@@ -498,6 +528,7 @@ namespace Task_Flyout.Services
             _cache.Subscriptions.RemoveAll(item => item.Id == subscriptionId);
             _cache.Articles.RemoveAll(item => item.SubscriptionId == subscriptionId);
             Repository.RemoveSubscription(subscriptionId);
+            NotifySearchMetadataChanged();
             PruneOrphanedImageCache(force: true);
         }
 
@@ -508,6 +539,7 @@ namespace Task_Flyout.Services
             var cached = _cache.Articles.FirstOrDefault(item => item.Id == article.Id);
             if (cached != null) cached.IsRead = isRead;
             Repository.UpdateArticleState(article.Id, isRead: isRead);
+            NotifySearchMetadataChanged();
         }
 
         public void SetArticleStarred(RssArticle article, bool isStarred)
@@ -517,6 +549,7 @@ namespace Task_Flyout.Services
             var cached = _cache.Articles.FirstOrDefault(item => item.Id == article.Id);
             if (cached != null) cached.IsStarred = isStarred;
             Repository.UpdateArticleState(article.Id, isStarred: isStarred);
+            NotifySearchMetadataChanged();
         }
 
         public Task<List<RssArticle>> LoadMoreArticlesAsync(string? subscriptionId, string? folderId, int skip, int take, RssArticleFilter filter = RssArticleFilter.All, string? searchText = null)
@@ -1435,7 +1468,7 @@ namespace Task_Flyout.Services
             }
         }
 
-        private static RssArticle ToArticleListItem(RssArticleRecord record)
+        internal static RssArticle ToArticleListItem(RssArticleRecord record)
             => new()
             {
                 Id = record.Id,
@@ -1460,18 +1493,26 @@ namespace Task_Flyout.Services
         private void SaveSubscription(RssSubscription subscription)
         {
             Repository.UpsertSubscription(ToSubscriptionRecord(subscription));
+            NotifySearchMetadataChanged();
         }
 
         private void SaveArticle(RssArticle article)
         {
             Repository.UpsertArticle(ToArticleWriteRecord(article));
+            NotifySearchMetadataChanged();
         }
 
         private void SaveRefresh(RssSubscription subscription, IEnumerable<RssArticle> articles)
-            => Repository.SaveRefresh(ToSubscriptionRecord(subscription), articles.Select(ToArticleWriteRecord));
+        {
+            Repository.SaveRefresh(ToSubscriptionRecord(subscription), articles.Select(ToArticleWriteRecord));
+            NotifySearchMetadataChanged();
+        }
 
         private void UpdateArticleFeedTitle(string subscriptionId, string title)
-            => Repository.UpdateArticleFeedTitle(subscriptionId, title);
+        {
+            Repository.UpdateArticleFeedTitle(subscriptionId, title);
+            NotifySearchMetadataChanged();
+        }
 
         private static RssSubscriptionRecord ToSubscriptionRecord(RssSubscription subscription)
             => new(
@@ -1499,7 +1540,10 @@ namespace Task_Flyout.Services
                 ToTicks(article.PublishedAt));
 
         private void TrimDatabaseArticles()
-            => Repository.TrimArticles(1000);
+        {
+            Repository.TrimArticles(1000);
+            NotifySearchMetadataChanged();
+        }
 
         private void SaveToDatabase()
             => Repository.SaveSnapshot(

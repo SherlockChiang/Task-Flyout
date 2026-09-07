@@ -94,6 +94,7 @@
                     <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <AutoSuggestBox x:Name="GlobalSearchBox"
@@ -106,7 +107,7 @@
                         <Button x:Name="GlobalSearchCloseButton"
                                 x:Uid="GlobalSearch_Close"
                                 AutomationProperties.AutomationId="GlobalSearchCloseButton"
-                                Grid.Column="1"
+                                Grid.Column="2"
                                 Width="40"
                                 Height="40"
                                 Padding="0"
@@ -114,6 +115,8 @@
                                 ToolTipService.ToolTip="Close">
                             <FontIcon Glyph="&#xE711;"/>
                         </Button>
+                        <ProgressRing x:Name="GlobalSearchIndexProgress" Grid.Column="1"
+                                      Width="16" Height="16" IsActive="False"/>
                     </Grid>
                     <ListView x:Name="GlobalSearchResultsList"
                               AutomationProperties.AutomationId="GlobalSearchResults"

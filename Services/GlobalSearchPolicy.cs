@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 
 namespace Task_Flyout.Services
 {
@@ -43,20 +44,29 @@ namespace Task_Flyout.Services
 
         public static IReadOnlyList<GlobalSearchCandidate> Search(
             IEnumerable<GlobalSearchCandidate> candidates,
-            string? query)
+            string? query, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             query = query?.Trim() ?? "";
             var source = candidates ?? Array.Empty<GlobalSearchCandidate>();
             if (query.Length == 0)
             {
                 return source
-                    .Where(candidate => candidate.Group == GlobalSearchGroupKind.Commands)
+                    .Where(candidate =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        return candidate.Group == GlobalSearchGroupKind.Commands;
+                    })
                     .OrderBy(candidate => candidate.Id, StringComparer.Ordinal)
                     .ToList();
             }
 
             return source
-                .Select(candidate => (Candidate: candidate, Score: Score(candidate, query)))
+                .Select(candidate =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return (Candidate: candidate, Score: Score(candidate, query));
+                })
                 .Where(match => match.Score > 0)
                 .GroupBy(match => match.Candidate.Group)
                 .OrderBy(group => group.Key)

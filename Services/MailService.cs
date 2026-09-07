@@ -216,6 +216,7 @@ namespace Task_Flyout.Services
         private const int MaxConcurrentGoogleMessageMetadataRequests = 6;
         private const int PersistentCacheSaveDebounceMs = 1500;
         public event EventHandler<NewMailNotificationEventArgs>? NewMailArrived;
+        internal event EventHandler? AccountsChanged;
         internal event EventHandler<MailCachePublishedEventArgs>? CachePublished;
 
         private sealed class CacheEntry<T>
@@ -1764,11 +1765,17 @@ namespace Task_Flyout.Services
         public IReadOnlyList<CachedMailMetadata> GetCachedMetadataSnapshot()
         {
             EnsureAccountsLoaded();
-            EnsurePersistentCacheLoaded();
             var visibleAccountIds = _accounts
                 .Where(account => account.IsSetupComplete)
                 .Select(account => account.Id)
                 .ToHashSet(StringComparer.Ordinal);
+            return GetCachedMetadataSnapshot(visibleAccountIds);
+        }
+
+        internal IReadOnlyList<CachedMailMetadata> GetCachedMetadataSnapshot(IReadOnlyCollection<string> accountIds)
+        {
+            EnsurePersistentCacheLoaded();
+            var visibleAccountIds = accountIds.ToHashSet(StringComparer.Ordinal);
 
             lock (_mailCacheLock)
             {
@@ -3097,6 +3104,13 @@ namespace Task_Flyout.Services
             DisconnectAllPollImapClients();
             string json = JsonSerializer.Serialize(_accounts, AppJsonContext.Default.ListMailAccount);
             QueueAccountStoreWrite(json);
+            var handlers = AccountsChanged;
+            if (handlers != null)
+                foreach (EventHandler handler in handlers.GetInvocationList())
+                {
+                    try { handler(this, EventArgs.Empty); }
+                    catch { System.Diagnostics.Debug.WriteLine("Mail account change subscriber failed."); }
+                }
         }
 
         private void QueueAccountStoreWrite(string json)
