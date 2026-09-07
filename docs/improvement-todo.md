@@ -20,7 +20,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | Order | ID | Status | Next bounded outcome | Verification / dependency |
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
-| Now | R1-03 | IN PROGRESS | Fix native mail-notification activation falling back to Calendar. | Reproduced SDK semicolon transport being rejected by the query-only parser. Parser/router fix and 13 actual-SDK synthetic contract checks pass; signed candidate and real notification-click acceptance remain pending. |
+| Now | R1-03 | IN PROGRESS | Verify native mail-notification activation after the transport fix. | Fix `0d4dad8` passes 1307 Debug/Release tests and 13 actual-SDK synthetic checks. Signed Release candidate `1.4.4.6` is ready; currently running `1.4.4.5` was not replaced. Real notification-click acceptance remains pending. |
 | 1 | F0-01 | PAUSED | Resume repeatable interaction measurements after the notification regression is accepted. | `1.4.4.5` is now observed running from its installed directory. Hold performance sampling while R1-03 is active; no timings or gains are claimed. Preserve the control artifact and pending trace/overhead work. |
 | 2 | R1-01 | TODO | Include account identity in global-search agenda deduplication and result keys. | A separate correctness commit before search optimization; equal remote IDs from two accounts remain distinct and navigate correctly. |
 | 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
@@ -1971,3 +1971,33 @@ They are historical records; active work remains in the backlog tables above.
   Signed candidate preparation follows; a real toast click
   remains a pending runtime check, not an inferred success from these tests.
 - Commit: `fix: parse SDK notification arguments before routing`.
+
+### 2026-09-07 R1-03 Signed Mail Notification Candidate
+
+- Built and signed Release x64 `1.4.4.6` from
+  `0d4dad8bc4c9223bcf25cde4cffa43df3909c490` using the existing certificate
+  `15303040F7CEECFDE9C023F15481D15C39CCDB46`. No new key, trust change or
+  timestamp was introduced. The existing local Release builder was reused;
+  the directory name does not make this a measured performance result.
+- Artifact:
+  `AppPackages/PerformanceControl_1.4.4.6_0d4dad8/Task_Flyout_1.4.4.6_x64_Test/Task_Flyout_1.4.4.6_x64.msix`.
+  SHA-256:
+  `2A31D6C4B2BED474F2940AE45A6E90F17678EA1882036203A676526133E740F7`.
+- Verified package name/publisher/version/x64, valid signature, assembly
+  configuration `Release` and informational version
+  `1.0.0+0d4dad8bc4c9223bcf25cde4cffa43df3909c490`. Packaged DLL matches the
+  current ReadyToRun output (SHA-256
+  `3F97268AFB32168C7DE75483A9EE95508FB544D0BCDAC8119AEEE564E8B0D7BD`),
+  MVID `baa8f3b20cd14ae2ab0518a1050732a3`.
+- The actual app remains running `1.4.4.5`. This candidate was not installed,
+  the real process was not stopped, and no real notification/clipboard/mailbox
+  action was synthesized. Both user-owned files remain byte-identical.
+- Pending acceptance after normal tray Exit and installation: click a newly
+  received mail notification while the main window is hidden and while Calendar
+  is visible; verify the original account/message opens. Also check a retained
+  notification after fully exiting the app for cold activation, and two already
+  configured accounts if available. Missing/deleted targets may show the existing
+  mail-page error, but must not silently fall back to Calendar. Do not clear user
+  data or create/send mail merely to manufacture a test result.
+- Commit: `docs: archive mail notification fix candidate`. R1-03 stays IN PROGRESS
+  until live acceptance; F0-01 stays paused.
