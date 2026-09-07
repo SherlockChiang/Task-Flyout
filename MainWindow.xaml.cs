@@ -595,13 +595,15 @@ namespace Task_Flyout
             if (App.Current is App app)
             {
                 var accountManager = app.SyncManager.AccountManager;
-                foreach (var item in app.SyncManager.GetLocalCache().DayItems.Values.SelectMany(items => items)
+                foreach (var identityGroup in app.SyncManager.GetLocalCache().DayItems.Values.SelectMany(items => items)
                              .Where(accountManager.IsItemVisible)
-                             .GroupBy(item => $"{item.Provider}|{item.CalendarId}|{item.Id}|{item.DateKey}", StringComparer.Ordinal)
-                             .Select(group => group.First()))
+                             .GroupBy(item => GlobalSearchPolicy.CreateAgendaId(
+                                 item.Provider, item.AccountId, item.CalendarId, item.Id, item.DateKey, item.IsTask),
+                                 StringComparer.Ordinal))
                 {
+                    var item = identityGroup.First();
                     var group = item.IsTask ? GlobalSearchGroupKind.Tasks : GlobalSearchGroupKind.Calendar;
-                    var id = $"agenda:{group}:{item.Provider}:{item.CalendarId}:{item.Id}:{item.DateKey}";
+                    var id = identityGroup.Key;
                     _globalSearchPayloads[id] = item;
                     candidates.Add(new GlobalSearchCandidate(id, group, item.Title,
                         string.Join(" · ", new[] { item.DateKey, item.Location, item.Provider }.Where(value => !string.IsNullOrWhiteSpace(value))),

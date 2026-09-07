@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 
 namespace Task_Flyout.Services
 {
@@ -24,6 +25,21 @@ namespace Task_Flyout.Services
     public static class GlobalSearchPolicy
     {
         public const int ContentGroupCap = 8;
+
+        public static string CreateAgendaId(
+            string? provider, string? accountId, string? calendarId,
+            string? itemId, string? dateKey, bool isTask)
+        {
+            // Match account routing (including legacy IDs/casing), but keep
+            // provider-owned calendar/item IDs case-sensitive. Structural encoding
+            // prevents delimiters in those IDs from merging different targets.
+            string providerKey = AccountIdentityPolicy.CreateProviderKey(provider, accountId).ToUpperInvariant();
+            return "agenda:" + JsonSerializer.Serialize(new[]
+            {
+                isTask ? "task" : "event", providerKey,
+                calendarId ?? "", itemId ?? "", dateKey ?? ""
+            });
+        }
 
         public static IReadOnlyList<GlobalSearchCandidate> Search(
             IEnumerable<GlobalSearchCandidate> candidates,

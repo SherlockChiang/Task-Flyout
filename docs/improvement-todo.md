@@ -10,7 +10,7 @@ Status values:
 - `BLOCKED`: requires an external decision, credential, service, or environment
 - `PAUSED`: intentionally archived; no further implementation or runtime attempts
 
-## Current Queue - 2026-09-05 Accepted Candidate And Responsiveness
+## Current Queue - 2026-09-07 Responsiveness Resumed
 
 This queue takes precedence over the older backlog order. The evidence and
 sequencing rationale are in [optimization-roadmap.md](optimization-roadmap.md).
@@ -20,9 +20,9 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | Order | ID | Status | Next bounded outcome | Verification / dependency |
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
-| Now | R1-03 | IN PROGRESS | Verify native mail-notification activation after the transport fix. | Fix `0d4dad8` passes 1307 Debug/Release tests and 13 actual-SDK synthetic checks. Signed Release candidate `1.4.4.6` is ready; currently running `1.4.4.5` was not replaced. Real notification-click acceptance remains pending. |
-| 1 | F0-01 | PAUSED | Resume repeatable interaction measurements after the notification regression is accepted. | `1.4.4.5` is now observed running from its installed directory. Hold performance sampling while R1-03 is active; no timings or gains are claimed. Preserve the control artifact and pending trace/overhead work. |
-| 2 | R1-01 | TODO | Include account identity in global-search agenda deduplication and result keys. | A separate correctness commit before search optimization; equal remote IDs from two accounts remain distinct and navigate correctly. |
+| Accepted | R1-03 | DONE | Preserve repaired mail-notification activation. | User reports the original symptom resolved on installed/running `1.4.4.6`; fix `0d4dad8`. This does not independently validate every cold-start or multi-account scenario. |
+| 1 | F0-01 | IN PROGRESS | Collect comparable interaction measurements on the accepted Release build. | Healthy installed/running `1.4.4.6` confirmed. No files found in the two standard performance-log locations; a diagnostic-enabled process and verified build/run IDs are still needed. No timings or gains are claimed. |
+| 2 | R1-01 | DONE | Preserve account identity in global-search agenda deduplication and result keys. | Both operations use one structural identity, including account and item kind. Two-account collisions and original payload lookup are tested; 15 new tests, 1322 total, clean Debug x64 build. Not yet packaged or live-tested with two accounts. |
 | 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
 | 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
 | 5 | F1-02 | TODO | Apply calendar changes without rebuilding unchanged visible cells/timeline geometry. | Profile publication and manual-sync paths; avoid duplicate application of the same state, preserve end times, source account, date selection, scroll and editing state. |
@@ -151,7 +151,7 @@ pre-existing iCloud/Traditional Chinese worktree with unrelated maintenance.
 | M1-10 | DONE | Reliability/UI | Recover the taskbar weather bar after Explorer restarts. | Taskbar recreation triggers prompt reattachment or a throttled rebuild; disabled/re-enabled bars cannot reuse a dead native window; polling remains a fallback and the recovery matrix is tested. | `fix(weatherbar): recover after Explorer restarts` |
 | M1-11 | DONE | Reliability/Startup | Keep tray-triggered Flyout construction behind stable account hydration. | The click path records request diagnostics and restores efficiency state on failure; the Flyout never enumerates the account collection while startup hydration is mutating it. | `fix(flyout): serialize account hydration before opening` |
 | M1-12 | DONE | Reliability/Calendar | Refresh agenda data while the Flyout remains hidden. | The app heartbeat force-refreshes the shared agenda range at the configured interval after account hydration, throttles failed attempts, invalidates the reminder snapshot, and checks upcoming events against the refreshed cache. | `fix(calendar): refresh agenda while flyout is hidden` |
-| M1-13 | IN PROGRESS | Reliability/Mail | Open new-mail notification targets directly after background-only polling. | Prior cache/folder-identity work is retained. Reopened for R1-03: actual SDK activation transport was rejected before mail navigation; live click acceptance is required after the parser fix. | `fix(mail): open notification targets reliably`; R1-03 follow-up |
+| M1-13 | DONE | Reliability/Mail | Open new-mail notification targets directly after background-only polling. | Prior cache/folder-identity work is retained. R1-03 repaired SDK argument transport; user reports mail-notification navigation fixed on `1.4.4.6`. Broader multi-account/cold-start acceptance remains a separate gate. | `fix(mail): open notification targets reliably`; `0d4dad8` |
 | M1-14 | DONE | Data integrity/Mail | Keep unread state coherent across provider, folder views, cache, notifications, and background polling. | Read/unread mutations update every cached identity for the account, reconcile authoritative provider state after refresh, and cannot resurrect stale unread badges or notifications. | `fix(mail): converge mutable state by provider identity`, `fix(mail): reconcile authoritative unread snapshots`, `fix(mail): synchronize unread UI and notifications` |
 | M1-15 | DONE | Reliability/Calendar | Correct event editor times, timeline duration, date-strip overflow, and automatic refresh. | Existing events hydrate both start and end controls; the day timeline renders the complete interval; the date header has no unintended horizontal scrollbar; foreground and hidden refresh paths reliably publish fresh data without overlap or stale replacement. | `fix(calendar): align event times and timeline`, `fix(calendar): publish background refreshes to open views`, `fix(google): route mutations to source calendar` |
 | M1-16 | DONE | Reliability/Flyout | Reliably dismiss an unpinned Flyout and preserve distinct tray gestures. | User accepted `1.4.4.4` single-click, double-click and outside-click behavior. Explicit dismissal cancels pending Flyout work and stale hydration continuations. Preserve pinned/opening/closing/cold-start stress cases as the ongoing regression matrix. | `fix(flyout): close reliably on focus loss`, `fix(flyout): preserve tray activation handoff`, `fix(flyout): complete tray activation handoff`, `433c171` |
@@ -2001,3 +2001,31 @@ They are historical records; active work remains in the backlog tables above.
   data or create/send mail merely to manufacture a test result.
 - Commit: `docs: archive mail notification fix candidate`. R1-03 stays IN PROGRESS
   until live acceptance; F0-01 stays paused.
+
+### 2026-09-07 Mail Acceptance And Search Account Identity
+
+- The user reports the original mail-notification problem looks fixed and asks
+  to resume the prior work. Read-only checks confirm a healthy installed and
+  running `1.4.4.6`. R1-03/M1-13 are complete for that user-reported symptom;
+  no claim is made about an agent-observed full multi-account/cold-start matrix.
+- F0-01 resumes, but the two standard diagnostic-log locations contain no
+  performance files. Runtime sampling still requires a diagnostic-enabled
+  process. While that setup remains pending, the independent R1-01 correctness
+  prerequisite was completed; efficiency/trim policies were not changed.
+- Agenda search deduplication and payload/result IDs now share one key from
+  `GlobalSearchPolicy.CreateAgendaId`. It includes the existing normalized
+  provider/account route, calendar/list ID, item ID, date and task/event kind.
+  Structural encoding prevents punctuation in provider-owned IDs from shifting
+  key boundaries. Calendar/item IDs remain case-sensitive, and missing account
+  IDs use the established legacy-account rules.
+- The snapshot still applies account visibility before grouping and keeps the
+  original AgendaItem as its navigation payload. Search ranking, group caps,
+  synchronous indexing and user data are unchanged. The tests cover duplicate
+  remote IDs from two accounts, lookup of both original targets, legacy accounts,
+  provider aliases, casing, dates/kinds, delimiter collisions and UI culture.
+- Verification: 27 focused search/account tests and 1322 total tests passed;
+  Debug x64 build passed with zero warnings/errors. R1-01 is a source-level
+  correctness fix, not a measured performance gain or a new installed build.
+- Commit: `fix(search): preserve account-scoped agenda identity`. The user's
+  manifest and Windhawk changes remain outside the commit; no package, app
+  restart, live provider mutation or remote push occurred.
