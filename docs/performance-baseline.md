@@ -32,6 +32,44 @@ The summarizer reads both original ten-column logs and v2 logs; old files are no
 
 The summarizer uses nearest-rank percentiles; P95 requires at least 20 successful samples. Started/cancelled/superseded/ignored/failed operations do not enter successful-duration percentiles. Unfinished operations, sequence gaps or reported writer losses suppress percentiles for affected groups. It does not infer that every process must perform every action. It rejects invalid durations/conflicting duplicate rows, deduplicates repeated input files, and does not assign duration percentiles to v2 milestones/status records. The `-AsObject` output retains all grouping fields and outcome counts. Run `scripts/test-performance-summary.ps1` for synthetic regression checks, not runtime performance results.
 
+### Start A Diagnostic Session
+
+The accepted installed `1.4.4.6` can be used without installing another package:
+
+```powershell
+# Read-only preflight; safe while the app is running:
+.\scripts\start-performance-session.ps1 -DescribeOnly
+# After normal tray-menu Exit:
+.\scripts\start-performance-session.ps1
+```
+
+The launcher checks the installed version/publisher and exact main-assembly
+hash, refuses to start a second instance, and sets diagnostics only in the new
+process environment. It does not edit persistent settings or terminate a
+process. The archived standalone taskbar experiment is also suppressed for that
+process using `TASKFLYOUT_DISABLE_STANDALONE_TASKBAR=1`; keep that condition the
+same in control/treatment runs. Other inherited shell/proxy/power/prewarm settings
+must still be recorded and held constant.
+
+Success requires a fresh v2 run ID, matching build ID and Release configuration,
+and a timestamp after launch in one of the known log paths. A timeout is not
+success: the script reports it and leaves the app running for inspection, rather
+than retrying or force-stopping it. Defaults pin `1.4.4.6`; testing another build
+requires its version, assembly hash and MVID explicitly. The preflight reads the
+DLL to hash it, so this is process-cold, not a cold filesystem-cache experiment.
+
+`scripts/test-performance-session.ps1` validates the plan and guards without
+launching the app. All 14 checks passed in both PowerShell implementations while
+the real app was running. The actual launch/log-confirmation branch has not yet
+been exercised in this pass because normal exit is still required. Do not claim
+runtime timings from these preflight checks.
+
+After `StartedAndLogging`, use the fixed short/long hidden intervals and separate
+search sessions from the protocol below. Accumulate 20 successful comparable
+samples before P95. `1.4.4.6` predates the R1-01 search-identity fix; any later
+search-performance A/B comparison must include that correctness fix on both
+sides instead of counting a changed result set as an optimization.
+
 ### Implemented Interaction Slice (2026-09-06)
 
 | Scenario | Cumulative observations from command/input-handler entry | Terminal observation |

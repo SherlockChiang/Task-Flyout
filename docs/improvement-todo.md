@@ -21,7 +21,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
 | Accepted | R1-03 | DONE | Preserve repaired mail-notification activation. | User reports the original symptom resolved on installed/running `1.4.4.6`; fix `0d4dad8`. This does not independently validate every cold-start or multi-account scenario. |
-| 1 | F0-01 | IN PROGRESS | Collect comparable interaction measurements on the accepted Release build. | Healthy installed/running `1.4.4.6` confirmed. No files found in the two standard performance-log locations; a diagnostic-enabled process and verified build/run IDs are still needed. No timings or gains are claimed. |
+| 1 | F0-01 | IN PROGRESS | Collect comparable interaction measurements on the accepted Release build. | Installed/running `1.4.4.6` confirmed; no samples found. `start-performance-session.ps1` is ready and its 14 preflight/guard checks pass in both PowerShell versions. Await normal Exit, actual diagnostic launch and verified fresh run ID; no timings or gains are claimed. |
 | 2 | R1-01 | DONE | Preserve account identity in global-search agenda deduplication and result keys. | Both operations use one structural identity, including account and item kind. Two-account collisions and original payload lookup are tested; 15 new tests, 1322 total, clean Debug x64 build. Not yet packaged or live-tested with two accounts. |
 | 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
 | 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
@@ -2029,3 +2029,25 @@ They are historical records; active work remains in the backlog tables above.
 - Commit: `fix(search): preserve account-scoped agenda identity`. The user's
   manifest and Windhawk changes remain outside the commit; no package, app
   restart, live provider mutation or remote push occurred.
+
+### 2026-09-07 F0-01 Process-Local Diagnostic Launcher
+
+- Added `scripts/start-performance-session.ps1`, pinned by default to the
+  accepted installed `1.4.4.6` version, DLL SHA-256 and MVID. It verifies package
+  health/publisher and payload, refuses to knowingly start another instance,
+  and enables performance logging only in the child process environment.
+- The archived standalone taskbar experiment is suppressed for this run via
+  its existing environment switch. This temporary difference from an ordinary
+  launch is explicit in the plan/result and must be constant for comparisons.
+  No persistent preference, power policy, certificate or trust store is changed.
+- Launch success requires a new, timestamp-checked v2 run with the matching
+  Release build identity. Timeout/error does not count as a sample and does not
+  trigger automatic force-stop or relaunch. The hash preflight warms the binary
+  file cache; process-cold results must not be called disk-cold results.
+- All 14 preflight/invalid-input/running-process/environment-preservation checks
+  passed under PowerShell 7 and Windows PowerShell. The existing `1.4.4.6` process
+  remained running; the actual launch/log-confirmation branch is untested pending
+  normal exit. No benchmark results, package installation or new app launch are
+  claimed. Instructions are in `performance-baseline.md`.
+- Commit: `test: add guarded performance session launcher`. F0-01 remains active;
+  the next step is an actual diagnostic session, not another baseline rebuild.
