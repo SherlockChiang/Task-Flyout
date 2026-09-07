@@ -21,7 +21,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | --- | --- | --- | --- | --- |
 | Accepted | M1-16 | DONE | Preserve the accepted single-click Flyout / double-click main-window / outside-click dismissal behavior. | User accepted candidate `1.4.4.4`; implementation `433c171`, 9 focused and 1264 total tests passed. Extended stress scenarios remain regression checks, not separately observed results. |
 | Accepted | R1-03 | DONE | Preserve repaired mail-notification activation. | User reports the original symptom resolved on installed/running `1.4.4.6`; fix `0d4dad8`. This does not independently validate every cold-start or multi-account scenario. |
-| 1 | F0-01 | IN PROGRESS | Investigate first-use setup with the existing prewarm option before policy changes. | Run `826586eb218b4de1ba182cca22d11fab`: one first-use host-visible callback at 1100.630 ms; three successful reopens at 97.342/65.281/66.637 ms. Capture works; first-use setup is the current investigation target. Confirm the actual prewarm setting before comparing sessions on the same build. No P95/gain claim. |
+| 1 | F0-01 | IN PROGRESS | Compare first use with the existing prewarm setting enabled. | User confirms prewarm currently off; the same run now contains 7 successful reopens, latest three early callbacks 70.324/68.499/67.800 ms. Keep this off-state record separate. Next enable the existing setting, restart the same 1.4.4.7 diagnostic build, wait without opening and record the new run before its first open. No P95/gain claim. |
 | 2 | R1-01 | DONE | Preserve account identity in global-search agenda deduplication and result keys. | Both operations use one structural identity, including account and item kind. Two-account collisions and original payload lookup are tested; 15 new tests, 1322 total, clean Debug x64 build. Not yet packaged or live-tested with two accounts. |
 | 3 | F1-01 | TODO | Evaluate and, only if measured, reduce immediate background trim and foreground activation work. | Compare current policy with delayed/memory-pressure-gated trim; audit thread enumeration cost; visible UI retains normal priority, idle remains efficient, memory stays bounded, and accepted tray gestures do not regress. |
 | 4 | M1-07 | TODO | Render global search before building a cancellable metadata-only index. | F0-01 and R1-01 first; first feedback does not await SQLite/DPAPI/RSS reads; query/account generations reject stale results; no eager RSS HTML on UI thread. |
@@ -2234,3 +2234,30 @@ They are historical records; active work remains in the backlog tables above.
   was changed during this inspection.
 - F0-01 remains IN PROGRESS; frame tracing, measurement overhead and a larger
   comparable sample remain outstanding. Commit: `docs: record warm reopen observations`.
+
+### 2026-09-07 F0-01 Prewarm-Off State Confirmed
+
+- The user confirms 'Preload tray flyout after startup' is currently off and
+  reports three additional tests. The same process/run remains active; no
+  settings or process changes were made by the agent.
+- The log contains four new completed reopens since the preceding read, seven
+  total. The intervening extra operation's early callback is 66.674 ms; the
+  latest three are 70.324, 68.499 and 67.800 ms. Their content-applied checkpoints
+  are 8.610, 8.089 and 8.539 ms, and open-completed callbacks 379.843, 374.554
+  and 382.698 ms. All have complete successful endpoints, with no reported
+  failures, loss or cancellation. Exact hide times are still not recorded.
+- Annotate this session with the user's reported off-state; the log itself does
+  not expose the captured startup preference. Do not silently infer or mix
+  configuration changes. Seven samples still do not qualify for P95.
+- Next controlled step uses the existing option, not a new package or default
+  policy: enable prewarm in Settings > System & General, exit normally, restart
+  through the 1.4.4.7 sidecar launcher, wait at least fifteen seconds without
+  opening Flyout or the main window, and provide the new StartedAndLogging run.
+  Inspect its pre-first-open footprint before requesting one first open.
+- Enabled preference does not prove prewarm ran: memory gates and cache hydration
+  can skip/delay it. Record that uncertainty and verify the new observations.
+  The memory snapshot will describe that state, not a precisely attributed
+  increase over unmatched earlier snapshots. Preserve the off-state run and
+  existing settings context; do not combine on/off runs for a percentile.
+- Commit: `docs: record confirmed prewarm-off sample`. F0-01 remains IN PROGRESS;
+  no performance improvement or runtime setting change is claimed by this update.

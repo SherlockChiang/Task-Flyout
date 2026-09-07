@@ -186,6 +186,15 @@ The toggle is read at startup, followed by an eight-second delay and memory
 gates; changing it does not prewarm the current process. Keep its value recorded
 per run and do not combine differently configured sessions into one percentile.
 
+The user subsequently confirmed the setting off in this session. There are now
+seven valid reopens, with the last three early callbacks at 70.324, 68.499 and
+67.800 ms. The planned on-state comparison requires enabling the existing toggle,
+normal Exit, the same 1.4.4.7 diagnostic launcher, and at least fifteen seconds
+without opening any app surface. Record the new run and pre-first-open memory
+before testing one first open. This wait allows the startup delay but does not
+prove the memory gates admitted prewarm; retain skip/delay uncertainty and avoid
+attributing unmatched memory snapshots solely to the toggle.
+
 Existing instrumentation needs care: `MarkOnce` records a zero-duration milestone
 once per process; `tray_click_to_open_request` ends after requesting a toggle.
 Neither measures repeat-open input-to-visible latency. The v2 observations add
