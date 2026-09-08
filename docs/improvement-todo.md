@@ -24,7 +24,7 @@ input behavior, live provider isolation, or private Explorer compatibility.
 | Archived | F0-01 | PAUSED | Preserve the partial observations; no further benchmark runs requested. | User ended benchmarking on 2026-09-08. No complete P95, controlled prewarm comparison, frame trace or improvement claim. Retain the corrected toggle-without-restart annotation; do not ask for more samples. |
 | 2 | R1-01 | DONE | Preserve account identity in global-search agenda deduplication and result keys. | Both operations use one structural identity, including account and item kind. Two-account collisions and original payload lookup are tested; 15 new tests, 1322 total, clean Debug x64 build. Not yet packaged or live-tested with two accounts. |
 | Deferred | F1-01 | PAUSED | Keep existing efficiency and working-set policy. | Current observations do not justify a policy change; user ended the benchmark pass. No new trim or animation experiment. |
-| Now | M1-07 | IN PROGRESS | Prepare a normal functional candidate for asynchronous search. | Index/query workers, source/session guards and body-free RSS records are implemented. Follow-up pairs each query with its snapshot's revision and rechecks shell readiness on queued rebuilds. 1342 Debug/Release tests pass; ordinary UI acceptance remains, not more benchmarks. |
+| Now | M1-07 | IN PROGRESS | Accept the normal asynchronous-search candidate. | Signed Release x64 `1.4.4.8` from `b17f429` is ready and statically verified; 1342 Debug/Release tests passed. No installation/restart or diagnostic sampling performed. Check ordinary search open/input/close and correct result navigation, not timing loops. |
 | 5 | F1-02 | TODO | Apply calendar changes without rebuilding unchanged visible cells/timeline geometry. | Profile publication and manual-sync paths; avoid duplicate application of the same state, preserve end times, source account, date selection, scroll and editing state. |
 | 6 | F1-03 | TODO | Update displayed mail/search results incrementally. | Existing bulk-load suppression already exists; target `_displayedItems.Clear()` and churn in `ApplyMailSearch`, preserve selection/scroll, unread convergence and account-scoped navigation. |
 | 7 | F1-04 | TODO | Profile HTML preparation and page lifetime before adjusting reader caching. | Separate sanitization, WebView initialization, navigation and network; stale account/message work never displays; preserve sanitization/remote-resource restrictions; no default global WebView prewarm. |
@@ -2339,3 +2339,33 @@ They are historical records; active work remains in the backlog tables above.
 - Commit: `fix(search): bind query results to snapshot revision`. A normal signed
   functional package follows; no diagnostic launcher or repeated timing request
   will be added to its acceptance steps.
+
+### 2026-09-08 M1-07 Signed Functional Candidate
+
+- The initial packaging request did not execute because the approval service
+  returned 503. After the user explicitly requested another packaging attempt,
+  the build and existing-certificate signing completed successfully.
+- Release x64 `1.4.4.8` source:
+  `b17f4294ab24319c9d60083db89918369e4d2704`, including asynchronous search
+  `db56385` and the snapshot-revision follow-up.
+- Artifact:
+  `AppPackages/PerformanceControl_1.4.4.8_b17f429/Task_Flyout_1.4.4.8_x64_Test/Task_Flyout_1.4.4.8_x64.msix`.
+  SHA-256:
+  `ABC33DE83879D58D1E6E8D54104718DE127DB1A89CC475823D38B20F07B8DFE8`.
+  The directory name comes from the reused build tool, not a renewed benchmark.
+- Existing signer `15303040F7CEECFDE9C023F15481D15C39CCDB46` reused; SignTool and
+  Authenticode validation passed. No certificate/trust change or timestamp.
+  Verified manifest version/x64/publisher, Release assembly configuration and
+  exact source informational version. DLL matches the current R2R output:
+  SHA-256 `F8BC25621666867C5EAFE183483A6B143713A0BB0347E0E5126AA749EE14F900`,
+  MVID `cbbcb2fe2c124f198966cc9cc197019c`.
+- No app was installed, started or stopped; no diagnostic launcher, runtime log
+  collection, timing loop or native taskbar experiment was performed. Original
+  manifest and Windhawk hashes remain unchanged and outside this commit.
+- Pending ordinary acceptance: normal Exit of the old version, install this
+  exact package, launch normally, open Ctrl+K, type/change/clear a local query,
+  close/reopen search, and open existing agenda/mail/RSS results. Verify correct
+  account/target, responsive cancellation and preserved tray/mail-notification
+  behavior. Do not run Start-Performance scripts or collect a new baseline.
+- Commit: `docs: archive signed asynchronous search candidate`. M1-07 remains
+  IN PROGRESS for functional UI acceptance.
