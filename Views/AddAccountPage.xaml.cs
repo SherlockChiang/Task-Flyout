@@ -545,12 +545,6 @@ namespace Task_Flyout.Views
                 else
                     await provider.ConnectInteractivelyAsync();
 
-                if (App.Current is App app)
-                {
-                    if (providerName == "Microsoft")
-                        await app.MailService.AddOutlookAccountAsync();
-                }
-
                 // Create account entry
                 var account = mgr.GetAccount(providerName, provider.AccountId);
                 bool isNewAccount = account == null;

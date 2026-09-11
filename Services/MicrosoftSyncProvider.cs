@@ -28,7 +28,9 @@ namespace Task_Flyout.Services
 
         private string _defaultTodoListId = "";
 
-        private static readonly string[] AllFeatureScopes = ProviderAuthorizationScopePolicy.MicrosoftAllFeatures;
+        private static readonly string[] CoreScopes = ProviderAuthorizationScopePolicy.MicrosoftCore;
+        private static readonly string[] MailReadWriteScopes = ProviderAuthorizationScopePolicy.MicrosoftMailReadWrite;
+        private static readonly string[] MailSendScopes = ProviderAuthorizationScopePolicy.MicrosoftMailSend;
 
         public MicrosoftSyncProvider(string? accountId = null, string? accountDisplayName = null)
         {
@@ -103,11 +105,11 @@ namespace Task_Flyout.Services
             {
                 var client = await GetMsalClientAsync();
                 var account = await GetStoredAccountAsync(client);
-                var builder = client.AcquireTokenInteractive(AllFeatureScopes).WithUseEmbeddedWebView(false);
+                var builder = client.AcquireTokenInteractive(CoreScopes).WithUseEmbeddedWebView(false);
                 if (account != null) builder = builder.WithAccount(account);
                 var result = await builder.ExecuteAsync(cancellationToken);
                 await ProtectedLocalStore.WriteTextAsync(GetAuthRecordPath(), result.Account.HomeAccountId.Identifier);
-                _graphClient = CreateSilentGraphClient(client, result.Account.HomeAccountId.Identifier);
+                _graphClient = CreateGraphClient(client, result.Account.HomeAccountId.Identifier, CoreScopes);
             }
             finally
             {
@@ -128,13 +130,13 @@ namespace Task_Flyout.Services
                     throw new AuthorizationInteractionRequiredException(ProviderName, "Microsoft reconnect is required. Open account settings to reconnect explicitly.");
                 try
                 {
-                    await client.AcquireTokenSilent(AllFeatureScopes, account).ExecuteAsync(cancellationToken);
+                    await client.AcquireTokenSilent(CoreScopes, account).ExecuteAsync(cancellationToken);
                 }
                 catch (MsalUiRequiredException ex)
                 {
                     throw new AuthorizationInteractionRequiredException(ProviderName, "Microsoft reconnect is required. Open account settings to reconnect explicitly.", ex);
                 }
-                _graphClient = CreateSilentGraphClient(client, account.HomeAccountId.Identifier);
+                _graphClient = CreateGraphClient(client, account.HomeAccountId.Identifier, CoreScopes);
             }
             finally
             {
@@ -144,8 +146,41 @@ namespace Task_Flyout.Services
 
         public async Task<GraphServiceClient> EnsureMailAuthorizedAsync(bool requireWrite = false, bool requireSend = false, CancellationToken cancellationToken = default)
         {
-            await EnsureAuthorizedAsync(cancellationToken);
-            return _graphClient;
+            var scopes = requireSend ? MailSendScopes : MailReadWriteScopes;
+            await EnsureScopesAuthorizedAsync(scopes, cancellationToken);
+            var client = await GetMsalClientAsync();
+            var account = await GetStoredAccountAsync(client)
+                ?? throw new AuthorizationInteractionRequiredException(ProviderName, "Microsoft reconnect is required. Open account settings to reconnect explicitly.");
+            return CreateGraphClient(client, account.HomeAccountId.Identifier, scopes);
+        }
+
+        private async Task EnsureScopesAuthorizedAsync(string[] scopes, CancellationToken cancellationToken)
+        {
+            await _authorizationLock.WaitAsync(cancellationToken);
+            try
+            {
+                var client = await GetMsalClientAsync();
+                var account = await GetStoredAccountAsync(client);
+                if (account == null)
+                    throw new AuthorizationInteractionRequiredException(ProviderName, "Microsoft reconnect is required. Open account settings to reconnect explicitly.");
+
+                try
+                {
+                    await client.AcquireTokenSilent(scopes, account).ExecuteAsync(cancellationToken);
+                }
+                catch (MsalUiRequiredException)
+                {
+                    var result = await client.AcquireTokenInteractive(scopes)
+                        .WithAccount(account)
+                        .WithUseEmbeddedWebView(false)
+                        .ExecuteAsync(cancellationToken);
+                    await ProtectedLocalStore.WriteTextAsync(GetAuthRecordPath(), result.Account.HomeAccountId.Identifier);
+                }
+            }
+            finally
+            {
+                _authorizationLock.Release();
+            }
         }
 
         private async Task<IPublicClientApplication> GetMsalClientAsync()
@@ -179,18 +214,20 @@ namespace Task_Flyout.Services
             return cachedAccounts[0];
         }
 
-        private static GraphServiceClient CreateSilentGraphClient(IPublicClientApplication client, string homeAccountId)
-            => new(new SilentMsalTokenCredential(client, homeAccountId), AllFeatureScopes);
+        private static GraphServiceClient CreateGraphClient(IPublicClientApplication client, string homeAccountId, string[] scopes)
+            => new(new SilentMsalTokenCredential(client, homeAccountId, scopes), scopes);
 
         private sealed class SilentMsalTokenCredential : TokenCredential
         {
             private readonly IPublicClientApplication _client;
             private readonly string _homeAccountId;
+            private readonly string[] _scopes;
 
-            public SilentMsalTokenCredential(IPublicClientApplication client, string homeAccountId)
+            public SilentMsalTokenCredential(IPublicClientApplication client, string homeAccountId, string[] scopes)
             {
                 _client = client;
                 _homeAccountId = homeAccountId;
+                _scopes = scopes;
             }
 
             public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
@@ -203,7 +240,7 @@ namespace Task_Flyout.Services
                     throw new AuthorizationInteractionRequiredException("Microsoft", "Microsoft account is no longer present in the token cache.");
                 try
                 {
-                    var result = await _client.AcquireTokenSilent(AllFeatureScopes, account).ExecuteAsync(cancellationToken);
+                    var result = await _client.AcquireTokenSilent(_scopes, account).ExecuteAsync(cancellationToken);
                     return new AccessToken(result.AccessToken, result.ExpiresOn);
                 }
                 catch (MsalUiRequiredException ex)

@@ -41,7 +41,13 @@ Requested scopes:
 - `Mail.ReadWrite`: required for listing, reading, and marking Outlook messages as read.
 - `Mail.Send`: required when sending Outlook mail. Task Flyout creates an immutable-ID draft so a timed-out send can be confirmed without sending a duplicate.
 
-All five Microsoft scopes are requested together from an explicit Connect/Reconnect action. Runtime Graph access uses `AcquireTokenSilent`; only the explicit connection action can call `AcquireTokenInteractive`.
+Microsoft authorization is incremental:
+
+- The Microsoft account Connect/Reconnect action requests only `User.Read`, `Calendars.ReadWrite`, and `Tasks.ReadWrite`.
+- Adding or first reading an Outlook mailbox requests `User.Read` and `Mail.ReadWrite`.
+- Sending Outlook mail adds `Mail.Send` to the mailbox scopes. The send path uses the same mailbox client so draft creation and sending remain covered.
+
+Runtime calendar/task access uses `AcquireTokenSilent`. Mail access first tries `AcquireTokenSilent` and opens the interactive consent flow only when the requested mailbox scopes have not yet been granted. Only an explicit connection or first-use mailbox action can call `AcquireTokenInteractive`.
 
 Local cleanup on account removal:
 

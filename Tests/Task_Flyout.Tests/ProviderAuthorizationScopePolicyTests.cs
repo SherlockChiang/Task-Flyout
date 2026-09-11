@@ -56,4 +56,14 @@ public class ProviderAuthorizationScopePolicyTests
         Assert.Contains("Mail.Send", ProviderAuthorizationScopePolicy.MicrosoftAllFeatures);
         Assert.DoesNotContain("Mail.Read", ProviderAuthorizationScopePolicy.MicrosoftAllFeatures);
     }
+
+    [Fact]
+    public void Microsoft_scopes_are_split_by_feature()
+    {
+        Assert.Equal(new[] { "User.Read", "Calendars.ReadWrite", "Tasks.ReadWrite" }, ProviderAuthorizationScopePolicy.MicrosoftCore);
+        Assert.Equal(new[] { "User.Read", "Mail.ReadWrite" }, ProviderAuthorizationScopePolicy.MicrosoftMailReadWrite);
+        Assert.Equal(new[] { "User.Read", "Mail.ReadWrite", "Mail.Send" }, ProviderAuthorizationScopePolicy.MicrosoftMailSend);
+        Assert.DoesNotContain("Mail.Send", ProviderAuthorizationScopePolicy.MicrosoftCore);
+        Assert.DoesNotContain("Calendars.ReadWrite", ProviderAuthorizationScopePolicy.MicrosoftMailReadWrite);
+    }
 }

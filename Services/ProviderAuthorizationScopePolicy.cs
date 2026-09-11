@@ -32,5 +32,25 @@ namespace Task_Flyout.Services
             "Mail.ReadWrite",
             "Mail.Send"
         };
+
+        public static readonly string[] MicrosoftCore =
+        {
+            "User.Read",
+            "Calendars.ReadWrite",
+            "Tasks.ReadWrite"
+        };
+
+        public static readonly string[] MicrosoftMailReadWrite =
+        {
+            "User.Read",
+            "Mail.ReadWrite"
+        };
+
+        public static readonly string[] MicrosoftMailSend =
+        {
+            "User.Read",
+            "Mail.ReadWrite",
+            "Mail.Send"
+        };
     }
 }
