@@ -369,7 +369,10 @@ namespace Task_Flyout
                     _semanticDotColors.Remove(args.Item);
                 }
 
-                args.Item.CornerRadius = new CornerRadius(16);
+                // Keep the day container rectangular so the density indicator is
+                // rendered as a continuous line instead of being interrupted by
+                // the flyout's custom circular day backgrounds.
+                args.Item.CornerRadius = new CornerRadius(0);
                 ApplyDayItemDensity(args.Item);
 
             }
