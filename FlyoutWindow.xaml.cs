@@ -512,27 +512,23 @@ namespace Task_Flyout
             }
 
             var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
-            var colors = new List<Color>();
+            var densityColor = Color.FromArgb(255, 0, 120, 215);
             if (_localCache.DayItems.TryGetValue(dateKey, out var agendaItems))
             {
                 foreach (var agendaItem in agendaItems)
                 {
                     if (accountMgr != null && !accountMgr.IsItemVisible(agendaItem)) continue;
                     accountMgr?.PopulateItemColor(agendaItem);
-                    var color = !string.IsNullOrEmpty(agendaItem.ColorHex)
+                    densityColor = !string.IsNullOrEmpty(agendaItem.ColorHex)
                         ? Services.ColorHelper.ParseHex(agendaItem.ColorHex)
-                        : Color.FromArgb(255, 0, 120, 215);
-                    if (!colors.Any(existing => existing.R == color.R && existing.G == color.G && existing.B == color.B))
-                        colors.Add(color);
-                    if (colors.Count == 3) break;
+                        : densityColor;
+                    break;
                 }
             }
 
-            if (colors.Count == 0)
-                colors.Add(Color.FromArgb(255, 0, 120, 215));
-
-            item.SetDensityColors(colors);
-            _semanticDotColors[item] = colors;
+            var densityColors = new List<Color> { densityColor };
+            item.SetDensityColors(densityColors);
+            _semanticDotColors[item] = densityColors;
         }
 
         private List<CalendarViewDayItem> GetRealizedDayItems()
