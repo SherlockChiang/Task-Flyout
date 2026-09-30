@@ -1480,7 +1480,15 @@ namespace Task_Flyout.Views
             try
             {
                 if (App.Current is App app && app.SyncManager.GetProvider("Microsoft") is ISyncProvider provider)
-                    await provider.ConnectInteractivelyAsync(authCts.Token);
+                {
+                    // Reuse an existing agenda authorization when Outlook mail is added.
+                    // For a first-time Microsoft account there is no cached account, so
+                    // fall back to the interactive flow as before.
+                    if (app.SyncManager.AccountManager.IsConnected("Microsoft"))
+                        await provider.EnsureAuthorizedAsync(authCts.Token);
+                    else
+                        await provider.ConnectInteractivelyAsync(authCts.Token);
+                }
                 var account = await _mailService.AddOutlookAccountAsync(authCts.Token);
                 AddStatusText.Text = string.Format(_loader.GetStringOrDefault("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
                 await RefreshAccountsAsync();
