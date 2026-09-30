@@ -5,7 +5,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Shapes;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -91,7 +90,6 @@ namespace Task_Flyout
         private ScrollViewer? _activeScrollViewer;
         private readonly Dictionary<CalendarViewDayItem, DateTime> _realizedDayItems = new();
         private readonly Dictionary<CalendarViewDayItem, List<Color>> _semanticDotColors = new();
-        private long _dayItemGeneration;
         private long _agendaCacheVersion;
         private DateTime _localCacheAnchorMonth = DateTime.MinValue;
         private long _filterVersion;
@@ -99,8 +97,6 @@ namespace Task_Flyout
         private CalendarDotRenderKey? _lastDotRenderKey;
         private string? _failedTaskMutationKey;
         private Func<Task>? _retryTaskMutationSucceeded;
-        private readonly List<DotSpec> _dotSpecs = new();
-        private readonly Dictionary<uint, SolidColorBrush> _dotBrushCache = new();
 
         public ObservableCollection<AgendaItem> AgendaItems { get; set; } = new();
         public HashSet<string> MarkedDates { get; set; } = new();
@@ -141,8 +137,6 @@ namespace Task_Flyout
         private static readonly TimeSpan BackgroundRefreshCooldown = TimeSpan.FromMinutes(1);
         private static readonly TimeSpan ActivationHandoffInterval = TimeSpan.FromMilliseconds(16);
         private const int MaxActivationHandoffAttempts = 16;
-
-        private readonly record struct DotSpec(double Left, double Top, SolidColorBrush Fill);
 
         public FlyoutWindow()
         {
@@ -196,8 +190,8 @@ namespace Task_Flyout
                 DispatcherQueue.TryEnqueue(OpenPreparedFlyout);
         }
 
-        private void OnScrollViewerViewChanging(object? sender, ScrollViewerViewChangingEventArgs e) => ScheduleDotRefresh(TimeSpan.FromMilliseconds(80));
-        private void OnScrollViewerViewChanged(object? sender, ScrollViewerViewChangedEventArgs e) => ScheduleDotRefresh(TimeSpan.FromMilliseconds(80));
+        private void OnScrollViewerViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
+            => ScheduleDotRefresh(TimeSpan.FromMilliseconds(100));
 
         private void HookActiveScrollViewer()
         {
@@ -211,7 +205,6 @@ namespace Task_Flyout
                 if (current is ScrollViewer sv)
                 {
                     _activeScrollViewer = sv;
-                    _activeScrollViewer.ViewChanging += OnScrollViewerViewChanging;
                     _activeScrollViewer.ViewChanged += OnScrollViewerViewChanged;
                     break;
                 }
@@ -363,10 +356,7 @@ namespace Task_Flyout
                 if (_realizedDayItems.Remove(args.Item))
                 {
                     _semanticDotColors.Remove(args.Item);
-                    _dayItemGeneration++;
                 }
-                args.Item.Loaded -= DayItem_Loaded;
-                RequestDotRefresh();
                 return;
             }
 
@@ -377,21 +367,12 @@ namespace Task_Flyout
                 {
                     _realizedDayItems[args.Item] = date;
                     _semanticDotColors.Remove(args.Item);
-                    _dayItemGeneration++;
                 }
 
                 args.Item.CornerRadius = new CornerRadius(16);
-                args.Item.SetDensityColors(null);
+                ApplyDayItemDensity(args.Item);
 
-                args.Item.Loaded -= DayItem_Loaded;
-                args.Item.Loaded += DayItem_Loaded;
-                RequestDotRefresh();
             }
-        }
-
-        private void DayItem_Loaded(object sender, RoutedEventArgs e)
-        {
-            ScheduleDotRefresh(TimeSpan.FromMilliseconds(200));
         }
 
         private void ScheduleDotRefresh(TimeSpan delay)
@@ -428,7 +409,7 @@ namespace Task_Flyout
 
         private void RefreshAllDots()
         {
-            if (DotOverlay == null || MainCalendar == null) return;
+            if (MainCalendar == null) return;
 
             if (MainCalendar.DisplayMode != CalendarViewDisplayMode.Month)
             {
@@ -437,11 +418,15 @@ namespace Task_Flyout
                     _displayedMonth.Month,
                     _agendaCacheVersion,
                     (int)MainCalendar.DisplayMode,
-                    _dayItemGeneration,
+                    0,
                     _filterVersion);
                 if (CalendarDotRenderPolicy.RequiresSemanticRender(_lastDotRenderKey, nonMonthKey))
                 {
-                    ClearDotOverlay();
+                    foreach (var item in GetRealizedDayItems())
+                    {
+                        item.SetDensityColors(null);
+                        item.FontWeight = Microsoft.UI.Text.FontWeights.Normal;
+                    }
                     _semanticDotColors.Clear();
                     _lastDotRenderKey = nonMonthKey;
                 }
@@ -449,8 +434,6 @@ namespace Task_Flyout
             }
 
             HookActiveScrollViewer();
-            _dotSpecs.Clear();
-
             var dayItems = GetRealizedDayItems();
             UpdateDisplayedMonth(dayItems);
 
@@ -459,7 +442,7 @@ namespace Task_Flyout
                 _displayedMonth.Month,
                 _agendaCacheVersion,
                 (int)MainCalendar.DisplayMode,
-                _dayItemGeneration,
+                0,
                 _filterVersion);
             if (CalendarDotRenderPolicy.RequiresSemanticRender(_lastDotRenderKey, renderKey))
             {
@@ -469,55 +452,13 @@ namespace Task_Flyout
 
             if (EventCounts == null || EventCounts.Count == 0)
             {
-                ClearDotOverlay();
+                foreach (var item in dayItems)
+                {
+                    item.SetDensityColors(null);
+                    item.FontWeight = Microsoft.UI.Text.FontWeights.Normal;
+                }
                 return;
             }
-
-            foreach (var item in dayItems)
-            {
-                if (!_semanticDotColors.TryGetValue(item, out var dotColors) || dotColors.Count == 0)
-                    continue;
-
-                try
-                {
-                    double dotSize = 4.5;
-                    double spacing = 2.5;
-                    double bottomMargin = 6;
-
-                    if (_activeScrollViewer != null)
-                    {
-                        var transformToSv = item.TransformToVisual(_activeScrollViewer);
-                        var posInSv = transformToSv.TransformPoint(new Windows.Foundation.Point(0, 0));
-
-                        double dotYInSv = posInSv.Y + item.ActualHeight - bottomMargin;
-
-                        if (dotYInSv < 0 || dotYInSv > _activeScrollViewer.ActualHeight)
-                            continue;
-                    }
-
-                    var transformToCanvas = item.TransformToVisual(DotOverlay);
-                    var posInCanvas = transformToCanvas.TransformPoint(new Windows.Foundation.Point(0, 0));
-
-                    int dotsToShow = Math.Min(dotColors.Count, 3);
-                    double totalWidth = (dotsToShow * dotSize) + ((dotsToShow - 1) * spacing);
-
-                    double startX = posInCanvas.X + (item.ActualWidth - totalWidth) / 2;
-                    double dotYInCanvas = posInCanvas.Y + item.ActualHeight - dotSize - bottomMargin;
-
-                    for (int i = 0; i < dotsToShow; i++)
-                    {
-                        _dotSpecs.Add(new DotSpec(
-                            startX + i * (dotSize + spacing),
-                            dotYInCanvas,
-                            GetDotBrush(dotColors[i])));
-                    }
-                }
-                catch
-                {
-                }
-            }
-
-            ApplyDotOverlay(_dotSpecs);
         }
 
         private void UpdateDisplayedMonth(IReadOnlyList<CalendarViewDayItem> dayItems)
@@ -548,79 +489,50 @@ namespace Task_Flyout
         private void RebuildSemanticDotCache(IReadOnlyList<CalendarViewDayItem> dayItems)
         {
             _semanticDotColors.Clear();
-            var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
 
             foreach (var item in dayItems)
             {
-                var dateStr = item.Date.Date.ToString("yyyy-MM-dd");
-                bool hasEvent = EventCounts.TryGetValue(dateStr, out int count) && count > 0;
-                item.FontWeight = hasEvent
-                    ? Microsoft.UI.Text.FontWeights.Bold
-                    : Microsoft.UI.Text.FontWeights.Normal;
-                if (!hasEvent) continue;
+                ApplyDayItemDensity(item);
+            }
+        }
 
-                var colors = new List<Color>();
-                if (_localCache.DayItems.TryGetValue(dateStr, out var agendaItems))
+        private void ApplyDayItemDensity(CalendarViewDayItem item)
+        {
+            var dateKey = item.Date.Date.ToString("yyyy-MM-dd");
+            bool hasEvent = EventCounts.TryGetValue(dateKey, out int count) && count > 0;
+            item.FontWeight = hasEvent
+                ? Microsoft.UI.Text.FontWeights.Bold
+                : Microsoft.UI.Text.FontWeights.Normal;
+
+            if (!hasEvent)
+            {
+                item.SetDensityColors(null);
+                _semanticDotColors.Remove(item);
+                return;
+            }
+
+            var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
+            var colors = new List<Color>();
+            if (_localCache.DayItems.TryGetValue(dateKey, out var agendaItems))
+            {
+                foreach (var agendaItem in agendaItems)
                 {
-                    foreach (var agendaItem in agendaItems)
-                    {
-                        if (accountMgr != null && !accountMgr.IsItemVisible(agendaItem)) continue;
-                        accountMgr?.PopulateItemColor(agendaItem);
-                        var color = !string.IsNullOrEmpty(agendaItem.ColorHex)
-                            ? Services.ColorHelper.ParseHex(agendaItem.ColorHex)
-                            : Color.FromArgb(255, 0, 120, 215);
-                        if (!colors.Any(existing => existing.R == color.R && existing.G == color.G && existing.B == color.B))
-                            colors.Add(color);
-                    }
+                    if (accountMgr != null && !accountMgr.IsItemVisible(agendaItem)) continue;
+                    accountMgr?.PopulateItemColor(agendaItem);
+                    var color = !string.IsNullOrEmpty(agendaItem.ColorHex)
+                        ? Services.ColorHelper.ParseHex(agendaItem.ColorHex)
+                        : Color.FromArgb(255, 0, 120, 215);
+                    if (!colors.Any(existing => existing.R == color.R && existing.G == color.G && existing.B == color.B))
+                        colors.Add(color);
+                    if (colors.Count == 3) break;
                 }
-                if (colors.Count == 0)
-                    colors.Add(Color.FromArgb(255, 0, 120, 215));
-                _semanticDotColors[item] = colors;
-            }
-        }
-
-        private void ApplyDotOverlay(IReadOnlyList<DotSpec> dots)
-        {
-            while (DotOverlay.Children.Count > dots.Count)
-                DotOverlay.Children.RemoveAt(DotOverlay.Children.Count - 1);
-
-            while (DotOverlay.Children.Count < dots.Count)
-            {
-                DotOverlay.Children.Add(new Ellipse
-                {
-                    Width = 4.5,
-                    Height = 4.5,
-                    IsHitTestVisible = false
-                });
             }
 
-            for (int i = 0; i < dots.Count; i++)
-            {
-                var dot = (Ellipse)DotOverlay.Children[i];
-                dot.Fill = dots[i].Fill;
-                Canvas.SetLeft(dot, dots[i].Left);
-                Canvas.SetTop(dot, dots[i].Top);
-            }
-        }
+            if (colors.Count == 0)
+                colors.Add(Color.FromArgb(255, 0, 120, 215));
 
-        private void ClearDotOverlay()
-        {
-            _dotSpecs.Clear();
-            DotOverlay.Children.Clear();
-        }
-
-        private SolidColorBrush GetDotBrush(Color color)
-        {
-            uint key = ((uint)color.A << 24) | ((uint)color.R << 16) | ((uint)color.G << 8) | color.B;
-            if (_dotBrushCache.TryGetValue(key, out var brush))
-                return brush;
-
-            if (_dotBrushCache.Count > 64)
-                _dotBrushCache.Clear();
-
-            brush = new SolidColorBrush(color);
-            _dotBrushCache[key] = brush;
-            return brush;
+            item.SetDensityColors(colors);
+            _semanticDotColors[item] = colors;
         }
 
         private List<CalendarViewDayItem> GetRealizedDayItems()
@@ -1916,7 +1828,6 @@ namespace Task_Flyout
         {
             if (!FlyoutResidencyPolicy.ShouldTrimMemoryCaches(IsVisibleOrOpening)) return;
             _flyoutWeatherIconCache.Clear();
-            _dotBrushCache.Clear();
             _lastDotRenderKey = null;
         }
 
@@ -1946,7 +1857,6 @@ namespace Task_Flyout
             CancelWeatherRefresh();
             if (_activeScrollViewer != null)
             {
-                _activeScrollViewer.ViewChanging -= OnScrollViewerViewChanging;
                 _activeScrollViewer.ViewChanged -= OnScrollViewerViewChanged;
                 _activeScrollViewer = null;
             }

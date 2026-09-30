@@ -87,7 +87,7 @@
                 </ItemsControl.ItemsPanel>
             </ItemsControl>
 
-            <Grid x:Name="CalendarHost" Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,12" Width="320" Height="354">
+            <Grid x:Name="CalendarHost" Grid.Row="2" HorizontalAlignment="Stretch" Margin="16,0,16,12" Height="354">
                 <CalendarView x:Name="MainCalendar" 
                               HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                               CalendarViewDayItemChanging="MainCalendar_CalendarViewDayItemChanging" 
@@ -99,7 +99,6 @@
                     </CalendarView.CalendarViewDayItemStyle>
                 </CalendarView>
 
-                <Canvas x:Name="DotOverlay" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
             </Grid>
 
         </Grid>
@@ -201,7 +200,6 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Button x:Uid="Flyout_BtnSettings" Grid.Column="0" Click="BtnSettings_Click" Background="Transparent" BorderThickness="0" Foreground="{ThemeResource TextFillColorPrimaryBrush}">
                 <SymbolIcon Symbol="Setting"/>
@@ -214,9 +212,6 @@
             </Button>
             <ProgressRing x:Name="SyncProgress" Grid.Column="3" Width="20" Height="20" Margin="12,0,0,0"
                           IsActive="False" Visibility="Collapsed" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-            <Button x:Uid="Flyout_BtnAdd" Grid.Column="4" Style="{StaticResource AccentButtonStyle}" Width="36" Height="32" Padding="0" Click="BtnToggleAddPanel_Click">
-                <SymbolIcon Symbol="Add"/>
-            </Button>
         </Grid>
 
         <Border x:Name="AddPanel" Grid.Row="1" Background="{ThemeResource ControlFillColorDefaultBrush}"
