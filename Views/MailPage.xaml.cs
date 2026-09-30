@@ -1486,6 +1486,8 @@ namespace Task_Flyout.Views
                     // fall back to the interactive flow as before.
                     if (app.SyncManager.AccountManager.IsConnected("Microsoft"))
                         await provider.EnsureAuthorizedAsync(authCts.Token);
+                    else if (provider is MicrosoftSyncProvider microsoftProvider)
+                        await microsoftProvider.ConnectMailInteractivelyAsync(authCts.Token);
                     else
                         await provider.ConnectInteractivelyAsync(authCts.Token);
                 }

@@ -117,6 +117,24 @@ namespace Task_Flyout.Services
             }
         }
 
+        public async Task ConnectMailInteractivelyAsync(CancellationToken cancellationToken = default)
+        {
+            await _authorizationLock.WaitAsync(cancellationToken);
+            try
+            {
+                var client = await GetMsalClientAsync();
+                var result = await client.AcquireTokenInteractive(MailReadWriteScopes)
+                    .WithUseEmbeddedWebView(false)
+                    .ExecuteAsync(cancellationToken);
+                await ProtectedLocalStore.WriteTextAsync(GetAuthRecordPath(), result.Account.HomeAccountId.Identifier);
+                _graphClient = CreateGraphClient(client, result.Account.HomeAccountId.Identifier, MailReadWriteScopes);
+            }
+            finally
+            {
+                _authorizationLock.Release();
+            }
+        }
+
         public async Task EnsureAuthorizedAsync(CancellationToken cancellationToken = default)
         {
             if (_graphClient != null) return;
