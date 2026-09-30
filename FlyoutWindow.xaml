@@ -90,11 +90,29 @@
             <Grid x:Name="CalendarHost" Grid.Row="2" HorizontalAlignment="Stretch" Margin="16,0,16,12" Height="354">
                 <CalendarView x:Name="MainCalendar" 
                               HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                              CalendarItemCornerRadius="0"
+                              CalendarItemBackground="Transparent"
+                              CalendarItemHoverBackground="Transparent"
+                              CalendarItemPressedBackground="Transparent"
+                              CalendarItemDisabledBackground="Transparent"
+                              TodayBackground="Transparent"
+                              TodayHoverBackground="Transparent"
+                              TodayPressedBackground="Transparent"
+                              TodayDisabledBackground="Transparent"
+                              TodayBlackoutBackground="Transparent"
+                              TodaySelectedInnerBorderBrush="Transparent"
+                              SelectedBorderBrush="Transparent"
+                              SelectedHoverBorderBrush="Transparent"
+                              SelectedPressedBorderBrush="Transparent"
+                              SelectedDisabledBorderBrush="Transparent"
                               CalendarViewDayItemChanging="MainCalendar_CalendarViewDayItemChanging" 
                               SelectedDatesChanged="MainCalendar_SelectedDatesChanged">
                     <CalendarView.CalendarViewDayItemStyle>
                         <Style TargetType="CalendarViewDayItem">
                             <Setter Property="Margin" Value="1"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderBrush" Value="Transparent"/>
+                            <Setter Property="CornerRadius" Value="0"/>
                         </Style>
                     </CalendarView.CalendarViewDayItemStyle>
                 </CalendarView>
