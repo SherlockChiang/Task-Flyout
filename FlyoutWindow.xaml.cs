@@ -515,21 +515,24 @@ namespace Task_Flyout
             }
 
             var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
-            var densityColor = Color.FromArgb(255, 0, 120, 215);
+            var densityColors = new List<Color>();
             if (_localCache.DayItems.TryGetValue(dateKey, out var agendaItems))
             {
                 foreach (var agendaItem in agendaItems)
                 {
                     if (accountMgr != null && !accountMgr.IsItemVisible(agendaItem)) continue;
                     accountMgr?.PopulateItemColor(agendaItem);
-                    densityColor = !string.IsNullOrEmpty(agendaItem.ColorHex)
+                    var densityColor = !string.IsNullOrEmpty(agendaItem.ColorHex)
                         ? Services.ColorHelper.ParseHex(agendaItem.ColorHex)
-                        : densityColor;
-                    break;
+                        : Color.FromArgb(255, 0, 120, 215);
+                    densityColors.Add(densityColor);
+                    if (densityColors.Count == 10) break;
                 }
             }
 
-            var densityColors = new List<Color> { densityColor };
+            if (densityColors.Count == 0)
+                densityColors.Add(Color.FromArgb(255, 0, 120, 215));
+
             item.SetDensityColors(densityColors);
             _semanticDotColors[item] = densityColors;
         }
