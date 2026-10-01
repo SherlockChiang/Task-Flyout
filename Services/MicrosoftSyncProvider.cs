@@ -127,7 +127,6 @@ namespace Task_Flyout.Services
                     .WithUseEmbeddedWebView(false)
                     .ExecuteAsync(cancellationToken);
                 await ProtectedLocalStore.WriteTextAsync(GetAuthRecordPath(), result.Account.HomeAccountId.Identifier);
-                _graphClient = CreateGraphClient(client, result.Account.HomeAccountId.Identifier, MailReadWriteScopes);
             }
             finally
             {

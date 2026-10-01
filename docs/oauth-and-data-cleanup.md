@@ -33,6 +33,14 @@ Local cleanup on account removal:
 
 ## Microsoft
 
+**2026-10-01 review:** `1.4.5.5` is not accepted for standalone Outlook setup.
+School-account admin consent remains blocked. The current working tree removes
+the standalone-mail path's automatic agenda creation and no longer stores the
+mail-scoped client as the agenda client. See [the consent review](microsoft-oauth-consent.md)
+for the remaining code findings and pending acceptance. The interaction
+restrictions below describe the intended policy; Microsoft mail's interactive
+fallback does not yet fully enforce it for background callers.
+
 Requested scopes:
 
 - `Calendars.ReadWrite`: required for creating, editing, deleting, and reading Outlook calendar events.
@@ -69,8 +77,9 @@ Local cleanup on mail account removal:
 ## Notes
 
 - OAuth tokens and local mail/calendar/task caches are stored only on the device.
-- Google setup requests three scopes (Calendar, Tasks, and Gmail Modify), while
-  Microsoft setup requests its complete current feature scope set once.
+- Google setup requests three scopes (Calendar, Tasks, and Gmail Modify).
+  Microsoft separates agenda, mailbox, and sending scope sets; the remaining
+  entry-point/state-isolation gaps are recorded in the review above.
 - Existing Google tokens containing the former five-scope superset remain valid
   and are restored silently.
 - Existing partial-scope tokens produce a reconnect-required state. They are upgraded only after the user explicitly clicks Connect/Reconnect.

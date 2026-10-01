@@ -537,13 +537,8 @@ namespace Task_Flyout.Services
                 a.Kind == MailAccountKind.Outlook &&
                 string.Equals(a.Address, address, StringComparison.OrdinalIgnoreCase));
             if (existing != null)
-            {
-                await EnsureProviderAgendaAccountAsync(
-                    "Microsoft",
-                    existing.ProviderAccountId,
-                    existing.DisplayTitle);
                 return existing;
-            }
+
 
             var account = new MailAccount
             {
@@ -557,10 +552,6 @@ namespace Task_Flyout.Services
             _accounts.Add(account);
             SaveAccounts();
             UpdateMailPollingSettings();
-            await EnsureProviderAgendaAccountAsync(
-                "Microsoft",
-                account.ProviderAccountId,
-                account.DisplayTitle);
             return account;
         }
 
