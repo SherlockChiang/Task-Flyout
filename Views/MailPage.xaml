@@ -342,6 +342,25 @@
                                     </Button>
                                 </Grid>
 
+                                <Button x:Name="AddOutlookImapButton" x:Uid="MailPage_AddOutlookImapButton"
+                                        Content="Outlook IMAP（OAuth2）" HorizontalAlignment="Stretch"
+                                        Click="AddOutlookImapButton_Click"/>
+
+                                <StackPanel x:Name="OutlookImapSettingsPanel" Visibility="Collapsed" Spacing="10">
+                                    <TextBlock x:Uid="MailPage_OutlookImapHint" TextWrapping="WrapWholeWords"
+                                               Text="使用 Microsoft 登录，不填写密码。需启用 IMAP；学校账户仍可能需要管理员批准。首次发送时单独申请 SMTP 权限。"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <TextBox x:Name="OutlookImapAddressBox" x:Uid="MailPage_OutlookImapAddress"
+                                             Header="Microsoft 登录邮箱" PlaceholderText="name@outlook.com"/>
+                                    <ComboBox x:Name="OutlookImapTypeBox" x:Uid="MailPage_OutlookImapType"
+                                              Header="账户类型" SelectedIndex="0" HorizontalAlignment="Stretch">
+                                        <ComboBoxItem x:Uid="MailPage_OutlookImapPersonal" Content="个人 Outlook.com"/>
+                                        <ComboBoxItem x:Uid="MailPage_OutlookImapOrganization" Content="工作或学校 Microsoft 365"/>
+                                    </ComboBox>
+                                    <Button x:Name="ConnectOutlookImapButton" x:Uid="MailPage_ConnectOutlookImapButton"
+                                            Content="登录并连接 IMAP" Click="ConnectOutlookImapButton_Click"/>
+                                </StackPanel>
+
                                 <StackPanel x:Name="ImapSettingsPanel" Visibility="Collapsed" Spacing="10">
                                     <TextBox x:Name="ImapDisplayNameBox" x:Uid="MailPage_ImapDisplayName" Header="显示名称" PlaceholderText="Work Mail"/>
                                     <TextBox x:Name="ImapAddressBox" x:Uid="MailPage_ImapAddress" Header="邮箱地址" PlaceholderText="name@example.com"/>

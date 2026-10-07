@@ -1,5 +1,18 @@
 # Task Flyout 优化路线图
 
+## 2026-10-07 Outlook IMAP / SMTP OAuth2 可选入口
+
+保留现有 Graph 与密码 IMAP，新增个人 Outlook.com / 工作或学校 Microsoft 365
+选项。收信、未读同步、邮件操作和轮询复用现有 IMAP 路径；只在显式添加／重连
+时允许交互，首次发送单独申请 Exchange `SMTP.Send`。每个账户使用独立 Windows
+DPAPI MSAL 缓存，不覆盖日历或 Graph 授权；固定微软 TLS 端点，不回退密码登录。
+
+`MS-AUTH-03` 代码已接入，新添 31 个策略测试，1383 项 Release 测试通过，Debug x64
+构建零警告／零错误；真实浏览器、协议与打包 UI 尚未
+验收。使用前需核对 Entra 注册的 Exchange 委托权限、账户受众和 IMAP/SMTP AUTH
+开关；没有修改任何外部配置。学校仍可要求管理员批准，`MS-AUTH-01` 继续 BLOCKED。
+操作说明和手工验收见 [Outlook IMAP OAuth2](outlook-imap-oauth.md)。
+
 ## 2026-10-07 Outlook 授权隔离补齐
 
 移除邮箱添加的日程授权前置；显式“添加 Outlook”先静默复用邮箱授权，必要时

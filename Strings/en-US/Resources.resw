@@ -2056,4 +2056,14 @@ Widgets suppression: ready {8}; snapshot {9}; notification pending {10}</value><
   <data name="WeatherWind_NW" xml:space="preserve"><value>NW</value></data>
   <data name="TextRainHour" xml:space="preserve"><value>{0}h</value></data>
   <data name="GlobalSearch_LoadFailed" xml:space="preserve"><value>Some cached results could not be loaded.</value></data>
+  <data name="MailPage_AddOutlookImapButton.Content" xml:space="preserve"><value>Outlook IMAP (OAuth2)</value></data>
+  <data name="MailPage_OutlookImapHint.Text" xml:space="preserve"><value>Sign in with Microsoft, without entering a password here. IMAP must be enabled; school accounts may still need admin approval. SMTP permission is requested separately when sending.</value></data>
+  <data name="MailPage_OutlookImapAddress.Header" xml:space="preserve"><value>Microsoft sign-in email</value></data>
+  <data name="MailPage_OutlookImapType.Header" xml:space="preserve"><value>Account type</value></data>
+  <data name="MailPage_OutlookImapPersonal.Content" xml:space="preserve"><value>Personal Outlook.com</value></data>
+  <data name="MailPage_OutlookImapOrganization.Content" xml:space="preserve"><value>Work or school Microsoft 365</value></data>
+  <data name="MailPage_ConnectOutlookImapButton.Content" xml:space="preserve"><value>Sign in and connect IMAP</value></data>
+  <data name="TextOutlookImapReconnectRequired" xml:space="preserve"><value>Outlook IMAP needs authorization. Sign in again below to reconnect this mailbox.</value></data>
+  <data name="TextOutlookImapAccountMismatch" xml:space="preserve"><value>Sign in with the Microsoft email address entered above, not another account or an alias.</value></data>
+  <data name="TextOutlookImapFailed" xml:space="preserve"><value>Could not connect Outlook IMAP. Check the account type, IMAP access and app permissions; your organization may require admin approval.</value></data>
 </root>

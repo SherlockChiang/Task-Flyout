@@ -43,6 +43,14 @@ not exercise these live MSAL/Graph paths.
 
 ## Available resolution paths
 
+An alternative **Outlook IMAP (OAuth2)** option is now implemented in source;
+see [its setup and acceptance checklist](outlook-imap-oauth.md). It uses delegated
+Exchange IMAP/SMTP scopes, not Graph tokens. It still requires the registration
+and mailbox protocol settings to permit access, and the school's consent policy
+can require admin approval for this method too. Neither basic authentication nor
+an application password is offered as a bypass. Real protocol acceptance and
+registration configuration have not been performed.
+
 1. Ask the school's IT administrator to review **Task Flyout** and its delegated
    mailbox permissions. Use the app's actual Application (client) ID from its
    Entra registration, not its display name alone. The administrator determines

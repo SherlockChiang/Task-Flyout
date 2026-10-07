@@ -416,12 +416,11 @@ namespace Task_Flyout.Views
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-            catch (AuthorizationInteractionRequiredException) when (account.Kind == MailAccountKind.Outlook)
+            catch (AuthorizationInteractionRequiredException) when (account.Kind == MailAccountKind.Outlook || account.UsesOutlookImapOAuth)
             {
                 node.HasUnrealizedChildren = true;
                 AddAccountPanel.Visibility = Visibility.Visible;
-                AddStatusText.Text = _loader.GetStringOrDefault("TextOutlookReconnectRequired")
-                    ?? "Outlook needs authorization. Use Add Outlook to reconnect the same account.";
+                AddStatusText.Text = ShowOutlookReconnect(account);
             }
             catch (Exception ex)
             {
@@ -768,13 +767,12 @@ namespace Task_Flyout.Views
                     ClearDetail();
             }
             catch (OperationCanceledException) when (requestCts.IsCancellationRequested) { }
-            catch (AuthorizationInteractionRequiredException) when (account.Kind == MailAccountKind.Outlook)
+            catch (AuthorizationInteractionRequiredException) when (account.Kind == MailAccountKind.Outlook || account.UsesOutlookImapOAuth)
             {
                 if (loadVersion != _messageLoadVersion || !ReferenceEquals(account, _selectedAccount) || !ReferenceEquals(folder, _selectedFolder))
                     return;
                 AddAccountPanel.Visibility = Visibility.Visible;
-                string status = _loader.GetStringOrDefault("TextOutlookReconnectRequired")
-                    ?? "Outlook needs authorization. Use Add Outlook to reconnect the same account.";
+                string status = ShowOutlookReconnect(account);
                 AddStatusText.Text = status;
                 SetMessageListStatus(status, isError: true);
             }
@@ -1123,8 +1121,15 @@ namespace Task_Flyout.Views
                     SetMessageListStatus(_loader.GetStringOrDefault("TextDiscardDraftFailed") ?? "The protected draft could not be deleted. Try again.", isError: true);
                     return;
                 }
-                if (!_mailService.RemoveAccount(account.Id))
+                try
+                {
+                    if (!await _mailService.RemoveAccountAsync(account.Id)) return;
+                }
+                catch
+                {
+                    SetMessageListStatus(GetResourceStringOrDefault("TextDisconnectProviderFailed", "The account change did not finish. Existing local data may remain; try again."), isError: true);
                     return;
+                }
             }
 
             ReleaseMailWebView();
@@ -1161,6 +1166,20 @@ namespace Task_Flyout.Views
             EmptyDetailPanel.Visibility = Visibility.Collapsed;
             AddStatusText.Text = "";
             ImapSettingsPanel.Visibility = Visibility.Collapsed;
+            OutlookImapSettingsPanel.Visibility = Visibility.Collapsed;
+        }
+
+        private string ShowOutlookReconnect(MailAccount account)
+        {
+            if (account.UsesOutlookImapOAuth)
+            {
+                ImapSettingsPanel.Visibility = Visibility.Collapsed;
+                OutlookImapSettingsPanel.Visibility = Visibility.Visible;
+                OutlookImapAddressBox.Text = account.Address;
+                OutlookImapTypeBox.SelectedIndex = (int)account.OutlookMailboxType;
+                return GetResourceStringOrDefault("TextOutlookImapReconnectRequired", "Outlook IMAP needs authorization. Sign in again below to reconnect this mailbox.");
+            }
+            return GetResourceStringOrDefault("TextOutlookReconnectRequired", "Outlook needs authorization. Use Add Outlook to reconnect the same account.");
         }
 
         private async void ComposeButton_Click(object sender, RoutedEventArgs e)
@@ -1529,6 +1548,59 @@ namespace Task_Flyout.Views
             ShowImapSettings();
         }
 
+        private void AddOutlookImapButton_Click(object sender, RoutedEventArgs e)
+        {
+            ImapSettingsPanel.Visibility = Visibility.Collapsed;
+            OutlookImapSettingsPanel.Visibility = Visibility.Visible;
+            OutlookImapAddressBox.Text = "";
+            OutlookImapTypeBox.SelectedIndex = 0;
+            AddStatusText.Text = "";
+        }
+
+        private async void ConnectOutlookImapButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_mailService == null || _accountAuthCts != null) return;
+            var address = OutlookImapAddressBox.Text.Trim();
+            if (!MimeKit.MailboxAddress.TryParse(address, out var mailbox) ||
+                !OutlookImapPolicy.MatchesAddress(address, mailbox.Address))
+            {
+                AddStatusText.Text = GetResourceStringOrDefault("TextEnterEmail", "Please enter email address.");
+                return;
+            }
+            var mailboxType = OutlookImapTypeBox.SelectedIndex == 1
+                ? OutlookMailboxType.WorkOrSchool : OutlookMailboxType.Personal;
+            var authCts = CancellationTokenSource.CreateLinkedTokenSource(_pageRequestCts.Token);
+            authCts.CancelAfter(TimeSpan.FromMinutes(5));
+            _accountAuthCts = authCts;
+            SetAddButtonsEnabled(false);
+            AddStatusText.Text = GetResourceStringOrDefault("TextOpeningMSAuth", "Opening Microsoft authorization...");
+            try
+            {
+                var account = await _mailService.AddOutlookImapAccountAsync(address, mailboxType, authCts.Token);
+                AddStatusText.Text = string.Format(GetResourceStringOrDefault("TextAccountAdded", "Added {0}"), account.DisplayTitle);
+                await RefreshAccountsAsync();
+            }
+            catch (OperationCanceledException) when (authCts.IsCancellationRequested)
+            {
+                if (_isPageLoaded)
+                    AddStatusText.Text = GetResourceStringOrDefault("TextOutlookAuthCanceled", "Outlook authorization was canceled or timed out. Try adding the account again.");
+            }
+            catch (OutlookImapAccountMismatchException)
+            {
+                AddStatusText.Text = GetResourceStringOrDefault("TextOutlookImapAccountMismatch", "Sign in with the Microsoft email address entered above, not another account or an alias.");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Outlook IMAP setup failed: {ex.GetType().Name}");
+                AddStatusText.Text = GetResourceStringOrDefault("TextOutlookImapFailed", "Could not connect Outlook IMAP. Check the account type, IMAP access and app permissions; your organization may require admin approval.");
+            }
+            finally
+            {
+                CompleteAccountAuthorization(authCts);
+                SetAddButtonsEnabled(true);
+            }
+        }
+
         private async Task AddGoogleAccountAsync()
         {
             if (_mailService == null) return;
@@ -1581,6 +1653,7 @@ namespace Task_Flyout.Views
 
         private void ShowImapSettings()
         {
+            OutlookImapSettingsPanel.Visibility = Visibility.Collapsed;
             ImapSettingsPanel.Visibility = Visibility.Visible;
             ImapDisplayNameBox.Text = "";
             ImapAddressBox.Text = "";
@@ -1681,6 +1754,10 @@ namespace Task_Flyout.Views
             AddOutlookButton.IsEnabled = isEnabled;
             AddGmailButton.IsEnabled = isEnabled;
             AddImapButton.IsEnabled = isEnabled;
+            AddOutlookImapButton.IsEnabled = isEnabled;
+            ConnectOutlookImapButton.IsEnabled = isEnabled;
+            OutlookImapAddressBox.IsEnabled = isEnabled;
+            OutlookImapTypeBox.IsEnabled = isEnabled;
             SaveImapButton.IsEnabled = isEnabled;
             CancelAccountAuthorizationButton.Visibility = !isEnabled && _accountAuthCts != null
                 ? Visibility.Visible : Visibility.Collapsed;

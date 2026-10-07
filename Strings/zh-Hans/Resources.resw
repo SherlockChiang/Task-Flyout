@@ -2056,4 +2056,14 @@ Widgets 抑制：就绪 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="WeatherWind_NW" xml:space="preserve"><value>西北</value></data>
   <data name="TextRainHour" xml:space="preserve"><value>{0}小时</value></data>
   <data name="GlobalSearch_LoadFailed" xml:space="preserve"><value>部分本地缓存结果暂时无法加载。</value></data>
+  <data name="MailPage_AddOutlookImapButton.Content" xml:space="preserve"><value>Outlook IMAP（OAuth2）</value></data>
+  <data name="MailPage_OutlookImapHint.Text" xml:space="preserve"><value>使用 Microsoft 登录，不在此输入密码。需启用 IMAP；学校账户仍可能需要管理员批准。首次发送时单独申请 SMTP 权限。</value></data>
+  <data name="MailPage_OutlookImapAddress.Header" xml:space="preserve"><value>Microsoft 登录邮箱</value></data>
+  <data name="MailPage_OutlookImapType.Header" xml:space="preserve"><value>账户类型</value></data>
+  <data name="MailPage_OutlookImapPersonal.Content" xml:space="preserve"><value>个人 Outlook.com</value></data>
+  <data name="MailPage_OutlookImapOrganization.Content" xml:space="preserve"><value>工作或学校 Microsoft 365</value></data>
+  <data name="MailPage_ConnectOutlookImapButton.Content" xml:space="preserve"><value>登录并连接 IMAP</value></data>
+  <data name="TextOutlookImapReconnectRequired" xml:space="preserve"><value>Outlook IMAP 需要重新授权。请在下方登录并重新连接此邮箱。</value></data>
+  <data name="TextOutlookImapAccountMismatch" xml:space="preserve"><value>请使用上方填写的 Microsoft 登录邮箱登录，不要选择其他账户或填写别名。</value></data>
+  <data name="TextOutlookImapFailed" xml:space="preserve"><value>无法连接 Outlook IMAP。请检查账户类型、IMAP 开关和应用权限；组织账户可能需要管理员批准。</value></data>
 </root>

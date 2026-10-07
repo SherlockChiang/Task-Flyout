@@ -53,12 +53,19 @@ namespace Task_Flyout.Services
         public int SmtpPort { get; set; } = 587;
         public bool SmtpUseSsl { get; set; }
         public string SmtpUserName { get; set; } = "";
+        // Missing fields in existing IMAP records retain password authentication.
+        public MailAuthenticationMode AuthenticationMode { get; set; }
+        public OutlookMailboxType OutlookMailboxType { get; set; }
+        public string ImapOAuthHomeAccountId { get; set; } = "";
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool UsesOutlookImapOAuth => Kind == MailAccountKind.Imap &&
+            AuthenticationMode == MailAuthenticationMode.MicrosoftOAuth2;
 
         public string ProviderName => Kind switch
         {
             MailAccountKind.Outlook => "Outlook",
             MailAccountKind.Google => "Gmail",
-            MailAccountKind.Imap => "IMAP",
+            MailAccountKind.Imap => UsesOutlookImapOAuth ? "Outlook IMAP" : "IMAP",
             _ => "Mail"
         };
 
@@ -187,6 +194,7 @@ namespace Task_Flyout.Services
         // serialised by _isPollingMail, and the UI keeps using its own ephemeral clients,
         // so these are never accessed concurrently (MailKit clients are not thread-safe).
         private readonly Dictionary<string, ImapClient> _pollImapClients = new(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, OutlookImapAuthorization> _outlookImapAuthorization = new(StringComparer.Ordinal);
         private MailPersistentCache? _persistentCache;
         private bool _persistentCacheLoaded;
         private readonly object _persistentCacheSaveLock = new();
@@ -376,13 +384,15 @@ namespace Task_Flyout.Services
             SavePersistentCache();
         }
 
-        public bool RemoveAccount(string accountId)
+        public async Task<bool> RemoveAccountAsync(string accountId)
         {
             EnsureAccountsLoaded();
 
             var account = _accounts.FirstOrDefault(a => a.Id == accountId);
             if (account == null) return false;
 
+            if (account.UsesOutlookImapOAuth)
+                await GetOutlookImapAuthorization(account).ClearLocalAuthorizationAsync();
             _accounts.Remove(account);
             if (account.Kind == MailAccountKind.Imap)
                 RemoveImapPassword(account.Id);
@@ -609,6 +619,7 @@ namespace Task_Flyout.Services
 
             var existing = _accounts.FirstOrDefault(a =>
                 a.Kind == MailAccountKind.Imap &&
+                a.AuthenticationMode == MailAuthenticationMode.Password &&
                 string.Equals(a.Address, account.Address, StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(a.ImapHost, account.ImapHost, StringComparison.OrdinalIgnoreCase));
 
@@ -634,6 +645,74 @@ namespace Task_Flyout.Services
             SaveAccounts();
             UpdateMailPollingSettings();
             return account;
+        }
+
+        public async Task<MailAccount> AddOutlookImapAccountAsync(
+            string address, OutlookMailboxType mailboxType, CancellationToken cancellationToken = default)
+        {
+            EnsureAccountsLoaded();
+            address = address.Trim();
+            if (!MailboxAddress.TryParse(address, out var mailbox) ||
+                !OutlookImapPolicy.MatchesAddress(address, mailbox.Address))
+                throw new ArgumentException("A Microsoft sign-in email address is required.", nameof(address));
+
+            var existing = _accounts.FirstOrDefault(a => a.UsesOutlookImapOAuth &&
+                a.OutlookMailboxType == mailboxType && OutlookImapPolicy.MatchesAddress(a.Address, address));
+            var account = existing ?? new MailAccount
+            {
+                Kind = MailAccountKind.Imap,
+                AuthenticationMode = MailAuthenticationMode.MicrosoftOAuth2,
+                OutlookMailboxType = mailboxType,
+                DisplayName = "Outlook IMAP",
+                Address = address,
+                ImapUserName = address,
+                ImapHost = OutlookImapPolicy.ImapHost,
+                ImapPort = OutlookImapPolicy.ImapPort,
+                ImapUseSsl = true,
+                SmtpHost = OutlookImapPolicy.GetSmtpHost(mailboxType),
+                SmtpPort = OutlookImapPolicy.SmtpPort,
+                SmtpUseSsl = false,
+                SmtpUserName = address
+            };
+            ValidateOutlookImapAccount(account);
+            var authorization = GetOutlookImapAuthorization(account);
+            string homeAccountId;
+            try
+            {
+                homeAccountId = await authorization.ConnectImapInteractivelyAsync(cancellationToken);
+                await TestImapConnectionAsync(account, "", cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            catch
+            {
+                if (existing == null)
+                {
+                    // Failed/cancelled setup never retains a hidden token cache.
+                    await authorization.ClearLocalAuthorizationAsync();
+                    _outlookImapAuthorization.TryRemove(account.Id, out _);
+                }
+                throw;
+            }
+            account.ImapOAuthHomeAccountId = homeAccountId;
+            account.IsSetupComplete = true;
+            if (existing == null) _accounts.Add(account);
+            SaveAccounts();
+            UpdateMailPollingSettings();
+            return account;
+        }
+
+        private OutlookImapAuthorization GetOutlookImapAuthorization(MailAccount account)
+            => _outlookImapAuthorization.GetOrAdd(account.Id, _ => new OutlookImapAuthorization(
+                account.Id, account.OutlookMailboxType, account.Address, account.ImapOAuthHomeAccountId));
+
+        private static void ValidateOutlookImapAccount(MailAccount account)
+        {
+            OutlookImapPolicy.ValidateEndpoints(account.OutlookMailboxType,
+                account.ImapHost, account.ImapPort, account.ImapUseSsl,
+                account.SmtpHost, account.SmtpPort, account.SmtpUseSsl);
+            if (!OutlookImapPolicy.MatchesAddress(account.Address, account.ImapUserName) ||
+                !OutlookImapPolicy.MatchesAddress(account.Address, account.SmtpUserName))
+                throw new InvalidOperationException("Outlook OAuth usernames must match the connected mailbox.");
         }
 
         public async Task<MailAccount> AddGoogleAccountAsync(
@@ -1434,10 +1513,19 @@ namespace Task_Flyout.Services
             var validationError = MailAttachmentPolicy.Validate(attachments);
             if (validationError != null) throw new InvalidOperationException(validationError.Value.ToString());
             progress?.Report(new MailSendProgress(MailSendStage.Preparing, 0, attachments.Count));
+            string? smtpAccessToken = null;
             // Sending is an explicit user action. Complete incremental consent
             // before starting the shorter transport timeout; polling stays silent.
             if (account.Kind == MailAccountKind.Outlook)
                 await ConnectOutlookMailAsync(requireSend: true, cancellationToken);
+            if (account.UsesOutlookImapOAuth)
+            {
+                ValidateOutlookImapAccount(account);
+                using var authorizationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                authorizationCts.CancelAfter(TimeSpan.FromMinutes(5));
+                smtpAccessToken = await GetOutlookImapAuthorization(account).GetTokenAsync(
+                    sending: true, allowInteraction: true, authorizationCts.Token);
+            }
             using var timeoutCts = new CancellationTokenSource(attachments.Count == 0 ? TimeSpan.FromSeconds(30) : TimeSpan.FromMinutes(2));
             using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
             var operationToken = operationCts.Token;
@@ -1456,7 +1544,7 @@ namespace Task_Flyout.Services
 
             if (account.Kind == MailAccountKind.Imap)
             {
-                await SendSmtpMailAsync(account, to, subject, body, attachments, progress, operationToken);
+                await SendSmtpMailAsync(account, to, subject, body, attachments, progress, operationToken, smtpAccessToken);
                 return;
             }
 
@@ -2038,18 +2126,31 @@ namespace Task_Flyout.Services
             }
         }
 
-        private async Task SendSmtpMailAsync(MailAccount account, string to, string subject, string body, IReadOnlyList<MailAttachmentData> attachments, IProgress<MailSendProgress>? progress, CancellationToken cancellationToken)
+        private async Task SendSmtpMailAsync(MailAccount account, string to, string subject, string body, IReadOnlyList<MailAttachmentData> attachments, IProgress<MailSendProgress>? progress, CancellationToken cancellationToken, string? oauthAccessToken)
         {
             if (string.IsNullOrWhiteSpace(account.SmtpHost))
                 throw new InvalidOperationException("SMTP server is required for IMAP mail sending.");
 
-            var password = GetImapPassword(account.Id);
+            var password = account.UsesOutlookImapOAuth ? "" : GetImapPassword(account.Id);
+            if (account.UsesOutlookImapOAuth)
+            {
+                ValidateOutlookImapAccount(account);
+                if (string.IsNullOrWhiteSpace(oauthAccessToken))
+                    throw new AuthorizationInteractionRequiredException("Outlook IMAP", "SMTP authorization is required before sending.");
+            }
+            else if (account.AuthenticationMode != MailAuthenticationMode.Password)
+                throw new InvalidOperationException("Unsupported mail authentication mode.");
             var message = CreateMimeMessage(account, to, subject, body, attachments);
 
             using var client = new MailKit.Net.Smtp.SmtpClient { Timeout = MailNetworkTimeoutMs };
             var socketOptions = GetSmtpSocketOptions(account);
             await client.ConnectAsync(account.SmtpHost, account.SmtpPort, socketOptions, cancellationToken);
-            await client.AuthenticateAsync(string.IsNullOrWhiteSpace(account.SmtpUserName) ? account.ImapUserName : account.SmtpUserName, password, cancellationToken);
+            if (account.UsesOutlookImapOAuth)
+            {
+                await client.AuthenticateAsync(new SaslMechanismOAuth2(account.SmtpUserName, oauthAccessToken!), cancellationToken);
+            }
+            else if (account.AuthenticationMode == MailAuthenticationMode.Password)
+                await client.AuthenticateAsync(string.IsNullOrWhiteSpace(account.SmtpUserName) ? account.ImapUserName : account.SmtpUserName, password, cancellationToken);
             try
             {
                 progress?.Report(new MailSendProgress(MailSendStage.Sending, attachments.Count, attachments.Count));
@@ -2407,9 +2508,17 @@ namespace Task_Flyout.Services
             }
 
             var client = new ImapClient();
-            await ConnectImapAsync(client, account, GetImapPassword(account.Id));
-            _pollImapClients[account.Id] = client;
-            return client;
+            try
+            {
+                await ConnectImapAsync(client, account, GetImapPassword(account.Id));
+                _pollImapClients[account.Id] = client;
+                return client;
+            }
+            catch
+            {
+                client.Dispose();
+                throw;
+            }
         }
 
         private void DisconnectPollImapClient(string accountId)
@@ -2791,21 +2900,36 @@ namespace Task_Flyout.Services
         // hands off to the per-account poll backoff.
         private const int MailNetworkTimeoutMs = 10000;
 
-        private static async Task ConnectImapAsync(ImapClient client, MailAccount account, string password, CancellationToken cancellationToken = default)
+        private async Task ConnectImapAsync(ImapClient client, MailAccount account, string password, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(account.ImapHost))
                 throw new InvalidOperationException("IMAP server is required.");
             if (string.IsNullOrWhiteSpace(account.ImapUserName))
                 throw new InvalidOperationException("IMAP user name is required.");
-            if (string.IsNullOrWhiteSpace(password))
+            if (account.AuthenticationMode == MailAuthenticationMode.Password && string.IsNullOrWhiteSpace(password))
                 throw new InvalidOperationException("IMAP password is required.");
+            string? accessToken = null;
+            if (account.UsesOutlookImapOAuth)
+            {
+                ValidateOutlookImapAccount(account);
+                // Bound silent restoration too, without opening a browser.
+                using var authCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                authCts.CancelAfter(TimeSpan.FromSeconds(30));
+                accessToken = await GetOutlookImapAuthorization(account).GetTokenAsync(
+                    sending: false, allowInteraction: false, authCts.Token);
+            }
+            else if (account.AuthenticationMode != MailAuthenticationMode.Password)
+                throw new InvalidOperationException("Unsupported mail authentication mode.");
 
             client.Timeout = MailNetworkTimeoutMs;
             using var timeoutCts = new CancellationTokenSource(MailNetworkTimeoutMs);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
             var socketOptions = account.ImapUseSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
             await client.ConnectAsync(account.ImapHost, account.ImapPort, socketOptions, cts.Token);
-            await client.AuthenticateAsync(account.ImapUserName, password, cts.Token);
+            if (accessToken != null)
+                await client.AuthenticateAsync(new SaslMechanismOAuth2(account.ImapUserName, accessToken), cts.Token);
+            else
+                await client.AuthenticateAsync(account.ImapUserName, password, cts.Token);
         }
 
         private static async Task<bool> GetImapReadStateAsync(IMailFolder folder, UniqueId id, Dictionary<uint, MessageFlags?> flagsById, CancellationToken cancellationToken = default)
