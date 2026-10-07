@@ -416,6 +416,13 @@ namespace Task_Flyout.Views
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+            catch (AuthorizationInteractionRequiredException) when (account.Kind == MailAccountKind.Outlook)
+            {
+                node.HasUnrealizedChildren = true;
+                AddAccountPanel.Visibility = Visibility.Visible;
+                AddStatusText.Text = _loader.GetStringOrDefault("TextOutlookReconnectRequired")
+                    ?? "Outlook needs authorization. Use Add Outlook to reconnect the same account.";
+            }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Load folders failed: {ex.Message}");
@@ -761,6 +768,16 @@ namespace Task_Flyout.Views
                     ClearDetail();
             }
             catch (OperationCanceledException) when (requestCts.IsCancellationRequested) { }
+            catch (AuthorizationInteractionRequiredException) when (account.Kind == MailAccountKind.Outlook)
+            {
+                if (loadVersion != _messageLoadVersion || !ReferenceEquals(account, _selectedAccount) || !ReferenceEquals(folder, _selectedFolder))
+                    return;
+                AddAccountPanel.Visibility = Visibility.Visible;
+                string status = _loader.GetStringOrDefault("TextOutlookReconnectRequired")
+                    ?? "Outlook needs authorization. Use Add Outlook to reconnect the same account.";
+                AddStatusText.Text = status;
+                SetMessageListStatus(status, isError: true);
+            }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Load messages failed: {ex.Message}");
@@ -1472,6 +1489,7 @@ namespace Task_Flyout.Views
 
             _accountAuthCts?.Cancel();
             var authCts = CancellationTokenSource.CreateLinkedTokenSource(_pageRequestCts.Token);
+            authCts.CancelAfter(TimeSpan.FromMinutes(5));
             _accountAuthCts = authCts;
 
             SetAddButtonsEnabled(false);
@@ -1479,23 +1497,16 @@ namespace Task_Flyout.Views
 
             try
             {
-                if (App.Current is App app && app.SyncManager.GetProvider("Microsoft") is ISyncProvider provider)
-                {
-                    // Reuse an existing agenda authorization when Outlook mail is added.
-                    // For a first-time Microsoft account there is no cached account, so
-                    // fall back to the interactive flow as before.
-                    if (app.SyncManager.AccountManager.IsConnected("Microsoft"))
-                        await provider.EnsureAuthorizedAsync(authCts.Token);
-                    else if (provider is MicrosoftSyncProvider microsoftProvider)
-                        await microsoftProvider.ConnectMailInteractivelyAsync(authCts.Token);
-                    else
-                        await provider.ConnectInteractivelyAsync(authCts.Token);
-                }
                 var account = await _mailService.AddOutlookAccountAsync(authCts.Token);
                 AddStatusText.Text = string.Format(_loader.GetStringOrDefault("TextAccountAdded") ?? "Added {0}", account.DisplayTitle);
                 await RefreshAccountsAsync();
             }
-            catch (OperationCanceledException) when (authCts.IsCancellationRequested) { }
+            catch (OperationCanceledException) when (authCts.IsCancellationRequested)
+            {
+                if (_isPageLoaded)
+                    AddStatusText.Text = _loader.GetStringOrDefault("TextOutlookAuthCanceled")
+                        ?? "Outlook authorization was canceled or timed out. Try adding the account again.";
+            }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Add Outlook account failed: {ex.Message}");
@@ -1561,6 +1572,11 @@ namespace Task_Flyout.Views
             if (ReferenceEquals(_accountAuthCts, authCts))
                 _accountAuthCts = null;
             authCts.Dispose();
+        }
+
+        private void CancelAccountAuthorizationButton_Click(object sender, RoutedEventArgs e)
+        {
+            _accountAuthCts?.Cancel();
         }
 
         private void ShowImapSettings()
@@ -1666,6 +1682,8 @@ namespace Task_Flyout.Views
             AddGmailButton.IsEnabled = isEnabled;
             AddImapButton.IsEnabled = isEnabled;
             SaveImapButton.IsEnabled = isEnabled;
+            CancelAccountAuthorizationButton.Visibility = !isEnabled && _accountAuthCts != null
+                ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private async void MailListView_ItemClick(object sender, ItemClickEventArgs e)

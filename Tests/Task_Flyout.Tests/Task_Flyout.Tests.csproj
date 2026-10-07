@@ -99,6 +99,7 @@
     <Compile Include="..\..\Services\MailProviderAccountLinkPolicy.cs" Link="Source\MailProviderAccountLinkPolicy.cs" />
     <Compile Include="..\..\Services\ProviderAuthorizationScopePolicy.cs" Link="Source\ProviderAuthorizationScopePolicy.cs" />
     <Compile Include="..\..\Services\AuthorizationInteractionRequiredException.cs" Link="Source\AuthorizationInteractionRequiredException.cs" />
+    <Compile Include="..\..\Services\ExplicitAuthorizationFlow.cs" Link="Source\ExplicitAuthorizationFlow.cs" />
     <Compile Include="..\..\Services\OnboardingPolicy.cs" Link="Source\OnboardingPolicy.cs" />
     <Compile Include="..\..\Services\CachePrunePolicy.cs" Link="Source\CachePrunePolicy.cs" />
     <Compile Include="..\..\Services\BoundedHostGatePool.cs" Link="Source\BoundedHostGatePool.cs" />

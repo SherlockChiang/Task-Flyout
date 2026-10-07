@@ -842,6 +842,12 @@
   <data name="TextAddOutlookFailed" xml:space="preserve">
     <value>添加 Outlook 账户失败，请检查授权或网络连接。</value>
   </data>
+  <data name="TextOutlookAuthCanceled" xml:space="preserve">
+    <value>Outlook 授权已取消或超时，请重新添加账户。</value>
+  </data>
+  <data name="TextOutlookReconnectRequired" xml:space="preserve">
+    <value>Outlook 需要重新授权，请使用“添加 Outlook”重新连接同一账户。</value>
+  </data>
   <data name="TextOpeningGoogleAuth" xml:space="preserve">
     <value>正在打开 Google 授权...</value>
   </data>

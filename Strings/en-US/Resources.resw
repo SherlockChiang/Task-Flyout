@@ -842,6 +842,12 @@
   <data name="TextAddOutlookFailed" xml:space="preserve">
     <value>Failed to add Outlook account. Please check authorization or network.</value>
   </data>
+  <data name="TextOutlookAuthCanceled" xml:space="preserve">
+    <value>Outlook authorization was canceled or timed out. Try adding the account again.</value>
+  </data>
+  <data name="TextOutlookReconnectRequired" xml:space="preserve">
+    <value>Outlook needs authorization. Use Add Outlook to reconnect the same account.</value>
+  </data>
   <data name="TextOpeningGoogleAuth" xml:space="preserve">
     <value>Opening Google authorization...</value>
   </data>

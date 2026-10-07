@@ -522,7 +522,7 @@ namespace Task_Flyout.Services
         public async Task<MailAccount> AddOutlookAccountAsync(CancellationToken cancellationToken = default)
         {
             EnsureAccountsLoaded();
-            await EnsureOutlookMailReadAuthorizedAsync(cancellationToken);
+            await ConnectOutlookMailAsync(requireSend: false, cancellationToken);
             if (_outlookClient == null)
                 throw new InvalidOperationException("Outlook authorization failed.");
 
@@ -1434,6 +1434,10 @@ namespace Task_Flyout.Services
             var validationError = MailAttachmentPolicy.Validate(attachments);
             if (validationError != null) throw new InvalidOperationException(validationError.Value.ToString());
             progress?.Report(new MailSendProgress(MailSendStage.Preparing, 0, attachments.Count));
+            // Sending is an explicit user action. Complete incremental consent
+            // before starting the shorter transport timeout; polling stays silent.
+            if (account.Kind == MailAccountKind.Outlook)
+                await ConnectOutlookMailAsync(requireSend: true, cancellationToken);
             using var timeoutCts = new CancellationTokenSource(attachments.Count == 0 ? TimeSpan.FromSeconds(30) : TimeSpan.FromMinutes(2));
             using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
             var operationToken = operationCts.Token;
@@ -1916,8 +1920,9 @@ namespace Task_Flyout.Services
 
         private async Task SendOutlookMailAsync(MailAccount account, string to, string subject, string body, IReadOnlyList<MailAttachmentData> attachments, IProgress<MailSendProgress>? progress, CancellationToken cancellationToken)
         {
-            await EnsureOutlookMailAuthorizedAsync(requireWrite: true, requireSend: true, cancellationToken);
-            if (_outlookClient == null) return;
+            // Keep sending consent for this operation even if polling restores
+            // a mailbox-only client while the draft/send requests are awaiting.
+            var outlookClient = await GetOutlookMailClientAsync(requireWrite: true, requireSend: true, cancellationToken);
 
             var message = new GraphMessage
             {
@@ -1935,7 +1940,7 @@ namespace Task_Flyout.Services
             };
             progress?.Report(new MailSendProgress(MailSendStage.UploadingAttachments, 0, attachments.Count));
 
-            var draft = await _outlookClient.Me.Messages.PostAsync(message, request =>
+            var draft = await outlookClient.Me.Messages.PostAsync(message, request =>
                 request.Headers.Add("Prefer", "IdType=\"ImmutableId\""), cancellationToken);
             if (string.IsNullOrWhiteSpace(draft?.Id))
                 throw new InvalidOperationException("Microsoft Graph did not return a draft identifier.");
@@ -1944,26 +1949,26 @@ namespace Task_Flyout.Services
             try
             {
                 progress?.Report(new MailSendProgress(MailSendStage.Sending, attachments.Count, attachments.Count));
-                await _outlookClient.Me.Messages[draft.Id].Send.PostAsync(request =>
+                await outlookClient.Me.Messages[draft.Id].Send.PostAsync(request =>
                     request.Headers.Add("Prefer", "IdType=\"ImmutableId\""), cancellationToken);
             }
             catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
             {
                 progress?.Report(new MailSendProgress(MailSendStage.Confirming, attachments.Count, attachments.Count));
-                if (await TryConfirmOutlookSentMessageAsync(draft.Id))
+                if (await TryConfirmOutlookSentMessageAsync(outlookClient, draft.Id))
                     return;
                 throw new MailSendStatusUnknownException(ex);
             }
             catch
             {
-                await TryMoveOutlookDraftToDeletedItemsAsync(draft.Id);
+                await TryMoveOutlookDraftToDeletedItemsAsync(outlookClient, draft.Id);
                 throw;
             }
         }
 
-        private async Task<bool> TryConfirmOutlookSentMessageAsync(string immutableMessageId)
+        private async Task<bool> TryConfirmOutlookSentMessageAsync(GraphServiceClient outlookClient, string immutableMessageId)
         {
-            if (_outlookClient == null || string.IsNullOrWhiteSpace(immutableMessageId)) return false;
+            if (string.IsNullOrWhiteSpace(immutableMessageId)) return false;
 
             using var confirmationCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             try
@@ -1973,7 +1978,7 @@ namespace Task_Flyout.Services
                     if (attempt > 0)
                         await Task.Delay(TimeSpan.FromSeconds(2), confirmationCts.Token);
 
-                    var message = await _outlookClient.Me.Messages[immutableMessageId].GetAsync(request =>
+                    var message = await outlookClient.Me.Messages[immutableMessageId].GetAsync(request =>
                     {
                         request.Headers.Add("Prefer", "IdType=\"ImmutableId\"");
                         request.QueryParameters.Select = new[] { "isDraft", "sentDateTime" };
@@ -1990,16 +1995,16 @@ namespace Task_Flyout.Services
             return false;
         }
 
-        private async Task TryMoveOutlookDraftToDeletedItemsAsync(string draftId)
+        private async Task TryMoveOutlookDraftToDeletedItemsAsync(GraphServiceClient outlookClient, string draftId)
         {
-            if (_outlookClient == null || string.IsNullOrWhiteSpace(draftId)) return;
+            if (string.IsNullOrWhiteSpace(draftId)) return;
 
             using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             try
             {
                 string? deletedItemsId = await ResolveOutlookWellKnownFolderIdAsync("deleteditems", cleanupCts.Token);
                 if (string.IsNullOrWhiteSpace(deletedItemsId)) return;
-                await _outlookClient.Me.Messages[draftId].Move.PostAsync(
+                await outlookClient.Me.Messages[draftId].Move.PostAsync(
                     new MovePostRequestBody { DestinationId = deletedItemsId },
                     requestConfiguration: null, cancellationToken: cleanupCts.Token);
             }
@@ -2986,21 +2991,25 @@ namespace Task_Flyout.Services
             await EnsureOutlookMailAuthorizedAsync(requireWrite: true, requireSend: false, cancellationToken);
         }
 
-        private async Task EnsureOutlookMailSendAuthorizedAsync(CancellationToken cancellationToken = default)
+        private async Task ConnectOutlookMailAsync(bool requireSend, CancellationToken cancellationToken)
         {
-            await EnsureOutlookMailAuthorizedAsync(requireWrite: false, requireSend: true, cancellationToken);
+            if (App.Current is not App app ||
+                app.SyncManager.GetProvider("Microsoft") is not MicrosoftSyncProvider microsoftProvider)
+                throw new InvalidOperationException("Microsoft provider is not available.");
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+            using var authorizationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            _outlookClient = await microsoftProvider.ConnectMailInteractivelyAsync(authorizationCts.Token, requireSend);
         }
 
         private async Task EnsureOutlookMailAuthorizedAsync(bool requireWrite, bool requireSend, CancellationToken cancellationToken = default)
-        {
-            if (App.Current is App app &&
-                app.SyncManager.GetProvider("Microsoft") is MicrosoftSyncProvider microsoftProvider)
-            {
-                _outlookClient = await microsoftProvider.EnsureMailAuthorizedAsync(requireWrite, requireSend, cancellationToken);
-            }
+            => _outlookClient = await GetOutlookMailClientAsync(requireWrite, requireSend, cancellationToken);
 
-            if (_outlookClient == null)
+        private async Task<GraphServiceClient> GetOutlookMailClientAsync(bool requireWrite, bool requireSend, CancellationToken cancellationToken)
+        {
+            if (App.Current is not App app ||
+                app.SyncManager.GetProvider("Microsoft") is not MicrosoftSyncProvider microsoftProvider)
                 throw new InvalidOperationException("Microsoft provider is not available.");
+            return await microsoftProvider.EnsureMailAuthorizedAsync(requireWrite, requireSend, cancellationToken);
         }
 
         private async Task EnsureProviderAgendaAccountAsync(

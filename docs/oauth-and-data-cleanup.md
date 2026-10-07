@@ -33,13 +33,11 @@ Local cleanup on account removal:
 
 ## Microsoft
 
-**2026-10-01 review:** `1.4.5.5` is not accepted for standalone Outlook setup.
-School-account admin consent remains blocked. The current working tree removes
-the standalone-mail path's automatic agenda creation and no longer stores the
-mail-scoped client as the agenda client. See [the consent review](microsoft-oauth-consent.md)
-for the remaining code findings and pending acceptance. The interaction
-restrictions below describe the intended policy; Microsoft mail's interactive
-fallback does not yet fully enforce it for background callers.
+**2026-10-07 follow-up:** standalone Outlook setup is isolated from agenda
+authorization; it does not create an agenda account or initialize an agenda
+client. School-account admin consent remains blocked and live acceptance is
+pending. See [the consent review](microsoft-oauth-consent.md) for the source
+evidence, implementation follow-up, and the unsent IT review draft.
 
 Requested scopes:
 
@@ -52,10 +50,15 @@ Requested scopes:
 Microsoft authorization is incremental:
 
 - The Microsoft account Connect/Reconnect action requests only `User.Read`, `Calendars.ReadWrite`, and `Tasks.ReadWrite`.
-- Adding or first reading an Outlook mailbox requests `User.Read` and `Mail.ReadWrite`.
+- The explicit Add Outlook action restores or requests `User.Read` and `Mail.ReadWrite`.
 - Sending Outlook mail adds `Mail.Send` to the mailbox scopes. The send path uses the same mailbox client so draft creation and sending remain covered.
 
-Runtime calendar/task access uses `AcquireTokenSilent`. Mail access first tries `AcquireTokenSilent` and opens the interactive consent flow only when the requested mailbox scopes have not yet been granted. Only an explicit connection or first-use mailbox action can call `AcquireTokenInteractive`.
+Runtime calendar/task and mailbox access use silent token acquisition. Only
+an explicit connection or Send action can supply an interactive callback for
+Microsoft mail. Reading messages, changing read/unread state, and background
+polling cannot open a browser. Missing or revoked consent requires reconnection
+from the Mail page. Explicit consent is completed before the send transport
+timeout starts; a failed or canceled consent does not send a message.
 
 Local cleanup on account removal:
 
@@ -78,13 +81,20 @@ Local cleanup on mail account removal:
 
 - OAuth tokens and local mail/calendar/task caches are stored only on the device.
 - Google setup requests three scopes (Calendar, Tasks, and Gmail Modify).
-  Microsoft separates agenda, mailbox, and sending scope sets; the remaining
-  entry-point/state-isolation gaps are recorded in the review above.
+  Microsoft separates agenda, mailbox, and sending scope sets; live acceptance
+  and external tenant approval are recorded in the review above.
 - Existing Google tokens containing the former five-scope superset remain valid
   and are restored silently.
 - Existing partial-scope tokens produce a reconnect-required state. They are upgraded only after the user explicitly clicks Connect/Reconnect.
-- Background sync, startup polling, message reading, mark-read, sending, and task/calendar mutations cannot start an interactive browser flow.
+- Background sync, startup polling, message reading, mark-read, and task/calendar
+  mutations cannot start an interactive browser flow. The explicit Microsoft
+  Send action can request the additional sending consent when needed.
 
 ## Interaction Policy
 
-Interactive OAuth is restricted to the Google and Microsoft Connect/Reconnect buttons. Providers serialize authorization state so concurrent startup sync and mail polling cannot launch duplicate authorization sessions. A missing, revoked, or partial token remains stored and produces `AuthorizationInteractionRequiredException`; feature code may show cached data and a reconnect status but must not clear the token or launch a browser.
+Interactive OAuth is restricted to explicit connection actions and the
+Microsoft Send action. Providers serialize authorization state so concurrent
+startup sync and mail polling cannot launch duplicate authorization sessions.
+A missing, revoked, or partial token on runtime restoration produces
+`AuthorizationInteractionRequiredException`; feature code may show cached data
+and a reconnect status but must not clear the token or launch a browser.

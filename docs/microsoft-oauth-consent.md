@@ -84,18 +84,34 @@ Do not attach tokens, passwords, authorization codes, or the complete sign-in
 URL to the ticket. The client ID is public app identification; it is not a
 client secret. The placeholders above still need to be filled before sending.
 
-## Pending implementation and acceptance
+## Implementation status and pending acceptance
 
-- Remove the agenda-authorization prerequisite from explicit Outlook setup;
-  reuse the stored Microsoft identity while requesting only mailbox scopes.
-- Keep the mail client separate from the agenda client and stop creating an
-  agenda account as a side effect of a standalone mailbox connection.
-- Keep background mailbox restoration silent and make explicit authorization
-  cancellation/failure return the UI to a retryable state.
+- `304657c` removed automatic agenda creation and the mail-scoped assignment
+  to the agenda client. Existing agenda entries are not automatically removed.
+- The 2026-10-07 follow-up removes the agenda prerequisite from Outlook setup.
+  The explicit Add Outlook action now restores the stored identity's mailbox
+  token first, and requests only mailbox scopes if interaction is necessary.
+- Runtime mailbox restoration now has no interactive callback. Missing or
+  expired consent throws `AuthorizationInteractionRequiredException`; folder
+  and message loading present a localized reconnect action through Add Outlook.
+- The explicit Send action restores or requests sending consent before its
+  transport timeout starts. It does not add calendar or task permissions.
+  Its draft, send, confirmation, and cleanup requests retain the operation's
+  client so polling cannot replace sending scopes during the operation.
+- Explicit mail authorization is bounded to five minutes; account setup also
+  exposes a Cancel button. Cancellation/failure releases the provider lock and
+  restores the setup buttons. A different account returned for a known stored
+  identity is rejected before replacing the protected home-account record.
+- Nine new tests exercise the production fallback helper: silent reuse,
+  runtime missing consent, explicit fallback, network failure, cancellation,
+  and denial without retry. All 1352 Release tests pass. These tests do not run
+  a real browser/MSAL session or inspect the school's tenant policies.
+  Debug x64 application build passes with zero warnings and errors.
 - Verify no-account, existing agenda, expired consent, denied/admin-required,
   browser cancellation, background polling, and later calendar opt-in paths.
 - Record source/build validation separately from live tenant approval. Do not
   mark the school-account blocker resolved on the basis of another build.
 
 No app registration, tenant setting, publisher status, consent grant, or
-account data was changed during this review. No request was sent to IT.
+account data was changed while implementing this follow-up. No request was
+sent to IT. Code completion does not resolve the external approval requirement.

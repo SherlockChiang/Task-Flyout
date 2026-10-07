@@ -383,6 +383,9 @@
                                 <TextBlock x:Name="AddStatusText" Text="" FontSize="13"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                            TextWrapping="WrapWholeWords"/>
+                                <Button x:Name="CancelAccountAuthorizationButton" x:Uid="MailPage_BtnCancel"
+                                        Content="Cancel" Visibility="Collapsed" HorizontalAlignment="Left"
+                                        Click="CancelAccountAuthorizationButton_Click"/>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>

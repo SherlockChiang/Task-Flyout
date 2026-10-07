@@ -836,6 +836,12 @@
   <data name="TextOpeningMSAuth" xml:space="preserve">
     <value>正在開啟 Microsoft 授權...</value>
   </data>
+  <data name="TextOutlookAuthCanceled" xml:space="preserve">
+    <value>Outlook 授權已取消或逾時，請重新新增帳戶。</value>
+  </data>
+  <data name="TextOutlookReconnectRequired" xml:space="preserve">
+    <value>Outlook 需要重新授權，請使用「新增 Outlook」重新連線同一帳戶。</value>
+  </data>
   <data name="TextAccountAdded" xml:space="preserve">
     <value>已新增 {0}</value>
   </data>

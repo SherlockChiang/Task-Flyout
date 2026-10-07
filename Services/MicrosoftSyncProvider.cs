@@ -117,22 +117,9 @@ namespace Task_Flyout.Services
             }
         }
 
-        public async Task ConnectMailInteractivelyAsync(CancellationToken cancellationToken = default)
-        {
-            await _authorizationLock.WaitAsync(cancellationToken);
-            try
-            {
-                var client = await GetMsalClientAsync();
-                var result = await client.AcquireTokenInteractive(MailReadWriteScopes)
-                    .WithUseEmbeddedWebView(false)
-                    .ExecuteAsync(cancellationToken);
-                await ProtectedLocalStore.WriteTextAsync(GetAuthRecordPath(), result.Account.HomeAccountId.Identifier);
-            }
-            finally
-            {
-                _authorizationLock.Release();
-            }
-        }
+        public Task<GraphServiceClient> ConnectMailInteractivelyAsync(
+            CancellationToken cancellationToken = default, bool requireSend = false)
+            => AuthorizeMailAsync(requireSend, allowInteraction: true, cancellationToken);
 
         public async Task EnsureAuthorizedAsync(CancellationToken cancellationToken = default)
         {
@@ -161,38 +148,50 @@ namespace Task_Flyout.Services
             }
         }
 
-        public async Task<GraphServiceClient> EnsureMailAuthorizedAsync(bool requireWrite = false, bool requireSend = false, CancellationToken cancellationToken = default)
+        public Task<GraphServiceClient> EnsureMailAuthorizedAsync(bool requireWrite = false, bool requireSend = false, CancellationToken cancellationToken = default)
+            => AuthorizeMailAsync(requireSend, allowInteraction: false, cancellationToken);
+
+        private async Task<GraphServiceClient> AuthorizeMailAsync(bool requireSend, bool allowInteraction, CancellationToken cancellationToken)
         {
             var scopes = requireSend ? MailSendScopes : MailReadWriteScopes;
-            await EnsureScopesAuthorizedAsync(scopes, cancellationToken);
-            var client = await GetMsalClientAsync();
-            var account = await GetStoredAccountAsync(client)
-                ?? throw new AuthorizationInteractionRequiredException(ProviderName, "Microsoft reconnect is required. Open account settings to reconnect explicitly.");
-            return CreateGraphClient(client, account.HomeAccountId.Identifier, scopes);
-        }
-
-        private async Task EnsureScopesAuthorizedAsync(string[] scopes, CancellationToken cancellationToken)
-        {
             await _authorizationLock.WaitAsync(cancellationToken);
             try
             {
                 var client = await GetMsalClientAsync();
                 var account = await GetStoredAccountAsync(client);
-                if (account == null)
-                    throw new AuthorizationInteractionRequiredException(ProviderName, "Microsoft reconnect is required. Open account settings to reconnect explicitly.");
 
-                try
+                async Task<AuthenticationResult> RestoreAsync(CancellationToken token)
                 {
-                    await client.AcquireTokenSilent(scopes, account).ExecuteAsync(cancellationToken);
+                    if (account == null)
+                        throw new AuthorizationInteractionRequiredException(ProviderName, "Outlook authorization is required. Use Add Outlook in Mail to reconnect.");
+                    try
+                    {
+                        return await client.AcquireTokenSilent(scopes, account).ExecuteAsync(token);
+                    }
+                    catch (MsalUiRequiredException ex)
+                    {
+                        throw new AuthorizationInteractionRequiredException(ProviderName, "Outlook authorization is required. Use Add Outlook in Mail to reconnect.", ex);
+                    }
                 }
-                catch (MsalUiRequiredException)
+
+                async Task<AuthenticationResult> ConnectAsync(CancellationToken token)
                 {
-                    var result = await client.AcquireTokenInteractive(scopes)
-                        .WithAccount(account)
-                        .WithUseEmbeddedWebView(false)
-                        .ExecuteAsync(cancellationToken);
+                    var builder = client.AcquireTokenInteractive(scopes).WithUseEmbeddedWebView(false);
+                    builder = account != null ? builder.WithAccount(account) : builder.WithPrompt(Microsoft.Identity.Client.Prompt.SelectAccount);
+                    var result = await builder.ExecuteAsync(token);
+                    token.ThrowIfCancellationRequested();
+                    if (account != null && !string.Equals(account.HomeAccountId.Identifier,
+                        result.Account.HomeAccountId.Identifier, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("The signed-in Microsoft account does not match the connected account.");
                     await ProtectedLocalStore.WriteTextAsync(GetAuthRecordPath(), result.Account.HomeAccountId.Identifier);
+                    return result;
                 }
+
+                var result = await ExplicitAuthorizationFlow.AcquireAsync(
+                    RestoreAsync, allowInteraction ? ConnectAsync : null, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                // Calendar and To Do keep their own client and core scopes.
+                return CreateGraphClient(client, result.Account.HomeAccountId.Identifier, scopes);
             }
             finally
             {
