@@ -2421,3 +2421,27 @@ They are historical records; active work remains in the backlog tables above.
 - Not packaged, installed or started; no actual Microsoft login or outgoing
   message was performed. Benchmark and native taskbar experiments remain paused.
   User manifest and Windhawk changes remain uncommitted and untouched.
+
+### 2026-10-07 Outlook IMAP OAuth2 Signed Test Package
+
+- User requested a local test package. Signed Release x64 candidate `1.4.5.8`
+  uses source `96a1f3cf80b1514e23598109836e6e077c535da0`, including implementation
+  `dac3aa56796997e53c2b09ca9f37314393c7d898`.
+- Package:
+  `AppPackages/PerformanceControl_1.4.5.8_96a1f3c/Task_Flyout_1.4.5.8_x64_Test/Task_Flyout_1.4.5.8_x64.msix`.
+- SHA-256: `3A5F560323FA02757C07DCD7CB7480A38912DE1072ED77490D233C5A646EA463`.
+  Existing signer: `15303040F7CEECFDE9C023F15481D15C39CCDB46`.
+  Package identity/version/x64 architecture, SignTool and Authenticode checks
+  passed. Local test package is signed without a timestamp.
+- Re-ran Release tests: 1383 passed, zero failed/skipped. Packaging completed
+  using the isolated manifest; pre-existing source manifest and Windhawk hashes
+  stayed unchanged. Only this archive is committed after packaging.
+- Not installed, launched or restarted. No login, outgoing test mail, tenant
+  setting change, consent grant, diagnostic session or taskbar runtime attempt.
+- For ordinary manual testing: exit the old app normally, install this exact
+  MSIX, launch normally, then Mail → Add account → Outlook IMAP (OAuth2). Choose
+  Work/school for the university account; personal accounts require their own
+  selection and IMAP enabled. Follow [the acceptance checklist](outlook-imap-oauth.md).
+- `MS-AUTH-03` remains IN PROGRESS for live/package acceptance. The owner still
+  needs to check registration Exchange delegated permissions and protocol access;
+  `MS-AUTH-01` remains externally BLOCKED. Packaging cannot bypass admin approval.
