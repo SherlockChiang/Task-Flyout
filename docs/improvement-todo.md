@@ -2371,3 +2371,24 @@ They are historical records; active work remains in the backlog tables above.
   behavior. Do not run Start-Performance scripts or collect a new baseline.
 - Commit: `docs: archive signed asynchronous search candidate`. M1-07 remains
   IN PROGRESS for functional UI acceptance.
+
+### 2026-10-07 Outlook Explicit Authorization Candidate
+
+- Implementation: `720017e860570156d4f5c25837ec25e37fa4ce37`. MS-AUTH-02 code is
+  complete; live Microsoft and packaged UI acceptance are pending.
+- 1352 Release tests pass; 9 new cases exercise production authorization
+  fallback/cancellation/denial logic. Debug x64 builds with zero warnings/errors.
+- Signed Release x64 candidate: `1.4.5.7`,
+  `AppPackages/PerformanceControl_1.4.5.7_720017e/Task_Flyout_1.4.5.7_x64_Test/Task_Flyout_1.4.5.7_x64.msix`.
+- SHA-256: `93958D7E4E0CD4ED57D20F8CEB3E30A459B7665BF1A702D5665786A66BD2F7E3`.
+  Existing signer `15303040F7CEECFDE9C023F15481D15C39CCDB46`; package identity,
+  SignTool, and Authenticode validation passed. Not installed or started.
+- Pending manual checks: Add Outlook without an agenda account; reuse an
+  existing Microsoft identity without calendar consent; cancel/deny/retry;
+  restore after restart; runtime missing consent displays reconnection without
+  a browser; first explicit Send can request Mail.Send; later explicit agenda
+  connection can request its scopes. No outgoing test mail was sent.
+- MS-AUTH-01 stays externally blocked. The school still requires admin approval;
+  this build cannot override tenant policy. See [the unsent IT draft](microsoft-oauth-consent.md).
+- Benchmarking and taskbar-weather experiments remain paused. Existing manifest
+  and Windhawk modifications are preserved and excluded from the commits.

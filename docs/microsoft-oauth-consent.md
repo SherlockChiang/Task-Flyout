@@ -107,6 +107,9 @@ client secret. The placeholders above still need to be filled before sending.
   and denial without retry. All 1352 Release tests pass. These tests do not run
   a real browser/MSAL session or inspect the school's tenant policies.
   Debug x64 application build passes with zero warnings and errors.
+- Candidate `1.4.5.7` from `720017e` is built and signed with the existing
+  certificate. Package identity, SignTool, and Authenticode checks pass; it has
+  not been installed. The exact path and hash are in [the todo archive](improvement-todo.md#2026-10-07-outlook-explicit-authorization-candidate).
 - Verify no-account, existing agenda, expired consent, denied/admin-required,
   browser cancellation, background polling, and later calendar opt-in paths.
 - Record source/build validation separately from live tenant approval. Do not
