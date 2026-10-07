@@ -2393,3 +2393,31 @@ They are historical records; active work remains in the backlog tables above.
   this build cannot override tenant policy. See [the unsent IT draft](microsoft-oauth-consent.md).
 - Benchmarking and taskbar-weather experiments remain paused. Existing manifest
   and Windhawk modifications are preserved and excluded from the commits.
+
+### 2026-10-07 Outlook IMAP OAuth2 Implementation
+
+- Implementation: `dac3aa56796997e53c2b09ca9f37314393c7d898`.
+  `MS-AUTH-03` code is complete; live protocol and packaged UI acceptance remain
+  IN PROGRESS. Existing Outlook Graph and password IMAP entries are unchanged.
+- New Mail account option: Outlook IMAP (OAuth2), with personal or work/school
+  account selection and no password field. Read/unread convergence and mailbox
+  operations reuse the existing account-scoped IMAP paths.
+- Dedicated DPAPI MSAL cache for each mail ID; no use of the shared Graph cache.
+  IMAP setup/reconnect and SMTP Send allow explicit incremental consent;
+  runtime loading and polling only restore silently. Fixed TLS endpoints,
+  home-account checks, setup cancellation/timeouts and account cleanup are wired.
+- 1383/1383 Release tests pass, including 31 new endpoint/scope/identity/cache-name
+  policy cases. Final Debug x64 application build: zero warnings and errors.
+  The policy tests do not prove real MSAL, MailKit, DPAPI or packaged UI behavior.
+  All three resource files parse without duplicate keys and contain the ten new
+  localized entries. Staged diff whitespace check passes.
+- Before live testing, check the existing Entra registration's account audience,
+  desktop redirect and delegated Exchange `IMAP.AccessAsUser.All` / `SMTP.Send`
+  permissions, plus mailbox IMAP / SMTP AUTH availability. No registration,
+  tenant policy or consent grant was changed. `MS-AUTH-01` stays BLOCKED.
+- [Connection instructions and acceptance matrix](outlook-imap-oauth.md) include
+  cancel/deny/wrong account, restart, two-account isolation, unread convergence,
+  silent missing consent, approved test send and removal/cleanup retry checks.
+- Not packaged, installed or started; no actual Microsoft login or outgoing
+  message was performed. Benchmark and native taskbar experiments remain paused.
+  User manifest and Windhawk changes remain uncommitted and untouched.
