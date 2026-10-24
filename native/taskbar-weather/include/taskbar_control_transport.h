@@ -27,6 +27,7 @@ enum class HostControlDispatchStatus : std::uint32_t {
     AcknowledgementWaitFailed = 14,
     AcknowledgementInvalid = 15,
     ControllerRejected = 16,
+    HostSignatureInvalid = 17,
 };
 
 struct HostControlDispatchResult {

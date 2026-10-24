@@ -4,6 +4,7 @@
 
 #include <array>
 #include <atomic>
+#include <cwchar>
 #include <string>
 
 namespace taskflyout::taskbar {
@@ -42,18 +43,38 @@ std::wstring CurrentExecutablePath() {
 }
 
 std::wstring ResolveHostPath(std::wstring_view requested) {
-    if (!requested.empty()) {
-        return std::wstring(requested);
-    }
-
     std::wstring executable = CurrentExecutablePath();
     const auto separator = executable.find_last_of(L"\\/");
     if (separator == std::wstring::npos) {
         return {};
     }
-    executable.resize(separator + 1);
-    executable += kDefaultHostFileName;
-    return executable;
+    const std::wstring executableDirectory = executable.substr(0, separator);
+    const std::wstring candidate = requested.empty()
+        ? executableDirectory + L"\\" + kDefaultHostFileName
+        : std::wstring(requested);
+
+    std::array<wchar_t, 32768> fullPath{};
+    const DWORD length = GetFullPathNameW(
+        candidate.c_str(),
+        static_cast<DWORD>(fullPath.size()),
+        fullPath.data(),
+        nullptr);
+    if (length == 0 || length >= fullPath.size()) {
+        return {};
+    }
+
+    const std::wstring resolved(fullPath.data(), length);
+    const auto candidateSeparator = resolved.find_last_of(L"\\/");
+    if (candidateSeparator == std::wstring::npos ||
+        _wcsicmp(
+            resolved.substr(0, candidateSeparator).c_str(),
+            executableDirectory.c_str()) != 0 ||
+        _wcsicmp(
+            resolved.substr(candidateSeparator + 1).c_str(),
+            kDefaultHostFileName) != 0) {
+        return {};
+    }
+    return resolved;
 }
 
 HWND FindVerifiedTaskbarWindow(
@@ -341,6 +362,15 @@ HostControlDispatchResult DispatchHostControl(
         return result;
     }
 
+    std::wstring hostValidationDetail;
+    if (!ValidateSignedHostBinary(resolvedHostPath, hostValidationDetail)) {
+        result.status = HostControlDispatchStatus::HostSignatureInvalid;
+        result.detail = hostValidationDetail.empty()
+            ? L"host-signature-invalid"
+            : hostValidationDetail;
+        return result;
+    }
+
     LoadedHost host;
     if (!host.Load(resolvedHostPath)) {
         result.status = HostControlDispatchStatus::HostLoadFailed;
@@ -476,6 +506,8 @@ const wchar_t* HostControlDispatchStatusName(
             return L"acknowledgement-invalid";
         case HostControlDispatchStatus::ControllerRejected:
             return L"controller-rejected";
+        case HostControlDispatchStatus::HostSignatureInvalid:
+            return L"host-signature-invalid";
     }
     return L"unknown";
 }

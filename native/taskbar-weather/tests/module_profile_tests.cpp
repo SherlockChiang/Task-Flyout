@@ -86,6 +86,13 @@ int wmain(int argc, wchar_t** argv) {
         hostFingerprint.sizeOfImage != 0,
         L"built host DLL should have a non-empty image");
 
+    std::wstring signatureDetail;
+    passed &= Expect(
+        !taskflyout::taskbar::ValidateSignedHostBinary(
+            argv[1],
+            signatureDetail),
+        L"an unsigned host must be rejected before Explorer injection");
+
     std::array<std::uint8_t, 2> dosSignature{};
     passed &= Expect(
         taskflyout::taskbar::ReadPeBytesAtRva(

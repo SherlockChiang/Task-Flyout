@@ -1,6 +1,8 @@
 #include "module_profile.h"
 
 #include <TlHelp32.h>
+#include <softpub.h>
+#include <wintrust.h>
 
 #include <array>
 #include <algorithm>
@@ -95,6 +97,37 @@ bool IsWindowsExplorerPath(const std::wstring& path) {
     std::wstring expected(windowsDirectory.data(), length);
     expected += L"\\explorer.exe";
     return _wcsicmp(expected.c_str(), path.c_str()) == 0;
+}
+
+bool VerifyAuthenticode(
+    const std::wstring& path,
+    std::wstring& detail) noexcept {
+    WINTRUST_FILE_INFO fileInfo{};
+    fileInfo.cbStruct = sizeof(fileInfo);
+    fileInfo.pcwszFilePath = path.c_str();
+
+    GUID policy = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+    WINTRUST_DATA trustData{};
+    trustData.cbStruct = sizeof(trustData);
+    trustData.dwUIChoice = WTD_UI_NONE;
+    trustData.fdwRevocationChecks = WTD_REVOKE_NONE;
+    trustData.dwUnionChoice = WTD_CHOICE_FILE;
+    trustData.pFile = &fileInfo;
+    trustData.dwStateAction = WTD_STATEACTION_VERIFY;
+    trustData.dwProvFlags = WTD_CACHE_ONLY_URL_RETRIEVAL;
+
+    const LONG status = WinVerifyTrust(nullptr, &policy, &trustData);
+
+    trustData.dwStateAction = WTD_STATEACTION_CLOSE;
+    WinVerifyTrust(nullptr, &policy, &trustData);
+
+    if (status != ERROR_SUCCESS) {
+        detail = L"host-authenticode-invalid";
+        return false;
+    }
+
+    detail = L"host-authenticode-valid";
+    return true;
 }
 
 bool FindTaskbarViewModule(
@@ -396,6 +429,21 @@ bool ReadPeBytesAtRva(
 
     detail = L"pe-rva-not-mapped";
     return false;
+}
+
+bool ValidateSignedHostBinary(
+    const std::wstring& path,
+    std::wstring& detail) noexcept {
+    PeFingerprint fingerprint;
+    if (!ReadPeFingerprint(path, fingerprint, detail)) {
+        detail = L"host-pe-invalid";
+        return false;
+    }
+    if (fingerprint.machine != IMAGE_FILE_MACHINE_AMD64) {
+        detail = L"host-machine-not-amd64";
+        return false;
+    }
+    return VerifyAuthenticode(path, detail);
 }
 
 bool MatchesTaskbarFrameHookPrologue(

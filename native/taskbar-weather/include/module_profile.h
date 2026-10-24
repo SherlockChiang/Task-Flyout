@@ -76,6 +76,9 @@ bool ReadPeBytesAtRva(
     std::uint32_t rva,
     std::span<std::uint8_t> output,
     std::wstring& detail) noexcept;
+bool ValidateSignedHostBinary(
+    const std::wstring& path,
+    std::wstring& detail) noexcept;
 bool MatchesTaskbarFrameHookPrologue(
     std::span<const std::uint8_t> bytes) noexcept;
 ProbeResult ProbePrimaryTaskbar() noexcept;

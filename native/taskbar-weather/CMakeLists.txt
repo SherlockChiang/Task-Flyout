@@ -44,7 +44,7 @@ add_library(taskbar_weather_profile STATIC
 )
 target_include_directories(taskbar_weather_profile PUBLIC include)
 target_compile_definitions(taskbar_weather_profile PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(taskbar_weather_profile PUBLIC user32)
+target_link_libraries(taskbar_weather_profile PUBLIC user32 wintrust)
 
 add_library(taskbar_weather_view_model STATIC
     src/weather_view_model.cpp

@@ -256,6 +256,11 @@ int wmain() {
                 L"controller-rejected",
         L"acknowledged and rejected controller outcomes should be distinct");
     passed &= Expect(
+        std::wstring_view(HostControlDispatchStatusName(
+            HostControlDispatchStatus::HostSignatureInvalid)) ==
+            L"host-signature-invalid",
+        L"host signature failures should remain diagnosable");
+    passed &= Expect(
         std::wstring_view(HostControlAcknowledgementName(
             HostControlAcknowledgement::AlreadyStarted)) ==
                 L"already-started" &&
