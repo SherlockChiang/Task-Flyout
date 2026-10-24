@@ -1,5 +1,32 @@
 # Task Flyout 优化路线图
 
+## 2026-10-25 发布安全证据复核
+
+本节是当前发布判断的证据入口；下方早期扫描内容保留为历史观察，不应覆盖
+本节的最新结果。
+
+- 依赖链已从 `MailKit 4.16.0 -> MimeKit 4.16.0 ->
+  System.Security.Cryptography.Pkcs 10.0.0` 升级为 `MailKit/MimeKit 4.18.2`
+  和 `Pkcs 10.0.13`。当前 `dotnet list Task_Flyout.csproj package --vulnerable
+  --include-transitive --format json --no-restore` 未返回漏洞项；Quality workflow
+  会在高危项出现时阻断 PR。
+- 当前 Release 测试为 1,398/1,398，通过；应用 Debug x64 构建为 0 警告、0 错误。
+  Quality workflow 现在还会对当前提交执行 RuntimeIdentifier restore/build、变更
+  C# 格式检查、未签名 MSIX 构建和 packaged UI smoke，使用示例 OAuth 输入，不读取
+  发布秘密。包内容检查会拒绝 `credentials.json`、`Secrets.cs` 和证书文件。
+- 任务栏 native 测试为 13/13，通过；Host 在 `LoadLibraryW` 前必须通过 x64 PE
+  检查和 Authenticode 验证，broker 只接受自身目录下的固定 Host 文件名。当前机器
+  Windows build 为 `26300`，代码只允许已验证的 `26200`，因此 Explorer 实机启用、
+  重启、升级失配和恢复矩阵仍然是待外部验证项，不能标记为通过。
+- 本地 MSIX 生成和包内容检查已通过；本机未注册运行该候选包，packaged UI smoke
+  以 CI runner 的当前提交结果为准。
+- 之前停在 `threat_model` 阶段的 Codex Security 扫描仍是不完整扫描，不能改写为
+  “全库无漏洞”。重新运行完整扫描和审阅外部系统矩阵后，才能形成正式发布结论。
+
+当前结论：依赖、数据迁移、异常处理、异步释放、PR 质量门禁和文档证据已经有
+独立提交；正式发布仍需完成允许版本的 Explorer disposable-session 矩阵、CI
+packaged smoke，以及其余 OAuth/租户等外部验收。
+
 ## 2026-10-07 Outlook IMAP / SMTP OAuth2 可选入口
 
 保留现有 Graph 与密码 IMAP，新增个人 Outlook.com / 工作或学校 Microsoft 365
