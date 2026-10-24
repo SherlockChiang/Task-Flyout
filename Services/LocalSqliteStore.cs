@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -11,6 +12,9 @@ namespace Task_Flyout.Services
     public static class LocalSqliteStore
     {
         private const int BusyTimeoutMilliseconds = 5000;
+        private const string StoreFileName = "taskflyout_store.db";
+        private const string MigrationMarkerFileName = "taskflyout_store.migration.v1";
+        private const string MigrationMarkerContent = "1\n";
         private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("TaskFlyout.LocalCache.v1");
         private static readonly object InitLock = new();
         private static volatile bool _initialized;
@@ -18,6 +22,7 @@ namespace Task_Flyout.Services
         private static int _checkpointPending;
 #if TASKFLYOUT_TESTS
         private static string? _testDataPath;
+        private static string? _testRoamingDataPath;
 #endif
 
         public static string? ReadProtectedText(string scope, string key)
@@ -101,7 +106,9 @@ ON CONFLICT(scope, key) DO UPDATE SET value = excluded.value, updated_ticks = ex
             lock (InitLock)
             {
                 if (_initialized) return;
-                Directory.CreateDirectory(GetAppDataPath());
+                var localPath = GetAppDataPath();
+                Directory.CreateDirectory(localPath);
+                MigrateRoamingStoreIfNeeded(localPath);
                 using var connection = OpenConnection();
                 ExecuteNonQuery(connection, "PRAGMA journal_mode=WAL;");
                 ExecuteNonQuery(connection, "PRAGMA synchronous=NORMAL;");
@@ -114,8 +121,10 @@ CREATE TABLE IF NOT EXISTS protected_store (
     PRIMARY KEY(scope, key)
 );
 """);
+                WriteMigrationMarker(localPath);
                 _initialized = true;
                 TryTruncateWal(connection);
+                CleanupRoamingStoreIfMigrated(localPath);
             }
         }
 
@@ -191,7 +200,7 @@ CREATE TABLE IF NOT EXISTS protected_store (
         {
             _connectionString ??= new SqliteConnectionStringBuilder
             {
-                DataSource = Path.Combine(GetAppDataPath(), "taskflyout_store.db"),
+                DataSource = Path.Combine(GetAppDataPath(), StoreFileName),
                 DefaultTimeout = BusyTimeoutMilliseconds / 1000
             }.ToString();
             return new SqliteConnection(_connectionString);
@@ -209,21 +218,221 @@ CREATE TABLE IF NOT EXISTS protected_store (
 #if TASKFLYOUT_TESTS
             if (!string.IsNullOrWhiteSpace(_testDataPath)) return _testDataPath;
 #endif
-            return AppDataPathHelper.RoamingRoot;
+            return AppDataPathHelper.LocalRoot;
         }
 
 #if TASKFLYOUT_TESTS
         internal static void SetDataPathForTests(string? path)
+            => SetDataPathsForTests(path, null);
+
+        internal static void SetDataPathsForTests(string? localPath, string? roamingPath)
         {
             lock (InitLock)
             {
                 SqliteConnection.ClearAllPools();
-                _testDataPath = path;
+                _testDataPath = localPath;
+                _testRoamingDataPath = roamingPath;
                 _connectionString = null;
                 _initialized = false;
                 _checkpointPending = 0;
             }
         }
 #endif
+
+        private static void MigrateRoamingStoreIfNeeded(string localPath)
+        {
+            var roamingPath = GetRoamingDataPath();
+            if (PathsEqual(localPath, roamingPath)) return;
+
+            var sourcePath = Path.Combine(roamingPath, StoreFileName);
+            var targetPath = Path.Combine(localPath, StoreFileName);
+            if (!File.Exists(sourcePath)) return;
+
+            Directory.CreateDirectory(localPath);
+            using var migrationLock = AcquireMigrationLock(localPath);
+
+            // Another Task Flyout instance may have completed the copy while we
+            // waited for the lock. Re-check before touching either database.
+            if (!File.Exists(sourcePath)) return;
+
+            if (!File.Exists(targetPath))
+            {
+                CreateMigrationSnapshot(sourcePath, targetPath);
+            }
+            else
+            {
+                ValidateDatabase(targetPath);
+            }
+        }
+
+        private static FileStream AcquireMigrationLock(string localPath)
+        {
+            var lockPath = Path.Combine(localPath, $"{StoreFileName}.migration.lock");
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (true)
+            {
+                try
+                {
+                    return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                }
+                catch (IOException) when (DateTime.UtcNow < deadline)
+                {
+                    Thread.Sleep(100);
+                }
+            }
+        }
+
+        private static void CreateMigrationSnapshot(string sourcePath, string targetPath)
+        {
+            var temporaryPath = $"{targetPath}.{Guid.NewGuid():N}.tmp";
+            try
+            {
+                using (var source = new SqliteConnection(new SqliteConnectionStringBuilder
+                {
+                    DataSource = sourcePath,
+                    Mode = SqliteOpenMode.ReadWrite,
+                    DefaultTimeout = BusyTimeoutMilliseconds / 1000
+                }.ToString()))
+                {
+                    source.Open();
+                    ValidateAndCheckpoint(source, sourcePath);
+
+                    using var vacuum = source.CreateCommand();
+                    vacuum.CommandText = "VACUUM INTO $targetPath;";
+                    vacuum.Parameters.AddWithValue("$targetPath", temporaryPath);
+                    vacuum.ExecuteNonQuery();
+                }
+
+                ValidateDatabase(temporaryPath);
+                SqliteConnection.ClearAllPools();
+                File.Move(temporaryPath, targetPath);
+            }
+            finally
+            {
+                TryDeleteFile(temporaryPath);
+            }
+        }
+
+        private static void ValidateDatabase(string path)
+        {
+            using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+            {
+                DataSource = path,
+                Mode = SqliteOpenMode.ReadOnly,
+                DefaultTimeout = BusyTimeoutMilliseconds / 1000
+            }.ToString());
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA integrity_check;";
+            var result = command.ExecuteScalar() as string;
+            if (!string.Equals(result, "ok", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException($"SQLite integrity check failed for '{path}'.");
+        }
+
+        private static void ValidateAndCheckpoint(SqliteConnection connection, string path)
+        {
+            using (var checkpoint = connection.CreateCommand())
+            {
+                checkpoint.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+                using var reader = checkpoint.ExecuteReader();
+                if (!reader.Read() || reader.GetInt32(0) != 0)
+                    throw new IOException($"SQLite WAL checkpoint is busy for '{path}'.");
+            }
+
+            using var integrity = connection.CreateCommand();
+            integrity.CommandText = "PRAGMA integrity_check;";
+            var result = integrity.ExecuteScalar() as string;
+            if (!string.Equals(result, "ok", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException($"SQLite integrity check failed for '{path}'.");
+        }
+
+        private static void WriteMigrationMarker(string localPath)
+        {
+            var markerPath = Path.Combine(localPath, MigrationMarkerFileName);
+            if (File.Exists(markerPath) &&
+                string.Equals(File.ReadAllText(markerPath), MigrationMarkerContent, StringComparison.Ordinal))
+                return;
+
+            var temporaryPath = $"{markerPath}.{Guid.NewGuid():N}.tmp";
+            try
+            {
+                using (var stream = new FileStream(
+                    temporaryPath,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.None,
+                    bufferSize: 256,
+                    options: FileOptions.WriteThrough))
+                using (var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), 256, leaveOpen: true))
+                {
+                    writer.Write(MigrationMarkerContent);
+                    writer.Flush();
+                    stream.Flush(flushToDisk: true);
+                }
+
+                if (File.Exists(markerPath))
+                    File.Replace(temporaryPath, markerPath, destinationBackupFileName: null, ignoreMetadataErrors: true);
+                else
+                    File.Move(temporaryPath, markerPath);
+            }
+            finally
+            {
+                TryDeleteFile(temporaryPath);
+            }
+        }
+
+        private static void CleanupRoamingStoreIfMigrated(string localPath)
+        {
+            var roamingPath = GetRoamingDataPath();
+            if (PathsEqual(localPath, roamingPath)) return;
+
+            var sourcePath = Path.Combine(roamingPath, StoreFileName);
+            var markerPath = Path.Combine(localPath, MigrationMarkerFileName);
+            if (!File.Exists(sourcePath) || !File.Exists(markerPath)) return;
+            if (!string.Equals(File.ReadAllText(markerPath), MigrationMarkerContent, StringComparison.Ordinal)) return;
+
+            foreach (var path in new[] { sourcePath, sourcePath + "-wal", sourcePath + "-shm" })
+            {
+                try
+                {
+                    if (File.Exists(path)) File.Delete(path);
+                }
+                catch (IOException ex)
+                {
+                    Debug.WriteLine($"Could not remove migrated roaming store '{path}': {ex.Message}");
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    Debug.WriteLine($"Could not remove migrated roaming store '{path}': {ex.Message}");
+                }
+            }
+        }
+
+        private static bool PathsEqual(string left, string right)
+            => string.Equals(
+                Path.GetFullPath(left).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                Path.GetFullPath(right).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                StringComparison.OrdinalIgnoreCase);
+
+        private static void TryDeleteFile(string path)
+        {
+            try
+            {
+                if (File.Exists(path)) File.Delete(path);
+            }
+            catch
+            {
+            }
+        }
+
+        private static string GetRoamingDataPath()
+        {
+#if TASKFLYOUT_TESTS
+            if (!string.IsNullOrWhiteSpace(_testRoamingDataPath)) return _testRoamingDataPath;
+            if (!string.IsNullOrWhiteSpace(_testDataPath))
+                return Path.Combine(_testDataPath, "__legacy_roaming");
+#endif
+            return AppDataPathHelper.RoamingRoot;
+        }
     }
 }

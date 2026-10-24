@@ -6,6 +6,63 @@ namespace Task_Flyout.Tests;
 public class LocalSqliteStoreTests
 {
     [Fact]
+    public void Migrates_roaming_store_to_local_root_and_removes_source_after_verification()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "taskflyout-tests", Guid.NewGuid().ToString("N"));
+        var localRoot = Path.Combine(root, "local");
+        var roamingRoot = Path.Combine(root, "roaming");
+        Directory.CreateDirectory(localRoot);
+        Directory.CreateDirectory(roamingRoot);
+
+        try
+        {
+            LocalSqliteStore.SetDataPathsForTests(roamingRoot, roamingRoot);
+            LocalSqliteStore.WriteProtectedText("mail", "cache", "roaming secret");
+
+            LocalSqliteStore.SetDataPathsForTests(localRoot, roamingRoot);
+            Assert.Equal("roaming secret", LocalSqliteStore.ReadProtectedText("mail", "cache"));
+            Assert.True(File.Exists(Path.Combine(localRoot, "taskflyout_store.db")));
+            Assert.True(File.Exists(Path.Combine(localRoot, "taskflyout_store.migration.v1")));
+            Assert.False(File.Exists(Path.Combine(roamingRoot, "taskflyout_store.db")));
+        }
+        finally
+        {
+            LocalSqliteStore.SetDataPathsForTests(null, null);
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Migration_failure_preserves_both_source_and_invalid_target()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "taskflyout-tests", Guid.NewGuid().ToString("N"));
+        var localRoot = Path.Combine(root, "local");
+        var roamingRoot = Path.Combine(root, "roaming");
+        Directory.CreateDirectory(localRoot);
+        Directory.CreateDirectory(roamingRoot);
+
+        try
+        {
+            LocalSqliteStore.SetDataPathsForTests(roamingRoot, roamingRoot);
+            LocalSqliteStore.WriteProtectedText("mail", "cache", "roaming secret");
+            var invalidTarget = Path.Combine(localRoot, "taskflyout_store.db");
+            var invalidBytes = new byte[] { 0x54, 0x46, 0x00, 0x01 };
+            File.WriteAllBytes(invalidTarget, invalidBytes);
+
+            LocalSqliteStore.SetDataPathsForTests(localRoot, roamingRoot);
+            Assert.ThrowsAny<Exception>(() => LocalSqliteStore.ReadProtectedText("mail", "cache"));
+            Assert.True(File.Exists(Path.Combine(roamingRoot, "taskflyout_store.db")));
+            Assert.Equal(invalidBytes, File.ReadAllBytes(invalidTarget));
+            Assert.False(File.Exists(Path.Combine(localRoot, "taskflyout_store.migration.v1")));
+        }
+        finally
+        {
+            LocalSqliteStore.SetDataPathsForTests(null, null);
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Protected_store_round_trips_and_deletes_data_in_isolated_database()
     {
         var testRoot = Path.Combine(Path.GetTempPath(), "taskflyout-tests", Guid.NewGuid().ToString("N"));
