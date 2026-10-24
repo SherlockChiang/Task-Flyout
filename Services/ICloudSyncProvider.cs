@@ -9,7 +9,7 @@ using Task_Flyout.Models;
 
 namespace Task_Flyout.Services
 {
-    public sealed class ICloudSyncProvider : ISyncProvider, IDisposable
+    public sealed class ICloudSyncProvider : ISyncProvider, IAsyncDisposable
     {
         private static readonly TimeSpan CalendarListCacheDuration = TimeSpan.FromMinutes(30);
         private readonly SemaphoreSlim _operationGate = new(1, 1);
@@ -418,9 +418,9 @@ namespace Task_Flyout.Services
             if (_disposed) throw new ObjectDisposedException(nameof(ICloudSyncProvider));
         }
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
-            _operationGate.Wait();
+            await _operationGate.WaitAsync().ConfigureAwait(false);
             try
             {
                 if (_disposed) return;
