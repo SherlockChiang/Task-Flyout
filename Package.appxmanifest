@@ -65,7 +65,11 @@
 	</Applications>
 
 	<Capabilities>
+		<!-- Required for the tray icon, startup task, taskbar weather placement,
+		     and toast activation routing. It does not grant elevation. -->
 		<rescap:Capability Name="runFullTrust" />
+		<!-- Requested only when the user enables current-location or automatic
+		     weather following; startup does not request location access. -->
 		<DeviceCapability Name="location" />
 	</Capabilities>
 </Package>

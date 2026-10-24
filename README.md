@@ -76,6 +76,10 @@ task registration, taskbar weather bar placement, and toast activation routing.
 It is not used to run background installers, elevate privileges, or execute
 downloaded code.
 
+The `location` capability is used only after the user chooses current-location
+weather or enables automatic weather following. The app does not request location
+access during startup when those settings are off.
+
 ## Build from source
 
 **Requirements**

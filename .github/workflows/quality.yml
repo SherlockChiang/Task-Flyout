@@ -124,6 +124,7 @@ jobs:
             /p:BuildStandaloneTaskbarNative=false
           $packages = @(Get-ChildItem -LiteralPath $packageDir -Recurse -File -Filter '*.msix')
           if ($packages.Count -eq 0) { throw 'No unsigned MSIX package was produced.' }
+          .\scripts\test-package-content.ps1 -PackageDirectory $packageDir
       - name: Register package for current-revision smoke
         shell: pwsh
         run: |
