@@ -27,6 +27,39 @@ jobs:
       - name: Restore dependencies
         shell: pwsh
         run: dotnet restore "Tests\Task_Flyout.Tests\Task_Flyout.Tests.csproj" --locked-mode
+      - name: Restore application dependencies
+        shell: pwsh
+        run: dotnet restore "Task_Flyout.csproj" --locked-mode
+      - name: Audit application dependencies
+        shell: pwsh
+        run: |
+          $report = dotnet list "Task_Flyout.csproj" package --vulnerable --include-transitive --format json --no-restore | ConvertFrom-Json
+          $findings = @(
+            foreach ($project in @($report.projects)) {
+              foreach ($framework in @($project.frameworks)) {
+                foreach ($package in @($framework.topLevelPackages) + @($framework.transitivePackages)) {
+                  if ($null -eq $package) { continue }
+                  foreach ($vulnerability in @($package.vulnerabilities)) {
+                    if ($null -eq $vulnerability) { continue }
+                    [pscustomobject]@{
+                      Package = $package.id
+                      Severity = $vulnerability.severity
+                      Advisory = $vulnerability.advisoryurl
+                    }
+                  }
+                }
+              }
+            }
+          )
+          $high = @($findings | Where-Object Severity -eq 'High')
+          if ($high.Count -gt 0) {
+            $high | Format-Table -AutoSize | Out-Host
+            throw "High-severity NuGet vulnerabilities must be fixed before merge."
+          }
+          if ($findings.Count -gt 0) {
+            $findings | Format-Table -AutoSize | Out-Host
+            Write-Warning "NuGet vulnerabilities remain, but none are high severity. Review them before release."
+          }
       - name: Run tests
         shell: pwsh
         run: dotnet test "Tests\Task_Flyout.Tests\Task_Flyout.Tests.csproj" -c Release --no-restore
