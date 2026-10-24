@@ -120,6 +120,7 @@
     <Compile Include="..\..\Services\RecurrencePolicy.cs" Link="Source\RecurrencePolicy.cs" />
     <Compile Include="..\..\Services\AppDataPathHelper.cs" Link="Source\AppDataPathHelper.cs" />
     <Compile Include="..\..\Services\LocalSqliteStore.cs" Link="Source\LocalSqliteStore.cs" />
+    <Compile Include="..\..\Services\ProtectedLocalStore.cs" Link="Source\ProtectedLocalStore.cs" />
     <Compile Include="..\..\Services\WeatherLocationPolicy.cs" Link="Source\WeatherLocationPolicy.cs" />
     <Compile Include="..\..\Services\WeatherLocationLabelPolicy.cs" Link="Source\WeatherLocationLabelPolicy.cs" />
     <Compile Include="..\..\Services\WeatherAlertTextPolicy.cs" Link="Source\WeatherAlertTextPolicy.cs" />
