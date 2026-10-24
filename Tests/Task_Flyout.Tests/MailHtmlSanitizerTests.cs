@@ -1,3 +1,4 @@
+using System.Text;
 using Task_Flyout.Services;
 
 namespace Task_Flyout.Tests;
@@ -212,5 +213,67 @@ public class MailHtmlSanitizerTests
     public void HasRemoteResources_false(string? html)
     {
         Assert.False(MailHtmlSanitizer.HasRemoteResources(html));
+    }
+
+    [Fact]
+    public void Handles_malformed_and_obfuscated_corpus_without_active_markup()
+    {
+        var corpus = new[]
+        {
+            "<img src=\"https://evil.example/" + new string('x', 100_000),
+            "<a href='java\t\nscript:alert(1)' onmouseover='alert(2)'",
+            "<svg:onload=\"alert(1)><script src='https://evil.example/x.js'",
+            "<form action=\"data:text/html,<script>alert(1)</script>\"><input name=x>",
+            "<style>@import url(https://evil.example/a.css); body{background:url(https://evil.example/x)}</style>",
+            "<meta http-equiv=refresh content='0;url=https://evil.example'>"
+        };
+
+        foreach (var html in corpus)
+        {
+            AssertSafe(MailHtmlSanitizer.SanitizeUntrusted(html));
+            AssertSafe(MailHtmlSanitizer.SanitizeTrusted(html));
+        }
+    }
+
+    [Fact]
+    public void Handles_deterministic_fuzz_corpus_without_throwing()
+    {
+        var random = new Random(0x5A17);
+        var fragments = new[]
+        {
+            "<script", "</script>", "<iframe", " onerror=", "javascript:",
+            "vbscript:", "data:text/html,", "srcset=", "style=", "@import"
+        };
+
+        for (var caseIndex = 0; caseIndex < 128; caseIndex++)
+        {
+            var builder = new StringBuilder(capacity: 2048);
+            for (var index = 0; index < 48; index++)
+            {
+                if (random.Next(4) == 0)
+                    builder.Append(fragments[random.Next(fragments.Length)]);
+                else
+                    builder.Append((char)random.Next(0x20, 0x7f));
+            }
+
+            var untrusted = MailHtmlSanitizer.SanitizeUntrusted(builder.ToString());
+            var trusted = MailHtmlSanitizer.SanitizeTrusted(builder.ToString());
+            Assert.NotNull(untrusted);
+            Assert.NotNull(trusted);
+        }
+    }
+
+    private static void AssertSafe(string sanitized)
+    {
+        if (sanitized.StartsWith("<pre>", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        Assert.DoesNotContain("<script", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<iframe", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<svg", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onerror", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onmouseover", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("javascript:", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("vbscript:", sanitized, StringComparison.OrdinalIgnoreCase);
     }
 }
