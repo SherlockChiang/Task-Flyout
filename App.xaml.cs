@@ -217,7 +217,6 @@ namespace Task_Flyout
             this.InitializeComponent();
             this.UnhandledException += (sender, e) =>
             {
-                e.Handled = true;
                 string errorMsg = DiagnosticEventFormatter.FormatException("app.unhandled", e.Exception);
 
                 try
@@ -228,7 +227,17 @@ namespace Task_Flyout
                     System.IO.File.WriteAllText(logPath, errorMsg);
                     PruneOldCrashLogs(logDir);
                 }
-                catch { }
+                catch (Exception logException)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"Unhandled exception could not be persisted: {logException.Message}");
+                }
+
+                // Only input-bound regex timeouts and cancellation are known to
+                // leave the application state safe enough to continue. Unknown
+                // failures remain unhandled so WinUI terminates the process
+                // instead of hiding possible data corruption.
+                e.Handled = UnhandledExceptionPolicy.IsRecoverable(e.Exception);
             };
             SyncManager.RegisterProvider(new Services.MicrosoftSyncProvider());
             SyncManager.RegisterProvider(new Services.ICloudSyncProvider());
@@ -1184,7 +1193,7 @@ namespace Task_Flyout
                WeatherService.IsEnabled &&
                _standaloneWidgetsSuppressionReady &&
                !(_standaloneTaskbarCoordinator is
-                     { IsRequested: false, RequiresStop: true }) &&
+               { IsRequested: false, RequiresStop: true }) &&
                !(_standaloneTaskbarCoordinator?.DiagnosticOnlyRejected ?? false) &&
                !_nativeWidgetsModeActive &&
                !WindowsWidgetsService.HasCapturedTaskbarEntry(values) &&
