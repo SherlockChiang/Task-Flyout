@@ -617,17 +617,20 @@ namespace Task_Flyout.Services
         public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, string? providerName = null, string? accountId = null)
             => await CreateItemAsync(title, isEvent, isAllDay, targetDate, startTime, endTime, location, EventRecurrenceKind.None, providerName, accountId);
 
-        public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, EventRecurrenceKind recurrence, string? providerName = null, string? accountId = null)
+        public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, EventRecurrenceKind recurrence, string? providerName = null, string? accountId = null, QuickCreateOptions? options = null)
         {
             var provider = providerName != null
                 ? ResolveProvider(providerName, accountId)
                 : GetProvidersSnapshot().FirstOrDefault(IsProviderConnected);
-            if (provider == null) return;
+            if (provider == null || !IsProviderConnected(provider))
+                throw new InvalidOperationException("The selected account is no longer connected.");
+            options ??= new QuickCreateOptions(Recurrence: recurrence);
+            QuickCreatePolicy.Validate(provider.ProviderName, isEvent, title, options with { Recurrence = recurrence });
 
             if (isEvent)
-                await provider.CreateEventAsync(title, targetDate, startTime, endTime, location, isAllDay, recurrence);
+                await provider.CreateEventAsync(title, targetDate, startTime, endTime, location, isAllDay, recurrence, options);
             else
-                await provider.CreateTaskAsync(title, targetDate, startTime, isAllDay);
+                await provider.CreateTaskAsync(title, targetDate, startTime, isAllDay, options with { Recurrence = recurrence });
         }
 
         public async Task DeleteItemAsync(string providerName, string itemId, bool isEvent, string taskListId = "", string? accountId = null)

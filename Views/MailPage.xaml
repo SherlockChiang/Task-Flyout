@@ -267,11 +267,13 @@
                             </ScrollViewer>
                         </Grid>
                         <Grid x:Name="MailDetailActions" Grid.Row="6" ColumnSpacing="8">
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
+                            <Button x:Uid="QuickCreate_FromSource" Grid.Row="1" Grid.ColumnSpan="3" Content="Create task" Margin="0,8,0,0" Click="CreateTaskFromMail_Click"/>
                             <Button x:Uid="MailPage_TrustSenderButton" x:Name="TrustSenderButton" MinWidth="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="TrustSenderButton_Click">
                                 <Grid ColumnSpacing="6">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>

@@ -218,7 +218,8 @@ namespace Task_Flyout.Services
             TimeSpan endTime,
             string location,
             bool isAllDay,
-            EventRecurrenceKind recurrence = EventRecurrenceKind.None)
+            EventRecurrenceKind recurrence = EventRecurrenceKind.None,
+            QuickCreateOptions? options = null)
             => RunExclusiveAsync(() => CreateEventCoreAsync(
                 title,
                 targetDate,
@@ -226,7 +227,7 @@ namespace Task_Flyout.Services
                 endTime,
                 location,
                 isAllDay,
-                recurrence));
+                recurrence, options));
 
         private async Task CreateEventCoreAsync(
             string title,
@@ -235,7 +236,8 @@ namespace Task_Flyout.Services
             TimeSpan endTime,
             string location,
             bool isAllDay,
-            EventRecurrenceKind recurrence)
+            EventRecurrenceKind recurrence,
+            QuickCreateOptions? options)
         {
             EnsureAuthorizedCore();
             var calendars = await GetCalendarsCoreAsync(CancellationToken.None);
@@ -247,16 +249,16 @@ namespace Task_Flyout.Services
                 uid,
                 title,
                 location,
-                "",
+                options?.Description ?? "",
                 window.Start,
                 window.End,
                 window.IsAllDay,
-                recurrence.ToString());
+                recurrence.ToString(), reminderMinutes: options?.ReminderMinutes);
             Uri resourceUri = CreateResourceUri(calendar.Uri, uid);
             await _client!.CreateResourceAsync(resourceUri, calendarData, CancellationToken.None);
         }
 
-        public Task CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay)
+        public Task CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay, QuickCreateOptions? options = null)
             => Task.FromException(new NotSupportedException("iCloud Calendar does not provide task synchronization."));
 
         public Task DeleteItemAsync(

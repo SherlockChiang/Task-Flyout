@@ -618,8 +618,8 @@ namespace Task_Flyout.Services
                 };
 
                 var window = SyncEventTimePolicy.Create(targetDate, startTime, endTime);
-                updateEvent.Start = new DateTimeTimeZone { DateTime = window.Start.ToString("s"), TimeZone = "UTC" };
-                updateEvent.End = new DateTimeTimeZone { DateTime = window.End.ToString("s"), TimeZone = "UTC" };
+                updateEvent.Start = new DateTimeTimeZone { DateTime = window.Start.ToString("s"), TimeZone = TimeZoneInfo.Local.Id };
+                updateEvent.End = new DateTimeTimeZone { DateTime = window.End.ToString("s"), TimeZone = TimeZoneInfo.Local.Id };
                 updateEvent.IsAllDay = window.IsAllDay;
 
                 await _graphClient.Me.Events[itemId].PatchAsync(updateEvent);
@@ -631,7 +631,7 @@ namespace Task_Flyout.Services
                 {
                     Title = title,
                     Body = new ItemBody { Content = description, ContentType = BodyType.Text },
-                    DueDateTime = new DateTimeTimeZone { DateTime = targetDate.ToString("yyyy-MM-ddT00:00:00"), TimeZone = "UTC" }
+                    DueDateTime = new DateTimeTimeZone { DateTime = targetDate.ToString("yyyy-MM-ddT00:00:00"), TimeZone = TimeZoneInfo.Local.Id }
                 };
                 await _graphClient.Me.Todo.Lists[listId].Tasks[itemId].PatchAsync(updateTask);
             }
@@ -650,18 +650,22 @@ namespace Task_Flyout.Services
             await _graphClient.Me.Todo.Lists[listId].Tasks[taskId].PatchAsync(updateTask);
         }
 
-        public async Task CreateEventAsync(string title, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, bool isAllDay, EventRecurrenceKind recurrence = EventRecurrenceKind.None)
+        public async Task CreateEventAsync(string title, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, bool isAllDay, EventRecurrenceKind recurrence = EventRecurrenceKind.None, QuickCreateOptions? options = null)
         {
             await EnsureAuthorizedAsync();
             var newEvent = new Event
             {
                 Subject = title,
+                Body = new ItemBody { ContentType = BodyType.Text, Content = options?.Description ?? "" },
+                IsReminderOn = options?.ReminderMinutes is int reminder ? reminder >= 0 : null,
+                ReminderMinutesBeforeStart = options?.ReminderMinutes is >= 0 ? options.ReminderMinutes : null,
+                TransactionId = options?.RequestId,
                 Location = string.IsNullOrWhiteSpace(location) ? null : new Location { DisplayName = location }
             };
 
             var window = SyncEventTimePolicy.Create(targetDate, isAllDay ? null : startTime, endTime);
-            newEvent.Start = new DateTimeTimeZone { DateTime = window.Start.ToString("s"), TimeZone = "UTC" };
-            newEvent.End = new DateTimeTimeZone { DateTime = window.End.ToString("s"), TimeZone = "UTC" };
+            newEvent.Start = new DateTimeTimeZone { DateTime = window.Start.ToString("s"), TimeZone = TimeZoneInfo.Local.Id };
+            newEvent.End = new DateTimeTimeZone { DateTime = window.End.ToString("s"), TimeZone = TimeZoneInfo.Local.Id };
             newEvent.IsAllDay = window.IsAllDay;
 
             if (recurrence != EventRecurrenceKind.None)
@@ -670,7 +674,7 @@ namespace Task_Flyout.Services
             await _graphClient.Me.Events.PostAsync(newEvent);
         }
 
-        public async Task CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay)
+        public async Task CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay, QuickCreateOptions? options = null)
         {
             await EnsureAuthorizedAsync();
             var listId = await GetDefaultTodoListIdAsync();
@@ -678,7 +682,16 @@ namespace Task_Flyout.Services
             var newTask = new TodoTask
             {
                 Title = title,
-                DueDateTime = new DateTimeTimeZone { DateTime = targetDate.ToString("yyyy-MM-ddT00:00:00"), TimeZone = "UTC" }
+                Body = new ItemBody { ContentType = BodyType.Text, Content = options?.Description ?? "" },
+                DueDateTime = new DateTimeTimeZone { DateTime = targetDate.Date.ToString("s"), TimeZone = TimeZoneInfo.Local.Id },
+                IsReminderOn = options?.ReminderMinutes is int reminder ? reminder >= 0 : null,
+                ReminderDateTime = options?.ReminderMinutes is >= 0 ? new DateTimeTimeZone
+                {
+                    DateTime = targetDate.Date.AddHours(9).AddMinutes(-options.ReminderMinutes.Value).ToString("s"),
+                    TimeZone = TimeZoneInfo.Local.Id
+                } : null,
+                Recurrence = options?.Recurrence is { } taskRecurrence && taskRecurrence != EventRecurrenceKind.None
+                    ? CreateMicrosoftRecurrence(taskRecurrence, targetDate) : null
             };
 
             await _graphClient.Me.Todo.Lists[listId].Tasks.PostAsync(newTask);
@@ -722,6 +735,7 @@ namespace Task_Flyout.Services
 
         private static PatternedRecurrence CreateMicrosoftRecurrence(EventRecurrenceKind recurrence, DateTime startDate)
         {
+            var fields = QuickCreatePolicy.RecurrenceFields(recurrence, startDate);
             return new PatternedRecurrence
             {
                 Pattern = new RecurrencePattern
@@ -734,12 +748,18 @@ namespace Task_Flyout.Services
                         EventRecurrenceKind.Yearly => RecurrencePatternType.AbsoluteYearly,
                         _ => RecurrencePatternType.Daily
                     },
-                    Interval = 1
+                    Interval = 1,
+                    DaysOfWeek = fields.DayOfWeek.HasValue
+                        ? new List<DayOfWeekObject?> { Enum.Parse<DayOfWeekObject>(fields.DayOfWeek.Value.ToString()) } : null,
+                    FirstDayOfWeek = fields.DayOfWeek.HasValue ? DayOfWeekObject.Sunday : null,
+                    DayOfMonth = fields.DayOfMonth,
+                    Month = fields.Month
                 },
                 Range = new RecurrenceRange
                 {
                     Type = RecurrenceRangeType.NoEnd,
-                    StartDate = DateOnly.FromDateTime(startDate.Date)
+                    StartDate = DateOnly.FromDateTime(startDate.Date),
+                    RecurrenceTimeZone = TimeZoneInfo.Local.Id
                 }
             };
         }

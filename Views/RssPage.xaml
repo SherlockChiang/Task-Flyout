@@ -283,12 +283,15 @@
                                 <TextBlock x:Name="ReaderMetaText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                 <TextBlock x:Name="ReaderPrivacyText" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap"/>
                             </StackPanel>
-                            <Button x:Uid="RssPage_OpenArticleInBrowserButton" Grid.Column="2" Click="OpenArticleInBrowserButton_Click">
+                            <StackPanel Grid.Column="2" Spacing="4">
+                            <Button x:Uid="QuickCreate_FromSource" Content="Create task" Click="CreateTaskFromArticle_Click"/>
+                            <Button x:Uid="RssPage_OpenArticleInBrowserButton" Click="OpenArticleInBrowserButton_Click">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <FontIcon Glyph="&#xE774;" FontSize="14"/>
                                     <TextBlock x:Uid="RssPage_Browser" Text="浏览器"/>
                                 </StackPanel>
                             </Button>
+                            </StackPanel>
                         </Grid>
 
                         <Grid Grid.Row="1"

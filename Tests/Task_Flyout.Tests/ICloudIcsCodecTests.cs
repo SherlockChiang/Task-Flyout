@@ -5,6 +5,28 @@ namespace Task_Flyout.Tests;
 
 public class ICloudIcsCodecTests
 {
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(-1, null)]
+    [InlineData(15, "TRIGGER:-PT15M")]
+    [InlineData(60, "TRIGGER:-PT60M")]
+    public void Creates_provider_alarm_without_losing_recurrence(int? minutes, string? expectedTrigger)
+    {
+        var start = new DateTime(2026, 8, 3, 10, 0, 0);
+        string calendar = ICloudIcsCodec.CreateCalendar("alarm", "Review", "", "Source notes", start, start.AddHours(1),
+            false, "Weekly", reminderMinutes: minutes);
+        if (expectedTrigger == null) Assert.DoesNotContain("BEGIN:VALARM", calendar);
+        else
+        {
+            Assert.Contains("BEGIN:VALARM", calendar);
+            Assert.Contains("ACTION:DISPLAY", calendar);
+            Assert.Contains(expectedTrigger, calendar);
+        }
+        var events = ICloudIcsCodec.ParseEvents(calendar, ResourceUri, start.Date, start.Date.AddDays(15));
+        Assert.Equal(3, events.Count);
+        Assert.All(events, item => Assert.Equal("Source notes", item.Description));
+    }
+
     private static readonly Uri ResourceUri = new("https://p01-caldav.icloud.com/123/calendars/work/event.ics");
 
     [Fact]

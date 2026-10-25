@@ -1372,35 +1372,15 @@ namespace Task_Flyout.Views
         private void BtnAddNew_Click(object sender, RoutedEventArgs e)
             => OpenNewDialog(isTask: false);
 
-        public void OpenNewDialog(bool isTask)
+        public async void OpenNewDialog(bool isTask)
         {
-            _itemBeingEdited = null;
-            EditDialog.Title = _loader.GetStringOrDefault("TextNewItem") ?? "New Event / Task";
-            EditDialog.SecondaryButtonText = "";
-            EditCmbProvider.IsEnabled = true;
-            EditRadioEvent.IsEnabled = true;
-            bool hasTaskProvider = (App.Current as App)?.SyncManager.AccountManager.Accounts
-                .Any(account => SyncProviderCapabilityPolicy.ForProvider(account.ProviderName).SupportsTasks) == true;
-            EditRadioTask.IsEnabled = hasTaskProvider;
-            EditRadioTask.IsChecked = isTask && hasTaskProvider;
-            EditRadioEvent.IsChecked = !isTask || !hasTaskProvider;
-            SetupEditProviderComboBox();
-            EditRadioType_Changed(null, null);
-            EditRecurrenceComboBox.SelectedIndex = 0;
-            EditRecurrenceComboBox.IsEnabled = true;
-
-            EditTxtTitle.Text = "";
-            EditTxtLocation.Text = "";
-            EditTxtDescription.Text = "";
-            EditDatePicker.Date = _viewDate.Year == DateTime.Today.Year && _viewDate.Month == DateTime.Today.Month ? DateTime.Today : new DateTime(_viewDate.Year, _viewDate.Month, 1);
-
-            EditChkAllDay.IsChecked = false;
-            EditStartTimePicker.SelectedTime = null;
-            EditEndTimePicker.SelectedTime = null;
-
-            EditDialog.XamlRoot = this.XamlRoot;
-            PrepareEditDialogSize();
-            _ = EditDialog.ShowAsync();
+            var date = _viewDate.Year == DateTime.Today.Year && _viewDate.Month == DateTime.Today.Month
+                ? DateTime.Today : new DateTime(_viewDate.Year, _viewDate.Month, 1);
+            if (await QuickCreateForm.ShowDialogAsync(XamlRoot, date, isTask))
+            {
+                await SyncMonthDataAsync(forceRefresh: true);
+                App.MyFlyoutWindow?.ReloadFilters();
+            }
         }
 
         private void PrepareDialogForEdit(AgendaItem item)

@@ -141,6 +141,9 @@ namespace Task_Flyout
         public FlyoutWindow()
         {
             InitializeComponent();
+            QuickCreateEditor.Saved += QuickCreateEditor_Saved;
+            QuickCreateEditor.Canceled += QuickCreateEditor_Canceled;
+            QuickCreateEditor.LayoutChanged += AdjustWindowHeight;
             RootGrid.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
             _loader = new ResourceLoader();
 
@@ -1254,7 +1257,7 @@ namespace Task_Flyout
                     if (_focusNewItemOnOpen)
                     {
                         _focusNewItemOnOpen = false;
-                        TxtNewTitle.Focus(FocusState.Programmatic);
+                        QuickCreateEditor.FocusTitle();
                     }
                     else
                     {
@@ -1464,9 +1467,7 @@ namespace Task_Flyout
         {
             if (_isShuttingDown || _mainWindowDismissal != null) return;
             DateExpander.IsExpanded = false;
-            SetupFlyoutProviderComboBox();
-            TimePickerStart.Time = new TimeSpan(DateTime.Now.Hour, (DateTime.Now.Minute / 5) * 5, 0);
-            TimePickerEnd.Time = TimePickerStart.Time.Add(TimeSpan.FromHours(1));
+            QuickCreateEditor.Initialize(_selectedDay);
             AddPanel.Visibility = Visibility.Visible;
             if (AgendaContainer != null) AgendaContainer.Visibility = Visibility.Collapsed;
             AdjustWindowHeight();
@@ -1478,7 +1479,7 @@ namespace Task_Flyout
             }
             else
             {
-                DispatcherQueue.TryEnqueue(() => TxtNewTitle.Focus(FocusState.Programmatic));
+                DispatcherQueue.TryEnqueue(QuickCreateEditor.FocusTitle);
             }
         }
 
@@ -1531,28 +1532,6 @@ namespace Task_Flyout
             }
         }
 
-        private void RadioType_Changed(object sender, RoutedEventArgs e)
-        {
-            if (TxtLocation == null || TimePickerEnd == null || TimePickerStart == null) return;
-
-            bool isEvent = RadioTypeEvent.IsChecked == true;
-
-            TxtLocation.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
-            TimePickerEnd.Visibility = isEvent ? Visibility.Visible : Visibility.Collapsed;
-            if (CmbAddProvider != null)
-                SetupFlyoutProviderComboBox();
-
-            TimePickerStart.Header = isEvent ? (_loader.GetStringOrDefault("TextStartTime") ?? "Start time") : (_loader.GetStringOrDefault("TextDueTime") ?? "Due time");
-
-            if (AddPanel != null && AddPanel.Visibility == Visibility.Visible)
-            {
-                RootGrid.UpdateLayout();
-                AdjustWindowHeight();
-            }
-        }
-
-        private void ChkAllDay_Checked(object sender, RoutedEventArgs e) { if (TimePanel != null) TimePanel.Visibility = Visibility.Collapsed; }
-        private void ChkAllDay_Unchecked(object sender, RoutedEventArgs e) { if (TimePanel != null) TimePanel.Visibility = Visibility.Visible; }
         private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -1890,141 +1869,31 @@ namespace Task_Flyout
             App.OpenMainWindowInternal(window => window.NavigateToCalendarAndEdit(item));
         }
 
-        private void SetupFlyoutProviderComboBox()
-        {
-            CmbAddProvider.Items.Clear();
-            var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
-            if (accountMgr != null)
-            {
-                foreach (var acct in accountMgr.Accounts)
-                {
-                    var capabilities = SyncProviderCapabilityPolicy.ForProvider(acct.ProviderName);
-                    if (RadioTypeTask?.IsChecked == true && !capabilities.SupportsTasks) continue;
-                    if (RadioTypeEvent?.IsChecked == true && !capabilities.SupportsEvents) continue;
-                    CmbAddProvider.Items.Add(new ComboBoxItem
-                    {
-                        Content = acct.DisplayTitle,
-                        Tag = acct.AccountId,
-                        DataContext = acct
-                    });
-                }
-            }
-
-            if (CmbAddProvider.Items.Count > 1)
-            {
-                CmbAddProvider.Visibility = Visibility.Visible;
-                CmbAddProvider.SelectedIndex = 0;
-            }
-            else
-            {
-                CmbAddProvider.Visibility = Visibility.Collapsed;
-                if (CmbAddProvider.Items.Count > 0) CmbAddProvider.SelectedIndex = 0;
-            }
-        }
-
         private void BtnToggleAddPanel_Click(object sender, RoutedEventArgs e)
         {
-            if (!SaveNewItemButton.IsEnabled) return;
+            if (QuickCreateEditor.IsBusy) return;
             if (AddPanel.Visibility == Visibility.Visible)
             {
                 AddPanel.Visibility = Visibility.Collapsed;
-                if (AgendaContainer != null) AgendaContainer.Visibility = Visibility.Visible;
+                AgendaContainer.Visibility = Visibility.Visible;
+                AdjustWindowHeight();
             }
-            else
-            {
-                DateExpander.IsExpanded = false;
-                SetupFlyoutProviderComboBox();
-
-                TimePickerStart.Time = new TimeSpan(DateTime.Now.Hour, (DateTime.Now.Minute / 5) * 5, 0);
-                TimePickerEnd.Time = TimePickerStart.Time.Add(TimeSpan.FromHours(1));
-
-                AddPanel.Visibility = Visibility.Visible;
-                if (AgendaContainer != null) AgendaContainer.Visibility = Visibility.Collapsed;
-                DispatcherQueue.TryEnqueue(() => TxtNewTitle.Focus(FocusState.Programmatic));
-            }
-            AdjustWindowHeight();
+            else ShowNewItem();
         }
 
-        private void BtnCancelAdd_Click(object sender, RoutedEventArgs e)
+        private void QuickCreateEditor_Saved()
         {
             AddPanel.Visibility = Visibility.Collapsed;
-            if (AgendaContainer != null) AgendaContainer.Visibility = Visibility.Visible;
-
-            TxtNewTitle.Text = string.Empty;
-            TxtLocation.Text = string.Empty;
-            AddItemStatusText.Text = string.Empty;
-            AddItemStatusText.Visibility = Visibility.Collapsed;
+            AgendaContainer.Visibility = Visibility.Visible;
             AdjustWindowHeight();
+            _ = SyncAllDataAsync(true);
         }
 
-        private async void BtnSaveNewItem_Click(object sender, RoutedEventArgs e)
+        private void QuickCreateEditor_Canceled()
         {
-            if (string.IsNullOrWhiteSpace(TxtNewTitle.Text)) return;
-
-            string title = TxtNewTitle.Text;
-            bool isEvent = RadioTypeEvent.IsChecked == true;
-            bool isAllDay = ChkAllDay.IsChecked == true;
-            string location = TxtLocation.Text;
-            var selectedOption = CmbAddProvider.SelectedItem as ComboBoxItem;
-            var selectedAccount = selectedOption?.DataContext as ConnectedAccountInfo;
-            string providerName = selectedAccount?.ProviderName ?? "Google";
-            string? accountId = selectedOption?.Tag?.ToString();
-
-            TimeSpan startTime = TimePickerStart.Time;
-            TimeSpan endTime = TimePickerEnd.Time;
-
-            if (isEvent && endTime <= startTime) endTime = startTime.Add(TimeSpan.FromHours(1));
-
-            DateTime targetDate = _selectedDay;
-
-            try
-            {
-                SaveNewItemButton.IsEnabled = false;
-                CancelAddButton.IsEnabled = false;
-                AddItemProgress.IsActive = true;
-                AddItemProgress.Visibility = Visibility.Visible;
-                AddItemStatusText.Text = _loader.GetStringOrDefault("TextSyncing") ?? "Syncing...";
-                AddItemStatusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
-                AddItemStatusText.Visibility = Visibility.Visible;
-                AdjustWindowHeight();
-
-                await _syncManager.CreateItemAsync(
-                    title,
-                    isEvent,
-                    isAllDay,
-                    targetDate,
-                    startTime,
-                    endTime,
-                    location,
-                    providerName,
-                    accountId);
-                TxtNewTitle.Text = string.Empty;
-                TxtLocation.Text = string.Empty;
-                AddItemStatusText.Text = string.Empty;
-                AddItemStatusText.Visibility = Visibility.Collapsed;
-                AddPanel.Visibility = Visibility.Collapsed;
-                if (AgendaContainer != null) AgendaContainer.Visibility = Visibility.Visible;
-                _ = SyncAllDataAsync(true);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("============== Sync Error ==============");
-                System.Diagnostics.Debug.WriteLine(ex.ToString());
-
-                AddItemStatusText.Text = string.Format(
-                    _loader.GetStringOrDefault("TextAddFailed2") ?? "Failed to add: {0}",
-                    UserSafeErrorMessage.FromException(ex));
-                AddItemStatusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
-                AddItemStatusText.Visibility = Visibility.Visible;
-            }
-            finally
-            {
-                AddItemProgress.IsActive = false;
-                AddItemProgress.Visibility = Visibility.Collapsed;
-                SaveNewItemButton.IsEnabled = true;
-                CancelAddButton.IsEnabled = true;
-                AdjustWindowHeight();
-            }
+            AddPanel.Visibility = Visibility.Collapsed;
+            AgendaContainer.Visibility = Visibility.Visible;
+            AdjustWindowHeight();
         }
     }
 }

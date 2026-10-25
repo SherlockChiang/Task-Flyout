@@ -3131,6 +3131,17 @@ body { background-color: {{background}} !important; }
             ClearDetail();
         }
 
+        private async void CreateTaskFromMail_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedItem == null || _selectedAccount == null) return;
+            string provider = MailProviderAccountLinkPolicy.GetProviderName(_selectedAccount.Kind);
+            string? preferred = string.IsNullOrWhiteSpace(provider) ? null
+                : AccountIdentityPolicy.CreateProviderKey(provider, _selectedAccount.ProviderAccountId);
+            var seed = QuickCreatePolicy.FromSource(_selectedItem.Subject,
+                _selectedItem.Sender + " · " + _selectedItem.ReceivedTime, _selectedItem.WebLink, preferred);
+            await QuickCreateForm.ShowDialogAsync(XamlRoot, DateTime.Today, isTask: true, seed);
+        }
+
         private async void ReplyButton_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedItem == null) return;

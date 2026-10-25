@@ -307,106 +307,11 @@ namespace Task_Flyout.Views
         private async void AddTaskButton_Click(object sender, RoutedEventArgs e)
         {
             if (_syncManager == null) return;
-
-            var providerAccounts = _syncManager.AccountManager.Accounts
-                .Where(account => SyncProviderCapabilityPolicy.ForProvider(account.ProviderName).SupportsTasks)
-                .ToList();
-
-            if (providerAccounts.Count == 0)
+            if (await QuickCreateForm.ShowDialogAsync(XamlRoot, DateTime.Today, isTask: true))
             {
-                await new ContentDialog
-                {
-                    Title = _loader.GetStringOrDefault("TextNoAccountAvailable") ?? "No Account Available",
-                    Content = _loader.GetStringOrDefault("TextAddAccountForTasks") ?? "Please add and sign in to a task-supporting account first.",
-                    CloseButtonText = _loader.GetStringOrDefault("TextConfirm") ?? "Confirm",
-                    XamlRoot = XamlRoot
-                }.ShowAsync();
-                return;
+                await SyncTasksAsync(forceRefresh: true, fullRange: true);
+                App.MyFlyoutWindow?.ReloadFilters();
             }
-
-            var titleBox = new TextBox
-            {
-                Header = _loader.GetStringOrDefault("TextTitle") ?? "Title",
-                PlaceholderText = _loader.GetStringOrDefault("TextTaskName") ?? "Task name"
-            };
-            var providerBox = new ComboBox
-            {
-                Header = _loader.GetStringOrDefault("TextAccount") ?? "Account",
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-            foreach (var account in providerAccounts)
-            {
-                providerBox.Items.Add(new ComboBoxItem
-                {
-                    Content = account.DisplayTitle,
-                    Tag = account.AccountId,
-                    DataContext = account
-                });
-            }
-            providerBox.SelectedIndex = 0;
-            var datePicker = new DatePicker
-            {
-                Header = _loader.GetStringOrDefault("TextDate") ?? "Date",
-                Date = DateTimeOffset.Now
-            };
-            var timePicker = new TimePicker
-            {
-                Header = _loader.GetStringOrDefault("TextTime") ?? "Time",
-                Time = new TimeSpan(9, 0, 0)
-            };
-            var panel = new StackPanel { Spacing = 12 };
-            panel.Children.Add(titleBox);
-            panel.Children.Add(providerBox);
-            panel.Children.Add(datePicker);
-            panel.Children.Add(timePicker);
-
-            var dialog = new ContentDialog
-            {
-                Title = _loader.GetStringOrDefault("TextAddTask") ?? "Add Task",
-                Content = panel,
-                PrimaryButtonText = _loader.GetStringOrDefault("CalendarDialog.PrimaryButtonText") ?? "Save",
-                CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
-                DefaultButton = ContentDialogButton.Primary,
-                XamlRoot = XamlRoot
-            };
-
-            dialog.PrimaryButtonClick += async (_, args) =>
-            {
-                var title = titleBox.Text.Trim();
-                if (string.IsNullOrWhiteSpace(title))
-                {
-                    args.Cancel = true;
-                    titleBox.PlaceholderText = _loader.GetStringOrDefault("TextEnterTaskName") ?? "Please enter task name";
-                    titleBox.Focus(FocusState.Programmatic);
-                    return;
-                }
-
-                var deferral = args.GetDeferral();
-                try
-                {
-                    var selectedOption = providerBox.SelectedItem as ComboBoxItem;
-                    var selectedAccount = selectedOption?.DataContext as ConnectedAccountInfo;
-                    var targetDate = datePicker.Date.DateTime.Date;
-                    await _syncManager.CreateItemAsync(
-                        title,
-                        isEvent: false,
-                        isAllDay: false,
-                        targetDate,
-                        timePicker.Time,
-                        timePicker.Time,
-                        "",
-                        selectedAccount?.ProviderName,
-                        selectedOption?.Tag?.ToString());
-                    await SyncTasksAsync(forceRefresh: true, fullRange: true);
-                    App.MyFlyoutWindow?.ReloadFilters();
-                }
-                finally
-                {
-                    deferral.Complete();
-                }
-            };
-
-            await dialog.ShowAsync();
         }
 
         private async void DeleteTaskButton_Click(object sender, RoutedEventArgs e)

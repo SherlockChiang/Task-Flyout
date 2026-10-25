@@ -6,6 +6,7 @@
     xmlns:desktop="using:DesktopFlyouts"
     xmlns:local="using:Task_Flyout"
     xmlns:models="using:Task_Flyout.Models"
+    xmlns:views="using:Task_Flyout.Views"
     FlyoutWidth="360"
     FlyoutHeight="Auto"
     Margin="12"
@@ -271,36 +272,7 @@
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
 
             <ScrollViewer x:Name="AddPanelScrollViewer" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
-                <StackPanel Spacing="10" Padding="0,0,0,12">
-                    <ComboBox x:Uid="Flyout_CmbProvider" x:Name="CmbAddProvider" Header="所属账户" HorizontalAlignment="Stretch" />
-
-                    <StackPanel Orientation="Horizontal" Spacing="24" Margin="0,-4,0,0">
-                        <RadioButton x:Uid="Flyout_RadioEvent" x:Name="RadioTypeEvent" Content="日程" IsChecked="True" Checked="RadioType_Changed"/>
-                        <RadioButton x:Uid="Flyout_RadioTask" x:Name="RadioTypeTask" Content="任务" Checked="RadioType_Changed"/>
-                    </StackPanel>
-
-                    <TextBox x:Uid="Flyout_TxtNewTitle" x:Name="TxtNewTitle" PlaceholderText="输入标题内容..." />
-                    <TextBox x:Uid="Flyout_TxtLocation" x:Name="TxtLocation" PlaceholderText="添加地点（选填）" />
-
-                    <StackPanel Spacing="8">
-                        <CheckBox x:Uid="Flyout_ChkAllDay" x:Name="ChkAllDay" Content="全天" IsChecked="False" Checked="ChkAllDay_Checked" Unchecked="ChkAllDay_Unchecked" Margin="0,0,0,-4"/>
-
-                        <StackPanel x:Name="TimePanel" Spacing="8">
-                            <TimePicker x:Uid="Flyout_TimePickerStart" x:Name="TimePickerStart" Header="开始时间" ClockIdentifier="24HourClock" HorizontalAlignment="Stretch" MinuteIncrement="5"/>
-                            <TimePicker x:Uid="Flyout_TimePickerEnd" x:Name="TimePickerEnd" Header="结束时间" ClockIdentifier="24HourClock" HorizontalAlignment="Stretch" MinuteIncrement="5"/>
-                        </StackPanel>
-                    </StackPanel>
-
-                    <TextBlock x:Name="AddItemStatusText" FontSize="12" TextWrapping="Wrap"
-                               Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                               Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
-
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
-                        <ProgressRing x:Name="AddItemProgress" Width="20" Height="20" IsActive="False" Visibility="Collapsed"/>
-                        <Button x:Uid="Flyout_BtnCancel" x:Name="CancelAddButton" Content="取消" Click="BtnCancelAdd_Click"/>
-                        <Button x:Uid="Flyout_BtnSave" x:Name="SaveNewItemButton" Content="保存" Width="80" Style="{StaticResource AccentButtonStyle}" Click="BtnSaveNewItem_Click"/>
-                    </StackPanel>
-                </StackPanel>
+                <views:QuickCreateForm x:Name="QuickCreateEditor" Margin="0,0,0,12"/>
             </ScrollViewer>
         </Border>
     </Grid>

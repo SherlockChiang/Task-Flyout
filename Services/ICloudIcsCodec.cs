@@ -121,7 +121,8 @@ namespace Task_Flyout.Services
             DateTime end,
             bool isAllDay,
             string recurrenceKind,
-            string? timeZoneId = null)
+            string? timeZoneId = null,
+            int? reminderMinutes = null)
         {
             var calendar = CreateEmptyCalendar();
             FrequencyType? frequency = ParseFrequency(recurrenceKind);
@@ -146,6 +147,14 @@ namespace Task_Flyout.Services
 
             if (frequency.HasValue)
                 calendarEvent.RecurrenceRule = new RecurrenceRule(frequency.Value);
+
+            if (reminderMinutes is >= 0)
+                calendarEvent.Alarms.Add(new Alarm
+                {
+                    Action = "DISPLAY",
+                    Description = title,
+                    Trigger = new Trigger(Duration.FromMinutes(-reminderMinutes.Value))
+                });
 
             calendar.Events.Add(calendarEvent);
             return Serialize(calendar);

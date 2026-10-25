@@ -477,12 +477,21 @@ namespace Task_Flyout.Services
 
                 items.Add(new AgendaItem
                 {
-                    Id = mapped.Id, Title = mapped.Title, Subtitle = mapped.Subtitle,
-                    Location = mapped.Location, Description = mapped.Description, IsEvent = true,
-                    Provider = mapped.Provider, AccountId = AccountId, CalendarId = mapped.CalendarId,
-                    CalendarName = mapped.CalendarName, DateKey = mapped.DateKey,
-                    StartDateTime = mapped.StartDateTime, EndDateTime = mapped.EndDateTime,
-                    IsRecurring = mapped.IsRecurring, RecurringEventId = mapped.RecurringEventId,
+                    Id = mapped.Id,
+                    Title = mapped.Title,
+                    Subtitle = mapped.Subtitle,
+                    Location = mapped.Location,
+                    Description = mapped.Description,
+                    IsEvent = true,
+                    Provider = mapped.Provider,
+                    AccountId = AccountId,
+                    CalendarId = mapped.CalendarId,
+                    CalendarName = mapped.CalendarName,
+                    DateKey = mapped.DateKey,
+                    StartDateTime = mapped.StartDateTime,
+                    EndDateTime = mapped.EndDateTime,
+                    IsRecurring = mapped.IsRecurring,
+                    RecurringEventId = mapped.RecurringEventId,
                     RecurrenceKind = mapped.RecurrenceKind
                 });
             }
@@ -591,11 +600,12 @@ namespace Task_Flyout.Services
             await updateRequest.ExecuteAsync();
         }
 
-        public async Task CreateEventAsync(string title, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, bool isAllDay, EventRecurrenceKind recurrence = EventRecurrenceKind.None)
+        public async Task CreateEventAsync(string title, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, bool isAllDay, EventRecurrenceKind recurrence = EventRecurrenceKind.None, QuickCreateOptions? options = null)
         {
             var newEvent = new Google.Apis.Calendar.v3.Data.Event
             {
                 Summary = title,
+                Description = options?.Description,
                 Location = string.IsNullOrWhiteSpace(location) ? null : location
             };
 
@@ -607,20 +617,29 @@ namespace Task_Flyout.Services
             }
             else
             {
-                newEvent.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = window.Start };
-                newEvent.End = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = window.End };
+                string timeZone = QuickCreatePolicy.CalendarTimeZoneId(TimeZoneInfo.Local.Id);
+                newEvent.Start = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = window.Start, TimeZone = timeZone };
+                newEvent.End = new Google.Apis.Calendar.v3.Data.EventDateTime { DateTimeDateTimeOffset = window.End, TimeZone = timeZone };
             }
 
             if (recurrence != EventRecurrenceKind.None)
                 newEvent.Recurrence = new List<string> { $"RRULE:FREQ={RecurrencePolicy.ToGoogleFrequency(recurrence.ToString())}" };
 
+            if (options?.ReminderMinutes is int minutes)
+                newEvent.Reminders = new Google.Apis.Calendar.v3.Data.Event.RemindersData
+                {
+                    UseDefault = false,
+                    Overrides = minutes < 0 ? new List<Google.Apis.Calendar.v3.Data.EventReminder>()
+                        : new List<Google.Apis.Calendar.v3.Data.EventReminder> { new() { Method = "popup", Minutes = minutes } }
+                };
+
             await EnsureAuthorizedAsync();
             await CalendarSvc!.Events.Insert(newEvent, "primary").ExecuteAsync();
         }
 
-        public async Task CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay)
+        public async Task CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay, QuickCreateOptions? options = null)
         {
-            var newTask = new Google.Apis.Tasks.v1.Data.Task { Title = title };
+            var newTask = new Google.Apis.Tasks.v1.Data.Task { Title = title, Notes = options?.Description };
 
             newTask.Due = targetDate.ToString("yyyy-MM-dd'T'00:00:00.000'Z'");
 

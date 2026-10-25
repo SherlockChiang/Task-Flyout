@@ -2116,4 +2116,25 @@ Widgets 抑制：就绪 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="SyncCenter_UnknownFailure" xml:space="preserve"><value>同步未能完成，请重试；若仍失败，请重新连接账户。</value></data>
   <data name="SyncCenter_RetryAccount" xml:space="preserve"><value>重试同步</value></data>
   <data name="SyncCenter_ScopeHint" xml:space="preserve"><value>时间表示本次运行中的成功刷新。邮件重试会刷新文件夹和收件箱；排队的邮件更改会自动重试。任务数量仅统计本次运行中跟踪的编辑。</value></data>
+  <data name="QuickCreate_Example" xml:space="preserve"><value>明天 09:00 评审方案</value></data>
+  <data name="QuickCreate_Duration" xml:space="preserve"><value>时长</value></data>
+  <data name="QuickCreate_Minutes" xml:space="preserve"><value>{0} 分钟</value></data>
+  <data name="QuickCreate_Reminder" xml:space="preserve"><value>账户服务提醒</value></data>
+  <data name="QuickCreate_ProviderDefault" xml:space="preserve"><value>使用服务默认设置</value></data>
+  <data name="QuickCreate_NoReminder" xml:space="preserve"><value>不提醒</value></data>
+  <data name="QuickCreate_Before" xml:space="preserve"><value>提前 {0} 分钟</value></data>
+  <data name="QuickCreate_Remember" xml:space="preserve"><value>将此账户和时长设为默认</value></data>
+  <data name="QuickCreate_Parse" xml:space="preserve"><value>识别日期和时间</value></data>
+  <data name="QuickCreate_GoogleTaskHint" xml:space="preserve"><value>Google 任务仅支持截止日期，不支持时间、提醒和重复规则。</value></data>
+  <data name="QuickCreate_TaskHint" xml:space="preserve"><value>任务使用截止日期；提醒以当天 09:00 为基准，保存至账户服务。</value></data>
+  <data name="QuickCreate_ReminderHint" xml:space="preserve"><value>提醒保存至账户服务，全天日程以零点为基准。应用自身的通知设置单独生效。</value></data>
+  <data name="QuickCreate_DateOnly" xml:space="preserve"><value>任务仅使用截止日期。请移除时间或切换为日程，再次识别；已保留原输入。</value></data>
+  <data name="QuickCreate_DateRange" xml:space="preserve"><value>请选择日期选择器范围内的日期；已保留原输入。</value></data>
+  <data name="QuickCreate_ParseFailed" xml:space="preserve"><value>请以今天、明天、后天或 YYYY-MM-DD 开头，可加 09:00 或 9点30分，再填写标题；已保留原输入。</value></data>
+  <data name="QuickCreate_ReviewParsed" xml:space="preserve"><value>已应用识别出的日期和时间，请核对后保存。</value></data>
+  <data name="QuickCreate_Required" xml:space="preserve"><value>请选择账户和日期，并填写标题。</value></data>
+  <data name="QuickCreate_InvalidTime" xml:space="preserve"><value>夏令时切换导致此时间不存在，请选择其他时间。</value></data>
+  <data name="QuickCreate_SaveFailed" xml:space="preserve"><value>未能确认创建成功，已保留全部输入。再次保存前，请先检查目标账户，避免重复创建。</value></data>
+  <data name="QuickCreate_FromSource.Content" xml:space="preserve"><value>创建任务</value></data>
+  <data name="QuickCreate_FromSource.AutomationProperties.Name" xml:space="preserve"><value>根据此内容创建任务</value></data>
 </root>

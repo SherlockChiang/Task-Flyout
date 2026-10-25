@@ -2116,4 +2116,25 @@ Widgets 抑制：就緒 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="SyncCenter_UnknownFailure" xml:space="preserve"><value>同步未能完成，請重試；若仍失敗，請重新連結帳戶。</value></data>
   <data name="SyncCenter_RetryAccount" xml:space="preserve"><value>重試同步</value></data>
   <data name="SyncCenter_ScopeHint" xml:space="preserve"><value>時間表示本次執行中的成功重新整理。郵件重試會重新整理資料夾與收件匣；排程中的郵件更改會自動重試。工作數量僅統計本次執行中追蹤的編輯。</value></data>
+  <data name="QuickCreate_Example" xml:space="preserve"><value>明天 09:00 評審方案</value></data>
+  <data name="QuickCreate_Duration" xml:space="preserve"><value>時長</value></data>
+  <data name="QuickCreate_Minutes" xml:space="preserve"><value>{0} 分鐘</value></data>
+  <data name="QuickCreate_Reminder" xml:space="preserve"><value>帳戶服務提醒</value></data>
+  <data name="QuickCreate_ProviderDefault" xml:space="preserve"><value>使用服務預設設定</value></data>
+  <data name="QuickCreate_NoReminder" xml:space="preserve"><value>不提醒</value></data>
+  <data name="QuickCreate_Before" xml:space="preserve"><value>提前 {0} 分鐘</value></data>
+  <data name="QuickCreate_Remember" xml:space="preserve"><value>將此帳戶和時長設為預設</value></data>
+  <data name="QuickCreate_Parse" xml:space="preserve"><value>辨識日期與時間</value></data>
+  <data name="QuickCreate_GoogleTaskHint" xml:space="preserve"><value>Google 工作僅支援截止日期，不支援時間、提醒與重複規則。</value></data>
+  <data name="QuickCreate_TaskHint" xml:space="preserve"><value>工作使用截止日期；提醒以當天 09:00 為基準，儲存至帳戶服務。</value></data>
+  <data name="QuickCreate_ReminderHint" xml:space="preserve"><value>提醒儲存至帳戶服務，全天行程以午夜為基準。應用程式本身的通知設定個別生效。</value></data>
+  <data name="QuickCreate_DateOnly" xml:space="preserve"><value>工作僅使用截止日期。請移除時間或切換為行程，再次辨識；已保留原輸入。</value></data>
+  <data name="QuickCreate_DateRange" xml:space="preserve"><value>請選擇日期選擇器範圍內的日期；已保留原輸入。</value></data>
+  <data name="QuickCreate_ParseFailed" xml:space="preserve"><value>請以今天、明天、後天或 YYYY-MM-DD 開頭，可加 09:00 或 9點30分，再填寫標題；已保留原輸入。</value></data>
+  <data name="QuickCreate_ReviewParsed" xml:space="preserve"><value>已套用辨識出的日期與時間，請核對後儲存。</value></data>
+  <data name="QuickCreate_Required" xml:space="preserve"><value>請選擇帳戶與日期，並填寫標題。</value></data>
+  <data name="QuickCreate_InvalidTime" xml:space="preserve"><value>日光節約時間切換導致此時間不存在，請選擇其他時間。</value></data>
+  <data name="QuickCreate_SaveFailed" xml:space="preserve"><value>未能確認建立成功，已保留全部輸入。再次儲存前，請先檢查目標帳戶，避免重複建立。</value></data>
+  <data name="QuickCreate_FromSource.Content" xml:space="preserve"><value>建立工作</value></data>
+  <data name="QuickCreate_FromSource.AutomationProperties.Name" xml:space="preserve"><value>根據此內容建立工作</value></data>
 </root>

@@ -2116,4 +2116,25 @@ Widgets suppression: ready {8}; snapshot {9}; notification pending {10}</value><
   <data name="SyncCenter_UnknownFailure" xml:space="preserve"><value>Sync could not finish. Retry, or reconnect if the problem persists.</value></data>
   <data name="SyncCenter_RetryAccount" xml:space="preserve"><value>Retry sync</value></data>
   <data name="SyncCenter_ScopeHint" xml:space="preserve"><value>Times describe successful refreshes in this session. Mail retry refreshes folders and Inbox; queued mail changes retry automatically. Task counts cover tracked edits in this session.</value></data>
+  <data name="QuickCreate_Example" xml:space="preserve"><value>Tomorrow 09:00 review the proposal</value></data>
+  <data name="QuickCreate_Duration" xml:space="preserve"><value>Duration</value></data>
+  <data name="QuickCreate_Minutes" xml:space="preserve"><value>{0} minutes</value></data>
+  <data name="QuickCreate_Reminder" xml:space="preserve"><value>Provider reminder</value></data>
+  <data name="QuickCreate_ProviderDefault" xml:space="preserve"><value>Provider default</value></data>
+  <data name="QuickCreate_NoReminder" xml:space="preserve"><value>No reminder</value></data>
+  <data name="QuickCreate_Before" xml:space="preserve"><value>{0} minutes before</value></data>
+  <data name="QuickCreate_Remember" xml:space="preserve"><value>Use this account and duration by default</value></data>
+  <data name="QuickCreate_Parse" xml:space="preserve"><value>Recognize date and time</value></data>
+  <data name="QuickCreate_GoogleTaskHint" xml:space="preserve"><value>Google Tasks saves a due date only; time, reminders and recurrence are unavailable.</value></data>
+  <data name="QuickCreate_TaskHint" xml:space="preserve"><value>Tasks use a due date. Reminders are relative to 09:00 on that date and are saved to the provider.</value></data>
+  <data name="QuickCreate_ReminderHint" xml:space="preserve"><value>Reminders are saved to the provider. All-day events use midnight. App notification settings remain separate.</value></data>
+  <data name="QuickCreate_DateOnly" xml:space="preserve"><value>Tasks use a due date only. Remove the time or choose Event, then recognize again. Your input was kept.</value></data>
+  <data name="QuickCreate_DateRange" xml:space="preserve"><value>Choose a date within the date picker's range. Your input was kept.</value></data>
+  <data name="QuickCreate_ParseFailed" xml:space="preserve"><value>Start with today, tomorrow or YYYY-MM-DD, optionally followed by HH:mm or 9 am, then a title. Your input was kept.</value></data>
+  <data name="QuickCreate_ReviewParsed" xml:space="preserve"><value>Date and time applied. Review the fields before saving.</value></data>
+  <data name="QuickCreate_Required" xml:space="preserve"><value>Choose an account and date, and enter a title.</value></data>
+  <data name="QuickCreate_InvalidTime" xml:space="preserve"><value>This time does not exist because the clocks change. Choose another time.</value></data>
+  <data name="QuickCreate_SaveFailed" xml:space="preserve"><value>Could not confirm creation. Your input is kept. Check the destination for duplicates before retrying Save.</value></data>
+  <data name="QuickCreate_FromSource.Content" xml:space="preserve"><value>Create task</value></data>
+  <data name="QuickCreate_FromSource.AutomationProperties.Name" xml:space="preserve"><value>Create a task from this item</value></data>
 </root>

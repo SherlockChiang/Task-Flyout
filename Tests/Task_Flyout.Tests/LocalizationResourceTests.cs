@@ -42,7 +42,7 @@ public class LocalizationResourceTests
     {
         string root = FindRepositoryRoot();
         var keys = LoadResourceKeys(Path.Combine(root, "Strings", "en-US", "Resources.resw"));
-        var lookup = new Regex("(?:GetStringOrDefault|GetSafeString|GetResourceStringOrDefault)\\(\\s*\"([^\"]+)\"", RegexOptions.CultureInvariant);
+        var lookup = new Regex("(?:GetStringOrDefault|GetSafeString|GetResourceStringOrDefault|\\bText)\\(\\s*\"([^\"]+)\"(?=\\s*[,\\)])", RegexOptions.CultureInvariant);
         var sourceFiles = Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}Tests{Path.DirectorySeparatorChar}")
                 && !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")

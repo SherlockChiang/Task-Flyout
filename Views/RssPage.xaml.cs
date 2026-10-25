@@ -1426,6 +1426,13 @@ namespace Task_Flyout.Views
             _rssResourceCts = null;
         }
 
+        private async void CreateTaskFromArticle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedArticle == null) return;
+            var seed = QuickCreatePolicy.FromSource(_selectedArticle.Title, _selectedArticle.FeedTitle, _selectedArticle.Link);
+            await QuickCreateForm.ShowDialogAsync(XamlRoot, DateTime.Today, isTask: true, seed);
+        }
+
         private void OpenArticleInBrowserButton_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedArticle == null) return;
