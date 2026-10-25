@@ -337,6 +337,7 @@ namespace Task_Flyout
 
         private void BtnGoToToday_Click(object sender, RoutedEventArgs e)
         {
+            DateExpander.IsExpanded = false;
             if (MainCalendar.DisplayMode != CalendarViewDisplayMode.Month)
             {
                 MainCalendar.DisplayMode = CalendarViewDisplayMode.Month;
@@ -551,6 +552,7 @@ namespace Task_Flyout
             }
 
             _selectedDay = args.AddedDates[0].Date;
+            LoadCacheForDate(_selectedDay);
             UpdateSelectedDateHeader();
             ShowDataForDate(_selectedDay);
         }
@@ -559,7 +561,9 @@ namespace Task_Flyout
         {
             if (_selectedDay.Date == DateTime.Today)
             {
-                TxtSelectedDateHeader.Text = _loader.GetStringOrDefault("CalendarPage_BtnToday/Content") ?? "Today";
+                TxtSelectedDateHeader.Text = DateExpander.IsExpanded
+                    ? (_loader.GetStringOrDefault("CalendarPage_BtnToday/Content") ?? "Today")
+                    : (_loader.GetStringOrDefault("Flyout_TodayUpcoming") ?? "Today and next up");
                 if (TxtRelativeDate != null) TxtRelativeDate.Visibility = Visibility.Collapsed;
             }
             else
@@ -600,6 +604,26 @@ namespace Task_Flyout
                     stateSubtitle = _loader.GetStringOrDefault("TextWelcomeSub") ?? "Click setting icon to link accounts";
                 }
             }
+            else if (date.Date == DateTime.Today && !DateExpander.IsExpanded)
+            {
+                var source = _localCache.DayItems.Values.SelectMany(items => items)
+                    .Where(IsItemVisible).Where(item => item.IsEvent || item.IsTask)
+                    .DistinctBy(FlyoutItemKey).ToDictionary(FlyoutItemKey);
+                var selected = FlyoutOverviewPolicy.Select(source.Values.Select(item => new FlyoutOverviewEntry(
+                    FlyoutItemKey(item), item.DateKey, item.StartDateTime, item.IsTask && item.IsCompleted)), date);
+                foreach (var entry in selected)
+                {
+                    var item = source[entry.Key];
+                    PopulateItemColor(item);
+                    tempAgenda.Add(item.DateKey == key ? item : CopyUpcomingItem(item));
+                }
+                if (tempAgenda.Count == 0)
+                {
+                    surfaceKind = FlyoutAgendaSurfaceKind.Empty;
+                    stateTitle = _loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events";
+                    stateSubtitle = _loader.GetStringOrDefault("TextNoAgendaSub") ?? "Take a break";
+                }
+            }
             else if (_localCache.DayItems.ContainsKey(key) && _localCache.DayItems[key].Any(IsItemVisible))
             {
                 var visibleItems = _localCache.DayItems[key].Where(IsItemVisible).ToList();
@@ -620,29 +644,10 @@ namespace Task_Flyout
                 if (nextDayKey != null)
                 {
                     var nextItems = _localCache.DayItems[nextDayKey].Where(IsItemVisible).ToList();
-                    DateTime nextDate = DateTime.Parse(nextDayKey);
-                    int daysDiff = (nextDate - date).Days;
-                    string daysLaterText = daysDiff == 1 ? (_loader.GetStringOrDefault("TextTomorrow") ?? "Tomorrow")
-                                                         : (daysDiff == 2 ? (_loader.GetStringOrDefault("TextDayAfterTomorrow") ?? "The day after tomorrow")
-                                                         : nextDate.ToString("M", CultureInfo.CurrentUICulture));
                     foreach (var item in nextItems)
                     {
                         PopulateItemColor(item);
-                        tempAgenda.Add(new AgendaItem
-                        {
-                            Id = item.Id,
-                            Title = item.Title,
-                            Subtitle = $"{(_loader.GetStringOrDefault("TextUpcoming") ?? "Upcoming")} · {daysLaterText} {item.Subtitle}",
-                            Location = item.Location,
-                            IsEvent = item.IsEvent,
-                            IsTask = item.IsTask,
-                            IsCompleted = item.IsCompleted,
-                            Provider = item.Provider,
-                            AccountId = item.AccountId,
-                            CalendarId = item.CalendarId,
-                            ColorHex = item.ColorHex,
-                            DateKey = item.DateKey
-                        });
+                        tempAgenda.Add(CopyUpcomingItem(item));
                     }
                 }
             }
@@ -656,6 +661,62 @@ namespace Task_Flyout
 
         private bool HasConnectedAgendaAccounts()
             => (App.Current as App)?.SyncManager?.AccountManager.Accounts.Count > 0;
+
+        private static string FlyoutItemKey(AgendaItem item) => GlobalSearchPolicy.CreateAgendaId(
+            item.Provider, item.AccountId, item.CalendarId, item.Id, item.DateKey, item.IsTask);
+
+        private AgendaItem CopyUpcomingItem(AgendaItem item)
+        {
+            string date = DateTime.TryParseExact(item.DateKey, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
+                ? day.ToString("M", LocalizationHelper.AppCulture) : item.DateKey;
+            return new AgendaItem
+            {
+                Id = item.Id,
+                Title = item.Title,
+                Subtitle = $"{(_loader.GetStringOrDefault("TextUpcoming") ?? "Upcoming")} · {date} {item.Subtitle}",
+                Location = item.Location,
+                Description = item.Description,
+                IsEvent = item.IsEvent,
+                IsTask = item.IsTask,
+                IsCompleted = item.IsCompleted,
+                Provider = item.Provider,
+                AccountId = item.AccountId,
+                CalendarId = item.CalendarId,
+                CalendarName = item.CalendarName,
+                ColorHex = item.ColorHex,
+                DateKey = item.DateKey,
+                StartDateTime = item.StartDateTime,
+                EndDateTime = item.EndDateTime,
+                IsRecurring = item.IsRecurring,
+                RecurringEventId = item.RecurringEventId,
+                RecurrenceKind = item.RecurrenceKind
+            };
+        }
+
+        private void DateExpander_Changed(Expander sender, object args)
+        {
+            if (!_contentInitialized) return;
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                LoadCacheForDate(_selectedDay);
+                UpdateSelectedDateHeader();
+                ShowDataForDate(_selectedDay);
+                AdjustWindowHeight();
+                if (DateExpander.IsExpanded) RequestDotRefresh();
+            });
+        }
+
+        private void OpenCalendar_Click(object sender, RoutedEventArgs e)
+        {
+            HideFlyout(autoHide: false);
+            App.OpenMainWindowInternal(window => window.NavigateToCalendar());
+        }
+
+        private void OpenTasks_Click(object sender, RoutedEventArgs e)
+        {
+            HideFlyout(autoHide: false);
+            App.OpenMainWindowInternal(window => window.NavigateToTasks());
+        }
 
         private bool ReplaceAgendaItems(IReadOnlyList<AgendaItem> items)
         {
@@ -1009,6 +1070,7 @@ namespace Task_Flyout
         private void OpenPreparedFlyout()
         {
             if (_isShuttingDown || IsOpen || !_showPending || !_desiredOpen) return;
+            DateExpander.IsExpanded = false;
             LoadCacheForDate(DateTime.Today);
             _selectedDay = DateTime.Today;
             ShowDataForDate(_selectedDay);
@@ -1314,80 +1376,25 @@ namespace Task_Flyout
 
         private void AdjustWindowHeight()
         {
-            int logicalWidth = 360;
-            double targetLogicalHeight = 0;
             double scaleFactor = Math.Max(1, RootGrid.XamlRoot?.RasterizationScale ?? 1);
             var workArea = DisplayArea.Primary.WorkArea;
-            double availableLogicalHeight = workArea.Height / scaleFactor;
-            double calendarHeight = ResponsiveLayoutPolicy.GetFlyoutCalendarHeight(availableLogicalHeight);
-            if (CalendarHost != null) CalendarHost.Height = calendarHeight;
-            if (AgendaContainer != null) AgendaContainer.MinHeight = availableLogicalHeight < 650 ? 0 : 80;
+            double logicalWidth = Math.Max(1, Math.Min(360, workArea.Width / scaleFactor - 24));
+            double availableHeight = Math.Max(1, workArea.Height / scaleFactor - 24);
+            FlyoutWidth = new GridLength(logicalWidth);
+            CalendarHost.Height = ResponsiveLayoutPolicy.GetFlyoutCalendarHeight(availableHeight);
+            FooterGrid.Measure(new Windows.Foundation.Size(logicalWidth, double.PositiveInfinity));
+            HeaderScrollViewer.MaxHeight = FlyoutOverviewPolicy.HeaderMaximum(availableHeight, FooterGrid.DesiredSize.Height);
+            AgendaContainer.MinHeight = availableHeight < 650 ? 0 : 80;
 
-            if (AddPanel != null && AddPanel.Visibility == Visibility.Visible)
-            {
-                ContentRow.Height = GridLength.Auto;
-                RootGrid.UpdateLayout();
-                RootGrid.Measure(new Windows.Foundation.Size(logicalWidth, double.PositiveInfinity));
-                targetLogicalHeight = RootGrid.DesiredSize.Height;
-            }
-            else
-            {
-                ContentRow.Height = new GridLength(1, GridUnitType.Star);
-
-                // Measure the header area (Row 0) dynamically to account for weather strip visibility
-                double headerHeight = 16; // top padding
-                headerHeight += 50;       // clock area
-                headerHeight += 12;       // clock bottom margin
-                headerHeight += calendarHeight;
-                headerHeight += 12;       // calendar bottom margin
-
-                // Account for weather detail strip when visible
-                if (WeatherDetailStrip != null && WeatherDetailStrip.Visibility == Visibility.Visible)
-                {
-                    WeatherDetailStrip.Measure(new Windows.Foundation.Size(logicalWidth, double.PositiveInfinity));
-                    headerHeight += WeatherDetailStrip.DesiredSize.Height + 8; // strip height + margin
-                }
-
-                // Measure agenda list height
-                int listHeight = 0;
-                foreach (var item in AgendaItems)
-                {
-                    if (item.Subtitle != null && item.Subtitle.Contains(_loader.GetStringOrDefault("TextUpcoming") ?? "Upcoming")) listHeight += 65;
-                    else listHeight += !string.IsNullOrEmpty(item.Location) ? 75 : 65;
-                }
-
-                // Bottom bar height (~56) + agenda header (~30) + agenda border padding (16) + margins
-                double bottomAndAgendaChrome = 56 + 30 + 16 + 16;
-
-                targetLogicalHeight = headerHeight + listHeight + bottomAndAgendaChrome;
-                ContentRow.Height = GridLength.Auto;
-                RootGrid.Measure(new Windows.Foundation.Size(logicalWidth, double.PositiveInfinity));
-                targetLogicalHeight = Math.Max(targetLogicalHeight, RootGrid.DesiredSize.Height);
-                ContentRow.Height = new GridLength(1, GridUnitType.Star);
-            }
-
-            double maxLogicalHeight = Math.Max(1, availableLogicalHeight - 24);
-            if (targetLogicalHeight > maxLogicalHeight)
-            {
-                targetLogicalHeight = maxLogicalHeight;
-                AgendaListControl.SetValue(ScrollViewer.VerticalScrollModeProperty, ScrollMode.Enabled);
-
-                if (AddPanelScrollViewer != null)
-                {
-                    AddPanelScrollViewer.VerticalScrollMode = ScrollMode.Enabled;
-                }
-            }
-            else
-            {
-                AgendaListControl.SetValue(ScrollViewer.VerticalScrollModeProperty, ScrollMode.Disabled);
-
-                if (AddPanelScrollViewer != null)
-                {
-                    AddPanelScrollViewer.VerticalScrollMode = ScrollMode.Disabled;
-                }
-            }
-
-            FlyoutHeight = new GridLength(Math.Ceiling(targetLogicalHeight));
+            // Measure natural content, then give the agenda/editor the remaining
+            // bounded row. The footer is always outside both scrolling regions.
+            ContentRow.Height = GridLength.Auto;
+            RootGrid.Measure(new Windows.Foundation.Size(logicalWidth, double.PositiveInfinity));
+            double desiredHeight = RootGrid.DesiredSize.Height;
+            ContentRow.Height = new GridLength(1, GridUnitType.Star);
+            AgendaListControl.SetValue(ScrollViewer.VerticalScrollModeProperty, ScrollMode.Enabled);
+            AddPanelScrollViewer.VerticalScrollMode = ScrollMode.Enabled;
+            FlyoutHeight = new GridLength(Math.Ceiling(Math.Min(desiredHeight, availableHeight)));
         }
 
         private void HideFlyout(bool autoHide)
@@ -1456,6 +1463,7 @@ namespace Task_Flyout
         public void ShowNewItem()
         {
             if (_isShuttingDown || _mainWindowDismissal != null) return;
+            DateExpander.IsExpanded = false;
             SetupFlyoutProviderComboBox();
             TimePickerStart.Time = new TimeSpan(DateTime.Now.Hour, (DateTime.Now.Minute / 5) * 5, 0);
             TimePickerEnd.Time = TimePickerStart.Time.Add(TimeSpan.FromHours(1));
@@ -1916,6 +1924,7 @@ namespace Task_Flyout
 
         private void BtnToggleAddPanel_Click(object sender, RoutedEventArgs e)
         {
+            if (!SaveNewItemButton.IsEnabled) return;
             if (AddPanel.Visibility == Visibility.Visible)
             {
                 AddPanel.Visibility = Visibility.Collapsed;
@@ -1923,6 +1932,7 @@ namespace Task_Flyout
             }
             else
             {
+                DateExpander.IsExpanded = false;
                 SetupFlyoutProviderComboBox();
 
                 TimePickerStart.Time = new TimeSpan(DateTime.Now.Hour, (DateTime.Now.Minute / 5) * 5, 0);
@@ -1930,6 +1940,7 @@ namespace Task_Flyout
 
                 AddPanel.Visibility = Visibility.Visible;
                 if (AgendaContainer != null) AgendaContainer.Visibility = Visibility.Collapsed;
+                DispatcherQueue.TryEnqueue(() => TxtNewTitle.Focus(FocusState.Programmatic));
             }
             AdjustWindowHeight();
         }

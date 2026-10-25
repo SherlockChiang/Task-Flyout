@@ -2100,4 +2100,9 @@ Widgets suppression: ready {8}; snapshot {9}; notification pending {10}</value><
   <data name="Today_RssHint" xml:space="preserve"><value>Unread articles across all cached subscriptions</value></data>
   <data name="Today_ReadFailed" xml:space="preserve"><value>Local data could not be read.</value></data>
   <data name="Today_RetryHint" xml:space="preserve"><value>Retry this card, or open its page to check the account and sync status.</value></data>
+  <data name="Flyout_DatePicker.Header" xml:space="preserve"><value>Choose date</value></data>
+  <data name="Flyout_OpenCalendar.Content" xml:space="preserve"><value>Full calendar</value></data>
+  <data name="Flyout_OpenTasks.Content" xml:space="preserve"><value>All tasks</value></data>
+  <data name="Flyout_QuickCreate.Content" xml:space="preserve"><value>Add</value></data>
+  <data name="Flyout_TodayUpcoming" xml:space="preserve"><value>Today and next up</value></data>
 </root>

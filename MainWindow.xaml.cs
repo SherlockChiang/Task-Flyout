@@ -1019,7 +1019,7 @@ namespace Task_Flyout
             App.ToggleWeatherBar(!enabled);
         }
 
-        private void NavigateToCalendar()
+        internal void NavigateToCalendar()
         {
             MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Calendar");
             ContentFrame.Navigate(typeof(Views.CalendarPage));

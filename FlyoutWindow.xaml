@@ -33,7 +33,8 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Padding="0,16,0,0">
+        <ScrollViewer x:Name="HeaderScrollViewer" Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Grid Padding="0,16,0,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -49,7 +50,7 @@
                 <Button x:Uid="Flyout_BtnGoToToday" Grid.Column="0" Background="Transparent" BorderThickness="0"
                         HorizontalAlignment="Left" Padding="0" Click="BtnGoToToday_Click">
                     <StackPanel>
-                        <TextBlock x:Name="TxtRealTimeClock" Text="10:30" FontSize="32" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                        <TextBlock x:Name="TxtRealTimeClock" Text="10:30" FontSize="26" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
                         <TextBlock x:Name="TxtRealTimeDate" Text="2023-10-24" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
                 </Button>
@@ -87,7 +88,12 @@
                 </ItemsControl.ItemsPanel>
             </ItemsControl>
 
-            <Grid x:Name="CalendarHost" Grid.Row="2" HorizontalAlignment="Stretch" Margin="16,0,16,12" Height="354">
+            <Expander x:Name="DateExpander" x:Uid="Flyout_DatePicker" Grid.Row="2"
+                      Header="Choose date" IsExpanded="False" HorizontalAlignment="Stretch"
+                      HorizontalContentAlignment="Stretch" Margin="16,0,16,12"
+                      AutomationProperties.AutomationId="FlyoutDatePicker"
+                      Expanding="DateExpander_Changed" Collapsed="DateExpander_Changed">
+            <Grid x:Name="CalendarHost" HorizontalAlignment="Stretch" Height="354">
                 <CalendarView x:Name="MainCalendar" 
                               HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                               CalendarItemCornerRadius="0"
@@ -124,8 +130,10 @@
                 </CalendarView>
 
             </Grid>
+            </Expander>
 
         </Grid>
+        </ScrollViewer>
 
         <Grid x:Name="AgendaContainer" Grid.Row="1" Margin="16,0,16,0" MinHeight="80">
             <Grid.RowDefinitions>
@@ -218,12 +226,28 @@
             </Border>
         </Grid>
 
-        <Grid Grid.Row="2" Margin="16,16,16,16">
+        <Grid x:Name="FooterGrid" Grid.Row="2" Margin="16,12,16,12" RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0" ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button x:Uid="Flyout_OpenCalendar" Content="Full calendar" HorizontalAlignment="Stretch"
+                        AutomationProperties.AutomationId="FlyoutOpenCalendar" Click="OpenCalendar_Click"/>
+                <Button x:Uid="Flyout_OpenTasks" Grid.Column="1" Content="All tasks" HorizontalAlignment="Stretch"
+                        AutomationProperties.AutomationId="FlyoutOpenTasks" Click="OpenTasks_Click"/>
+            </Grid>
+            <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Button x:Uid="Flyout_BtnSettings" Grid.Column="0" Click="BtnSettings_Click" Background="Transparent" BorderThickness="0" Foreground="{ThemeResource TextFillColorPrimaryBrush}">
                 <SymbolIcon Symbol="Setting"/>
@@ -236,6 +260,10 @@
             </Button>
             <ProgressRing x:Name="SyncProgress" Grid.Column="3" Width="20" Height="20" Margin="12,0,0,0"
                           IsActive="False" Visibility="Collapsed" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+            <Button x:Uid="Flyout_QuickCreate" Grid.Column="4" Content="Add"
+                    HorizontalAlignment="Right" Style="{StaticResource AccentButtonStyle}"
+                    AutomationProperties.AutomationId="FlyoutQuickCreate" Click="BtnToggleAddPanel_Click"/>
+            </Grid>
         </Grid>
 
         <Border x:Name="AddPanel" Grid.Row="1" Background="{ThemeResource ControlFillColorDefaultBrush}"

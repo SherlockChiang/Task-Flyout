@@ -34,6 +34,7 @@
   <ItemGroup>
     <Compile Include="..\..\Services\VerificationCodeDetector.cs" Link="Source\VerificationCodeDetector.cs" />
     <Compile Include="..\..\Services\TodayDashboardPolicy.cs" Link="Source\TodayDashboardPolicy.cs" />
+    <Compile Include="..\..\Services\FlyoutOverviewPolicy.cs" Link="Source\FlyoutOverviewPolicy.cs" />
     <Compile Include="..\..\Services\SafeUriLauncher.cs" Link="Source\SafeUriLauncher.cs" />
     <Compile Include="..\..\Services\NetworkSafety.cs" Link="Source\NetworkSafety.cs" />
     <Compile Include="..\..\Services\MailHtmlSanitizer.cs" Link="Source\MailHtmlSanitizer.cs" />

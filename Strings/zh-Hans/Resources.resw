@@ -2100,4 +2100,9 @@ Widgets 抑制：就绪 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="Today_RssHint" xml:space="preserve"><value>所有本地订阅中的未读文章</value></data>
   <data name="Today_ReadFailed" xml:space="preserve"><value>无法读取本地数据。</value></data>
   <data name="Today_RetryHint" xml:space="preserve"><value>重试此卡片，或打开对应页面检查账户与同步状态。</value></data>
+  <data name="Flyout_DatePicker.Header" xml:space="preserve"><value>选择日期</value></data>
+  <data name="Flyout_OpenCalendar.Content" xml:space="preserve"><value>完整日历</value></data>
+  <data name="Flyout_OpenTasks.Content" xml:space="preserve"><value>全部任务</value></data>
+  <data name="Flyout_QuickCreate.Content" xml:space="preserve"><value>新增</value></data>
+  <data name="Flyout_TodayUpcoming" xml:space="preserve"><value>今日与接下来的议程</value></data>
 </root>
