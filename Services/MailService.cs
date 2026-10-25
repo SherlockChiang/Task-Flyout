@@ -226,6 +226,48 @@ namespace Task_Flyout.Services
         public event EventHandler<NewMailNotificationEventArgs>? NewMailArrived;
         internal event EventHandler? AccountsChanged;
         internal event EventHandler<MailCachePublishedEventArgs>? CachePublished;
+        private readonly AccountSyncHealthTracker _syncHealth = new();
+        internal event EventHandler? SyncHealthChanged
+        {
+            add => _syncHealth.Changed += value;
+            remove => _syncHealth.Changed -= value;
+        }
+        internal AccountSyncHealth GetSyncHealth(string accountId) => _syncHealth.Get(accountId);
+
+        private static SyncFailureKind ClassifyMailSyncFailure(Exception exception) => exception switch
+        {
+            MailKit.Security.AuthenticationException => SyncFailureKind.Authorization,
+            Google.GoogleApiException { HttpStatusCode: HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden }
+                => SyncFailureKind.Authorization,
+            Microsoft.Kiota.Abstractions.ApiException { ResponseStatusCode: 401 or 403 } => SyncFailureKind.Authorization,
+            Microsoft.Kiota.Abstractions.ApiException { ResponseStatusCode: >= 500 } => SyncFailureKind.Network,
+            // IMAP uses IOException for broken connections as well as socket errors.
+            IOException => SyncFailureKind.Network,
+            _ => SyncFailurePolicy.Classify(exception)
+        };
+
+        internal async Task RefreshAccountAsync(string accountId, CancellationToken cancellationToken = default)
+        {
+            var account = GetAccounts().SingleOrDefault(candidate => string.Equals(candidate.Id, accountId, StringComparison.Ordinal));
+            if (account == null || !account.IsSetupComplete)
+                throw new InvalidOperationException("The selected mailbox is unavailable or needs setup.");
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(60));
+            await _syncHealth.RunAsync(account.Id, async () =>
+            {
+                var folders = await FetchFoldersCoreAsync(account, timeout.Token);
+                var inbox = folders.FirstOrDefault(folder => IsInboxName(folder.Id) || IsInboxName(folder.DisplayName));
+                if (inbox != null)
+                {
+                    var page = await FetchMessagesFromProviderAsync(account, inbox, false,
+                        Math.Clamp(PageSize, MinPageSize, MaxPageSize), null, timeout.Token);
+                    if (!GetAccounts().Any(candidate => ReferenceEquals(candidate, account)))
+                        throw new OperationCanceledException("The mailbox was removed during refresh.");
+                    CommitMessagePage(account, inbox, false, GetMessageCacheKey(account.Id, inbox.Id, false), page, append: false);
+                }
+                return true;
+            }, cancellationToken, ClassifyMailSyncFailure);
+        }
 
         private sealed class CacheEntry<T>
         {
@@ -394,6 +436,7 @@ namespace Task_Flyout.Services
             if (account.UsesOutlookImapOAuth)
                 await GetOutlookImapAuthorization(account).ClearLocalAuthorizationAsync();
             _accounts.Remove(account);
+            _syncHealth.Remove(account.Id);
             if (account.Kind == MailAccountKind.Imap)
                 RemoveImapPassword(account.Id);
 
@@ -781,6 +824,15 @@ namespace Task_Flyout.Services
             if (!forceRefresh && TryGetCachedFolders(cacheKey, out var cachedFolders))
                 return cachedFolders;
 
+            if (!account.IsSetupComplete)
+                return await FetchFoldersCoreAsync(account, cancellationToken);
+            return await _syncHealth.RunAsync(account.Id,
+                () => FetchFoldersCoreAsync(account, cancellationToken), cancellationToken, ClassifyMailSyncFailure);
+        }
+
+        private async Task<List<MailFolder>> FetchFoldersCoreAsync(MailAccount account, CancellationToken cancellationToken)
+        {
+            string cacheKey = account.Id;
             List<MailFolder> folders;
             if (account.Kind == MailAccountKind.Google && account.IsSetupComplete)
             {
@@ -805,10 +857,9 @@ namespace Task_Flyout.Services
             }
             else
             {
-                await EnsureOutlookMailReadAuthorizedAsync(cancellationToken);
-                if (_outlookClient == null) return new List<MailFolder>();
+                var outlookClient = await GetOutlookSyncClientAsync(account, cancellationToken);
 
-                var response = await _outlookClient.Me.MailFolders.GetAsync(request =>
+                var response = await outlookClient.Me.MailFolders.GetAsync(request =>
                 {
                     request.QueryParameters.Top = 50;
                     request.QueryParameters.Select = new[] { "id", "displayName", "unreadItemCount" };
@@ -1480,24 +1531,29 @@ namespace Task_Flyout.Services
                     return new MailMessageWindow { Items = existingItems, HasMore = false };
             }
 
-            MailProviderPage page;
-            try
+            return await _syncHealth.RunAsync(account.Id, async () =>
             {
-                page = await FetchMessagesFromProviderAsync(
-                    account,
-                    folder,
-                    unreadOnly,
-                    requestedPageSize,
-                    cursor,
-                    cancellationToken);
-            }
-            catch when (loadMore && !cancellationToken.IsCancellationRequested)
-            {
-                InvalidateMessageCursor(cacheKey);
-                throw;
-            }
+                if (!account.IsSetupComplete || folder.IsPlaceholder)
+                    throw new AuthorizationInteractionRequiredException(account.ProviderName, "Mailbox setup is required.");
+                MailProviderPage page;
+                try
+                {
+                    page = await FetchMessagesFromProviderAsync(
+                        account,
+                        folder,
+                        unreadOnly,
+                        requestedPageSize,
+                        cursor,
+                        cancellationToken);
+                }
+                catch when (loadMore && !cancellationToken.IsCancellationRequested)
+                {
+                    InvalidateMessageCursor(cacheKey);
+                    throw;
+                }
 
-            return CommitMessagePage(account, folder, unreadOnly, cacheKey, page, append: loadMore);
+                return CommitMessagePage(account, folder, unreadOnly, cacheKey, page, append: loadMore);
+            }, cancellationToken, ClassifyMailSyncFailure);
         }
 
         public async Task SendMailAsync(
@@ -1577,14 +1633,14 @@ namespace Task_Flyout.Services
             try
             {
                 if (RemovePendingMutationKind(new PendingMailMutation
-                    {
-                        AccountId = account.Id,
-                        FolderId = item.FolderId,
-                        MessageId = item.Id,
-                        ProviderKind = account.Kind,
-                        ImapUidValidity = item.ImapUidValidity,
-                        Kind = kind
-                    }))
+                {
+                    AccountId = account.Id,
+                    FolderId = item.FolderId,
+                    MessageId = item.Id,
+                    ProviderKind = account.Kind,
+                    ImapUidValidity = item.ImapUidValidity,
+                    Kind = kind
+                }))
                     SavePersistentCache();
 
                 for (int attempt = 0; ; attempt++)
@@ -1730,6 +1786,7 @@ namespace Task_Flyout.Services
                 ClearAccountCache(account.Id);
                 RemoveKnownUnreadForAccount(account.Id);
                 _accounts.Remove(account);
+                _syncHealth.Remove(account.Id);
             }
 
             if (accounts.Count > 0)
@@ -2405,7 +2462,8 @@ namespace Task_Flyout.Services
                             continue;
                         }
 
-                        var unreadPage = await PollFetchInboxUnreadAsync(account, inbox);
+                        var unreadPage = await _syncHealth.RunAsync(account.Id,
+                            () => PollFetchInboxUnreadAsync(account, inbox), classify: ClassifyMailSyncFailure);
                         var unreadItems = MergeMessagesIntoPersistentCache(account, inbox, unreadPage);
 
                         string inboxKey = $"{account.Id}|{inbox.Id}";
@@ -2581,21 +2639,20 @@ namespace Task_Flyout.Services
             if (cursor != null && cursor.ProviderKind != MailAccountKind.Outlook)
                 throw new InvalidOperationException("Mail continuation does not match the account provider.");
 
-            await EnsureOutlookMailReadAuthorizedAsync(cancellationToken);
-            if (_outlookClient == null) return new MailProviderPage();
+            var outlookClient = await GetOutlookSyncClientAsync(account, cancellationToken);
 
             Microsoft.Graph.Models.MessageCollectionResponse? response;
             if (cursor != null)
             {
                 if (!MailPaginationPolicy.IsAllowedGraphNextLink(cursor.Value))
                     throw new InvalidOperationException("Mail continuation URL is invalid.");
-                response = await _outlookClient.Me.MailFolders[folder.Id].Messages
+                response = await outlookClient.Me.MailFolders[folder.Id].Messages
                     .WithUrl(cursor.Value)
                     .GetAsync(cancellationToken: cancellationToken);
             }
             else
             {
-                response = await _outlookClient.Me.MailFolders[folder.Id].Messages.GetAsync(request =>
+                response = await outlookClient.Me.MailFolders[folder.Id].Messages.GetAsync(request =>
                 {
                     request.QueryParameters.Top = Math.Clamp(pageSize, MinPageSize, MaxPageSize);
                     request.QueryParameters.Select = new[]
@@ -2964,8 +3021,8 @@ namespace Task_Flyout.Services
                     AccountId = account.Id,
                     Id = label.Id ?? "",
                     DisplayName = label.Name ?? label.Id ?? "",
-                    UnreadCount = label.MessagesUnread
-                    ,IsUserLabel = string.Equals(label.Type, "user", StringComparison.OrdinalIgnoreCase)
+                    UnreadCount = label.MessagesUnread,
+                    IsUserLabel = string.Equals(label.Type, "user", StringComparison.OrdinalIgnoreCase)
                 })
                 .OrderByDescending(folder => folder.Id == "INBOX")
                 .ThenBy(folder => folder.DisplayName)
@@ -3103,6 +3160,16 @@ namespace Task_Flyout.Services
                 .Where(item => item != null)
                 .Cast<MailItem>()
                 .ToList();
+        }
+
+        private async Task<GraphServiceClient> GetOutlookSyncClientAsync(MailAccount account, CancellationToken cancellationToken)
+        {
+            var client = await GetOutlookMailClientAsync(false, false, cancellationToken);
+            var identity = await client.Me.GetAsync(request =>
+                request.QueryParameters.Select = new[] { "mail", "userPrincipalName" }, cancellationToken);
+            if (!AccountSyncSelection.MatchesMailbox(account.Address, identity?.Mail, identity?.UserPrincipalName))
+                throw new AuthorizationInteractionRequiredException("Outlook", "The authorized mailbox does not match the selected account.");
+            return client;
         }
 
         private async Task EnsureOutlookMailReadAuthorizedAsync(CancellationToken cancellationToken = default)

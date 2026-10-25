@@ -21,8 +21,17 @@ using Windows.Storage.Streams;
 
 namespace Task_Flyout.Views
 {
+    internal sealed record MailAccountSetupRequest(string AccountId);
+
     public sealed partial class MailPage : Page
     {
+        private MailAccountSetupRequest? _setupRequest;
+
+        protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+            _setupRequest = e.Parameter as MailAccountSetupRequest;
+        }
         private readonly ObservableCollection<MailItem> _items = new();
         private readonly ObservableCollection<MailItem> _displayedItems = new();
         public ObservableCollection<MailAttachmentData> ComposeAttachments { get; } = new();
@@ -193,7 +202,34 @@ namespace Task_Flyout.Views
             MailListView.ItemsSource = _displayedItems;
             UpdateResponsiveLayout(LayoutRoot.ActualWidth, LayoutRoot.ActualHeight);
             _isInitializing = false;
-            await RefreshAccountsAsync(autoSelect: !IsOpeningFromNotification);
+            await RefreshAccountsAsync(autoSelect: !IsOpeningFromNotification && _setupRequest == null);
+            if (!_isPageLoaded) return;
+            if (_setupRequest is { } setup)
+            {
+                _setupRequest = null;
+                var account = _mailService?.GetAccounts().SingleOrDefault(candidate => candidate.Id == setup.AccountId);
+                if (account != null)
+                {
+                    ShowAddAccountPanel();
+                    if (account.Kind == MailAccountKind.Imap && !account.UsesOutlookImapOAuth)
+                    {
+                        ShowImapSettings();
+                        ImapDisplayNameBox.Text = account.DisplayName;
+                        ImapAddressBox.Text = account.Address;
+                        ImapUserNameBox.Text = account.ImapUserName;
+                        ImapHostBox.Text = account.ImapHost;
+                        ImapPortBox.Value = account.ImapPort;
+                        ImapSslToggle.IsOn = account.ImapUseSsl;
+                        SmtpHostBox.Text = account.SmtpHost;
+                        SmtpPortBox.Value = account.SmtpPort;
+                        SmtpSslToggle.IsOn = account.SmtpUseSsl;
+                        SmtpUserNameBox.Text = account.SmtpUserName;
+                    }
+                    else AddStatusText.Text = ShowOutlookReconnect(account);
+                    AddStatusText.Text = account.DisplayTitle + " · " + account.Subtitle + Environment.NewLine + AddStatusText.Text;
+                }
+                return;
+            }
             if (!IsOpeningFromNotification)
                 await OfferDraftRecoveryAsync();
             if (IsOpeningFromNotification && _layoutMode == ResponsiveLayoutMode.Narrow)

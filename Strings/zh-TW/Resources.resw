@@ -442,7 +442,7 @@
     <value>新增帳戶</value>
   </data>
   <data name="AddAccount_Title.Text" xml:space="preserve">
-    <value>帳戶與健康狀態</value>
+    <value>帳戶與同步</value>
   </data>
   <data name="AddAccount_Subtitle.Text" xml:space="preserve">
     <value>查看連結狀態、快取資料、待處理更改與帳戶設定</value>
@@ -2105,4 +2105,15 @@ Widgets 抑制：就緒 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="Flyout_OpenTasks.Content" xml:space="preserve"><value>全部工作</value></data>
   <data name="Flyout_QuickCreate.Content" xml:space="preserve"><value>新增</value></data>
   <data name="Flyout_TodayUpcoming" xml:space="preserve"><value>今日與接下來的議程</value></data>
+  <data name="SyncCenter_TaskChanges" xml:space="preserve"><value>待上傳：{0}；失敗的更改：{1}。請在原工作檢視重試失敗的編輯。</value></data>
+  <data name="SyncCenter_Canceled" xml:space="preserve"><value>同步已取消</value></data>
+  <data name="SyncCenter_NotSynced" xml:space="preserve"><value>本次執行尚未成功同步</value></data>
+  <data name="SyncCenter_LastAttempt" xml:space="preserve"><value>上次嘗試：{0}</value></data>
+  <data name="SyncCenter_AuthFailure" xml:space="preserve"><value>授權已失效或存取遭拒，請重新連結此帳戶。</value></data>
+  <data name="SyncCenter_NetworkFailure" xml:space="preserve"><value>無法連線至服務，請檢查網路後重試。</value></data>
+  <data name="SyncCenter_TimeoutFailure" xml:space="preserve"><value>要求已逾時，請在服務可用時重試。</value></data>
+  <data name="SyncCenter_StorageFailure" xml:space="preserve"><value>無法儲存本機資料，請檢查可用儲存空間後重試。</value></data>
+  <data name="SyncCenter_UnknownFailure" xml:space="preserve"><value>同步未能完成，請重試；若仍失敗，請重新連結帳戶。</value></data>
+  <data name="SyncCenter_RetryAccount" xml:space="preserve"><value>重試同步</value></data>
+  <data name="SyncCenter_ScopeHint" xml:space="preserve"><value>時間表示本次執行中的成功重新整理。郵件重試會重新整理資料夾與收件匣；排程中的郵件更改會自動重試。工作數量僅統計本次執行中追蹤的編輯。</value></data>
 </root>

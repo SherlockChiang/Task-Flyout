@@ -1434,7 +1434,7 @@ namespace Task_Flyout
                         var result = await app.TaskMutations.ExecuteAsync(
                             key,
                             () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId, item.AccountId),
-                            ShowTaskMutationState);
+                            ShowTaskMutationState, providerKey: item.ProviderKey);
                         if (result.Phase == TaskMutationPhase.Failed)
                         {
                             item.IsCompleted = oldValue;

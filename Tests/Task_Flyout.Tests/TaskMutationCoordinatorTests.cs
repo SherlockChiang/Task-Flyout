@@ -5,6 +5,35 @@ namespace Task_Flyout.Tests;
 public class TaskMutationCoordinatorTests
 {
     [Fact]
+    public async Task Account_counts_use_explicit_scope_and_publish_final_zero()
+    {
+        var coordinator = new TaskMutationCoordinator();
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var notifications = new List<(int Pending, int Failed)>();
+        coordinator.StateChanged += (_, _) => notifications.Add(coordinator.GetAccountCounts("google|a"));
+        var pending = coordinator.ExecuteAsync("unrelated-item-key", () => release.Task, providerKey: "google|a");
+        await coordinator.ExecuteAsync("other", () => Task.FromException(new Exception()), providerKey: "google|ab");
+
+        Assert.Equal((1, 0), coordinator.GetAccountCounts("google|a"));
+        Assert.Equal((0, 1), coordinator.GetAccountCounts("google|ab"));
+        release.SetResult();
+        await pending;
+        Assert.Equal((0, 0), notifications[^1]);
+    }
+
+    [Fact]
+    public async Task Retry_retains_account_scope_until_success()
+    {
+        var coordinator = new TaskMutationCoordinator();
+        int attempt = 0;
+        await coordinator.ExecuteAsync("item", () => ++attempt == 1 ? Task.FromException(new Exception()) : Task.CompletedTask,
+            providerKey: "google|a");
+        Assert.Equal((0, 1), coordinator.GetAccountCounts("google|a"));
+        await coordinator.RetryAsync("item");
+        Assert.Equal((0, 0), coordinator.GetAccountCounts("google|a"));
+    }
+
+    [Fact]
     public async Task Successful_operation_reports_pending_then_succeeded()
     {
         var coordinator = new TaskMutationCoordinator();

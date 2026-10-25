@@ -13,6 +13,10 @@ namespace Task_Flyout.Views
     public sealed partial class AddAccountPage : Page
     {
         private ResourceLoader _loader = new ResourceLoader();
+        private bool _isActive;
+        private bool _authorizationBusy;
+        private readonly HashSet<string> _retrying = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (StackPanel Root, TextBlock Title, TextBlock Status, Button Retry, Button Reconnect)> _healthRows = new(StringComparer.Ordinal);
 
         public AddAccountPage()
         {
@@ -29,19 +33,31 @@ namespace Task_Flyout.Views
 
         private void AddAccountPage_Loaded(object sender, RoutedEventArgs e)
         {
+            _isActive = true;
             if (GetSyncManager() is { } syncManager)
                 syncManager.ProviderHealthChanged += SyncManager_ProviderHealthChanged;
             if (App.Current is App app)
+            {
                 app.TaskMutations.StateChanged += TaskMutations_StateChanged;
+                app.MailService.SyncHealthChanged += SyncManager_ProviderHealthChanged;
+                app.MailService.AccountsChanged += SyncManager_ProviderHealthChanged;
+                app.MailService.CachePublished += MailService_CachePublished;
+            }
             UpdateChecklist();
         }
 
         private void AddAccountPage_Unloaded(object sender, RoutedEventArgs e)
         {
+            _isActive = false;
             if (GetSyncManager() is { } syncManager)
                 syncManager.ProviderHealthChanged -= SyncManager_ProviderHealthChanged;
             if (App.Current is App app)
+            {
                 app.TaskMutations.StateChanged -= TaskMutations_StateChanged;
+                app.MailService.SyncHealthChanged -= SyncManager_ProviderHealthChanged;
+                app.MailService.AccountsChanged -= SyncManager_ProviderHealthChanged;
+                app.MailService.CachePublished -= MailService_CachePublished;
+            }
         }
 
         private void AddAccountScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -54,10 +70,17 @@ namespace Task_Flyout.Views
         }
 
         private void SyncManager_ProviderHealthChanged(object? sender, EventArgs e)
-            => DispatcherQueue.TryEnqueue(UpdateChecklist);
+            => QueueHealthUpdate();
 
         private void TaskMutations_StateChanged(object? sender, EventArgs e)
-            => DispatcherQueue.TryEnqueue(UpdateChecklist);
+            => QueueHealthUpdate();
+
+        private void MailService_CachePublished(object? sender, MailCachePublishedEventArgs e) => QueueHealthUpdate();
+
+        private void QueueHealthUpdate() => DispatcherQueue.TryEnqueue(() =>
+        {
+            if (_isActive) UpdateChecklist();
+        });
 
         private void UpdateButtonStates()
         {
@@ -113,23 +136,20 @@ namespace Task_Flyout.Views
         {
             if (HealthText == null || App.Current is not App app) return;
 
-            ConnectedAccountActions.Children.Clear();
+            var currentKeys = new HashSet<string>(StringComparer.Ordinal);
             foreach (var account in mgr.Accounts.ToList())
             {
                 var health = app.SyncManager.GetProviderHealth(
                     account.ProviderName,
                     account.AccountId);
-                ConnectedAccountActions.Children.Add(CreateAccountHealthRow(
-                    account,
-                    FormatProviderHealthState(health)));
+                var counts = app.TaskMutations.GetAccountCounts(health.ProviderKey);
+                string key = "agenda:" + health.ProviderKey;
+                currentKeys.Add(key);
+                UpdateHealthRow(key, account.DisplayTitle + " · " + account.ProviderName,
+                    FormatProviderHealthState(health) + Environment.NewLine + string.Format(
+                        _loader.GetStringOrDefault("SyncCenter_TaskChanges") ?? "Pending uploads: {0}; failed changes: {1}. Retry failed edits from their original task view.", counts.Pending, counts.Failed),
+                    account.AccountId, false, health.Kind == ProviderHealthKind.Syncing);
             }
-            bool hasConnectedAccounts = ConnectedAccountActions.Children.Count > 0;
-            ConnectedAccountsTitle.Visibility = hasConnectedAccounts
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-            ConnectedAccountActions.Visibility = hasConnectedAccounts
-                ? Visibility.Visible
-                : Visibility.Collapsed;
 
             var lines = new List<string>();
             int taskPending = app.TaskMutations.PendingCount;
@@ -137,21 +157,41 @@ namespace Task_Flyout.Views
             int mailPending = app.MailService.GetPendingMutationCount();
             foreach (var account in app.MailService.GetAccounts())
             {
-                var mailState = account.IsSetupComplete
-                    ? _loader.GetStringOrDefault("AddAccount_HealthReady") ?? "Connected"
-                    : _loader.GetStringOrDefault("AddAccount_MailSetupIncomplete") ?? "Setup incomplete";
+                var health = app.MailService.GetSyncHealth(account.Id);
+                string mailState = !account.IsSetupComplete
+                    ? _loader.GetStringOrDefault("AddAccount_MailSetupIncomplete") ?? "Setup incomplete"
+                    : health.State switch
+                    {
+                        AccountSyncState.Syncing => _loader.GetStringOrDefault("AddAccount_HealthSyncing") ?? "Syncing",
+                        AccountSyncState.Failed => _loader.GetStringOrDefault("AddAccount_HealthFailed") ?? "Sync failed",
+                        AccountSyncState.Canceled => _loader.GetStringOrDefault("SyncCenter_Canceled") ?? "Sync canceled",
+                        _ => _loader.GetStringOrDefault("AddAccount_HealthReady") ?? "Connected"
+                    };
                 int accountPending = app.MailService.GetPendingMutationCount(account.Id);
-                lines.Add(string.Format(
+                string state = string.Format(
                     _loader.GetStringOrDefault("AddAccount_MailHealth") ?? "Mail {0}: {1}; pending changes {2}",
                     account.DisplayTitle,
                     mailState,
-                    accountPending));
+                    accountPending);
+                string key = "mail:" + account.Id;
+                currentKeys.Add(key);
+                UpdateHealthRow(key, account.DisplayTitle + " · " + account.ProviderName,
+                    state + Environment.NewLine + FormatSyncObservation(health.LastAttemptUtc, health.LastSuccessUtc, health.Failure),
+                    account.Id, true, !account.IsSetupComplete || health.State == AccountSyncState.Syncing);
             }
+            foreach (string key in _healthRows.Keys.Where(key => !currentKeys.Contains(key)).ToList())
+            {
+                ConnectedAccountActions.Children.Remove(_healthRows[key].Root);
+                _healthRows.Remove(key);
+            }
+            ConnectedAccountsTitle.Visibility = currentKeys.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            ConnectedAccountActions.Visibility = ConnectedAccountsTitle.Visibility;
             lines.Add(string.Format(
                 _loader.GetStringOrDefault("AddAccount_PendingChanges") ?? "Pending changes: tasks {0}, failed tasks {1}, mail {2}",
                 taskPending,
                 taskFailed,
                 mailPending));
+            lines.Add(_loader.GetStringOrDefault("SyncCenter_ScopeHint") ?? "Times describe successful refreshes in this session. Mail retry refreshes folders and Inbox; queued mail changes retry automatically. Task counts cover tracked edits in this session.");
             HealthText.Text = string.Join(Environment.NewLine, lines);
             RetrySyncButton.Visibility = mgr.Accounts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -166,77 +206,116 @@ namespace Task_Flyout.Views
                 ProviderHealthKind.Failed => _loader.GetStringOrDefault("AddAccount_HealthFailed") ?? "Sync failed",
                 _ => _loader.GetStringOrDefault("AddAccount_HealthReady") ?? "Connected"
             };
-            if (health.LastSuccessUtc.HasValue)
-            {
-                state += " · " + string.Format(
-                    _loader.GetStringOrDefault("AddAccount_LastSuccess") ?? "Last success: {0}",
-                    health.LastSuccessUtc.Value.LocalDateTime.ToString("g"));
-            }
-            else if (health.HasCachedData)
+            if (health.HasCachedData && health.Kind != ProviderHealthKind.Ready)
             {
                 state += " · " + (_loader.GetStringOrDefault("AddAccount_CacheAvailable") ?? "Cached data available");
             }
-            return state;
+            return state + Environment.NewLine + FormatSyncObservation(health.LastAttemptUtc, health.LastSuccessUtc, health.Failure);
         }
 
-        private Grid CreateAccountHealthRow(
-            ConnectedAccountInfo account,
-            string state)
+        private string FormatSyncObservation(DateTimeOffset? attempt, DateTimeOffset? success, SyncFailureKind failure)
         {
-            var grid = new Grid
-            {
-                ColumnSpacing = 12,
-                Padding = new Thickness(0, 4, 0, 4)
-            };
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            string text = success.HasValue ? string.Format(
+                _loader.GetStringOrDefault("AddAccount_LastSuccess") ?? "Last success: {0}", success.Value.LocalDateTime.ToString("g"))
+                : _loader.GetStringOrDefault("SyncCenter_NotSynced") ?? "No successful sync in this session";
+            if (attempt.HasValue) text += " · " + string.Format(
+                _loader.GetStringOrDefault("SyncCenter_LastAttempt") ?? "Last attempt: {0}", attempt.Value.LocalDateTime.ToString("g"));
+            if (failure != SyncFailureKind.None) text += Environment.NewLine + FailureText(failure);
+            return text;
+        }
 
-            var details = new StackPanel { Spacing = 2, MinWidth = 0 };
-            details.Children.Add(new TextBlock
-            {
-                Text = account.DisplayTitle,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                TextTrimming = TextTrimming.CharacterEllipsis
-            });
-            details.Children.Add(new TextBlock
-            {
-                Text = string.Equals(account.DisplayTitle, account.ProviderName, StringComparison.OrdinalIgnoreCase)
-                    ? state
-                    : $"{account.ProviderName} · {state}",
-                FontSize = 12,
-                TextWrapping = TextWrapping.WrapWholeWords,
-                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
-            });
+        private string FailureText(SyncFailureKind failure) => failure switch
+        {
+            SyncFailureKind.Authorization => _loader.GetStringOrDefault("SyncCenter_AuthFailure") ?? "Authorization expired or access was denied. Reconnect this account.",
+            SyncFailureKind.Network => _loader.GetStringOrDefault("SyncCenter_NetworkFailure") ?? "The service could not be reached. Check your connection and retry.",
+            SyncFailureKind.Timeout => _loader.GetStringOrDefault("SyncCenter_TimeoutFailure") ?? "The request timed out. Retry when the service is available.",
+            SyncFailureKind.Storage => _loader.GetStringOrDefault("SyncCenter_StorageFailure") ?? "Local data could not be saved. Check available storage and retry.",
+            _ => _loader.GetStringOrDefault("SyncCenter_UnknownFailure") ?? "Sync could not finish. Retry, or reconnect if the problem persists."
+        };
 
+        private void UpdateHealthRow(string key, string title, string state, string accountId, bool mail, bool syncing)
+        {
+            if (!_healthRows.TryGetValue(key, out var row))
+            {
+                var root = new StackPanel { Spacing = 6, Padding = new Thickness(0, 8, 0, 8) };
+                var heading = new TextBlock { FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+                var status = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap };
+                var actions = new StackPanel { Spacing = 8, Orientation = Orientation.Horizontal };
+                var retry = new Button { Content = _loader.GetStringOrDefault("SyncCenter_RetryAccount") ?? "Retry sync" };
+                retry.Click += async (_, _) => await RetryAccountAsync(key, accountId, mail);
+                var reconnect = new Button { Tag = accountId };
+                if (mail) reconnect.Click += ReconnectMailButton_Click;
+                else reconnect.Click += ReconnectAccountButton_Click;
+                actions.Children.Add(retry);
+                actions.Children.Add(reconnect);
+                root.Children.Add(heading);
+                root.Children.Add(status);
+                root.Children.Add(actions);
+                row = (root, heading, status, retry, reconnect);
+                _healthRows[key] = row;
+                ConnectedAccountActions.Children.Add(root);
+            }
+            row.Title.Text = title;
+            row.Status.Text = state;
+            row.Retry.IsEnabled = !syncing && !_retrying.Contains(key) && !_authorizationBusy;
+            row.Reconnect.IsEnabled = !_authorizationBusy && !_retrying.Contains(key);
             string reconnectLabel = _loader.GetStringOrDefault("AddAccount_ReconnectAccount") ?? "Reconnect";
-            var reconnectButton = new Button
-            {
-                Content = reconnectLabel,
-                Tag = account.AccountId,
-                Padding = new Thickness(10, 4, 10, 4),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(
-                reconnectButton,
-                $"{reconnectLabel} {account.DisplayTitle}");
-            reconnectButton.Click += ReconnectAccountButton_Click;
+            row.Reconnect.Content = reconnectLabel;
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(row.Retry, $"{row.Retry.Content} {title}");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(row.Reconnect, $"{reconnectLabel} {title}");
+        }
 
-            Grid.SetColumn(details, 0);
-            Grid.SetColumn(reconnectButton, 1);
-            grid.Children.Add(details);
-            grid.Children.Add(reconnectButton);
-            return grid;
+        private async Task RetryAccountAsync(string key, string accountId, bool mail)
+        {
+            if (App.Current is not App app || !_retrying.Add(key)) return;
+            StatusText.Text = "";
+            UpdateChecklist();
+            try
+            {
+                if (mail) await app.MailService.RefreshAccountAsync(accountId);
+                else if (GetAccountManager()?.GetAccountById(accountId) is { } account)
+                    await app.SyncManager.SyncAccountAsync(account.ProviderName, account.AccountId, DateTime.Today.AddMonths(-1), DateTime.Today.AddMonths(2));
+            }
+            catch (Exception ex)
+            {
+                if (_isActive) StatusText.Text = FailureText(SyncFailurePolicy.Classify(ex));
+            }
+            finally
+            {
+                _retrying.Remove(key);
+                if (_isActive) UpdateChecklist();
+            }
+        }
+
+        private async void ReconnectMailButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (App.Current is not App app || sender is not Button { Tag: string id }) return;
+            var account = app.MailService.GetAccounts().SingleOrDefault(candidate => candidate.Id == id);
+            if (account == null) return;
+            if (account.Kind == MailAccountKind.Google)
+            {
+                SetAuthorizationControlsEnabled(false);
+                try { await app.ReconnectGoogleAccountAsync(AccountIdentityPolicy.ResolveAccountId("Google", account.ProviderAccountId)); }
+                catch (Exception ex) { if (_isActive) StatusText.Text = FailureText(SyncFailurePolicy.Classify(ex)); }
+                finally { SetAuthorizationControlsEnabled(true); if (_isActive) UpdateChecklist(); }
+            }
+            else Frame?.Navigate(typeof(MailPage), new MailAccountSetupRequest(id));
         }
 
         private async void RetrySyncButton_Click(object sender, RoutedEventArgs e)
         {
             if (GetSyncManager() is not { } syncManager) return;
+            StatusText.Text = "";
             RetrySyncButton.IsEnabled = false;
             AuthProgress.IsActive = true;
             try
             {
                 await syncManager.GetAllDataAsync(DateTime.Today.AddMonths(-1), DateTime.Today.AddMonths(2), forceRefresh: true);
                 UpdateChecklist();
+            }
+            catch (Exception ex)
+            {
+                if (_isActive) StatusText.Text = FailureText(SyncFailurePolicy.Classify(ex));
             }
             finally
             {
@@ -603,12 +682,14 @@ namespace Task_Flyout.Views
 
         private void SetAuthorizationControlsEnabled(bool isEnabled)
         {
+            _authorizationBusy = !isEnabled;
             BtnGoogle.IsEnabled = isEnabled;
             BtnMicrosoft.IsEnabled = isEnabled;
             BtnICloud.IsEnabled = isEnabled;
             RetrySyncButton.IsEnabled = isEnabled;
             ConnectedAccountActions.IsHitTestVisible = isEnabled;
             ConnectedAccountActions.Opacity = isEnabled ? 1 : 0.65;
+            UpdateChecklist();
         }
 
         private void CompleteAccountConnection()

@@ -442,7 +442,7 @@
     <value>Add Account</value>
   </data>
   <data name="AddAccount_Title.Text" xml:space="preserve">
-    <value>Accounts and health</value>
+    <value>Accounts and sync</value>
   </data>
   <data name="AddAccount_Subtitle.Text" xml:space="preserve">
     <value>Review connection status, cached data, pending changes, and account setup</value>
@@ -2105,4 +2105,15 @@ Widgets suppression: ready {8}; snapshot {9}; notification pending {10}</value><
   <data name="Flyout_OpenTasks.Content" xml:space="preserve"><value>All tasks</value></data>
   <data name="Flyout_QuickCreate.Content" xml:space="preserve"><value>Add</value></data>
   <data name="Flyout_TodayUpcoming" xml:space="preserve"><value>Today and next up</value></data>
+  <data name="SyncCenter_TaskChanges" xml:space="preserve"><value>Pending uploads: {0}; failed changes: {1}. Retry failed edits from their original task view.</value></data>
+  <data name="SyncCenter_Canceled" xml:space="preserve"><value>Sync canceled</value></data>
+  <data name="SyncCenter_NotSynced" xml:space="preserve"><value>No successful sync in this session</value></data>
+  <data name="SyncCenter_LastAttempt" xml:space="preserve"><value>Last attempt: {0}</value></data>
+  <data name="SyncCenter_AuthFailure" xml:space="preserve"><value>Authorization expired or access was denied. Reconnect this account.</value></data>
+  <data name="SyncCenter_NetworkFailure" xml:space="preserve"><value>The service could not be reached. Check your connection and retry.</value></data>
+  <data name="SyncCenter_TimeoutFailure" xml:space="preserve"><value>The request timed out. Retry when the service is available.</value></data>
+  <data name="SyncCenter_StorageFailure" xml:space="preserve"><value>Local data could not be saved. Check available storage and retry.</value></data>
+  <data name="SyncCenter_UnknownFailure" xml:space="preserve"><value>Sync could not finish. Retry, or reconnect if the problem persists.</value></data>
+  <data name="SyncCenter_RetryAccount" xml:space="preserve"><value>Retry sync</value></data>
+  <data name="SyncCenter_ScopeHint" xml:space="preserve"><value>Times describe successful refreshes in this session. Mail retry refreshes folders and Inbox; queued mail changes retry automatically. Task counts cover tracked edits in this session.</value></data>
 </root>

@@ -214,7 +214,7 @@ namespace Task_Flyout.Views
                     var result = await app.TaskMutations.ExecuteAsync(
                         key,
                         () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId, item.AccountId),
-                        ShowMutationState);
+                        ShowMutationState, providerKey: item.ProviderKey);
                     if (result.Phase == TaskMutationPhase.Failed)
                     {
                         SetTaskCompletionInCache(item, oldValue);
@@ -438,7 +438,7 @@ namespace Task_Flyout.Views
                     var mutation = await app.TaskMutations.ExecuteAsync(
                         key,
                         () => _syncManager.DeleteItemAsync(item.Provider, item.Id, isEvent: false, taskListId: item.CalendarId, accountId: item.AccountId),
-                        ShowMutationState);
+                        ShowMutationState, providerKey: item.ProviderKey);
                     if (mutation.Phase == TaskMutationPhase.Failed)
                     {
                         SetRetry(key, async () =>
@@ -679,7 +679,7 @@ namespace Task_Flyout.Views
                         await _syncManager.UpdateItemAsync(item.Provider, item.Id, false, title, "", notesBox.Text, newDate, null, null, item.CalendarId, item.AccountId);
                         if (newCompleted != item.IsCompleted)
                             await _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newCompleted, item.CalendarId, item.AccountId);
-                    }, ShowMutationState);
+                    }, ShowMutationState, providerKey: item.ProviderKey);
                     if (mutation.Phase == TaskMutationPhase.Failed)
                     {
                         args.Cancel = true;

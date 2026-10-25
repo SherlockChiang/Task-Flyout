@@ -442,7 +442,7 @@
     <value>添加账户</value>
   </data>
   <data name="AddAccount_Title.Text" xml:space="preserve">
-    <value>账户与健康状态</value>
+    <value>账户与同步</value>
   </data>
   <data name="AddAccount_Subtitle.Text" xml:space="preserve">
     <value>查看连接状态、缓存数据、待处理更改与账户设置</value>
@@ -2105,4 +2105,15 @@ Widgets 抑制：就绪 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="Flyout_OpenTasks.Content" xml:space="preserve"><value>全部任务</value></data>
   <data name="Flyout_QuickCreate.Content" xml:space="preserve"><value>新增</value></data>
   <data name="Flyout_TodayUpcoming" xml:space="preserve"><value>今日与接下来的议程</value></data>
+  <data name="SyncCenter_TaskChanges" xml:space="preserve"><value>待上传：{0}；失败的更改：{1}。请在原任务视图重试失败的编辑。</value></data>
+  <data name="SyncCenter_Canceled" xml:space="preserve"><value>同步已取消</value></data>
+  <data name="SyncCenter_NotSynced" xml:space="preserve"><value>本次运行尚未成功同步</value></data>
+  <data name="SyncCenter_LastAttempt" xml:space="preserve"><value>上次尝试：{0}</value></data>
+  <data name="SyncCenter_AuthFailure" xml:space="preserve"><value>授权已失效或访问被拒绝，请重新连接此账户。</value></data>
+  <data name="SyncCenter_NetworkFailure" xml:space="preserve"><value>无法连接服务，请检查网络后重试。</value></data>
+  <data name="SyncCenter_TimeoutFailure" xml:space="preserve"><value>请求已超时，请在服务可用时重试。</value></data>
+  <data name="SyncCenter_StorageFailure" xml:space="preserve"><value>无法保存本地数据，请检查可用存储空间后重试。</value></data>
+  <data name="SyncCenter_UnknownFailure" xml:space="preserve"><value>同步未能完成，请重试；若仍失败，请重新连接账户。</value></data>
+  <data name="SyncCenter_RetryAccount" xml:space="preserve"><value>重试同步</value></data>
+  <data name="SyncCenter_ScopeHint" xml:space="preserve"><value>时间表示本次运行中的成功刷新。邮件重试会刷新文件夹和收件箱；排队的邮件更改会自动重试。任务数量仅统计本次运行中跟踪的编辑。</value></data>
 </root>

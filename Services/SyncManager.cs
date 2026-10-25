@@ -6,7 +6,6 @@ using System.Globalization;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Concurrent;
 using Task_Flyout.Models;
 
 namespace Task_Flyout.Services
@@ -28,6 +27,7 @@ namespace Task_Flyout.Services
         bool HasCachedData)
     {
         public string AccountId { get; init; } = "";
+        public SyncFailureKind Failure { get; init; }
         public string ProviderKey => AccountIdentityPolicy.CreateProviderKey(ProviderName, AccountId);
     }
 
@@ -49,9 +49,11 @@ namespace Task_Flyout.Services
         private PublishedCacheSnapshot _publishedCache = new(0, new AppCache());
         private int _cacheLoaded;
         private long _cacheVersion;
+        private int _cacheSaveFailed;
         private readonly ReaderWriterLockSlim _cacheLock = new(LockRecursionPolicy.NoRecursion);
         private readonly SharedRequestCoordinator<List<AgendaItem>> _dataRequests = new();
-        private readonly ConcurrentDictionary<string, ProviderHealthSnapshot> _providerHealth = new(StringComparer.OrdinalIgnoreCase);
+        private readonly SemaphoreSlim _dataRefreshGate = new(1, 1);
+        private readonly AccountSyncHealthTracker _syncHealth = new(StringComparer.OrdinalIgnoreCase);
         private readonly VersionedAsyncWriter<string> _cacheWriter = new(
             json => LocalSqliteStore.WriteProtectedTextAsync(StoreScope, CacheKey, json));
         private const string StoreScope = "calendar";
@@ -63,6 +65,8 @@ namespace Task_Flyout.Services
         public AccountManager AccountManager { get; } = new AccountManager();
         public event EventHandler? ProviderHealthChanged;
         internal event EventHandler<AgendaCachePublishedEventArgs>? CachePublished;
+
+        public SyncManager() => _syncHealth.Changed += (_, _) => ProviderHealthChanged?.Invoke(this, EventArgs.Empty);
 
         public void RegisterProvider(ISyncProvider provider)
         {
@@ -130,8 +134,7 @@ namespace Task_Flyout.Services
 
             if (removed)
             {
-                _providerHealth.TryRemove(providerKey, out _);
-                ProviderHealthChanged?.Invoke(this, EventArgs.Empty);
+                _syncHealth.Remove(providerKey);
             }
             return removed;
         }
@@ -151,16 +154,24 @@ namespace Task_Flyout.Services
         {
             string resolvedAccountId = AccountIdentityPolicy.ResolveAccountId(providerName, accountId);
             string providerKey = AccountIdentityPolicy.CreateProviderKey(providerName, resolvedAccountId);
-            if (_providerHealth.TryGetValue(providerKey, out var health)) return health;
+            var health = _syncHealth.Get(providerKey);
             bool hasCachedData = HasCachedData(providerName, resolvedAccountId);
             return new ProviderHealthSnapshot(
                 providerName,
-                hasCachedData ? ProviderHealthKind.Cached : ProviderHealthKind.Ready,
-                null,
-                null,
+                health.State switch
+                {
+                    AccountSyncState.Syncing => ProviderHealthKind.Syncing,
+                    AccountSyncState.Failed when health.Failure == SyncFailureKind.Authorization => ProviderHealthKind.ReconnectRequired,
+                    AccountSyncState.Failed => hasCachedData ? ProviderHealthKind.Cached : ProviderHealthKind.Failed,
+                    AccountSyncState.Ready => ProviderHealthKind.Ready,
+                    _ => hasCachedData ? ProviderHealthKind.Cached : ProviderHealthKind.Ready
+                },
+                health.LastAttemptUtc,
+                health.LastSuccessUtc,
                 hasCachedData)
             {
-                AccountId = resolvedAccountId
+                AccountId = resolvedAccountId,
+                Failure = health.Failure
             };
         }
 
@@ -447,13 +458,36 @@ namespace Task_Flyout.Services
             return result.Select(CloneAgendaItem).ToList();
         }
 
-        private async Task<List<AgendaItem>> GetAllDataCoreAsync(DateTime min, DateTime max, bool forceRefresh, CancellationToken cancellationToken)
+        public async Task SyncAccountAsync(string providerName, string accountId, DateTime min, DateTime max, CancellationToken cancellationToken = default)
+        {
+            var provider = GetProvider(providerName, accountId);
+            if (provider == null || !IsProviderConnected(provider))
+                throw new InvalidOperationException("The selected account is no longer connected.");
+            min = min.Date;
+            max = max.Date;
+            await _dataRequests.RunAsync(
+                $"account|{provider.ProviderKey}|{min:yyyy-MM-dd}|{max:yyyy-MM-dd}",
+                token => GetAllDataCoreAsync(min, max, true, token, provider.ProviderKey),
+                cancellationToken);
+        }
+
+        private async Task<List<AgendaItem>> GetAllDataCoreAsync(DateTime min, DateTime max, bool forceRefresh, CancellationToken cancellationToken, string? selectedProviderKey = null)
+        {
+            // Account retries and full refreshes share the cache. Finish publication
+            // before starting the next fetch so an older result cannot overwrite it.
+            await _dataRefreshGate.WaitAsync(cancellationToken);
+            try { return await RefreshDataCoreAsync(min, max, forceRefresh, cancellationToken, selectedProviderKey); }
+            finally { _dataRefreshGate.Release(); }
+        }
+
+        private async Task<List<AgendaItem>> RefreshDataCoreAsync(DateTime min, DateTime max, bool forceRefresh, CancellationToken cancellationToken, string? selectedProviderKey)
         {
             EnsureCacheLoaded();
             min = min.Date;
             max = max.Date;
 
-            var activeProviders = GetProvidersSnapshot().Where(IsProviderConnected).ToList();
+            var activeProviders = AccountSyncSelection.Select(GetProvidersSnapshot(), provider => provider.ProviderKey,
+                IsProviderConnected, selectedProviderKey);
             if (activeProviders.Count == 0)
                 return GetCachedItems(min, max);
 
@@ -468,31 +502,38 @@ namespace Task_Flyout.Services
 
             var allItems = new List<AgendaItem>();
             var successfulProviders = new List<ISyncProvider>();
+            var attempts = activeProviders.ToDictionary(provider => provider.ProviderKey, provider => _syncHealth.Begin(provider.ProviderKey));
 
             var fetchTasks = activeProviders.Select(async provider =>
             {
-                SetProviderHealth(provider, ProviderHealthKind.Syncing, DateTimeOffset.UtcNow, null);
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(TimeSpan.FromSeconds(60));
                 try
                 {
-                    await provider.EnsureAuthorizedAsync(cancellationToken);
-                    var items = await provider.FetchDataAsync(min, max, cancellationToken);
+                    await provider.EnsureAuthorizedAsync(timeout.Token);
+                    var items = await provider.FetchDataAsync(min, max, timeout.Token);
                     foreach (var item in items ?? Enumerable.Empty<AgendaItem>())
                     {
                         if (string.IsNullOrWhiteSpace(item.Provider)) item.Provider = provider.ProviderName;
                         if (string.IsNullOrWhiteSpace(item.AccountId)) item.AccountId = provider.AccountId;
                     }
-                    SetProviderHealth(provider, ProviderHealthKind.Ready, null, DateTimeOffset.UtcNow);
                     return (Provider: provider, Items: items ?? new List<AgendaItem>(), Success: true);
                 }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-                catch (AuthorizationInteractionRequiredException)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    SetProviderHealth(provider, ProviderHealthKind.ReconnectRequired, null, null);
-                    return (Provider: provider, Items: new List<AgendaItem>(), Success: false);
+                    _syncHealth.Complete(provider.ProviderKey, attempts[provider.ProviderKey], canceled: true);
+                    throw;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    SetProviderHealth(provider, HasCachedData(provider.ProviderName, provider.AccountId) ? ProviderHealthKind.Cached : ProviderHealthKind.Failed, null, null);
+                    var failure = ex switch
+                    {
+                        Google.GoogleApiException { HttpStatusCode: System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden } => SyncFailureKind.Authorization,
+                        Microsoft.Kiota.Abstractions.ApiException { ResponseStatusCode: 401 or 403 } => SyncFailureKind.Authorization,
+                        Microsoft.Kiota.Abstractions.ApiException { ResponseStatusCode: >= 500 } => SyncFailureKind.Network,
+                        _ => SyncFailurePolicy.Classify(ex)
+                    };
+                    _syncHealth.Complete(provider.ProviderKey, attempts[provider.ProviderKey], failure);
                     return (Provider: provider, Items: new List<AgendaItem>(), Success: false);
                 }
             });
@@ -504,17 +545,22 @@ namespace Task_Flyout.Services
             }
             catch
             {
+                foreach (var provider in activeProviders)
+                    if (_syncHealth.Get(provider.ProviderKey).State == AccountSyncState.Syncing)
+                        _syncHealth.Complete(provider.ProviderKey, attempts[provider.ProviderKey], canceled: true);
                 remoteSpan.Complete("failure");
                 throw;
             }
             if (cancellationToken.IsCancellationRequested)
             {
+                foreach (var provider in activeProviders)
+                    _syncHealth.Complete(provider.ProviderKey, attempts[provider.ProviderKey], canceled: true);
                 remoteSpan.Complete("failure");
                 cancellationToken.ThrowIfCancellationRequested();
             }
             foreach (var result in results)
             {
-                if (result.Success)
+                if (result.Success && IsProviderConnected(result.Provider) && GetProvidersSnapshot().Contains(result.Provider))
                 {
                     successfulProviders.Add(result.Provider);
                     allItems.AddRange(result.Items);
@@ -524,11 +570,17 @@ namespace Task_Flyout.Services
             try
             {
                 bool changed = await MergeIntoCacheAsync(min, max, allItems, successfulProviders, activeProviders);
-                if (changed)
-                    await SaveCacheAsync();
+                // Also retry persistence after a previous failed write even when
+                // the next fetch returns the same in-memory data.
+                if (changed || Volatile.Read(ref _cacheSaveFailed) != 0)
+                    await SaveCacheAsync(throwOnFailure: true);
+                foreach (var provider in successfulProviders)
+                    _syncHealth.Complete(provider.ProviderKey, attempts[provider.ProviderKey]);
             }
             catch
             {
+                foreach (var provider in successfulProviders)
+                    _syncHealth.Complete(provider.ProviderKey, attempts[provider.ProviderKey], SyncFailureKind.Storage);
                 remoteSpan.Complete("failure");
                 throw;
             }
@@ -544,25 +596,6 @@ namespace Task_Flyout.Services
             var cache = Volatile.Read(ref _publishedCache).Cache;
             return cache.CachedRanges.Any(range => AccountIdentityPolicy.Matches(range.ProviderName, range.AccountId, providerName, accountId))
                 || cache.DayItems.Values.Any(items => items.Any(item => AccountIdentityPolicy.Matches(item.Provider, item.AccountId, providerName, accountId)));
-        }
-
-        private void SetProviderHealth(ISyncProvider provider, ProviderHealthKind kind, DateTimeOffset? attempt, DateTimeOffset? success)
-        {
-            _providerHealth.AddOrUpdate(
-                provider.ProviderKey,
-                _ => new ProviderHealthSnapshot(provider.ProviderName, kind, attempt, success, HasCachedData(provider.ProviderName, provider.AccountId))
-                {
-                    AccountId = provider.AccountId
-                },
-                (_, current) => current with
-                {
-                    Kind = kind,
-                    LastAttemptUtc = attempt ?? current.LastAttemptUtc,
-                    LastSuccessUtc = success ?? current.LastSuccessUtc,
-                    HasCachedData = HasCachedData(provider.ProviderName, provider.AccountId),
-                    AccountId = provider.AccountId
-                });
-            ProviderHealthChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public async Task UpdateTaskStatusAsync(string providerName, string taskId, bool isCompleted, string taskListId = "", string? accountId = null)
@@ -760,17 +793,20 @@ namespace Task_Flyout.Services
             }
         }
 
-        private async Task SaveCacheAsync()
+        private async Task SaveCacheAsync(bool throwOnFailure = false)
         {
             try
             {
                 var published = Volatile.Read(ref _publishedCache);
                 string json = JsonSerializer.Serialize(published.Cache, AppJsonContext.Default.AppCache);
                 await _cacheWriter.WriteAsync(published.Version, json);
+                Volatile.Write(ref _cacheSaveFailed, 0);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Calendar cache save failed: {ex.Message}");
+                Volatile.Write(ref _cacheSaveFailed, 1);
+                if (throwOnFailure) throw;
             }
         }
 

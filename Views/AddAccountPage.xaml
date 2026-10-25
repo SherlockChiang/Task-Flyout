@@ -11,8 +11,8 @@
                   SizeChanged="AddAccountScrollViewer_SizeChanged">
     <Grid x:Name="AddAccountLayoutRoot" Padding="{StaticResource TaskFlyoutPagePadding}" HorizontalAlignment="Stretch">
         <StackPanel x:Name="AddAccountContent" Spacing="24">
-            <TextBlock x:Uid="AddAccount_Title" Text="添加账户" FontSize="28" FontWeight="SemiBold"/>
-            <TextBlock x:Uid="AddAccount_Subtitle" Text="选择要连接的账户类型" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="14" TextWrapping="WrapWholeWords"/>
+            <TextBlock x:Uid="AddAccount_Title" Text="Accounts and sync" FontSize="28" FontWeight="SemiBold"/>
+            <TextBlock x:Uid="AddAccount_Subtitle" Text="Review account sync and pending changes" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="14" TextWrapping="WrapWholeWords"/>
 
             <Border Padding="{StaticResource TaskFlyoutSectionPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}">
                 <StackPanel Spacing="8">

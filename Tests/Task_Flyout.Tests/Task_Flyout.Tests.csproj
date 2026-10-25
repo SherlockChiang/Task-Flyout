@@ -32,6 +32,7 @@
   <!-- Compile the pure-logic sources directly rather than referencing the WinUI app
        project, which would drag in WinUI/MSIX tooling and the app entry point. -->
   <ItemGroup>
+    <Compile Include="../../Services/AccountSyncHealth.cs" Link="Source/AccountSyncHealth.cs" />
     <Compile Include="..\..\Services\VerificationCodeDetector.cs" Link="Source\VerificationCodeDetector.cs" />
     <Compile Include="..\..\Services\TodayDashboardPolicy.cs" Link="Source\TodayDashboardPolicy.cs" />
     <Compile Include="..\..\Services\FlyoutOverviewPolicy.cs" Link="Source\FlyoutOverviewPolicy.cs" />

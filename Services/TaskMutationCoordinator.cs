@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,6 +21,7 @@ namespace Task_Flyout.Services
         private readonly object _lock = new();
         private readonly Dictionary<string, Func<Task>> _retryOperations = new(StringComparer.Ordinal);
         private readonly Dictionary<string, QueueEntry> _queues = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _accountScopes = new(StringComparer.Ordinal);
         public event EventHandler? StateChanged;
 
         public int PendingCount
@@ -40,6 +42,17 @@ namespace Task_Flyout.Services
             get { lock (_lock) return _retryOperations.Count; }
         }
 
+        public (int Pending, int Failed) GetAccountCounts(string providerKey)
+        {
+            lock (_lock)
+            {
+                var keys = _accountScopes.Where(pair => string.Equals(pair.Value, providerKey, StringComparison.OrdinalIgnoreCase))
+                    .Select(pair => pair.Key).ToHashSet(StringComparer.Ordinal);
+                return (_queues.Where(pair => keys.Contains(pair.Key)).Sum(pair => pair.Value.Users),
+                    _retryOperations.Keys.Count(keys.Contains));
+            }
+        }
+
         private sealed class QueueEntry
         {
             public SemaphoreSlim Gate { get; } = new(1, 1);
@@ -49,12 +62,13 @@ namespace Task_Flyout.Services
         public async Task<TaskMutationState> ExecuteAsync(
             string key,
             Func<Task> operation,
-            Action<TaskMutationState>? stateChanged = null)
+            Action<TaskMutationState>? stateChanged = null,
+            string? providerKey = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(key);
             ArgumentNullException.ThrowIfNull(operation);
 
-            return await EnqueueAsync(key, operation, stateChanged, forceQueued: false);
+            return await EnqueueAsync(key, operation, stateChanged, forceQueued: false, providerKey);
         }
 
         public async Task<TaskMutationState?> RetryAsync(string key, Action<TaskMutationState>? stateChanged = null)
@@ -69,12 +83,14 @@ namespace Task_Flyout.Services
             string key,
             Func<Task> operation,
             Action<TaskMutationState>? stateChanged,
-            bool forceQueued)
+            bool forceQueued,
+            string? providerKey = null)
         {
             QueueEntry entry;
             bool wasQueued;
             lock (_lock)
             {
+                if (!string.IsNullOrWhiteSpace(providerKey)) _accountScopes[key] = providerKey;
                 if (!_queues.TryGetValue(key, out entry!))
                 {
                     entry = new QueueEntry();
@@ -114,8 +130,10 @@ namespace Task_Flyout.Services
                     {
                         _queues.Remove(key);
                         entry.Gate.Dispose();
+                        if (!_retryOperations.ContainsKey(key)) _accountScopes.Remove(key);
                     }
                 }
+                StateChanged?.Invoke(this, EventArgs.Empty);
             }
         }
 
