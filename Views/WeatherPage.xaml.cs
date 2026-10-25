@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Navigation;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,6 +26,8 @@ namespace Task_Flyout.Views
         private CancellationTokenSource? _citySearchCts;
         private int _citySearchGeneration;
         private bool _isUpdatingTaskbarMode;
+        private WeatherPageSection _section;
+        internal WeatherPageSection SelectedSection => _section;
 
         private readonly string[] _commonFonts = new[]
         {
@@ -40,6 +43,37 @@ namespace Task_Flyout.Views
             _loader = new ResourceLoader();
             this.Loaded += WeatherPage_Loaded;
             this.Unloaded += WeatherPage_Unloaded;
+        }
+
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+            _section = e.Parameter is WeatherPageSection section && Enum.IsDefined(section)
+                ? section : WeatherPageSection.Overview;
+            bool overview = _section == WeatherPageSection.Overview;
+            WeatherOverview.Visibility = overview ? Visibility.Visible : Visibility.Collapsed;
+            WeatherPreferences.Visibility = _section == WeatherPageSection.Preferences ? Visibility.Visible : Visibility.Collapsed;
+            WeatherAdvanced.Visibility = _section == WeatherPageSection.Advanced ? Visibility.Visible : Visibility.Collapsed;
+            OpenPreferencesButton.Visibility = overview ? Visibility.Visible : Visibility.Collapsed;
+            BackToSettingsButton.Visibility = overview ? Visibility.Collapsed : Visibility.Visible;
+            PageTitle.Text = GetSafeString(_section switch
+            {
+                WeatherPageSection.Preferences => "SettingsCategory_Weather",
+                WeatherPageSection.Advanced => "SettingsPage_OpenWeatherAdvanced.Content",
+                _ => "WeatherPage_Title.Text"
+            }, "Weather");
+        }
+
+        private void OpenPreferences_Click(object sender, RoutedEventArgs e)
+            => App.MyMainWindow?.NavigateToWeatherSettings(WeatherPageSection.Preferences);
+
+        private void BackToSettings_Click(object sender, RoutedEventArgs e)
+        {
+            if (Frame.BackStack.LastOrDefault()?.SourcePageType == typeof(SettingsPage))
+                Frame.GoBack();
+            else
+                App.MyMainWindow?.NavigateToSettings(_section == WeatherPageSection.Advanced
+                    ? SettingsCategory.Advanced : SettingsCategory.Weather);
         }
 
         private string GetSafeString(string key, string fallbackText)
@@ -202,6 +236,7 @@ namespace Task_Flyout.Views
         private async void WeatherPage_Loaded(object sender, RoutedEventArgs e)
         {
             if ((App.Current as App)?.WeatherService is not WeatherService weatherService) return;
+            _isInitializing = true;
             _weatherService = weatherService;
 
             WeatherToggle.IsOn = _weatherService.IsEnabled;
@@ -229,7 +264,7 @@ namespace Task_Flyout.Views
             else SourceComboBox.SelectedIndex = 0;
             UpdateSourceHint();
 
-            RefreshIconSourceComboBox();
+            if (_section == WeatherPageSection.Advanced) RefreshIconSourceComboBox();
 
             DailyForecastTitle.Text = GetSafeString("WeatherPage_DailyForecastTitle", "7-day forecast");
 
@@ -254,6 +289,13 @@ namespace Task_Flyout.Views
             BuildAlertTypeToggles();
 
             _isInitializing = false;
+            // Opening settings does not request location access or refresh the forecast.
+            // Explicit location, refresh and preference actions keep their existing handlers.
+            if (_section != WeatherPageSection.Overview) return;
+            // Preserve the existing legacy-font repair when viewing the forecast,
+            // while keeping settings initialization free of preference writes.
+            if (_weatherService.IconFontFamily == "Segoe Fluent Icons, Segoe MDL2 Assets")
+                _weatherService.IconFontFamily = "Segoe UI Symbol";
 
             if (autoFollowRequested && !_weatherService.IsLocationTrackingActive)
             {
@@ -642,10 +684,6 @@ namespace Task_Flyout.Views
         private void RefreshIconSourceComboBox()
         {
             if (IconFontComboBox == null) return;
-            // Migrate the old "Fluent Icons" classical preset which never rendered (no matching glyphs).
-            if (_weatherService != null && _weatherService.IconFontFamily == "Segoe Fluent Icons, Segoe MDL2 Assets")
-                _weatherService.IconFontFamily = "Segoe UI Symbol";
-
             IconFontComboBox.SelectionChanged -= IconFontComboBox_SelectionChanged;
             IconFontComboBox.Items.Clear();
 
@@ -1304,7 +1342,7 @@ namespace Task_Flyout.Views
             string key = val <= 50 ? "WeatherPage_AQIGood" : val <= 100 ? "WeatherPage_AQIModerate" : val <= 150 ? "WeatherPage_AQIUnhealthySensitive" : val <= 200 ? "WeatherPage_AQIUnhealthy" : "WeatherPage_AQIHazardous";
             string defaultVal = val <= 50 ? "Good" : val <= 100 ? "Moderate" : val <= 150 ? "Unhealthy for sensitive groups" : val <= 200 ? "Unhealthy" : "Hazardous";
             var level = loader.GetStringOrDefault(key, defaultVal);
-            
+
             return $"{aqi} ({level})";
         }
 

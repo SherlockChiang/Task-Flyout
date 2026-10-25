@@ -21,7 +21,7 @@ namespace Task_Flyout.Services
         public const double CalendarAgendaMinimumWidth = 820;
         public const double CalendarAgendaMinimumHeight = 560;
         public const double TasksWideMinimumWidth = 860;
-        public const double SettingsMasonryMinimumWidth = 900;
+        public const double SettingsNavigationMinimumWidth = 900;
         public const double ThreePaneMinimumWidth = 1120;
         public const double RssTwoPaneMinimumWidth = 720;
 
@@ -46,8 +46,8 @@ namespace Task_Flyout.Services
                || width < CalendarAgendaMinimumWidth
                || height < CalendarAgendaMinimumHeight;
 
-        public static bool ShouldUseSettingsMasonry(double width)
-            => double.IsFinite(width) && width >= SettingsMasonryMinimumWidth;
+        public static bool ShouldShowSettingsNavigationRail(double width)
+            => double.IsFinite(width) && width >= SettingsNavigationMinimumWidth;
 
         private static ResponsiveLayoutMode GetMode(double width, double wideMinimumWidth)
             => width >= wideMinimumWidth

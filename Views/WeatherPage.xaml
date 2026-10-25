@@ -6,97 +6,29 @@
     xmlns:models="using:Task_Flyout.Services"
     Background="{ThemeResource TaskFlyoutPageBackgroundBrush}">
 
+    <Page.Resources>
+        <DataTemplate x:Key="WrappingSettingsTextTemplate">
+            <TextBlock Text="{Binding}" TextWrapping="WrapWholeWords"/>
+        </DataTemplate>
+        <Style x:Key="WeatherSettingsButtonStyle" TargetType="Button">
+            <Setter Property="ContentTemplate" Value="{StaticResource WrappingSettingsTextTemplate}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+    </Page.Resources>
+
     <ScrollViewer x:Name="WeatherScrollViewer" Padding="{StaticResource TaskFlyoutPagePadding}" HorizontalContentAlignment="Stretch" SizeChanged="WeatherScrollViewer_SizeChanged">
         <StackPanel Spacing="28" HorizontalAlignment="Stretch">
-            <TextBlock x:Uid="WeatherPage_Title" Style="{StaticResource TitleTextBlockStyle}"/>
+            <Button x:Name="BackToSettingsButton" x:Uid="SettingsPage_Back" Content="返回设置" Visibility="Collapsed" Click="BackToSettings_Click"/>
+            <TextBlock x:Name="PageTitle" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap"/>
+            <Button x:Name="OpenPreferencesButton" x:Uid="SettingsPage_OpenWeather" Content="打开天气与任务栏设置" Click="OpenPreferences_Click" Style="{StaticResource WeatherSettingsButtonStyle}"/>
             <TextBlock x:Name="WeatherStatusText" FontSize="13" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+            <StackPanel x:Name="WeatherOverview" Spacing="28">
 
-            <!-- Current Weather Summary Card (top) -->
-            <Border x:Name="CurrentWeatherCard" Visibility="Collapsed"
-                    Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
-                    BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}">
-                <Grid x:Name="CurrentWeatherGrid" RowSpacing="12">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel x:Name="CurrentWeatherSummary" Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4" Margin="0,0,28,0" MinWidth="90">
-                        <Grid Width="72" Height="72" HorizontalAlignment="Center">
-                            <TextBlock x:Name="CurrentIcon" FontSize="48" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            <Image x:Name="CurrentIconImage0" Visibility="Collapsed" Stretch="Uniform"/>
-                            <Image x:Name="CurrentIconImage1" Visibility="Collapsed" Stretch="Uniform"/>
-                            <Image x:Name="CurrentIconImage2" Visibility="Collapsed" Stretch="Uniform"/>
-                            <Image x:Name="CurrentIconImage3" Visibility="Collapsed" Stretch="Uniform"/>
-                        </Grid>
-                        <TextBlock x:Name="CurrentTemp" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    </StackPanel>
-
-                    <StackPanel x:Name="CurrentWeatherDetails" Grid.Column="1" VerticalAlignment="Center" Spacing="6">
-                        <TextBlock x:Name="CurrentDesc" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                        <TextBlock x:Name="CurrentCity" FontSize="13" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                        <StackPanel x:Name="CurrentDetailsPanel" Orientation="Horizontal" Spacing="16" Margin="0,4,0,0"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <!-- 24-Hour Forecast -->
-            <StackPanel x:Name="ForecastPanel" Spacing="12" Visibility="Collapsed">
-                <TextBlock x:Uid="WeatherPage_24Hour" FontWeight="SemiBold" FontSize="16"/>
-                <Border Background="{ThemeResource TaskFlyoutSectionBackgroundBrush}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" Padding="12">
-                    <ListView x:Name="HourlyListView" SelectionMode="Single" SelectionChanged="HourlyListView_SelectionChanged"
-                              ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                              ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                        <ListView.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="2"/>
-                            </ItemsPanelTemplate>
-                        </ListView.ItemsPanel>
-                        <ListView.ItemContainerStyle>
-                            <Style TargetType="ListViewItem">
-                                <Setter Property="Padding" Value="2"/>
-                                <Setter Property="MinWidth" Value="0"/>
-                                <Setter Property="MinHeight" Value="0"/>
-                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                            </Style>
-                        </ListView.ItemContainerStyle>
-                        <ListView.ItemTemplate>
-                            <DataTemplate x:DataType="models:HourlyWeather">
-                                <StackPanel Width="64" Spacing="8" HorizontalAlignment="Center" Margin="2,6">
-                                    <TextBlock Text="{x:Bind Time}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                    <Grid Width="32" Height="32" HorizontalAlignment="Center">
-                                        <TextBlock Text="{x:Bind Icon}" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                   FontFamily="{x:Bind IconFont}"
-                                                   Visibility="{x:Bind local:WeatherXamlHelpers.UriToCollapsed(IconLayer0Uri)}"/>
-                                        <Image Stretch="Uniform"
-                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer0Uri)}"
-                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer0Uri)}"/>
-                                        <Image Stretch="Uniform"
-                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer1Uri)}"
-                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer1Uri)}"/>
-                                        <Image Stretch="Uniform"
-                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer2Uri)}"
-                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer2Uri)}"/>
-                                        <Image Stretch="Uniform"
-                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer3Uri)}"
-                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer3Uri)}"/>
-                                    </Grid>
-                                    <TextBlock Text="{x:Bind Temperature}" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="13"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
-                </Border>
-
-                <!-- Detail Panel for selected hour -->
-                <Border x:Name="HourDetailPanel" Visibility="Collapsed"
+                <!-- Current Weather Summary Card (top) -->
+                <Border x:Name="CurrentWeatherCard" Visibility="Collapsed"
                         Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
                         BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}">
-                    <Grid x:Name="HourDetailGrid" RowSpacing="12">
+                    <Grid x:Name="CurrentWeatherGrid" RowSpacing="12">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -106,99 +38,286 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel x:Name="HourDetailSummary" Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Center" Spacing="4" Margin="0,0,24,0" MinWidth="80">
-                            <Grid Width="64" Height="64" HorizontalAlignment="Center">
-                                <TextBlock x:Name="DetailIcon" FontSize="44" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                <Image x:Name="DetailIconImage0" Visibility="Collapsed" Stretch="Uniform"/>
-                                <Image x:Name="DetailIconImage1" Visibility="Collapsed" Stretch="Uniform"/>
-                                <Image x:Name="DetailIconImage2" Visibility="Collapsed" Stretch="Uniform"/>
-                                <Image x:Name="DetailIconImage3" Visibility="Collapsed" Stretch="Uniform"/>
+                        <StackPanel x:Name="CurrentWeatherSummary" Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4" Margin="0,0,28,0" MinWidth="90">
+                            <Grid Width="72" Height="72" HorizontalAlignment="Center">
+                                <TextBlock x:Name="CurrentIcon" FontSize="48" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <Image x:Name="CurrentIconImage0" Visibility="Collapsed" Stretch="Uniform"/>
+                                <Image x:Name="CurrentIconImage1" Visibility="Collapsed" Stretch="Uniform"/>
+                                <Image x:Name="CurrentIconImage2" Visibility="Collapsed" Stretch="Uniform"/>
+                                <Image x:Name="CurrentIconImage3" Visibility="Collapsed" Stretch="Uniform"/>
                             </Grid>
-                            <TextBlock x:Name="DetailTemp" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center"/>
-                            <TextBlock x:Name="DetailTime" FontSize="13" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                            <TextBlock x:Name="DetailDesc" FontSize="13" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="CurrentTemp" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
                         </StackPanel>
 
-                        <ItemsRepeater x:Name="DetailFieldsRepeater" Grid.Column="1">
-                            <ItemsRepeater.Layout>
-                                <UniformGridLayout MinItemWidth="170" MinColumnSpacing="12" MinRowSpacing="6"/>
-                            </ItemsRepeater.Layout>
-                        </ItemsRepeater>
+                        <StackPanel x:Name="CurrentWeatherDetails" Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+                            <TextBlock x:Name="CurrentDesc" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="CurrentCity" FontSize="13" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <StackPanel x:Name="CurrentDetailsPanel" Orientation="Horizontal" Spacing="16" Margin="0,4,0,0"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
+
+                <!-- 24-Hour Forecast -->
+                <StackPanel x:Name="ForecastPanel" Spacing="12" Visibility="Collapsed">
+                    <TextBlock x:Uid="WeatherPage_24Hour" FontWeight="SemiBold" FontSize="16"/>
+                    <Border Background="{ThemeResource TaskFlyoutSectionBackgroundBrush}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" Padding="12">
+                        <ListView x:Name="HourlyListView" SelectionMode="Single" SelectionChanged="HourlyListView_SelectionChanged"
+                                  ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                            <ListView.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="2"/>
+                                </ItemsPanelTemplate>
+                            </ListView.ItemsPanel>
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="Padding" Value="2"/>
+                                    <Setter Property="MinWidth" Value="0"/>
+                                    <Setter Property="MinHeight" Value="0"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="models:HourlyWeather">
+                                    <StackPanel Width="64" Spacing="8" HorizontalAlignment="Center" Margin="2,6">
+                                        <TextBlock Text="{x:Bind Time}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                        <Grid Width="32" Height="32" HorizontalAlignment="Center">
+                                            <TextBlock Text="{x:Bind Icon}" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       FontFamily="{x:Bind IconFont}"
+                                                       Visibility="{x:Bind local:WeatherXamlHelpers.UriToCollapsed(IconLayer0Uri)}"/>
+                                            <Image Stretch="Uniform"
+                                                   Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer0Uri)}"
+                                                   Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer0Uri)}"/>
+                                            <Image Stretch="Uniform"
+                                                   Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer1Uri)}"
+                                                   Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer1Uri)}"/>
+                                            <Image Stretch="Uniform"
+                                                   Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer2Uri)}"
+                                                   Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer2Uri)}"/>
+                                            <Image Stretch="Uniform"
+                                                   Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer3Uri)}"
+                                                   Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer3Uri)}"/>
+                                        </Grid>
+                                        <TextBlock Text="{x:Bind Temperature}" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="13"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Border>
+
+                    <!-- Detail Panel for selected hour -->
+                    <Border x:Name="HourDetailPanel" Visibility="Collapsed"
+                            Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
+                            BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}">
+                        <Grid x:Name="HourDetailGrid" RowSpacing="12">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel x:Name="HourDetailSummary" Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Center" Spacing="4" Margin="0,0,24,0" MinWidth="80">
+                                <Grid Width="64" Height="64" HorizontalAlignment="Center">
+                                    <TextBlock x:Name="DetailIcon" FontSize="44" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <Image x:Name="DetailIconImage0" Visibility="Collapsed" Stretch="Uniform"/>
+                                    <Image x:Name="DetailIconImage1" Visibility="Collapsed" Stretch="Uniform"/>
+                                    <Image x:Name="DetailIconImage2" Visibility="Collapsed" Stretch="Uniform"/>
+                                    <Image x:Name="DetailIconImage3" Visibility="Collapsed" Stretch="Uniform"/>
+                                </Grid>
+                                <TextBlock x:Name="DetailTemp" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="DetailTime" FontSize="13" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                <TextBlock x:Name="DetailDesc" FontSize="13" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap"/>
+                            </StackPanel>
+
+                            <ItemsRepeater x:Name="DetailFieldsRepeater" Grid.Column="1">
+                                <ItemsRepeater.Layout>
+                                    <UniformGridLayout MinItemWidth="170" MinColumnSpacing="12" MinRowSpacing="6"/>
+                                </ItemsRepeater.Layout>
+                            </ItemsRepeater>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- Daily Forecast -->
+                <StackPanel x:Name="DailyForecastPanel" Spacing="12" Visibility="Collapsed">
+                    <TextBlock x:Name="DailyForecastTitle" FontWeight="SemiBold" FontSize="16"/>
+                    <Border Background="{ThemeResource TaskFlyoutSectionBackgroundBrush}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" Padding="12">
+                        <ListView x:Name="DailyForecastListView" SelectionMode="None"
+                                  ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                            <ListView.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="4"/>
+                                </ItemsPanelTemplate>
+                            </ListView.ItemsPanel>
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="Padding" Value="2"/>
+                                    <Setter Property="MinWidth" Value="0"/>
+                                    <Setter Property="MinHeight" Value="0"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="models:DailyWeather">
+                                    <StackPanel Width="124" Spacing="8" Margin="4,8" HorizontalAlignment="Center">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{x:Bind DayLabel}" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="{x:Bind DateLabel}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                        </StackPanel>
+                                        <Grid Width="40" Height="40" HorizontalAlignment="Center">
+                                            <TextBlock Text="{x:Bind Icon}" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       FontFamily="{x:Bind IconFont}"
+                                                       Visibility="{x:Bind local:WeatherXamlHelpers.UriToCollapsed(IconLayer0Uri)}"/>
+                                            <Image Stretch="Uniform"
+                                                   Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer0Uri)}"
+                                                   Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer0Uri)}"/>
+                                            <Image Stretch="Uniform"
+                                                   Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer1Uri)}"
+                                                   Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer1Uri)}"/>
+                                            <Image Stretch="Uniform"
+                                                   Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer2Uri)}"
+                                                   Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer2Uri)}"/>
+                                            <Image Stretch="Uniform"
+                                                   Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer3Uri)}"
+                                                   Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer3Uri)}"/>
+                                        </Grid>
+                                        <TextBlock Text="{x:Bind TemperatureRange}" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="13"/>
+                                         <TextBlock Text="{x:Bind Description}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="WrapWholeWords" FontSize="12"
+                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxLines="2" TextTrimming="CharacterEllipsis"/>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{x:Bind PrecipProbability}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                                            <TextBlock Text="{x:Bind WindSpeed}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Border>
+                </StackPanel>
+
+                <ProgressRing x:Name="LoadingRing" IsActive="False" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+
             </StackPanel>
 
-            <!-- Daily Forecast -->
-            <StackPanel x:Name="DailyForecastPanel" Spacing="12" Visibility="Collapsed">
-                <TextBlock x:Name="DailyForecastTitle" FontWeight="SemiBold" FontSize="16"/>
-                <Border Background="{ThemeResource TaskFlyoutSectionBackgroundBrush}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" Padding="12">
-                    <ListView x:Name="DailyForecastListView" SelectionMode="None"
-                              ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                              ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                        <ListView.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="4"/>
-                            </ItemsPanelTemplate>
-                        </ListView.ItemsPanel>
-                        <ListView.ItemContainerStyle>
-                            <Style TargetType="ListViewItem">
-                                <Setter Property="Padding" Value="2"/>
-                                <Setter Property="MinWidth" Value="0"/>
-                                <Setter Property="MinHeight" Value="0"/>
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                            </Style>
-                        </ListView.ItemContainerStyle>
-                        <ListView.ItemTemplate>
-                            <DataTemplate x:DataType="models:DailyWeather">
-                                <StackPanel Width="124" Spacing="8" Margin="4,8" HorizontalAlignment="Center">
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Text="{x:Bind DayLabel}" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="13"/>
-                                        <TextBlock Text="{x:Bind DateLabel}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                    </StackPanel>
-                                    <Grid Width="40" Height="40" HorizontalAlignment="Center">
-                                        <TextBlock Text="{x:Bind Icon}" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                   FontFamily="{x:Bind IconFont}"
-                                                   Visibility="{x:Bind local:WeatherXamlHelpers.UriToCollapsed(IconLayer0Uri)}"/>
-                                        <Image Stretch="Uniform"
-                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer0Uri)}"
-                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer0Uri)}"/>
-                                        <Image Stretch="Uniform"
-                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer1Uri)}"
-                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer1Uri)}"/>
-                                        <Image Stretch="Uniform"
-                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer2Uri)}"
-                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer2Uri)}"/>
-                                        <Image Stretch="Uniform"
-                                               Source="{x:Bind local:WeatherXamlHelpers.UriToImageSource(IconLayer3Uri)}"
-                                               Visibility="{x:Bind local:WeatherXamlHelpers.UriToVisible(IconLayer3Uri)}"/>
-                                    </Grid>
-                                    <TextBlock Text="{x:Bind TemperatureRange}" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="13"/>
-                                     <TextBlock Text="{x:Bind Description}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="WrapWholeWords" FontSize="12"
-                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxLines="2" TextTrimming="CharacterEllipsis"/>
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Text="{x:Bind PrecipProbability}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
-                                        <TextBlock Text="{x:Bind WindSpeed}" HorizontalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
-                                    </StackPanel>
+            <StackPanel x:Name="WeatherPreferences" Spacing="28" Visibility="Collapsed">
+                <!-- Common weather preferences -->
+                <StackPanel Spacing="16" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}">
+
+                    <ToggleSwitch x:Uid="WeatherPage_Toggle" x:Name="WeatherToggle" Toggled="WeatherToggle_Toggled"/>
+
+                    <Border Height="1" Background="{ThemeResource TaskFlyoutDividerBrush}" Margin="0,4"/>
+
+                    <StackPanel Spacing="4">
+                        <ToggleSwitch x:Uid="WeatherPage_BarTitle" x:Name="WeatherBarToggle" Header="Taskbar Weather Bar" OnContent="On" OffContent="Off" Toggled="WeatherBarToggle_Toggled"/>
+                        <TextBlock x:Name="WeatherBarDesc" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <Border Height="1" Background="{ThemeResource TaskFlyoutDividerBrush}" Margin="0,4"/>
+
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Uid="WeatherPage_CityHeader" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <StackPanel x:Name="SavedLocationsPanel" Spacing="6" MaxWidth="840" HorizontalAlignment="Stretch"/>
+                        <TextBlock x:Name="SavedLocationsFeedback" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                        <Grid x:Name="LocationInputGrid" ColumnSpacing="8" RowSpacing="8" HorizontalAlignment="Stretch" MaxWidth="840">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <AutoSuggestBox Grid.Column="0" Grid.ColumnSpan="3" x:Uid="WeatherPage_CitySearchBox" x:Name="CitySearchBox"
+                                             TextChanged="CitySearchBox_TextChanged" QuerySubmitted="CitySearchBox_QuerySubmitted"
+                                             SuggestionChosen="CitySearchBox_SuggestionChosen" VerticalAlignment="Center"/>
+
+                            <Button x:Uid="WeatherPage_UseCurrentLocationButton" x:Name="UseCurrentLocationButton" Grid.Row="1" Grid.Column="0" Click="UseCurrentLocationButton_Click"
+                                     VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE81D;" FontSize="14"/>
+                                    <TextBlock x:Uid="WeatherPage_BtnUseLocation" Text="当前位置"/>
                                 </StackPanel>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
-                </Border>
+                            </Button>
+
+                            <Button x:Uid="WeatherPage_BtnRefresh" x:Name="BtnRefresh" Grid.Row="1" Grid.Column="1" Click="BtnRefresh_Click" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <TextBlock x:Uid="WeatherPage_LocationPrivacyDesc" Text="使用当前位置或自动跟随定位会调用 Windows 位置权限；坐标仅保存在本机，并只用于向所选天气源请求天气。" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <TextBlock x:Name="LocationStatusText" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+
+                        <ToggleSwitch x:Uid="WeatherPage_AutoFollowLocation" x:Name="AutoFollowLocationToggle"
+                                      Header="自动跟随定位" OnContent="On" OffContent="Off"
+                                      Toggled="AutoFollowLocationToggle_Toggled"/>
+                    </StackPanel>
+
+                    <Border Height="1" Background="{ThemeResource TaskFlyoutDividerBrush}" Margin="0,4"/>
+
+                    <!-- Weather Source -->
+                    <StackPanel Spacing="8">
+                        <ComboBox x:Name="SourceComboBox" x:Uid="WeatherPage_SourceHeader" MaxWidth="560" HorizontalAlignment="Stretch" SelectionChanged="SourceComboBox_SelectionChanged">
+                            <ComboBoxItem Content="Open-Meteo" Tag="OpenMeteo"/>
+                            <ComboBoxItem Content="wttr.in" Tag="WttrIn"/>
+                        </ComboBox>
+                        <TextBlock x:Name="SourceHintText" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" MaxWidth="900"/>
+                    </StackPanel>
+
+                </StackPanel>
+
+                <!-- Flyout Display Fields Card -->
+                <StackPanel Spacing="12" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}">
+                    <TextBlock x:Name="FlyoutFieldsHeader" FontWeight="SemiBold" FontSize="16"/>
+                    <TextBlock x:Name="FlyoutFieldsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                    <ItemsRepeater x:Name="FieldToggleRepeater">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="220" MinColumnSpacing="16" MinRowSpacing="4"/>
+                        </ItemsRepeater.Layout>
+                    </ItemsRepeater>
+                </StackPanel>
+
+                <!-- Taskbar Weather Bar Fields Card -->
+                <StackPanel Spacing="12" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}">
+                    <TextBlock x:Name="BarFieldsHeader" FontWeight="SemiBold" FontSize="16"/>
+                    <TextBlock x:Name="BarFieldsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                    <ItemsRepeater x:Name="BarFieldToggleRepeater">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="220" MinColumnSpacing="16" MinRowSpacing="4"/>
+                        </ItemsRepeater.Layout>
+                    </ItemsRepeater>
+                </StackPanel>
+
+                <!-- Taskbar Weather Bar Alerts Card -->
+                <StackPanel Spacing="12" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}">
+                    <TextBlock x:Name="AlertsHeader" FontWeight="SemiBold" FontSize="16"/>
+                    <TextBlock x:Name="AlertsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                    <ToggleSwitch x:Name="AlertsToggle" Toggled="AlertsToggle_Toggled"/>
+                    <StackPanel x:Name="AlertHoursPanel" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <TextBlock x:Name="AlertHoursLabel" VerticalAlignment="Center" FontSize="13"/>
+                        <NumberBox x:Name="AlertHoursBox" Minimum="1" Maximum="24" SpinButtonPlacementMode="Inline" Width="120" ValueChanged="AlertHoursBox_ValueChanged"/>
+                    </StackPanel>
+                    <ItemsRepeater x:Name="AlertTypeRepeater">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="220" MinColumnSpacing="16" MinRowSpacing="4"/>
+                        </ItemsRepeater.Layout>
+                    </ItemsRepeater>
+            </StackPanel>
             </StackPanel>
 
-            <ProgressRing x:Name="LoadingRing" IsActive="False" HorizontalAlignment="Left" Margin="0,12,0,0"/>
-
-            <!-- Settings Card (moved to bottom) -->
-            <StackPanel Spacing="16" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}">
-
-                <ToggleSwitch x:Uid="WeatherPage_Toggle" x:Name="WeatherToggle" Toggled="WeatherToggle_Toggled"/>
-
-                <Border Height="1" Background="{ThemeResource TaskFlyoutDividerBrush}" Margin="0,4"/>
-
-                <StackPanel Spacing="4">
-                    <ToggleSwitch x:Uid="WeatherPage_BarTitle" x:Name="WeatherBarToggle" Header="Taskbar Weather Bar" OnContent="On" OffContent="Off" Toggled="WeatherBarToggle_Toggled"/>
-                    <TextBlock x:Name="WeatherBarDesc" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap"/>
+            <StackPanel x:Name="WeatherAdvanced" Spacing="16" Visibility="Collapsed"
+                        Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}"
+                        CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}"
+                        BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}">
+                <TextBlock x:Uid="SettingsPage_WeatherAdvancedDescription" Text="自定义天气图标，以及 Windows Widgets 和实验性任务栏模式。" TextWrapping="Wrap"/>
+                <StackPanel Spacing="8">
                     <ToggleSwitch x:Uid="WeatherPage_StandaloneTaskbar" x:Name="StandaloneTaskbarToggle"
+                                  HeaderTemplate="{StaticResource WrappingSettingsTextTemplate}" HorizontalAlignment="Stretch"
                                   Header="Experimental: pure-XAML Task Flyout weather button"
                                   OnContent="On" OffContent="Off"
                                   Toggled="StandaloneTaskbarToggle_Toggled"/>
@@ -206,6 +325,7 @@
                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                TextWrapping="Wrap"/>
                     <ToggleSwitch x:Uid="WeatherPage_NativeWidgets" x:Name="NativeWidgetsToggle"
+                                  HeaderTemplate="{StaticResource WrappingSettingsTextTemplate}" HorizontalAlignment="Stretch"
                                   Header="Use the Windows native Widgets weather entry"
                                   OnContent="On" OffContent="Off"
                                   Toggled="NativeWidgetsToggle_Toggled"/>
@@ -213,76 +333,24 @@
                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                TextWrapping="Wrap"/>
                     <Button x:Uid="WeatherPage_OpenWidgetsBoard" x:Name="OpenWidgetsBoardButton"
+                            Style="{StaticResource WeatherSettingsButtonStyle}"
                             Content="Open Widgets (then Settings > Notifications)"
                             HorizontalAlignment="Left"
                             Visibility="Collapsed"
                             Click="OpenWidgetsBoardButton_Click"/>
                     <Button x:Uid="WeatherPage_OpenWidgetsSettings" x:Name="OpenWidgetsSettingsButton"
+                            Style="{StaticResource WeatherSettingsButtonStyle}"
                             Content="Open Windows taskbar settings"
                             HorizontalAlignment="Left"
                             Click="OpenWidgetsSettingsButton_Click"/>
                     <Button x:Uid="WeatherPage_OpenWidgetsStore" x:Name="OpenWidgetsStoreButton"
+                            Style="{StaticResource WeatherSettingsButtonStyle}"
                             Content="Install or repair Windows Web Experience Pack"
                             HorizontalAlignment="Left"
                             Visibility="Collapsed"
                             Click="OpenWidgetsStoreButton_Click"/>
                 </StackPanel>
-
                 <Border Height="1" Background="{ThemeResource TaskFlyoutDividerBrush}" Margin="0,4"/>
-
-                <StackPanel Spacing="8">
-                    <TextBlock x:Uid="WeatherPage_CityHeader" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                    <StackPanel x:Name="SavedLocationsPanel" Spacing="6" MaxWidth="840" HorizontalAlignment="Stretch"/>
-                    <TextBlock x:Name="SavedLocationsFeedback" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
-                    <Grid x:Name="LocationInputGrid" ColumnSpacing="8" RowSpacing="8" HorizontalAlignment="Stretch" MaxWidth="840">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <AutoSuggestBox Grid.Column="0" Grid.ColumnSpan="3" x:Uid="WeatherPage_CitySearchBox" x:Name="CitySearchBox"
-                                         TextChanged="CitySearchBox_TextChanged" QuerySubmitted="CitySearchBox_QuerySubmitted"
-                                         SuggestionChosen="CitySearchBox_SuggestionChosen" VerticalAlignment="Center"/>
-
-                        <Button x:Uid="WeatherPage_UseCurrentLocationButton" x:Name="UseCurrentLocationButton" Grid.Row="1" Grid.Column="0" Click="UseCurrentLocationButton_Click"
-                                 VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <FontIcon Glyph="&#xE81D;" FontSize="14"/>
-                                <TextBlock x:Uid="WeatherPage_BtnUseLocation" Text="当前位置"/>
-                            </StackPanel>
-                        </Button>
-
-                        <Button x:Uid="WeatherPage_BtnRefresh" x:Name="BtnRefresh" Grid.Row="1" Grid.Column="1" Click="BtnRefresh_Click" VerticalAlignment="Center"/>
-                    </Grid>
-
-                    <TextBlock x:Uid="WeatherPage_LocationPrivacyDesc" Text="使用当前位置或自动跟随定位会调用 Windows 位置权限；坐标仅保存在本机，并只用于向所选天气源请求天气。" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-
-                    <TextBlock x:Name="LocationStatusText" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed"
-                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
-
-                    <ToggleSwitch x:Uid="WeatherPage_AutoFollowLocation" x:Name="AutoFollowLocationToggle"
-                                  Header="自动跟随定位" OnContent="On" OffContent="Off"
-                                  Toggled="AutoFollowLocationToggle_Toggled"/>
-                </StackPanel>
-
-                <Border Height="1" Background="{ThemeResource TaskFlyoutDividerBrush}" Margin="0,4"/>
-
-                <!-- Weather Source -->
-                <StackPanel Spacing="8">
-                    <ComboBox x:Name="SourceComboBox" x:Uid="WeatherPage_SourceHeader" MaxWidth="560" HorizontalAlignment="Stretch" SelectionChanged="SourceComboBox_SelectionChanged">
-                        <ComboBoxItem Content="Open-Meteo" Tag="OpenMeteo"/>
-                        <ComboBoxItem Content="wttr.in" Tag="WttrIn"/>
-                    </ComboBox>
-                    <TextBlock x:Name="SourceHintText" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" MaxWidth="900"/>
-                </StackPanel>
-
-                <Border Height="1" Background="{ThemeResource TaskFlyoutDividerBrush}" Margin="0,4"/>
-
                 <!-- Weather Icon (emoji / custom font / imported icon pack) -->
                 <StackPanel Spacing="8">
                     <ComboBox x:Uid="WeatherPage_IconFontHeader" x:Name="IconFontComboBox" MaxWidth="560" HorizontalAlignment="Stretch" SelectionChanged="IconFontComboBox_SelectionChanged"/>
@@ -302,44 +370,6 @@
                     <TextBlock x:Name="IconPackStatusText" FontSize="12" TextWrapping="WrapWholeWords"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                 </StackPanel>
-            </StackPanel>
-
-            <!-- Flyout Display Fields Card -->
-            <StackPanel Spacing="12" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}">
-                <TextBlock x:Name="FlyoutFieldsHeader" FontWeight="SemiBold" FontSize="16"/>
-                <TextBlock x:Name="FlyoutFieldsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                <ItemsRepeater x:Name="FieldToggleRepeater">
-                    <ItemsRepeater.Layout>
-                        <UniformGridLayout MinItemWidth="220" MinColumnSpacing="16" MinRowSpacing="4"/>
-                    </ItemsRepeater.Layout>
-                </ItemsRepeater>
-            </StackPanel>
-
-            <!-- Taskbar Weather Bar Fields Card -->
-            <StackPanel Spacing="12" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}">
-                <TextBlock x:Name="BarFieldsHeader" FontWeight="SemiBold" FontSize="16"/>
-                <TextBlock x:Name="BarFieldsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                <ItemsRepeater x:Name="BarFieldToggleRepeater">
-                    <ItemsRepeater.Layout>
-                        <UniformGridLayout MinItemWidth="220" MinColumnSpacing="16" MinRowSpacing="4"/>
-                    </ItemsRepeater.Layout>
-                </ItemsRepeater>
-            </StackPanel>
-
-            <!-- Taskbar Weather Bar Alerts Card -->
-            <StackPanel Spacing="12" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" Padding="{StaticResource TaskFlyoutPanelPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}">
-                <TextBlock x:Name="AlertsHeader" FontWeight="SemiBold" FontSize="16"/>
-                <TextBlock x:Name="AlertsDesc" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                <ToggleSwitch x:Name="AlertsToggle" Toggled="AlertsToggle_Toggled"/>
-                <StackPanel x:Name="AlertHoursPanel" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                    <TextBlock x:Name="AlertHoursLabel" VerticalAlignment="Center" FontSize="13"/>
-                    <NumberBox x:Name="AlertHoursBox" Minimum="1" Maximum="24" SpinButtonPlacementMode="Inline" Width="120" ValueChanged="AlertHoursBox_ValueChanged"/>
-                </StackPanel>
-                <ItemsRepeater x:Name="AlertTypeRepeater">
-                    <ItemsRepeater.Layout>
-                        <UniformGridLayout MinItemWidth="220" MinColumnSpacing="16" MinRowSpacing="4"/>
-                    </ItemsRepeater.Layout>
-                </ItemsRepeater>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

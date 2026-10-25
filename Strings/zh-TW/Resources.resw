@@ -2190,4 +2190,23 @@ Widgets 抑制：就緒 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="Compact_Completed" xml:space="preserve"><value>已完成</value></data>
   <data name="Compact_Pending" xml:space="preserve"><value>待完成</value></data>
   <data name="Compact_Unavailable" xml:space="preserve"><value>此項目已不在目前清單中。請返回清單選擇其他項目。</value></data>
+  <data name="SettingsCategory_Appearance" xml:space="preserve"><value>外觀</value></data>
+  <data name="SettingsCategory_Accounts" xml:space="preserve"><value>帳戶與同步</value></data>
+  <data name="SettingsCategory_Notifications" xml:space="preserve"><value>通知</value></data>
+  <data name="SettingsCategory_Mail" xml:space="preserve"><value>郵件</value></data>
+  <data name="SettingsCategory_Weather" xml:space="preserve"><value>天氣與工作列</value></data>
+  <data name="SettingsCategory_Privacy" xml:space="preserve"><value>隱私與資料</value></data>
+  <data name="SettingsCategory_Advanced" xml:space="preserve"><value>進階診斷</value></data>
+  <data name="SettingsPage_CategorySelector.Header" xml:space="preserve"><value>設定分類</value></data>
+  <data name="SettingsPage_CategoryList.AutomationProperties.Name" xml:space="preserve"><value>設定分類</value></data>
+  <data name="SettingsPage_PrivacyHeading.Text" xml:space="preserve"><value>內容隱私與本機資料</value></data>
+  <data name="SettingsPage_AccountsDescription.Text" xml:space="preserve"><value>管理已連線帳戶、授權狀態與各帳戶的同步結果。</value></data>
+  <data name="SettingsPage_OpenAccounts.Content" xml:space="preserve"><value>開啟帳戶與同步中心</value></data>
+  <data name="SettingsPage_BackgroundHeading.Text" xml:space="preserve"><value>啟動與背景同步</value></data>
+  <data name="SettingsPage_WeatherDescription.Text" xml:space="preserve"><value>設定城市、天氣來源、浮動視窗與工作列顯示內容及天氣警報。</value></data>
+  <data name="SettingsPage_OpenWeather.Content" xml:space="preserve"><value>開啟天氣與工作列設定</value></data>
+  <data name="SettingsPage_AdvancedDescription.Text" xml:space="preserve"><value>效能選項、天氣圖示套件與 Windows Widgets 整合。</value></data>
+  <data name="SettingsPage_OpenWeatherAdvanced.Content" xml:space="preserve"><value>天氣圖示與工作列進階選項</value></data>
+  <data name="SettingsPage_Back.Content" xml:space="preserve"><value>返回設定</value></data>
+  <data name="SettingsPage_WeatherAdvancedDescription.Text" xml:space="preserve"><value>自訂天氣圖示，以及 Windows Widgets 與實驗性工作列模式。</value></data>
 </root>

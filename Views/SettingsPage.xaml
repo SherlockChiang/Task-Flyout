@@ -8,6 +8,10 @@
         <DataTemplate x:Key="WrappingToggleHeaderTemplate">
             <TextBlock Text="{Binding}" TextWrapping="WrapWholeWords"/>
         </DataTemplate>
+        <Style x:Key="SettingsNavigationButtonStyle" TargetType="Button">
+            <Setter Property="ContentTemplate" Value="{StaticResource WrappingToggleHeaderTemplate}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
         <Style x:Key="WrappingToggleSwitchStyle" TargetType="ToggleSwitch">
             <Setter Property="HeaderTemplate" Value="{StaticResource WrappingToggleHeaderTemplate}"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -21,137 +25,165 @@
         </Style>
     </Page.Resources>
 
-    <ScrollViewer x:Name="SettingsScrollViewer"
-                  Padding="{StaticResource TaskFlyoutPagePadding}"
-                  HorizontalContentAlignment="Stretch"
-                  SizeChanged="SettingsScrollViewer_SizeChanged">
-        <StackPanel x:Name="SettingsContent" Spacing="28" HorizontalAlignment="Stretch">
-            <TextBlock x:Uid="SettingsPage_Title" Text="设置" Style="{StaticResource TitleTextBlockStyle}"/>
+    <Grid x:Name="SettingsRoot" Padding="{StaticResource TaskFlyoutPagePadding}" RowSpacing="20" SizeChanged="SettingsRoot_SizeChanged">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <TextBlock x:Uid="SettingsPage_Title" Text="设置" Style="{StaticResource TitleTextBlockStyle}"/>
+        <ComboBox x:Name="CategorySelector" x:Uid="SettingsPage_CategorySelector" Grid.Row="1"
+                  Header="设置分类" HorizontalAlignment="Stretch"
+                  SelectionChanged="CategorySelector_SelectionChanged"/>
+        <Grid x:Name="CategoryGrid" Grid.Row="2" ColumnSpacing="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <ListView x:Name="CategoryList" x:Uid="SettingsPage_CategoryList" Width="220"
+                      Visibility="Collapsed" SelectionMode="Single" IsMultiSelectCheckBoxEnabled="False"
+                      SelectionChanged="CategorySelector_SelectionChanged">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" TextWrapping="WrapWholeWords" Margin="0,6"/>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+            <ScrollViewer x:Name="SettingsScrollViewer" Grid.Column="1" HorizontalContentAlignment="Stretch" IsEnabled="False">
+                <StackPanel x:Name="SettingsContent" Spacing="20" MaxWidth="900" HorizontalAlignment="Stretch">
+                    <TextBlock x:Name="CategoryTitle" FontSize="20" FontWeight="SemiBold" TextWrapping="WrapWholeWords"
+                               AutomationProperties.HeadingLevel="Level2"/>
+                    <StackPanel x:Name="AppearanceSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
+                        <TextBlock x:Uid="SettingsPage_Appearance" Text="外观与语言" FontWeight="SemiBold" FontSize="16"/>
 
-            <Grid>
-                <StackPanel x:Name="SettingsSingleColumn" Spacing="28">
-            <StackPanel x:Name="AppearanceSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
-                <TextBlock x:Uid="SettingsPage_Appearance" Text="外观与语言" FontWeight="SemiBold" FontSize="16"/>
+                        <ComboBox x:Uid="SettingsPage_ThemeMode" x:Name="ThemeComboBox" Header="应用主题" SelectedIndex="0" MinWidth="200" MaxWidth="320" HorizontalAlignment="Left" SelectionChanged="ThemeComboBox_SelectionChanged">
+                            <ComboBoxItem x:Uid="Theme_System" Content="跟随系统"/>
+                            <ComboBoxItem x:Uid="Theme_Light" Content="浅色"/>
+                            <ComboBoxItem x:Uid="Theme_Dark" Content="深色"/>
+                        </ComboBox>
 
-                <ComboBox x:Uid="SettingsPage_ThemeMode" x:Name="ThemeComboBox" Header="应用主题" SelectedIndex="0" MinWidth="200" MaxWidth="320" HorizontalAlignment="Left" SelectionChanged="ThemeComboBox_SelectionChanged">
-                    <ComboBoxItem x:Uid="Theme_System" Content="跟随系统"/>
-                    <ComboBoxItem x:Uid="Theme_Light" Content="浅色"/>
-                    <ComboBoxItem x:Uid="Theme_Dark" Content="深色"/>
-                </ComboBox>
-
-                <ComboBox x:Uid="SettingsPage_Language" x:Name="LanguageComboBox" Header="界面语言" SelectedIndex="0" MinWidth="200" MaxWidth="320" HorizontalAlignment="Left" SelectionChanged="LanguageComboBox_SelectionChanged">
-                    <ComboBoxItem x:Uid="Lang_System" Content="跟随系统"/>
-                    <ComboBoxItem x:Uid="Lang_ChineseSimplified" Content="简体中文" Tag="zh-Hans"/>
-                    <ComboBoxItem x:Uid="Lang_ChineseTraditional" Content="繁體中文" Tag="zh-TW"/>
-                    <ComboBoxItem x:Uid="Lang_English" Content="English" Tag="en-US"/>
-                </ComboBox>
-            </StackPanel>
-
-            <!-- Color Palette Section -->
-            <StackPanel x:Name="ColorPaletteSettingsSection" Spacing="12" Style="{StaticResource SettingsSectionStyle}">
-                <TextBlock x:Uid="SettingsPage_ColorPalette" Text="莫奈调色盘" FontWeight="SemiBold" FontSize="16"/>
-                <TextBlock x:Uid="SettingsPage_ColorPaletteDesc" Text="为每个日历和任务列表指定代表色，颜色将同步应用到侧栏与日历视图。" FontSize="13" Opacity="0.7" TextWrapping="Wrap"/>
-                <StackPanel x:Name="ColorPalettePanel" Spacing="8"/>
-            </StackPanel>
-
-            <!-- Clock Display Section -->
-            <StackPanel x:Name="ClockSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
-                <TextBlock x:Uid="SettingsPage_Clock" Text="时钟显示" FontWeight="SemiBold" FontSize="16"/>
-                <ToggleSwitch x:Uid="SettingsPage_ShowSeconds" x:Name="ShowSecondsToggle" Header="在浮窗时钟中显示秒" IsOn="False" Toggled="ShowSecondsToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
-            </StackPanel>
-
-            <!-- Notification Section -->
-            <StackPanel x:Name="NotificationSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
-                <TextBlock x:Uid="SettingsPage_Notification" Text="通知提醒" FontWeight="SemiBold" FontSize="16"/>
-                 <ToggleSwitch x:Uid="SettingsPage_NotifyToggle" x:Name="NotifyToggle" Header="日程开始前弹出通知" IsOn="True" Toggled="NotifyToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
-                   <ToggleSwitch x:Uid="SettingsPage_HideNotificationContent" x:Name="HideNotificationContentToggle" Header="在系统通知中隐藏邮件与日程内容" IsOn="True" Toggled="HideNotificationContentToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
-                 <TextBlock x:Uid="SettingsPage_NotifyDesc" Text="日程提醒只影响日历/任务开始前的提醒通知；天气警报在天气页单独设置。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                
-                <ComboBox x:Uid="SettingsPage_NotifyTime" x:Name="NotifyTimeComboBox" Header="提前提醒时间" Width="200" SelectionChanged="NotifyTimeComboBox_SelectionChanged" />
-                <ComboBox x:Uid="Notification_SnoozeSetting" x:Name="NotificationSnoozeComboBox" Header="稍后提醒时长" Width="200" SelectionChanged="NotificationPreferences_Changed"/>
-                <ToggleSwitch x:Uid="Notification_QuietSetting" x:Name="NotificationQuietToggle" Header="启用静默时段" Toggled="NotificationPreferences_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
-                <TimePicker x:Uid="Notification_QuietStart" x:Name="NotificationQuietStart" Header="开始时间" TimeChanged="NotificationQuietTime_Changed"/>
-                <TimePicker x:Uid="Notification_QuietEnd" x:Name="NotificationQuietEnd" Header="结束时间" TimeChanged="NotificationQuietTime_Changed"/>
-                <TextBlock x:Uid="Notification_QuietDescription" Text="静默时段内，邮件、日程和稍后提醒只进入通知中心，不显示横幅或播放声音。起止时间相同表示全天静默；天气警报仍单独设置。" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                <ToggleSwitch x:Uid="Notification_PrioritySetting" x:Name="NotificationPriorityToggle" Header="仅提醒重要任务和邮件" Toggled="NotificationPreferences_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
-                <TextBlock x:Uid="Notification_PriorityDescription" Text="仅提醒 Microsoft To Do 中标为重要的任务，以及已加旗标或提供高重要性标记的邮件。Google 任务没有重要性标记，将被过滤；日历事件和主动设置的稍后提醒仍保留。" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-            </StackPanel>
-
-            <StackPanel x:Name="MailSyncSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
-                <TextBlock x:Uid="SettingsPage_MailSync" Text="邮件同步" FontWeight="SemiBold" FontSize="16"/>
-                <ToggleSwitch x:Uid="SettingsPage_MailPolling" x:Name="MailPollingToggle" Header="定时抓取新邮件并显示 Windows 通知" IsOn="True" Toggled="MailPollingToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
-                <TextBlock x:Uid="SettingsPage_MailPollingDesc" Text="新邮件通知只影响邮件轮询；不会改变日程提醒或天气警报设置。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                <ComboBox x:Uid="SettingsPage_MailInterval" x:Name="MailPollingIntervalComboBox" Header="新邮件检查间隔" Width="200" SelectionChanged="MailPollingIntervalComboBox_SelectionChanged" />
-                 <ToggleSwitch x:Uid="SettingsPage_AutoMarkMailAsRead" x:Name="AutoMarkMailAsReadToggle" Header="打开邮件时自动标记为已读" IsOn="True" Toggled="AutoMarkMailAsReadToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
-                 <TextBlock x:Uid="SettingsPage_AutoMarkMailAsReadDesc" Text="此设置仅控制打开单封邮件时的自动标记；手动的已读、未读和旗标命令仍会写入邮箱。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                 <ToggleSwitch x:Uid="SettingsPage_BlockRemoteImages" x:Name="BlockRemoteImagesToggle" Header="默认阻止未信任发件人的远程图片（防追踪像素）" IsOn="True" Toggled="BlockRemoteImagesToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
-                 <ToggleSwitch x:Uid="SettingsPage_RssRemote" x:Name="AllowRssRemoteResourcesToggle" Header="允许 RSS 文章加载远程图片资源" IsOn="False" Toggled="AllowRssRemoteResourcesToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
-                 <StackPanel Spacing="6">
-                     <Button x:Uid="SettingsPage_ClearCache" x:Name="ClearWebViewCacheButton" Content="清理 WebView2 缓存" Click="ClearWebViewCacheButton_Click"/>
-                      <TextBlock x:Name="WebViewCacheStatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
-                 </StackPanel>
-                 <Button x:Uid="SettingsPage_ClearRssData" x:Name="ClearRssDataButton" Content="清除 RSS 本地数据" Click="ClearRssDataButton_Click"/>
-                 <StackPanel Spacing="6">
-                     <Button x:Uid="SettingsPage_ClearWeatherData" x:Name="ClearWeatherDataButton" Content="清除天气和位置数据" Click="ClearWeatherDataButton_Click"/>
-                      <TextBlock x:Name="WeatherDataStatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                 VerticalAlignment="Center" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
-                 </StackPanel>
-                 <InfoBar x:Uid="SettingsPage_CacheWarning"
-                         x:Name="WebViewCacheWarningBar"
-                         IsOpen="False"
-                         IsClosable="False"
-                         Severity="Warning"
-                         Title="WebView2 缓存接近上限"
-                         Message="建议立即清理以避免下次启动时自动 prune 增加 I/O 开销。"/>
-            </StackPanel>
-
-            <StackPanel x:Name="SystemSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
-                <TextBlock x:Uid="SettingsPage_System" Text="系统与常规" FontWeight="SemiBold" FontSize="16"/>
-                
-                <ComboBox x:Uid="SettingsPage_SyncInterval" x:Name="SyncIntervalComboBox" Header="自动同步间隔" Width="200" SelectionChanged="SyncIntervalComboBox_SelectionChanged" />
-                
-                <ToggleSwitch x:Uid="SettingsPage_Startup" x:Name="StartupToggle" Header="开机时自动启动" IsOn="False" Toggled="StartupToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
-                <ToggleSwitch x:Uid="SettingsPage_Background" x:Name="BackgroundToggle" Header="关闭主窗口时最小化到托盘 (后台运行)" IsOn="True" Toggled="BackgroundToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
-                <TextBlock x:Uid="SettingsPage_BackgroundDesc" Text="开启后关闭主窗口仍会保留托盘、同步、提醒和邮件轮询；关闭后会退出应用。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                <ToggleSwitch x:Uid="SettingsPage_EfficiencyMode" x:Name="EfficiencyModeToggle" Header="收起到托盘时启用效能模式 (省电)" IsOn="True" Toggled="EfficiencyModeToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
-                <ToggleSwitch x:Uid="SettingsPage_FlyoutPrewarm" x:Name="FlyoutPrewarmToggle" Header="启动后预加载托盘浮窗（首次打开更快，但会占用更多内存）" IsOn="False" Toggled="FlyoutPrewarmToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
-            </StackPanel>
-
-            <StackPanel x:Name="WeatherDiagnosticsSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
-                <TextBlock x:Uid="SettingsPage_WeatherBarDiagnostics" Text="天气栏诊断" FontWeight="SemiBold" FontSize="16"/>
-                <TextBlock x:Uid="SettingsPage_WeatherBarDiagnosticsDesc" Text="只读的窗口附加与布局状态，不包含窗口标题或个人数据。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                <TextBlock x:Name="WeatherBarDiagnosticsText" FontFamily="Consolas" FontSize="12" IsTextSelectionEnabled="True" TextWrapping="Wrap"/>
-                <Button x:Uid="SettingsPage_ReattachTaskbar" Content="重新附加任务栏" Click="ReattachTaskbarButton_Click" HorizontalAlignment="Left"/>
-            </StackPanel>
-
-            <StackPanel x:Name="AboutSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
-                <TextBlock x:Uid="SettingsPage_About" Text="关于" FontWeight="SemiBold" FontSize="16"/>
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <FontIcon Glyph="&#xE946;" FontSize="20" VerticalAlignment="Top" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                    <StackPanel Grid.Column="1" Spacing="2">
-                        <TextBlock Text="Task Flyout" FontWeight="SemiBold"/>
-                        <TextBlock x:Name="AboutVersionText" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                        <TextBlock x:Uid="SettingsPage_Desc" Text="日程、任务、天气、邮件与 RSS 的托盘浮窗工具。" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                        <ComboBox x:Uid="SettingsPage_Language" x:Name="LanguageComboBox" Header="界面语言" SelectedIndex="0" MinWidth="200" MaxWidth="320" HorizontalAlignment="Left" SelectionChanged="LanguageComboBox_SelectionChanged">
+                            <ComboBoxItem x:Uid="Lang_System" Content="跟随系统"/>
+                            <ComboBoxItem x:Uid="Lang_ChineseSimplified" Content="简体中文" Tag="zh-Hans"/>
+                            <ComboBoxItem x:Uid="Lang_ChineseTraditional" Content="繁體中文" Tag="zh-TW"/>
+                            <ComboBoxItem x:Uid="Lang_English" Content="English" Tag="en-US"/>
+                        </ComboBox>
                     </StackPanel>
-                </Grid>
-            </StackPanel>
+
+                    <!-- Color Palette Section -->
+                    <StackPanel x:Name="ColorPaletteSettingsSection" Spacing="12" Style="{StaticResource SettingsSectionStyle}">
+                        <TextBlock x:Uid="SettingsPage_ColorPalette" Text="莫奈调色盘" FontWeight="SemiBold" FontSize="16"/>
+                        <TextBlock x:Uid="SettingsPage_ColorPaletteDesc" Text="为每个日历和任务列表指定代表色，颜色将同步应用到侧栏与日历视图。" FontSize="13" Opacity="0.7" TextWrapping="Wrap"/>
+                        <StackPanel x:Name="ColorPalettePanel" Spacing="8"/>
+                    </StackPanel>
+
+                    <!-- Clock Display Section -->
+                    <StackPanel x:Name="ClockSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
+                        <TextBlock x:Uid="SettingsPage_Clock" Text="时钟显示" FontWeight="SemiBold" FontSize="16"/>
+                        <ToggleSwitch x:Uid="SettingsPage_ShowSeconds" x:Name="ShowSecondsToggle" Header="在浮窗时钟中显示秒" IsOn="False" Toggled="ShowSecondsToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                    </StackPanel>
+
+                    <!-- Notification Section -->
+                    <StackPanel x:Name="NotificationSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
+                        <TextBlock x:Uid="SettingsPage_Notification" Text="通知提醒" FontWeight="SemiBold" FontSize="16"/>
+                         <ToggleSwitch x:Uid="SettingsPage_NotifyToggle" x:Name="NotifyToggle" Header="日程开始前弹出通知" IsOn="True" Toggled="NotifyToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                         <TextBlock x:Uid="SettingsPage_NotifyDesc" Text="日程提醒只影响日历/任务开始前的提醒通知；天气警报在天气页单独设置。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+
+                        <ComboBox x:Uid="SettingsPage_NotifyTime" x:Name="NotifyTimeComboBox" Header="提前提醒时间" Width="200" SelectionChanged="NotifyTimeComboBox_SelectionChanged" />
+                        <ComboBox x:Uid="Notification_SnoozeSetting" x:Name="NotificationSnoozeComboBox" Header="稍后提醒时长" Width="200" SelectionChanged="NotificationPreferences_Changed"/>
+                        <ToggleSwitch x:Uid="Notification_QuietSetting" x:Name="NotificationQuietToggle" Header="启用静默时段" Toggled="NotificationPreferences_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                        <TimePicker x:Uid="Notification_QuietStart" x:Name="NotificationQuietStart" Header="开始时间" TimeChanged="NotificationQuietTime_Changed"/>
+                        <TimePicker x:Uid="Notification_QuietEnd" x:Name="NotificationQuietEnd" Header="结束时间" TimeChanged="NotificationQuietTime_Changed"/>
+                        <TextBlock x:Uid="Notification_QuietDescription" Text="静默时段内，邮件、日程和稍后提醒只进入通知中心，不显示横幅或播放声音。起止时间相同表示全天静默；天气警报仍单独设置。" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <ToggleSwitch x:Uid="Notification_PrioritySetting" x:Name="NotificationPriorityToggle" Header="仅提醒重要任务和邮件" Toggled="NotificationPreferences_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                        <TextBlock x:Uid="Notification_PriorityDescription" Text="仅提醒 Microsoft To Do 中标为重要的任务，以及已加旗标或提供高重要性标记的邮件。Google 任务没有重要性标记，将被过滤；日历事件和主动设置的稍后提醒仍保留。" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </StackPanel>
+
+                    <StackPanel x:Name="MailSyncSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
+                        <TextBlock x:Uid="SettingsPage_MailSync" Text="邮件同步" FontWeight="SemiBold" FontSize="16"/>
+                        <ToggleSwitch x:Uid="SettingsPage_MailPolling" x:Name="MailPollingToggle" Header="定时抓取新邮件并显示 Windows 通知" IsOn="True" Toggled="MailPollingToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                        <TextBlock x:Uid="SettingsPage_MailPollingDesc" Text="新邮件通知只影响邮件轮询；不会改变日程提醒或天气警报设置。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                        <ComboBox x:Uid="SettingsPage_MailInterval" x:Name="MailPollingIntervalComboBox" Header="新邮件检查间隔" Width="200" SelectionChanged="MailPollingIntervalComboBox_SelectionChanged" />
+                         <ToggleSwitch x:Uid="SettingsPage_AutoMarkMailAsRead" x:Name="AutoMarkMailAsReadToggle" Header="打开邮件时自动标记为已读" IsOn="True" Toggled="AutoMarkMailAsReadToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                         <TextBlock x:Uid="SettingsPage_AutoMarkMailAsReadDesc" Text="此设置仅控制打开单封邮件时的自动标记；手动的已读、未读和旗标命令仍会写入邮箱。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <StackPanel x:Name="PrivacySettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
+                         <TextBlock x:Uid="SettingsPage_PrivacyHeading" Text="内容隐私与本地数据" FontWeight="SemiBold" FontSize="16" TextWrapping="Wrap"/>
+                         <ToggleSwitch x:Uid="SettingsPage_HideNotificationContent" x:Name="HideNotificationContentToggle" Header="在系统通知中隐藏邮件与日程内容" IsOn="True" Toggled="HideNotificationContentToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                         <ToggleSwitch x:Uid="SettingsPage_BlockRemoteImages" x:Name="BlockRemoteImagesToggle" Header="默认阻止未信任发件人的远程图片（防追踪像素）" IsOn="True" Toggled="BlockRemoteImagesToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                         <ToggleSwitch x:Uid="SettingsPage_RssRemote" x:Name="AllowRssRemoteResourcesToggle" Header="允许 RSS 文章加载远程图片资源" IsOn="False" Toggled="AllowRssRemoteResourcesToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                         <StackPanel Spacing="6">
+                             <Button x:Uid="SettingsPage_ClearCache" x:Name="ClearWebViewCacheButton" Content="清理 WebView2 缓存" Click="ClearWebViewCacheButton_Click"/>
+                              <TextBlock x:Name="WebViewCacheStatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                         </StackPanel>
+                         <Button x:Uid="SettingsPage_ClearRssData" x:Name="ClearRssDataButton" Content="清除 RSS 本地数据" Click="ClearRssDataButton_Click"/>
+                         <StackPanel Spacing="6">
+                             <Button x:Uid="SettingsPage_ClearWeatherData" x:Name="ClearWeatherDataButton" Content="清除天气和位置数据" Click="ClearWeatherDataButton_Click"/>
+                              <TextBlock x:Name="WeatherDataStatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                         VerticalAlignment="Center" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+                         </StackPanel>
+                         <InfoBar x:Uid="SettingsPage_CacheWarning"
+                                 x:Name="WebViewCacheWarningBar"
+                                 IsOpen="False"
+                                 IsClosable="False"
+                                 Severity="Warning"
+                                 Title="WebView2 缓存接近上限"
+                                 Message="建议立即清理以避免下次启动时自动 prune 增加 I/O 开销。"/>
+                    </StackPanel>
+
+                    <StackPanel x:Name="AccountsSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
+                        <TextBlock x:Uid="SettingsPage_AccountsDescription" Text="管理已连接账户、授权状态和各账户的同步结果。" TextWrapping="Wrap"/>
+                        <Button x:Uid="SettingsPage_OpenAccounts" Content="打开账户与同步中心" Click="OpenAccounts_Click" Style="{StaticResource SettingsNavigationButtonStyle}"/>
+
+                        <ComboBox x:Uid="SettingsPage_SyncInterval" x:Name="SyncIntervalComboBox" Header="自动同步间隔" Width="200" SelectionChanged="SyncIntervalComboBox_SelectionChanged" />
+                    </StackPanel>
+
+                    <StackPanel x:Name="BackgroundSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
+                        <TextBlock x:Uid="SettingsPage_BackgroundHeading" Text="启动与后台同步" FontWeight="SemiBold" FontSize="16"/>
+
+                        <ToggleSwitch x:Uid="SettingsPage_Startup" x:Name="StartupToggle" Header="开机时自动启动" IsOn="False" Toggled="StartupToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                        <ToggleSwitch x:Uid="SettingsPage_Background" x:Name="BackgroundToggle" Header="关闭主窗口时最小化到托盘 (后台运行)" IsOn="True" Toggled="BackgroundToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                        <TextBlock x:Uid="SettingsPage_BackgroundDesc" Text="开启后关闭主窗口仍会保留托盘、同步、提醒和邮件轮询；关闭后会退出应用。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <StackPanel x:Name="WeatherSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
+                        <TextBlock x:Uid="SettingsPage_WeatherDescription" Text="设置城市、天气源、浮窗与任务栏显示内容和天气警报。" TextWrapping="Wrap"/>
+                        <Button x:Uid="SettingsPage_OpenWeather" Content="打开天气与任务栏设置" Click="OpenWeatherSettings_Click" Style="{StaticResource SettingsNavigationButtonStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel x:Name="AdvancedSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
+                        <TextBlock x:Uid="SettingsPage_AdvancedDescription" Text="性能选项、天气图标包和 Windows Widgets 集成。" TextWrapping="Wrap"/>
+                        <Button x:Uid="SettingsPage_OpenWeatherAdvanced" Content="天气图标与任务栏高级选项" Click="OpenWeatherAdvanced_Click" Style="{StaticResource SettingsNavigationButtonStyle}"/>
+                        <ToggleSwitch x:Uid="SettingsPage_EfficiencyMode" x:Name="EfficiencyModeToggle" Header="收起到托盘时启用效能模式 (省电)" IsOn="True" Toggled="EfficiencyModeToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                        <ToggleSwitch x:Uid="SettingsPage_FlyoutPrewarm" x:Name="FlyoutPrewarmToggle" Header="启动后预加载托盘浮窗（首次打开更快，但会占用更多内存）" IsOn="False" Toggled="FlyoutPrewarmToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel x:Name="WeatherDiagnosticsSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
+                        <TextBlock x:Uid="SettingsPage_WeatherBarDiagnostics" Text="天气栏诊断" FontWeight="SemiBold" FontSize="16"/>
+                        <TextBlock x:Uid="SettingsPage_WeatherBarDiagnosticsDesc" Text="只读的窗口附加与布局状态，不包含窗口标题或个人数据。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="WeatherBarDiagnosticsText" FontFamily="Consolas" FontSize="12" IsTextSelectionEnabled="True" TextWrapping="Wrap"/>
+                        <Button x:Uid="SettingsPage_ReattachTaskbar" Content="重新附加任务栏" Click="ReattachTaskbarButton_Click" HorizontalAlignment="Left"/>
+                    </StackPanel>
+
+                    <StackPanel x:Name="AboutSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">
+                        <TextBlock x:Uid="SettingsPage_About" Text="关于" FontWeight="SemiBold" FontSize="16"/>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE946;" FontSize="20" VerticalAlignment="Top" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <StackPanel Grid.Column="1" Spacing="2">
+                                <TextBlock Text="Task Flyout" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="AboutVersionText" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                <TextBlock x:Uid="SettingsPage_Desc" Text="日程、任务、天气、邮件与 RSS 的托盘浮窗工具。" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
                 </StackPanel>
 
-                <Grid x:Name="SettingsMasonryGrid"
-                      Visibility="Collapsed"
-                      ColumnSpacing="28">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel x:Name="SettingsLeftColumn" Spacing="28"/>
-                    <StackPanel x:Name="SettingsRightColumn" Grid.Column="1" Spacing="28"/>
-                </Grid>
-            </Grid>
-        </StackPanel>
-    </ScrollViewer>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
 </Page>

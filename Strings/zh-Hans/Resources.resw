@@ -2190,4 +2190,23 @@ Widgets 抑制：就绪 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="Compact_Completed" xml:space="preserve"><value>已完成</value></data>
   <data name="Compact_Pending" xml:space="preserve"><value>待完成</value></data>
   <data name="Compact_Unavailable" xml:space="preserve"><value>此项目已不在当前列表中。请返回列表选择其他项目。</value></data>
+  <data name="SettingsCategory_Appearance" xml:space="preserve"><value>外观</value></data>
+  <data name="SettingsCategory_Accounts" xml:space="preserve"><value>账户与同步</value></data>
+  <data name="SettingsCategory_Notifications" xml:space="preserve"><value>通知</value></data>
+  <data name="SettingsCategory_Mail" xml:space="preserve"><value>邮件</value></data>
+  <data name="SettingsCategory_Weather" xml:space="preserve"><value>天气与任务栏</value></data>
+  <data name="SettingsCategory_Privacy" xml:space="preserve"><value>隐私与数据</value></data>
+  <data name="SettingsCategory_Advanced" xml:space="preserve"><value>高级诊断</value></data>
+  <data name="SettingsPage_CategorySelector.Header" xml:space="preserve"><value>设置分类</value></data>
+  <data name="SettingsPage_CategoryList.AutomationProperties.Name" xml:space="preserve"><value>设置分类</value></data>
+  <data name="SettingsPage_PrivacyHeading.Text" xml:space="preserve"><value>内容隐私与本地数据</value></data>
+  <data name="SettingsPage_AccountsDescription.Text" xml:space="preserve"><value>管理已连接账户、授权状态和各账户的同步结果。</value></data>
+  <data name="SettingsPage_OpenAccounts.Content" xml:space="preserve"><value>打开账户与同步中心</value></data>
+  <data name="SettingsPage_BackgroundHeading.Text" xml:space="preserve"><value>启动与后台同步</value></data>
+  <data name="SettingsPage_WeatherDescription.Text" xml:space="preserve"><value>设置城市、天气源、浮窗与任务栏显示内容和天气警报。</value></data>
+  <data name="SettingsPage_OpenWeather.Content" xml:space="preserve"><value>打开天气与任务栏设置</value></data>
+  <data name="SettingsPage_AdvancedDescription.Text" xml:space="preserve"><value>性能选项、天气图标包和 Windows Widgets 集成。</value></data>
+  <data name="SettingsPage_OpenWeatherAdvanced.Content" xml:space="preserve"><value>天气图标与任务栏高级选项</value></data>
+  <data name="SettingsPage_Back.Content" xml:space="preserve"><value>返回设置</value></data>
+  <data name="SettingsPage_WeatherAdvancedDescription.Text" xml:space="preserve"><value>自定义天气图标，以及 Windows Widgets 和实验性任务栏模式。</value></data>
 </root>

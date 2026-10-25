@@ -2190,4 +2190,23 @@ Widgets suppression: ready {8}; snapshot {9}; notification pending {10}</value><
   <data name="Compact_Completed" xml:space="preserve"><value>Completed</value></data>
   <data name="Compact_Pending" xml:space="preserve"><value>Pending</value></data>
   <data name="Compact_Unavailable" xml:space="preserve"><value>This item is no longer in the current list. Go back to choose another item.</value></data>
+  <data name="SettingsCategory_Appearance" xml:space="preserve"><value>Appearance</value></data>
+  <data name="SettingsCategory_Accounts" xml:space="preserve"><value>Accounts and sync</value></data>
+  <data name="SettingsCategory_Notifications" xml:space="preserve"><value>Notifications</value></data>
+  <data name="SettingsCategory_Mail" xml:space="preserve"><value>Mail</value></data>
+  <data name="SettingsCategory_Weather" xml:space="preserve"><value>Weather and taskbar</value></data>
+  <data name="SettingsCategory_Privacy" xml:space="preserve"><value>Privacy and data</value></data>
+  <data name="SettingsCategory_Advanced" xml:space="preserve"><value>Advanced diagnostics</value></data>
+  <data name="SettingsPage_CategorySelector.Header" xml:space="preserve"><value>Settings category</value></data>
+  <data name="SettingsPage_CategoryList.AutomationProperties.Name" xml:space="preserve"><value>Settings categories</value></data>
+  <data name="SettingsPage_PrivacyHeading.Text" xml:space="preserve"><value>Content privacy and local data</value></data>
+  <data name="SettingsPage_AccountsDescription.Text" xml:space="preserve"><value>Manage connected accounts, authorization and sync results for each account.</value></data>
+  <data name="SettingsPage_OpenAccounts.Content" xml:space="preserve"><value>Open account and sync center</value></data>
+  <data name="SettingsPage_BackgroundHeading.Text" xml:space="preserve"><value>Startup and background sync</value></data>
+  <data name="SettingsPage_WeatherDescription.Text" xml:space="preserve"><value>Choose locations, the weather provider, flyout and taskbar fields, and weather alerts.</value></data>
+  <data name="SettingsPage_OpenWeather.Content" xml:space="preserve"><value>Open weather and taskbar settings</value></data>
+  <data name="SettingsPage_AdvancedDescription.Text" xml:space="preserve"><value>Performance options, weather icon packs and Windows Widgets integration.</value></data>
+  <data name="SettingsPage_OpenWeatherAdvanced.Content" xml:space="preserve"><value>Weather icons and advanced taskbar options</value></data>
+  <data name="SettingsPage_Back.Content" xml:space="preserve"><value>Back to settings</value></data>
+  <data name="SettingsPage_WeatherAdvancedDescription.Text" xml:space="preserve"><value>Customize weather icons, Windows Widgets and the experimental taskbar mode.</value></data>
 </root>

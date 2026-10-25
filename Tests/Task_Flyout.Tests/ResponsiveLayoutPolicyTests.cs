@@ -27,10 +27,10 @@ public class ResponsiveLayoutPolicyTests
     [InlineData(899, false)]
     [InlineData(900, true)]
     [InlineData(1440, true)]
-    public void Settings_use_masonry_only_when_two_columns_remain_readable(
+    public void Settings_show_navigation_rail_only_when_content_remains_readable(
         double width,
         bool expected)
-        => Assert.Equal(expected, ResponsiveLayoutPolicy.ShouldUseSettingsMasonry(width));
+        => Assert.Equal(expected, ResponsiveLayoutPolicy.ShouldShowSettingsNavigationRail(width));
 
     [Theory]
     [InlineData(819, 700, true)]

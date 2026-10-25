@@ -45,6 +45,7 @@ namespace Task_Flyout
         private bool _pendingCachedMailNavigation;
         private bool _isClampingToWorkArea;
         private Type _lastContentPageType = typeof(Views.TodayPage);
+        private object? _lastSettingsNavigationParameter;
         private readonly ObservableCollection<GlobalSearchResultGroup> _globalSearchGroups = new();
         private IReadOnlyList<GlobalSearchCandidate> _globalSearchSnapshot = Array.Empty<GlobalSearchCandidate>();
         private Dictionary<string, object> _globalSearchPayloads = new(StringComparer.Ordinal);
@@ -167,6 +168,8 @@ namespace Task_Flyout
             UpdatePageBackNavigation();
             if (e.SourcePageType != null)
                 _lastContentPageType = e.SourcePageType;
+            _lastSettingsNavigationParameter = e.Parameter is SettingsCategory or WeatherPageSection
+                ? e.Parameter : null;
 
             if (ContentFrame.SourcePageType == typeof(Views.SettingsPage))
             {
@@ -186,7 +189,9 @@ namespace Task_Flyout
             }
             else if (ContentFrame.SourcePageType == typeof(Views.WeatherPage))
             {
-                MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Weather");
+                MainNav.SelectedItem = e.Parameter is WeatherPageSection.Preferences or WeatherPageSection.Advanced
+                    ? MainNav.SettingsItem
+                    : MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Weather");
             }
             else if (ContentFrame.SourcePageType == typeof(Views.MailPage))
             {
@@ -304,7 +309,7 @@ namespace Task_Flyout
             if (pageType == typeof(Views.AddAccountPage))
                 pageType = ShouldShowOnboardingOnLaunch() ? typeof(Views.AddAccountPage) : typeof(Views.TodayPage);
 
-            ContentFrame.Navigate(pageType);
+            ContentFrame.Navigate(pageType, _lastSettingsNavigationParameter);
         }
 
         public string GetDiagnosticsCurrentPageName()
@@ -337,6 +342,13 @@ namespace Task_Flyout
 
             if (ContentFrame.SourcePageType != null)
                 _lastContentPageType = ContentFrame.SourcePageType;
+            // Keep only the settings location when releasing the page, not its controls.
+            _lastSettingsNavigationParameter = ContentFrame.Content switch
+            {
+                Views.SettingsPage settingsPage => settingsPage.SelectedCategory,
+                Views.WeatherPage weatherPage => weatherPage.SelectedSection,
+                _ => null
+            };
 
             if (ContentFrame.Content is Views.MailPage mailPage)
                 mailPage.DisposeLikeCleanup();
@@ -456,9 +468,27 @@ namespace Task_Flyout
         }
 
         public void NavigateToSettings()
+            => NavigateToSettings(SettingsCategory.Appearance);
+
+        internal void NavigateToSettings(SettingsCategory category)
         {
             MainNav.SelectedItem = MainNav.SettingsItem;
-            ContentFrame.Navigate(typeof(Views.SettingsPage));
+            ContentFrame.Navigate(typeof(Views.SettingsPage), category);
+        }
+
+        internal void NavigateToWeatherSettings(WeatherPageSection section)
+        {
+            MainNav.SelectedItem = MainNav.SettingsItem;
+            NavigateFromSettings(typeof(Views.WeatherPage), section);
+        }
+
+        private void NavigateFromSettings(Type pageType, object? parameter = null)
+        {
+            SettingsCategory? returnCategory = (ContentFrame.Content as Views.SettingsPage)?.SelectedCategory;
+            bool navigated = ContentFrame.Navigate(pageType, parameter);
+            if (navigated && returnCategory.HasValue && ContentFrame.BackStack.Count > 0)
+                ContentFrame.BackStack[^1] = new Microsoft.UI.Xaml.Navigation.PageStackEntry(
+                    typeof(Views.SettingsPage), returnCategory.Value, null);
         }
 
         public void NavigateToWeather()
@@ -1036,8 +1066,8 @@ namespace Task_Flyout
                 case "07-open-tasks": NavigateToTasks(); break;
                 case "08-open-mail": NavigateToMail(); break;
                 case "09-open-rss": NavigateToRss(); break;
-                case "10-open-settings":
-                case "12-cache-settings": NavigateToSettings(); break;
+                case "10-open-settings": NavigateToSettings(); break;
+                case "12-cache-settings": NavigateToSettings(SettingsCategory.Privacy); break;
                 case "11-open-accounts": NavigateToAddAccount(); break;
                 case "13-open-weather": NavigateToWeather(); break;
                 case "14-toggle-weather-bar": ToggleWeatherBarFromPalette(); break;
@@ -1126,7 +1156,7 @@ namespace Task_Flyout
 
         public void NavigateToAddAccount()
         {
-            ContentFrame.Navigate(typeof(Views.AddAccountPage));
+            NavigateFromSettings(typeof(Views.AddAccountPage));
         }
 
         public void NavigateToCalendarAndEdit(AgendaItem itemToEdit)

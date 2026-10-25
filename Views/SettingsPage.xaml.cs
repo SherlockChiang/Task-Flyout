@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Navigation;
 using Windows.Storage;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System;
@@ -23,15 +24,46 @@ namespace Task_Flyout.Views
         private bool _isClearingWebViewCache;
         private bool _isClearingRssData;
         private bool _isClearingWeatherData;
-        private bool? _usesMasonryLayout;
         private bool _isColorPickerDialogOpen;
+        private bool _loadStarted;
+        private bool _cacheStatusLoaded;
+        private bool _selectingCategory;
+        private SettingsCategory _category = SettingsCategory.Appearance;
+        internal SettingsCategory SelectedCategory => _category;
+        private readonly SettingsCategory[] _categories = Enum.GetValues<SettingsCategory>();
+        private readonly List<string> _categoryTitles = new();
+        private readonly Dictionary<FrameworkElement, SettingsCategory> _sections = new();
 
         public SettingsPage()
         {
             this.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
             this.InitializeComponent();
             _loader = new ResourceLoader();
+            foreach (var category in _categories)
+                _categoryTitles.Add(GetSafeString($"SettingsCategory_{category}", category.ToString()));
+            CategorySelector.ItemsSource = _categoryTitles;
+            CategoryList.ItemsSource = _categoryTitles;
+            _sections.Add(AppearanceSettingsSection, SettingsCategory.Appearance);
+            _sections.Add(ColorPaletteSettingsSection, SettingsCategory.Appearance);
+            _sections.Add(ClockSettingsSection, SettingsCategory.Appearance);
+            _sections.Add(AccountsSettingsSection, SettingsCategory.Accounts);
+            _sections.Add(BackgroundSettingsSection, SettingsCategory.Accounts);
+            _sections.Add(NotificationSettingsSection, SettingsCategory.Notifications);
+            _sections.Add(MailSyncSettingsSection, SettingsCategory.Mail);
+            _sections.Add(WeatherSettingsSection, SettingsCategory.Weather);
+            _sections.Add(PrivacySettingsSection, SettingsCategory.Privacy);
+            _sections.Add(AdvancedSettingsSection, SettingsCategory.Advanced);
+            _sections.Add(WeatherDiagnosticsSettingsSection, SettingsCategory.Advanced);
+            _sections.Add(AboutSettingsSection, SettingsCategory.Advanced);
+            SelectCategory(_category);
             this.Loaded += SettingsPage_Loaded;
+        }
+
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+            SelectCategory(e.Parameter is SettingsCategory category && Enum.IsDefined(category)
+                ? category : SettingsCategory.Appearance);
         }
 
         private string GetSafeString(string key, string fallbackText)
@@ -50,72 +82,86 @@ namespace Task_Flyout.Views
             }
         }
 
-        private void SettingsScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
+        private void SettingsRoot_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             double padding = ResponsiveLayoutPolicy.GetPagePadding(e.NewSize.Width, e.NewSize.Height);
             double sectionSpacing = ResponsiveLayoutPolicy.GetPageSectionSpacing(
                 e.NewSize.Width,
                 e.NewSize.Height);
-            SettingsScrollViewer.Padding = new Thickness(padding);
+            SettingsRoot.Padding = new Thickness(padding);
             SettingsContent.Spacing = sectionSpacing;
-            SettingsSingleColumn.Spacing = sectionSpacing;
-            SettingsMasonryGrid.ColumnSpacing = sectionSpacing;
-            SettingsLeftColumn.Spacing = sectionSpacing;
-            SettingsRightColumn.Spacing = sectionSpacing;
-            ApplySettingsCardLayout(
-                ResponsiveLayoutPolicy.ShouldUseSettingsMasonry(e.NewSize.Width));
-        }
-
-        private void ApplySettingsCardLayout(bool useMasonry)
-        {
-            if (_usesMasonryLayout == useMasonry)
-                return;
-
-            if (useMasonry)
+            bool wide = ResponsiveLayoutPolicy.ShouldShowSettingsNavigationRail(e.NewSize.Width);
+            bool moveFocus = wide ? CompactPaneFocus.HasFocus(CategorySelector) : CompactPaneFocus.HasFocus(CategoryList);
+            CategoryList.Visibility = wide ? Visibility.Visible : Visibility.Collapsed;
+            CategorySelector.Visibility = wide ? Visibility.Collapsed : Visibility.Visible;
+            CategoryGrid.ColumnSpacing = wide ? sectionSpacing : 0;
+            if (moveFocus)
             {
-                SettingsMasonryGrid.Visibility = Visibility.Visible;
-
-                MoveSettingsSection(SettingsLeftColumn, AppearanceSettingsSection);
-                MoveSettingsSection(SettingsLeftColumn, MailSyncSettingsSection);
-                MoveSettingsSection(SettingsLeftColumn, WeatherDiagnosticsSettingsSection);
-                MoveSettingsSection(SettingsLeftColumn, AboutSettingsSection);
-
-                MoveSettingsSection(SettingsRightColumn, ColorPaletteSettingsSection);
-                MoveSettingsSection(SettingsRightColumn, ClockSettingsSection);
-                MoveSettingsSection(SettingsRightColumn, NotificationSettingsSection);
-                MoveSettingsSection(SettingsRightColumn, SystemSettingsSection);
-
-                SettingsSingleColumn.Visibility = Visibility.Collapsed;
+                if (wide)
+                {
+                    if ((CategoryList.ContainerFromItem(CategoryList.SelectedItem) as Control)?.Focus(FocusState.Programmatic) != true)
+                        CategoryList.Focus(FocusState.Programmatic);
+                }
+                else
+                    CategorySelector.Focus(FocusState.Programmatic);
             }
-            else
-            {
-                SettingsSingleColumn.Visibility = Visibility.Visible;
-
-                MoveSettingsSection(SettingsSingleColumn, AppearanceSettingsSection);
-                MoveSettingsSection(SettingsSingleColumn, ColorPaletteSettingsSection);
-                MoveSettingsSection(SettingsSingleColumn, ClockSettingsSection);
-                MoveSettingsSection(SettingsSingleColumn, NotificationSettingsSection);
-                MoveSettingsSection(SettingsSingleColumn, MailSyncSettingsSection);
-                MoveSettingsSection(SettingsSingleColumn, SystemSettingsSection);
-                MoveSettingsSection(SettingsSingleColumn, WeatherDiagnosticsSettingsSection);
-                MoveSettingsSection(SettingsSingleColumn, AboutSettingsSection);
-
-                SettingsMasonryGrid.Visibility = Visibility.Collapsed;
-            }
-
-            _usesMasonryLayout = useMasonry;
         }
 
-        private void MoveSettingsSection(StackPanel target, UIElement section)
+        private async void CategorySelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            SettingsSingleColumn.Children.Remove(section);
-            SettingsLeftColumn.Children.Remove(section);
-            SettingsRightColumn.Children.Remove(section);
-            target.Children.Add(section);
+            if (_selectingCategory || sender is not Microsoft.UI.Xaml.Controls.Primitives.Selector selector
+                || selector.SelectedIndex < 0 || selector.SelectedIndex >= _categories.Length) return;
+            SelectCategory(_categories[selector.SelectedIndex]);
+            if (!_isInitializing) await RefreshCategoryDetailsAsync();
         }
+
+        private void SelectCategory(SettingsCategory category)
+        {
+            _category = category;
+            _selectingCategory = true;
+            int index = Array.IndexOf(_categories, category);
+            CategoryList.SelectedIndex = index;
+            CategorySelector.SelectedIndex = index;
+            _selectingCategory = false;
+            CategoryTitle.Text = _categoryTitles[index];
+            foreach (var (section, owner) in _sections)
+                section.Visibility = owner == category ? Visibility.Visible : Visibility.Collapsed;
+            SettingsScrollViewer.ChangeView(null, 0, null, disableAnimation: true);
+        }
+
+        private async System.Threading.Tasks.Task RefreshCategoryDetailsAsync()
+        {
+            if (_category == SettingsCategory.Advanced) UpdateWeatherBarDiagnostics();
+            if (_category != SettingsCategory.Privacy || _cacheStatusLoaded) return;
+            _cacheStatusLoaded = true;
+            ClearWebViewCacheButton.IsEnabled = false;
+            ClearRssDataButton.IsEnabled = false;
+            try
+            {
+                await UpdateWebViewCacheStatusAsync();
+            }
+            catch
+            {
+                _cacheStatusLoaded = false;
+                WebViewCacheStatusText.Text = GetSafeString("TextUnavailable", "Unavailable");
+            }
+            finally
+            {
+                ClearWebViewCacheButton.IsEnabled = !_isClearingWebViewCache;
+                ClearRssDataButton.IsEnabled = !_isClearingRssData;
+            }
+        }
+
+        private void OpenAccounts_Click(object sender, RoutedEventArgs e) => App.MyMainWindow?.NavigateToAddAccount();
+        private void OpenWeatherSettings_Click(object sender, RoutedEventArgs e)
+            => App.MyMainWindow?.NavigateToWeatherSettings(WeatherPageSection.Preferences);
+        private void OpenWeatherAdvanced_Click(object sender, RoutedEventArgs e)
+            => App.MyMainWindow?.NavigateToWeatherSettings(WeatherPageSection.Advanced);
 
         private async void SettingsPage_Loaded(object sender, RoutedEventArgs e)
         {
+            if (_loadStarted) return;
+            _loadStarted = true;
             var settings = ApplicationData.Current.LocalSettings;
 
             var theme = settings.Values["AppTheme"] as string;
@@ -145,8 +191,6 @@ namespace Task_Flyout.Views
             AllowRssRemoteResourcesToggle.IsOn = settings.Values["AllowRssRemoteResources"] as bool? ?? false;
             ShowSecondsToggle.IsOn = settings.Values["ShowSeconds"] as bool? ?? false;
             AboutVersionText.Text = GetVersionText();
-            UpdateWeatherBarDiagnostics();
-            await UpdateWebViewCacheStatusAsync();
 
             string minuteStr = GetSafeString("TextMinutes", "minutes");
 
@@ -186,6 +230,8 @@ namespace Task_Flyout.Views
 
             _isInitializing = false;
             UpdateDependentControlStates();
+            SettingsScrollViewer.IsEnabled = true;
+            await RefreshCategoryDetailsAsync();
         }
 
         private static string GetVersionText()
