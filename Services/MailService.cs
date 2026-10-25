@@ -1682,14 +1682,11 @@ namespace Task_Flyout.Services
         {
             if (account.Kind == MailAccountKind.Outlook)
             {
-                await EnsureOutlookMailWriteAuthorizedAsync(operationToken);
-                if (_outlookClient != null)
-                {
-                    var patch = kind == MailMutationKind.SetReadState
-                        ? new GraphMessage { IsRead = value }
-                        : new GraphMessage { Flag = new FollowupFlag { FlagStatus = value ? FollowupFlagStatus.Flagged : FollowupFlagStatus.NotFlagged } };
-                    await _outlookClient.Me.Messages[item.Id].PatchAsync(patch, cancellationToken: operationToken);
-                }
+                var client = await GetOutlookAccountClientAsync(account, requireWrite: true, operationToken);
+                var patch = kind == MailMutationKind.SetReadState
+                    ? new GraphMessage { IsRead = value }
+                    : new GraphMessage { Flag = new FollowupFlag { FlagStatus = value ? FollowupFlagStatus.Flagged : FollowupFlagStatus.NotFlagged } };
+                await client.Me.Messages[item.Id].PatchAsync(patch, cancellationToken: operationToken);
             }
             else if (account.Kind == MailAccountKind.Google)
             {
@@ -2507,7 +2504,8 @@ namespace Task_Flyout.Services
                     }
                 }
 
-                foreach (var pair in newItems.Take(5))
+                foreach (var pair in newItems.Where(pair => NotificationDeliveryPolicy.AllowsMail(
+                    NotificationPreferences.HighPriorityOnly, pair.Item.IsFlagged, pair.Item.Importance)).Take(5))
                     SendNewMailNotification(pair.Account, pair.Item);
 
                 _knownUnreadIds.Clear();
@@ -4434,6 +4432,7 @@ namespace Task_Flyout.Services
 
             try
             {
+                bool quiet = NotificationPreferences.IsQuietNow;
                 var builder = new AppNotificationBuilder()
                     .AddText(hideContent
                         ? (_loader.GetStringOrDefault("TextNewMail") ?? "New Mail")
@@ -4442,6 +4441,16 @@ namespace Task_Flyout.Services
                     .AddArgument("accountId", item.AccountId)
                     .AddArgument("folderId", item.FolderId)
                     .AddArgument("messageId", item.Id);
+                if (quiet) builder.MuteAudio();
+
+                var actionToken = NotificationActionStore.Store(new NotificationActionTarget(
+                    NotificationActionTarget.CurrentSchemaVersion, account.Kind.ToString(), item.Id, "",
+                    NotificationActionMask.MarkRead, DateTimeOffset.UtcNow.AddDays(2), AccountId: account.Id,
+                    ContainerId: item.FolderId, AccountAddress: account.Address, ImapUidValidity: item.ImapUidValidity,
+                    NotificationTag: MailNotificationIdentityPolicy.BuildTag(account.Kind, item),
+                    NotificationGroup: MailNotificationIdentityPolicy.Group));
+                builder.AddButton(new AppNotificationButton(_loader.GetStringOrDefault("Notification_MarkRead") ?? "Mark read")
+                    .AddArgument("action", "markMailRead").AddArgument("token", actionToken));
 
                 if (!hideContent)
                 {
@@ -4463,6 +4472,7 @@ namespace Task_Flyout.Services
                 var notification = builder.BuildNotification();
                 notification.Tag = MailNotificationIdentityPolicy.BuildTag(account.Kind, item);
                 notification.Group = MailNotificationIdentityPolicy.Group;
+                notification.SuppressDisplay = quiet;
                 AppNotificationManager.Default.Show(notification);
             }
             catch (Exception ex)

@@ -12,6 +12,7 @@ namespace Task_Flyout.Models
         public string Subtitle { get; set; } = "";
         public bool IsTask { get; set; }
         public bool IsEvent { get; set; }
+        public bool IsHighPriority { get; set; }
 
         private bool _isCompleted;
         public bool IsCompleted

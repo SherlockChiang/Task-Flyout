@@ -1,6 +1,6 @@
 namespace Task_Flyout.Services
 {
-    internal enum NotificationActivationKind { Ignore, OpenMain, OpenMail, AgendaAction, CopyCode }
+    internal enum NotificationActivationKind { Ignore, OpenMain, OpenMail, AgendaAction, MailAction, CopyCode }
 
     internal sealed record NotificationActivationRoute(
         NotificationActivationKind Kind,
@@ -31,6 +31,10 @@ namespace Task_Flyout.Services
             if (action == "copyCode" && args.Count == 2 && args.TryGetValue("codeToken", out var codeToken) &&
                 NotificationActivationParser.IsOpaqueToken(codeToken))
                 return new(NotificationActivationKind.CopyCode, Token: codeToken);
+
+            if (action == "markMailRead" && args.Count == 2 && args.TryGetValue("token", out var mailToken) &&
+                NotificationActivationParser.IsOpaqueToken(mailToken))
+                return new(NotificationActivationKind.MailAction, action, mailToken);
 
             // Only the explicit test entry and notifications with no arguments open
             // the default page. Invalid mail actions must not look like success.

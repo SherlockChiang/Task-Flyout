@@ -682,6 +682,7 @@ namespace Task_Flyout
                 IsEvent = item.IsEvent,
                 IsTask = item.IsTask,
                 IsCompleted = item.IsCompleted,
+                IsHighPriority = item.IsHighPriority,
                 Provider = item.Provider,
                 AccountId = item.AccountId,
                 CalendarId = item.CalendarId,
@@ -775,6 +776,7 @@ namespace Task_Flyout
                && left.IsEvent == right.IsEvent
                && left.IsTask == right.IsTask
                && left.IsCompleted == right.IsCompleted
+               && left.IsHighPriority == right.IsHighPriority
                && left.Provider == right.Provider
                && left.AccountId == right.AccountId
                && left.CalendarId == right.CalendarId

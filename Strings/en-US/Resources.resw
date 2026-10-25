@@ -2162,4 +2162,20 @@ Widgets suppression: ready {8}; snapshot {9}; notification pending {10}</value><
   <data name="Cross_UndoArchive" xml:space="preserve"><value>Undo archive</value></data>
   <data name="Cross_CheckMail" xml:space="preserve"><value>Check mail</value></data>
   <data name="Cross_Forget" xml:space="preserve"><value>Disable / dismiss</value></data>
+  <data name="Notification_SnoozeSetting.Header" xml:space="preserve"><value>Snooze duration</value></data>
+  <data name="Notification_QuietSetting.Header" xml:space="preserve"><value>Enable quiet hours</value></data>
+  <data name="Notification_QuietStart.Header" xml:space="preserve"><value>Start time</value></data>
+  <data name="Notification_QuietEnd.Header" xml:space="preserve"><value>End time</value></data>
+  <data name="Notification_QuietDescription.Text" xml:space="preserve"><value>During quiet hours, mail, calendar, task and snoozed reminders go to notification center without a banner or sound. Equal start and end times mean all day. Weather alerts have separate settings.</value></data>
+  <data name="Notification_PrioritySetting.Header" xml:space="preserve"><value>Only important tasks and mail</value></data>
+  <data name="Notification_PriorityDescription.Text" xml:space="preserve"><value>Includes tasks marked important in Microsoft To Do, and mail already flagged or reported as high importance when fetched. Google tasks have no importance flag and are filtered out. Calendar events and reminders you explicitly snooze are kept.</value></data>
+  <data name="Notification_SnoozeMinutes" xml:space="preserve"><value>Snooze {0} min</value></data>
+  <data name="Notification_SnoozedReminder" xml:space="preserve"><value>Snoozed reminder · original time</value></data>
+  <data name="Notification_MarkRead" xml:space="preserve"><value>Mark read</value></data>
+  <data name="Notification_Retry.Content" xml:space="preserve"><value>Retry</value></data>
+  <data name="Notification_ActionFailed" xml:space="preserve"><value>The notification action did not finish. Check the account connection and retry, or open the item to check its current status.</value></data>
+  <data name="Notification_TargetUnavailable" xml:space="preserve"><value>This notification has expired or its account or item is no longer available. Open the item from its account to continue.</value></data>
+  <data name="Notification_TaskCompleted" xml:space="preserve"><value>Task completed.</value></data>
+  <data name="Notification_MailRead" xml:space="preserve"><value>Mail marked read.</value></data>
+  <data name="Notification_MailQueued" xml:space="preserve"><value>Mail marked read locally. The change is queued for synchronization; check the account sync center for progress.</value></data>
 </root>

@@ -38,6 +38,8 @@ var withButtons = new AppNotificationBuilder().AddText("Synthetic action fixture
     .AddButton(new AppNotificationButton("Snooze").AddArgument("action", "snoozeAgenda").AddArgument("token", token))
     .AddButton(new AppNotificationButton("Complete").AddArgument("action", "completeTask").AddArgument("token", token))
     .AddButton(new AppNotificationButton("Copy").AddArgument("action", "copyCode").AddArgument("codeToken", token))
+    .AddButton(new AppNotificationButton("Read").AddArgument("action", "markMailRead").AddArgument("token", token))
+    .MuteAudio()
     .BuildNotification();
 var xml = XDocument.Parse(withButtons.Payload);
 Require(NotificationActivationRouter.Parse((string)xml.Root!.Attribute("launch")!, true).Kind == NotificationActivationKind.AgendaAction,
@@ -45,9 +47,16 @@ Require(NotificationActivationRouter.Parse((string)xml.Root!.Attribute("launch")
 foreach (var action in xml.Descendants("action"))
 {
     var route = NotificationActivationRouter.Parse((string)action.Attribute("arguments")!, true);
-    Require(route.Kind is NotificationActivationKind.AgendaAction or NotificationActivationKind.CopyCode,
+    Require(route.Kind is NotificationActivationKind.AgendaAction or NotificationActivationKind.CopyCode or NotificationActivationKind.MailAction,
         "SDK button payload was rejected.");
     Require(route.Token == token, "SDK button token changed.");
 }
+
+Require((string?)xml.Descendants("audio").Single().Attribute("silent") == "true", "Quiet delivery must mute audio.");
+withButtons.SuppressDisplay = true;
+withButtons.Group = "tasks";
+withButtons.Tag = "0123456789abcdef";
+Require(withButtons.SuppressDisplay && withButtons.Group == "tasks" && withButtons.Tag == "0123456789abcdef",
+    "Quiet delivery and notification identity did not round-trip through the SDK.");
 
 Console.WriteLine($"SDK notification contract passed: {checks} checks; no notifications shown or application data accessed.");

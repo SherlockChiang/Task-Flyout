@@ -68,6 +68,13 @@
                  <TextBlock x:Uid="SettingsPage_NotifyDesc" Text="日程提醒只影响日历/任务开始前的提醒通知；天气警报在天气页单独设置。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                 
                 <ComboBox x:Uid="SettingsPage_NotifyTime" x:Name="NotifyTimeComboBox" Header="提前提醒时间" Width="200" SelectionChanged="NotifyTimeComboBox_SelectionChanged" />
+                <ComboBox x:Uid="Notification_SnoozeSetting" x:Name="NotificationSnoozeComboBox" Header="稍后提醒时长" Width="200" SelectionChanged="NotificationPreferences_Changed"/>
+                <ToggleSwitch x:Uid="Notification_QuietSetting" x:Name="NotificationQuietToggle" Header="启用静默时段" Toggled="NotificationPreferences_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                <TimePicker x:Uid="Notification_QuietStart" x:Name="NotificationQuietStart" Header="开始时间" TimeChanged="NotificationQuietTime_Changed"/>
+                <TimePicker x:Uid="Notification_QuietEnd" x:Name="NotificationQuietEnd" Header="结束时间" TimeChanged="NotificationQuietTime_Changed"/>
+                <TextBlock x:Uid="Notification_QuietDescription" Text="静默时段内，邮件、日程和稍后提醒只进入通知中心，不显示横幅或播放声音。起止时间相同表示全天静默；天气警报仍单独设置。" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                <ToggleSwitch x:Uid="Notification_PrioritySetting" x:Name="NotificationPriorityToggle" Header="仅提醒重要任务和邮件" Toggled="NotificationPreferences_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                <TextBlock x:Uid="Notification_PriorityDescription" Text="仅提醒 Microsoft To Do 中标为重要的任务，以及已加旗标或提供高重要性标记的邮件。Google 任务没有重要性标记，将被过滤；日历事件和主动设置的稍后提醒仍保留。" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
 
             <StackPanel x:Name="MailSyncSettingsSection" Spacing="8" Style="{StaticResource SettingsSectionStyle}">

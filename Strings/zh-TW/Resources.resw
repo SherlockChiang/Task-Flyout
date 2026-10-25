@@ -2162,4 +2162,20 @@ Widgets 抑制：就緒 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="Cross_UndoArchive" xml:space="preserve"><value>復原封存</value></data>
   <data name="Cross_CheckMail" xml:space="preserve"><value>檢查郵件</value></data>
   <data name="Cross_Forget" xml:space="preserve"><value>停用／移除此記錄</value></data>
+  <data name="Notification_SnoozeSetting.Header" xml:space="preserve"><value>稍後提醒時長</value></data>
+  <data name="Notification_QuietSetting.Header" xml:space="preserve"><value>啟用靜默時段</value></data>
+  <data name="Notification_QuietStart.Header" xml:space="preserve"><value>開始時間</value></data>
+  <data name="Notification_QuietEnd.Header" xml:space="preserve"><value>結束時間</value></data>
+  <data name="Notification_QuietDescription.Text" xml:space="preserve"><value>靜默時段內，郵件、行事曆、工作和稍後提醒只進入通知中心，不顯示橫幅或播放音效。起止時間相同表示全天靜默；天氣警報仍單獨設定。</value></data>
+  <data name="Notification_PrioritySetting.Header" xml:space="preserve"><value>僅提醒重要工作和郵件</value></data>
+  <data name="Notification_PriorityDescription.Text" xml:space="preserve"><value>僅提醒 Microsoft To Do 中標為重要的工作，以及擷取時已加旗標或帶高重要性標記的郵件。Google 工作沒有重要性標記，將被篩除；行事曆事件和主動設定的稍後提醒仍保留。</value></data>
+  <data name="Notification_SnoozeMinutes" xml:space="preserve"><value>{0} 分鐘後提醒</value></data>
+  <data name="Notification_SnoozedReminder" xml:space="preserve"><value>稍後提醒 · 原定時間</value></data>
+  <data name="Notification_MarkRead" xml:space="preserve"><value>標記已讀</value></data>
+  <data name="Notification_Retry.Content" xml:space="preserve"><value>重試</value></data>
+  <data name="Notification_ActionFailed" xml:space="preserve"><value>通知操作未完成。請檢查帳戶連線後重試，或開啟對應項目確認目前狀態。</value></data>
+  <data name="Notification_TargetUnavailable" xml:space="preserve"><value>此通知已過期，或對應帳戶、項目已無法使用。請從所屬帳戶開啟項目繼續操作。</value></data>
+  <data name="Notification_TaskCompleted" xml:space="preserve"><value>工作已完成。</value></data>
+  <data name="Notification_MailRead" xml:space="preserve"><value>郵件已標記為已讀。</value></data>
+  <data name="Notification_MailQueued" xml:space="preserve"><value>郵件已在本機標記為已讀，變更已加入同步佇列；可在帳戶同步中心查看進度。</value></data>
 </root>

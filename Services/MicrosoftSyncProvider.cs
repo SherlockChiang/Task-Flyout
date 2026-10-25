@@ -579,6 +579,7 @@ namespace Task_Flyout.Services
                                 IsEvent = false,
                                 IsTask = true,
                                 IsCompleted = mapped.IsCompleted,
+                                IsHighPriority = task.Importance == Importance.High,
                                 Provider = mapped.Provider,
                                 AccountId = AccountId,
                                 CalendarId = mapped.CalendarId,

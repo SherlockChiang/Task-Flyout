@@ -22,6 +22,25 @@ namespace Task_Flyout
     public sealed partial class MainWindow : Window
     {
         private ResourceLoader _loader;
+        private Func<Task>? _notificationActionRetry;
+
+        internal void ShowNotificationActionResult(string message, bool error, Func<Task>? retry)
+        {
+            _notificationActionRetry = retry;
+            NotificationActionStatus.Message = message;
+            NotificationActionStatus.Severity = error ? InfoBarSeverity.Error : InfoBarSeverity.Success;
+            NotificationActionRetry.Visibility = retry == null ? Visibility.Collapsed : Visibility.Visible;
+            NotificationActionStatus.IsOpen = true;
+        }
+
+        private async void NotificationActionRetry_Click(object sender, RoutedEventArgs e)
+        {
+            var retry = _notificationActionRetry;
+            if (retry == null) return;
+            NotificationActionRetry.IsEnabled = false;
+            try { await retry(); }
+            finally { NotificationActionRetry.IsEnabled = true; }
+        }
         private bool _pendingMailMessageNavigation;
         private bool _pendingCachedMailNavigation;
         private bool _isClampingToWorkArea;

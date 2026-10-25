@@ -135,6 +135,10 @@ namespace Task_Flyout.Views
             FlyoutPrewarmToggle.IsOn = settings.Values["FlyoutPrewarmEnabled"] as bool? ?? false;
             NotifyToggle.IsOn = settings.Values["NotifyEnabled"] as bool? ?? true;
             HideNotificationContentToggle.IsOn = settings.Values["HideNotificationContent"] as bool? ?? true;
+            NotificationQuietToggle.IsOn = settings.Values["NotificationQuietEnabled"] as bool? ?? false;
+            NotificationPriorityToggle.IsOn = NotificationPreferences.HighPriorityOnly;
+            NotificationQuietStart.Time = TimeSpan.FromMinutes(NotificationDeliveryPolicy.ClockMinutes(settings.Values["NotificationQuietStart"] as int? ?? 1320, 1320));
+            NotificationQuietEnd.Time = TimeSpan.FromMinutes(NotificationDeliveryPolicy.ClockMinutes(settings.Values["NotificationQuietEnd"] as int? ?? 480, 480));
             MailPollingToggle.IsOn = settings.Values["MailPollingEnabled"] as bool? ?? true;
             AutoMarkMailAsReadToggle.IsOn = settings.Values["AutoMarkMailAsRead"] as bool? ?? true;
             BlockRemoteImagesToggle.IsOn = settings.Values["BlockRemoteImagesByDefault"] as bool? ?? true;
@@ -149,6 +153,10 @@ namespace Task_Flyout.Views
             NotifyTimeComboBox.Items.Clear();
             foreach (int m in new[] { 5, 10, 15, 30, 60 })
                 NotifyTimeComboBox.Items.Add(new ComboBoxItem { Content = $"{m} {minuteStr}", Tag = m.ToString() });
+            NotificationSnoozeComboBox.Items.Clear();
+            foreach (int m in new[] { 5, 10, 15, 30, 60 })
+                NotificationSnoozeComboBox.Items.Add(new ComboBoxItem { Content = $"{m} {minuteStr}", Tag = m.ToString() });
+            SelectComboByTag(NotificationSnoozeComboBox, NotificationPreferences.SnoozeMinutes.ToString());
 
             SyncIntervalComboBox.Items.Clear();
             foreach (int m in new[] { 5, 15, 30, 60 })
@@ -680,6 +688,23 @@ namespace Task_Flyout.Views
             }
         }
 
+        private void NotificationPreferences_Toggled(object sender, RoutedEventArgs e) => SaveNotificationPreferences();
+        private void NotificationPreferences_Changed(object sender, SelectionChangedEventArgs e) => SaveNotificationPreferences();
+        private void NotificationQuietTime_Changed(object sender, TimePickerValueChangedEventArgs e) => SaveNotificationPreferences();
+
+        private void SaveNotificationPreferences()
+        {
+            if (_isInitializing) return;
+            var values = ApplicationData.Current.LocalSettings.Values;
+            values["NotificationQuietEnabled"] = NotificationQuietToggle.IsOn;
+            values["NotificationQuietStart"] = (int)NotificationQuietStart.Time.TotalMinutes;
+            values["NotificationQuietEnd"] = (int)NotificationQuietEnd.Time.TotalMinutes;
+            values["NotificationHighPriorityOnly"] = NotificationPriorityToggle.IsOn;
+            if (NotificationSnoozeComboBox.SelectedItem is ComboBoxItem item && int.TryParse(item.Tag?.ToString(), out var minutes))
+                values["NotificationSnoozeMinutes"] = NotificationDeliveryPolicy.SnoozeMinutes(minutes);
+            UpdateDependentControlStates();
+        }
+
         private void NotifyTimeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_isInitializing) return;
@@ -713,6 +738,9 @@ namespace Task_Flyout.Views
         private void UpdateDependentControlStates()
         {
             NotifyTimeComboBox.IsEnabled = NotifyToggle.IsOn;
+            NotificationSnoozeComboBox.IsEnabled = NotifyToggle.IsOn;
+            NotificationQuietStart.IsEnabled = NotificationQuietToggle.IsOn;
+            NotificationQuietEnd.IsEnabled = NotificationQuietToggle.IsOn;
             MailPollingIntervalComboBox.IsEnabled = MailPollingToggle.IsOn;
         }
 

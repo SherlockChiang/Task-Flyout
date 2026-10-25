@@ -95,6 +95,8 @@
     <Compile Include="..\..\Services\NotificationActivationParser.cs" Link="Source\NotificationActivationParser.cs" />
     <Compile Include="..\..\Services\NotificationActivationRouter.cs" Link="Source\NotificationActivationRouter.cs" />
     <Compile Include="..\..\Services\NotificationActionPolicy.cs" Link="Source\NotificationActionPolicy.cs" />
+    <Compile Include="..\..\Services\NotificationDeliveryPolicy.cs" Link="Source\NotificationDeliveryPolicy.cs" />
+    <Compile Include="..\..\Services\NotificationTargetPolicy.cs" Link="Source\NotificationTargetPolicy.cs" />
     <Compile Include="..\..\Services\NotificationActionStore.cs" Link="Source\NotificationActionStore.cs" />
     <Compile Include="..\..\Services\WebResourcePolicy.cs" Link="Source\WebResourcePolicy.cs" />
     <Compile Include="..\..\Services\StatusMessageFormatter.cs" Link="Source\StatusMessageFormatter.cs" />

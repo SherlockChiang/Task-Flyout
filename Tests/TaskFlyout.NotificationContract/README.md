@@ -21,9 +21,9 @@ that runtime registration. The initial sandbox attempt in this pass did not
 complete SDK initialization; its test process was stopped, and the probe then
 passed in the normal user context. The user's Task Flyout process was not stopped.
 
-Expected result: 13 checks pass, covering actual SDK mail payloads (including
+Expected result: 17 checks pass, covering actual SDK mail payloads (including
 Outlook `+`, `/`, `=` IDs), automatic/explicit transport selection and agenda/
-copy button payloads. This is a separate manual contract check, not part of
+copy/mark-read button payloads, muted audio, suppressed banners and grouping tags. This is a separate contract check, not part of
 `Task_Flyout.Tests` or a live Windows notification-click acceptance test.
 
 The pure unit suite separately rejects malformed/duplicate/extra arguments and

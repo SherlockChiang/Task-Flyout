@@ -14,9 +14,16 @@ namespace Task_Flyout.Services
         NotificationActionMask AllowedActions,
         DateTimeOffset ExpiresAt,
         DateTimeOffset? SnoozedUntil = null,
-        string AccountId = "")
+        string AccountId = "",
+        string ContainerId = "",
+        bool IsTask = false,
+        string AccountAddress = "",
+        uint? ImapUidValidity = null,
+        string NotificationTag = "",
+        string NotificationGroup = "",
+        int SnoozeMinutes = 10)
     {
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 3;
     }
 
     [JsonSerializable(typeof(NotificationActionTarget))]
@@ -37,7 +44,9 @@ namespace Task_Flyout.Services
 
         public static async Task<NotificationActionTarget?> ReadAsync(string? token, NotificationActionMask requiredAction, bool consume)
         {
-            if (!NotificationActivationParser.IsOpaqueToken(token)) return null;
+            if (!NotificationActivationParser.IsOpaqueToken(token)
+                || requiredAction is not (NotificationActionMask.Open or NotificationActionMask.Snooze
+                    or NotificationActionMask.Complete or NotificationActionMask.MarkRead)) return null;
             await Gate.WaitAsync();
             try
             {
@@ -51,6 +60,27 @@ namespace Task_Flyout.Services
                 return target;
             }
             catch { return null; }
+            finally { Gate.Release(); }
+        }
+
+        public static async Task<DateTimeOffset?> ScheduleSnoozeAsync(string token)
+        {
+            if (!NotificationActivationParser.IsOpaqueToken(token)) return null;
+            await Gate.WaitAsync();
+            try
+            {
+                var json = LocalSqliteStore.ReadProtectedText(Scope, token);
+                if (json == null) return null;
+                var target = JsonSerializer.Deserialize(json, NotificationActionJsonContext.Default.NotificationActionTarget);
+                var now = DateTimeOffset.UtcNow;
+                if (target?.SchemaVersion != NotificationActionTarget.CurrentSchemaVersion
+                    || target.ExpiresAt <= now || !target.AllowedActions.HasFlag(NotificationActionMask.Snooze)) return null;
+                var due = target.SnoozedUntil ?? now.AddMinutes(NotificationDeliveryPolicy.SnoozeMinutes(target.SnoozeMinutes));
+                var updated = target with { SnoozedUntil = due, ExpiresAt = due.AddDays(1) };
+                LocalSqliteStore.WriteProtectedText(Scope, token,
+                    JsonSerializer.Serialize(updated, NotificationActionJsonContext.Default.NotificationActionTarget));
+                return due;
+            }
             finally { Gate.Release(); }
         }
     }

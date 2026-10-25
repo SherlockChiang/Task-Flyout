@@ -2,7 +2,7 @@ using System;
 namespace Task_Flyout.Services
 {
     [Flags]
-    internal enum NotificationActionMask { None = 0, Open = 1, Snooze = 2, Complete = 4 }
+    internal enum NotificationActionMask { None = 0, Open = 1, Snooze = 2, Complete = 4, MarkRead = 8 }
 
     internal static class NotificationActionPolicy
     {

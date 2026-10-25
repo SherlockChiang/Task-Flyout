@@ -47,6 +47,10 @@ public sealed class NotificationActivationRouteTests
     [InlineData("action=openAgenda;token=invalid")]
     [InlineData("action=copyCode;codeToken=invalid")]
     [InlineData("action=unknown")]
+    [InlineData("action=markMailRead;accountId=a;folderId=INBOX;messageId=42")]
+    [InlineData("action=markMailRead;token=invalid")]
+    [InlineData("action=markMailRead;token=0123456789abcdef0123456789abcdef;extra=a")]
+    [InlineData("action=markMailRead;token=0123456789abcdef0123456789abcdef;token=0123456789abcdef0123456789abcdef")]
     [InlineData("----AppNotificationActivated:")]
     public void Rejected_activations_never_fall_back_to_calendar(string argument)
         => Assert.Equal(NotificationActivationKind.Ignore, NotificationActivationRouter.Parse(argument).Kind);
@@ -81,4 +85,13 @@ public sealed class NotificationActivationRouteTests
     public void Mail_ids_containing_agenda_action_words_are_not_misrouted()
         => Assert.Equal(NotificationActivationKind.OpenMail, NotificationActivationRouter.Parse(
             "action=openMail;accountId=a;folderId=INBOX;messageId=openAgenda-completeTask-snoozeAgenda", sdkEncoded: true).Kind);
+
+    [Fact]
+    public void Mark_read_requires_opaque_capability()
+    {
+        const string token = "0123456789abcdef0123456789abcdef";
+        var route = NotificationActivationRouter.Parse($"action=markMailRead;token={token}", true);
+        Assert.Equal(NotificationActivationKind.MailAction, route.Kind);
+        Assert.Equal(token, route.Token);
+    }
 }

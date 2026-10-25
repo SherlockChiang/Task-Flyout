@@ -62,8 +62,21 @@
 
             </NavigationView.MenuItems>
 
-            <Frame x:Name="ContentFrame" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                   HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <InfoBar x:Name="NotificationActionStatus" IsOpen="False" IsClosable="True" Margin="12,8"
+                         AutomationProperties.LiveSetting="Polite">
+                    <InfoBar.ActionButton>
+                        <Button x:Name="NotificationActionRetry" x:Uid="Notification_Retry" Content="Retry"
+                                Click="NotificationActionRetry_Click" Visibility="Collapsed"/>
+                    </InfoBar.ActionButton>
+                </InfoBar>
+                <Frame x:Name="ContentFrame" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                       HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
+            </Grid>
         </NavigationView>
 
         <Grid x:Name="GlobalSearchOverlay"

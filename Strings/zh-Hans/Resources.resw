@@ -2162,4 +2162,20 @@ Widgets 抑制：就绪 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="Cross_UndoArchive" xml:space="preserve"><value>撤销归档</value></data>
   <data name="Cross_CheckMail" xml:space="preserve"><value>检查邮件</value></data>
   <data name="Cross_Forget" xml:space="preserve"><value>停用／移除此记录</value></data>
+  <data name="Notification_SnoozeSetting.Header" xml:space="preserve"><value>稍后提醒时长</value></data>
+  <data name="Notification_QuietSetting.Header" xml:space="preserve"><value>启用静默时段</value></data>
+  <data name="Notification_QuietStart.Header" xml:space="preserve"><value>开始时间</value></data>
+  <data name="Notification_QuietEnd.Header" xml:space="preserve"><value>结束时间</value></data>
+  <data name="Notification_QuietDescription.Text" xml:space="preserve"><value>静默时段内，邮件、日程、任务和稍后提醒只进入通知中心，不显示横幅或播放声音。起止时间相同表示全天静默；天气警报仍单独设置。</value></data>
+  <data name="Notification_PrioritySetting.Header" xml:space="preserve"><value>仅提醒重要任务和邮件</value></data>
+  <data name="Notification_PriorityDescription.Text" xml:space="preserve"><value>仅提醒 Microsoft To Do 中标为重要的任务，以及抓取时已加旗标或带高重要性标记的邮件。Google 任务没有重要性标记，将被过滤；日历事件和主动设置的稍后提醒仍保留。</value></data>
+  <data name="Notification_SnoozeMinutes" xml:space="preserve"><value>{0} 分钟后提醒</value></data>
+  <data name="Notification_SnoozedReminder" xml:space="preserve"><value>稍后提醒 · 原定时间</value></data>
+  <data name="Notification_MarkRead" xml:space="preserve"><value>标记已读</value></data>
+  <data name="Notification_Retry.Content" xml:space="preserve"><value>重试</value></data>
+  <data name="Notification_ActionFailed" xml:space="preserve"><value>通知操作未完成。请检查账户连接后重试，或打开对应项目确认当前状态。</value></data>
+  <data name="Notification_TargetUnavailable" xml:space="preserve"><value>此通知已过期，或对应账户、项目已不可用。请从所属账户打开项目继续操作。</value></data>
+  <data name="Notification_TaskCompleted" xml:space="preserve"><value>任务已完成。</value></data>
+  <data name="Notification_MailRead" xml:space="preserve"><value>邮件已标记为已读。</value></data>
+  <data name="Notification_MailQueued" xml:space="preserve"><value>邮件已在本地标记为已读，更改已加入同步队列；可在账户同步中心查看进度。</value></data>
 </root>

@@ -1235,6 +1235,7 @@ namespace Task_Flyout.Services
                 IsTask = item.IsTask,
                 IsEvent = item.IsEvent,
                 IsCompleted = item.IsCompleted,
+                IsHighPriority = item.IsHighPriority,
                 Location = item.Location,
                 Description = item.Description,
                 Provider = item.Provider,
@@ -1257,6 +1258,7 @@ namespace Task_Flyout.Services
                && left.IsTask == right.IsTask
                && left.IsEvent == right.IsEvent
                && left.IsCompleted == right.IsCompleted
+               && left.IsHighPriority == right.IsHighPriority
                && left.Location == right.Location
                && left.Description == right.Description
                && left.Provider == right.Provider
