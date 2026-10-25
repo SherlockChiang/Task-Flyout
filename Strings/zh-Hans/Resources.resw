@@ -2066,4 +2066,38 @@ Widgets 抑制：就绪 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="TextOutlookImapReconnectRequired" xml:space="preserve"><value>Outlook IMAP 需要重新授权。请在下方登录并重新连接此邮箱。</value></data>
   <data name="TextOutlookImapAccountMismatch" xml:space="preserve"><value>请使用上方填写的 Microsoft 登录邮箱登录，不要选择其他账户或填写别名。</value></data>
   <data name="TextOutlookImapFailed" xml:space="preserve"><value>无法连接 Outlook IMAP。请检查账户类型、IMAP 开关和应用权限；组织账户可能需要管理员批准。</value></data>
+  <data name="MainWindow_NavToday.Content" xml:space="preserve"><value>今日</value></data>
+  <data name="TodayPage_Title.Text" xml:space="preserve"><value>今日</value></data>
+  <data name="Today_OpenToday" xml:space="preserve"><value>打开今日工作台</value></data>
+  <data name="TodayPage_CacheHint.Text" xml:space="preserve"><value>显示最近的本地数据；打开对应页面可与服务同步。</value></data>
+  <data name="TodayPage_NewTask.Content" xml:space="preserve"><value>添加任务</value></data>
+  <data name="TodayPage_NewEvent.Content" xml:space="preserve"><value>新建日程</value></data>
+  <data name="TodayPage_Compose.Content" xml:space="preserve"><value>写邮件</value></data>
+  <data name="TodayPage_Refresh.Content" xml:space="preserve"><value>刷新本地概览</value></data>
+  <data name="TodayCard_Retry.Content" xml:space="preserve"><value>重试</value></data>
+  <data name="Today_Agenda" xml:space="preserve"><value>接下来的日程</value></data>
+  <data name="Today_Tasks" xml:space="preserve"><value>今日与逾期任务</value></data>
+  <data name="Today_Mail" xml:space="preserve"><value>收件箱未读邮件</value></data>
+  <data name="Today_Weather" xml:space="preserve"><value>天气</value></data>
+  <data name="Today_Rss" xml:space="preserve"><value>RSS 未读文章</value></data>
+  <data name="Today_OpenAgenda" xml:space="preserve"><value>打开日历</value></data>
+  <data name="Today_OpenTasks" xml:space="preserve"><value>查看全部任务</value></data>
+  <data name="Today_OpenMail" xml:space="preserve"><value>打开邮件</value></data>
+  <data name="Today_OpenWeather" xml:space="preserve"><value>打开天气</value></data>
+  <data name="Today_OpenRss" xml:space="preserve"><value>打开 RSS</value></data>
+  <data name="Today_Loading" xml:space="preserve"><value>正在加载本地数据…</value></data>
+  <data name="Today_NoTasks" xml:space="preserve"><value>本地没有今日或逾期任务。打开任务页面可添加或同步。</value></data>
+  <data name="Today_NoAgenda" xml:space="preserve"><value>本地没有接下来的日程。打开日历可添加或同步。</value></data>
+  <data name="Today_TaskHint" xml:space="preserve"><value>未完成任务 · 最早到期优先 · 最多显示 5 项</value></data>
+  <data name="Today_AgendaHint" xml:space="preserve"><value>进行中与即将开始的日程 · 最多显示 5 项</value></data>
+  <data name="Today_NoMailAccount" xml:space="preserve"><value>请在邮件页面添加账户或完成设置。</value></data>
+  <data name="Today_MailUnknown" xml:space="preserve"><value>部分收件箱尚无缓存计数。打开邮件页面可同步。</value></data>
+  <data name="Today_NoUnreadMail" xml:space="preserve"><value>本地缓存中没有收件箱未读邮件。</value></data>
+  <data name="Today_MailHint" xml:space="preserve"><value>已连接账户的收件箱缓存计数</value></data>
+  <data name="Today_NoWeather" xml:space="preserve"><value>当前位置暂无天气缓存。打开天气页面可选择位置或刷新。</value></data>
+  <data name="Today_WeatherUpdated" xml:space="preserve"><value>天气更新于 {0}</value></data>
+  <data name="Today_NoUnreadRss" xml:space="preserve"><value>本地没有未读文章。打开 RSS 可添加或刷新订阅。</value></data>
+  <data name="Today_RssHint" xml:space="preserve"><value>所有本地订阅中的未读文章</value></data>
+  <data name="Today_ReadFailed" xml:space="preserve"><value>无法读取本地数据。</value></data>
+  <data name="Today_RetryHint" xml:space="preserve"><value>重试此卡片，或打开对应页面检查账户与同步状态。</value></data>
 </root>

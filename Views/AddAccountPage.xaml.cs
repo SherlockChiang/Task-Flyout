@@ -264,7 +264,7 @@ namespace Task_Flyout.Views
         private void CompleteOnboarding()
         {
             Windows.Storage.ApplicationData.Current.LocalSettings.Values[OnboardingPolicy.CompletedVersionKey] = OnboardingPolicy.CurrentVersion;
-            Frame?.Navigate(typeof(CalendarPage));
+            Frame?.Navigate(typeof(TodayPage));
         }
 
         private StackPanel CreateDisabledContent(string name, string color, string status)
@@ -281,10 +281,10 @@ namespace Task_Flyout.Views
             inner.Children.Add(new TextBlock { Text = name, FontSize = 16, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             inner.Children.Add(new TextBlock
             {
-                 Text = status,
-                 FontSize = 12,
-                 TextWrapping = TextWrapping.WrapWholeWords,
-                 Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray)
+                Text = status,
+                FontSize = 12,
+                TextWrapping = TextWrapping.WrapWholeWords,
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray)
             });
             sp.Children.Add(inner);
             return sp;

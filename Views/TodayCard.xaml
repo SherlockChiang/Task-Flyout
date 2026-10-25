@@ -1,0 +1,34 @@
+<UserControl
+    x:Class="Task_Flyout.Views.TodayCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="using:Task_Flyout.Views">
+    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="20">
+        <StackPanel Spacing="12">
+            <TextBlock x:Name="Heading" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            <ProgressBar x:Name="LoadingBar" IsIndeterminate="False" Visibility="Collapsed"/>
+            <TextBlock x:Name="Summary" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            <TextBlock x:Name="Detail" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       AutomationProperties.LiveSetting="Polite"/>
+            <InfoBar x:Name="ErrorBar" IsOpen="False" IsClosable="False" Severity="Error"/>
+            <ListView x:Name="Rows" SelectionMode="None" IsItemClickEnabled="True" ItemClick="Rows_ItemClick"
+                      HorizontalContentAlignment="Stretch" Visibility="Collapsed">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="views:TodayCardRow">
+                        <StackPanel Spacing="3" Padding="0,6">
+                            <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                            <TextBlock Text="{x:Bind Subtitle}" TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+            <StackPanel Spacing="8">
+                <Button x:Name="OpenButton" HorizontalAlignment="Stretch" Click="OpenButton_Click"/>
+                <Button x:Name="RetryButton" x:Uid="TodayCard_Retry" Content="Retry"
+                        HorizontalAlignment="Stretch" Click="RetryButton_Click" Visibility="Collapsed"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

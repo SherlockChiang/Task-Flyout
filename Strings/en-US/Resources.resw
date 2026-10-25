@@ -2066,4 +2066,38 @@ Widgets suppression: ready {8}; snapshot {9}; notification pending {10}</value><
   <data name="TextOutlookImapReconnectRequired" xml:space="preserve"><value>Outlook IMAP needs authorization. Sign in again below to reconnect this mailbox.</value></data>
   <data name="TextOutlookImapAccountMismatch" xml:space="preserve"><value>Sign in with the Microsoft email address entered above, not another account or an alias.</value></data>
   <data name="TextOutlookImapFailed" xml:space="preserve"><value>Could not connect Outlook IMAP. Check the account type, IMAP access and app permissions; your organization may require admin approval.</value></data>
+  <data name="MainWindow_NavToday.Content" xml:space="preserve"><value>Today</value></data>
+  <data name="TodayPage_Title.Text" xml:space="preserve"><value>Today</value></data>
+  <data name="Today_OpenToday" xml:space="preserve"><value>Open Today</value></data>
+  <data name="TodayPage_CacheHint.Text" xml:space="preserve"><value>Your latest local data. Open a section to sync with its service.</value></data>
+  <data name="TodayPage_NewTask.Content" xml:space="preserve"><value>Add task</value></data>
+  <data name="TodayPage_NewEvent.Content" xml:space="preserve"><value>New event</value></data>
+  <data name="TodayPage_Compose.Content" xml:space="preserve"><value>Write mail</value></data>
+  <data name="TodayPage_Refresh.Content" xml:space="preserve"><value>Refresh local overview</value></data>
+  <data name="TodayCard_Retry.Content" xml:space="preserve"><value>Retry</value></data>
+  <data name="Today_Agenda" xml:space="preserve"><value>Next up</value></data>
+  <data name="Today_Tasks" xml:space="preserve"><value>Due today and overdue</value></data>
+  <data name="Today_Mail" xml:space="preserve"><value>Unread inbox mail</value></data>
+  <data name="Today_Weather" xml:space="preserve"><value>Weather</value></data>
+  <data name="Today_Rss" xml:space="preserve"><value>Unread RSS</value></data>
+  <data name="Today_OpenAgenda" xml:space="preserve"><value>Open calendar</value></data>
+  <data name="Today_OpenTasks" xml:space="preserve"><value>View all tasks</value></data>
+  <data name="Today_OpenMail" xml:space="preserve"><value>Open mail</value></data>
+  <data name="Today_OpenWeather" xml:space="preserve"><value>Open weather</value></data>
+  <data name="Today_OpenRss" xml:space="preserve"><value>Open RSS</value></data>
+  <data name="Today_Loading" xml:space="preserve"><value>Loading local data…</value></data>
+  <data name="Today_NoTasks" xml:space="preserve"><value>No cached tasks due today or overdue. Open Tasks to add or sync tasks.</value></data>
+  <data name="Today_NoAgenda" xml:space="preserve"><value>No upcoming events in the local cache. Open Calendar to add or sync events.</value></data>
+  <data name="Today_TaskHint" xml:space="preserve"><value>Incomplete tasks · earliest due first · up to 5 shown</value></data>
+  <data name="Today_AgendaHint" xml:space="preserve"><value>Ongoing and upcoming events · up to 5 shown</value></data>
+  <data name="Today_NoMailAccount" xml:space="preserve"><value>Add or finish setting up a mail account from Mail.</value></data>
+  <data name="Today_MailUnknown" xml:space="preserve"><value>Some inbox counts are not cached. Open Mail to sync them.</value></data>
+  <data name="Today_NoUnreadMail" xml:space="preserve"><value>No unread inbox mail in the local cache.</value></data>
+  <data name="Today_MailHint" xml:space="preserve"><value>Cached inbox counts across connected accounts</value></data>
+  <data name="Today_NoWeather" xml:space="preserve"><value>No weather cached for this location. Open Weather to choose or refresh it.</value></data>
+  <data name="Today_WeatherUpdated" xml:space="preserve"><value>Weather updated {0}</value></data>
+  <data name="Today_NoUnreadRss" xml:space="preserve"><value>No unread articles cached. Open RSS to add or refresh subscriptions.</value></data>
+  <data name="Today_RssHint" xml:space="preserve"><value>Unread articles across all cached subscriptions</value></data>
+  <data name="Today_ReadFailed" xml:space="preserve"><value>Local data could not be read.</value></data>
+  <data name="Today_RetryHint" xml:space="preserve"><value>Retry this card, or open its page to check the account and sync status.</value></data>
 </root>

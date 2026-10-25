@@ -8,6 +8,27 @@ public class RssSqliteRepositoryTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "TaskFlyoutRssRepositoryTests", Guid.NewGuid().ToString("N"));
 
     [Fact]
+    public void Unread_count_is_not_capped_by_article_paging()
+    {
+        string path = Path.Combine(_root, "counts.db");
+        var repository = new RssSqliteRepository(path);
+        Assert.Equal(0L, repository.CountUnreadArticles());
+        using var connection = new SqliteConnection($"Data Source={path}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+WITH RECURSIVE numbers(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM numbers WHERE n < 1501)
+INSERT INTO rss_articles(id, subscription_id, feed_title, title, link, summary, html_content, image_url, local_image_path, is_read)
+SELECT CAST(n AS TEXT), 'feed', '', '', '', '', '', '', '', CASE WHEN n = 1501 THEN 1 ELSE 0 END FROM numbers;
+""";
+        command.ExecuteNonQuery();
+        Assert.Equal(1500L, repository.CountUnreadArticles());
+        command.CommandText = "UPDATE rss_articles SET is_read = 1 WHERE id = '1';";
+        command.ExecuteNonQuery();
+        Assert.Equal(1499L, repository.CountUnreadArticles());
+    }
+
+    [Fact]
     public void Cancelled_metadata_query_does_not_initialize_storage()
     {
         string path = Path.Combine(_root, "cancelled.db");

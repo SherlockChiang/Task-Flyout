@@ -25,6 +25,11 @@
                         ItemInvoked="MainNav_ItemInvoked" BackRequested="MainNav_BackRequested">
 
             <NavigationView.MenuItems>
+                <NavigationViewItem x:Uid="MainWindow_NavToday" AutomationProperties.AutomationId="NavToday" Content="Today" Tag="Today">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Home"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem x:Uid="MainWindow_NavCalendar" AutomationProperties.AutomationId="NavCalendar" Content="主日历视图" Tag="Calendar">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE263;" FontFamily="ms-appx:///Assets/FluentSystemIcons-Filled.ttf#FluentSystemIcons-Filled"/>

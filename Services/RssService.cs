@@ -156,8 +156,8 @@ namespace Task_Flyout.Services
 
     public sealed record RemoteImageStream(IRandomAccessStream Stream, string ContentType);
 
-        public class RssService
-        {
+    public class RssService
+    {
         private readonly ResourceLoader _loader = new();
         private const int FeedRefreshMinutes = 30;
         private const long MaxImageBytes = 5 * 1024 * 1024;
@@ -558,6 +558,16 @@ namespace Task_Flyout.Services
             // after awaiting this operation, so keep the synchronous database work off it.
             return Task.Run(() => GetCachedArticlesPage(subscriptionId, folderId, skip, take, filter, searchText).ToList());
         }
+
+        internal Task<long> GetUnreadCountAsync() => Task.Run(() =>
+        {
+            var lease = _dataLifecycle.Capture();
+            lease.CancellationToken.ThrowIfCancellationRequested();
+            EnsureLoaded();
+            long count = Repository.CountUnreadArticles();
+            lease.CancellationToken.ThrowIfCancellationRequested();
+            return count;
+        });
 
         public Task InitializeAsync()
         {

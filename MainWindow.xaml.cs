@@ -25,7 +25,7 @@ namespace Task_Flyout
         private bool _pendingMailMessageNavigation;
         private bool _pendingCachedMailNavigation;
         private bool _isClampingToWorkArea;
-        private Type _lastContentPageType = typeof(Views.CalendarPage);
+        private Type _lastContentPageType = typeof(Views.TodayPage);
         private readonly ObservableCollection<GlobalSearchResultGroup> _globalSearchGroups = new();
         private IReadOnlyList<GlobalSearchCandidate> _globalSearchSnapshot = Array.Empty<GlobalSearchCandidate>();
         private Dictionary<string, object> _globalSearchPayloads = new(StringComparer.Ordinal);
@@ -76,9 +76,7 @@ namespace Task_Flyout
 
             _ = RefreshWeatherNavIconAsync();
 
-            var calendarItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault();
-            if (calendarItem != null) MainNav.SelectedItem = calendarItem;
-            ContentFrame.Navigate(ShouldShowOnboardingOnLaunch() ? typeof(Views.AddAccountPage) : typeof(Views.CalendarPage));
+            ContentFrame.Navigate(ShouldShowOnboardingOnLaunch() ? typeof(Views.AddAccountPage) : typeof(Views.TodayPage));
         }
 
         private void EnsureWithinCurrentWorkArea()
@@ -154,6 +152,10 @@ namespace Task_Flyout
             if (ContentFrame.SourcePageType == typeof(Views.SettingsPage))
             {
                 MainNav.SelectedItem = MainNav.SettingsItem;
+            }
+            else if (ContentFrame.SourcePageType == typeof(Views.TodayPage))
+            {
+                MainNav.SelectedItem = MainNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == "Today");
             }
             else if (ContentFrame.SourcePageType == typeof(Views.CalendarPage))
             {
@@ -269,7 +271,7 @@ namespace Task_Flyout
 
             var pageType = _lastContentPageType;
             if (pageType == typeof(Views.AddAccountPage))
-                pageType = typeof(Views.CalendarPage);
+                pageType = ShouldShowOnboardingOnLaunch() ? typeof(Views.AddAccountPage) : typeof(Views.TodayPage);
 
             ContentFrame.Navigate(pageType);
         }
@@ -408,6 +410,8 @@ namespace Task_Flyout
         private void MainNav_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
         {
             if (args.IsSettingsInvoked) ContentFrame.Navigate(typeof(SettingsPage));
+            else if (args.InvokedItemContainer is NavigationViewItem today && today.Tag?.ToString() == "Today")
+                ContentFrame.Navigate(typeof(TodayPage));
             else if (args.InvokedItemContainer is NavigationViewItem item && item.Tag?.ToString() == "Calendar")
                 ContentFrame.Navigate(typeof(CalendarPage));
             else if (args.InvokedItemContainer is NavigationViewItem itemT && itemT.Tag?.ToString() == "Tasks")
@@ -788,6 +792,7 @@ namespace Task_Flyout
 
         private void AddGlobalSearchCommands(List<GlobalSearchCandidate> candidates)
         {
+            AddCommand(candidates, "15-open-today", "Today_OpenToday", "Open Today", "\uE80F");
             AddCommand(candidates, "01-new-task", "GlobalSearch_CommandNewTask", "New task", "\uE73E");
             AddCommand(candidates, "02-new-event", "GlobalSearch_CommandNewEvent", "New event", "\uE787");
             AddCommand(candidates, "03-compose-mail", "GlobalSearch_CommandComposeMail", "Compose mail", "\uE70F");
@@ -990,6 +995,7 @@ namespace Task_Flyout
         {
             switch (id)
             {
+                case "15-open-today": ContentFrame.Navigate(typeof(TodayPage)); break;
                 case "01-new-task": NavigateToCalendarAndCreate(isTask: true); break;
                 case "02-new-event": NavigateToCalendarAndCreate(isTask: false); break;
                 case "03-compose-mail": NavigateToMailCompose(); break;
@@ -1025,7 +1031,7 @@ namespace Task_Flyout
             ContentFrame.Navigate(typeof(Views.RssPage));
         }
 
-        private void NavigateToCalendarAndCreate(bool isTask)
+        internal void NavigateToCalendarAndCreate(bool isTask)
         {
             NavigateToCalendar();
             DispatcherQueue.TryEnqueue(() =>

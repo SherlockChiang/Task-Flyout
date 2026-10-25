@@ -166,6 +166,15 @@ CREATE TABLE IF NOT EXISTS rss_articles (
             return ReadArticles(connection, subscriptionId, folderId, skip, take, filter, searchText, cancellationToken);
         }
 
+        public long CountUnreadArticles()
+        {
+            Initialize();
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM rss_articles WHERE is_read = 0;";
+            return (long)command.ExecuteScalar()!;
+        }
+
         public RssRepositorySnapshot LoadSnapshot(int maximumArticleCount)
         {
             Initialize();
