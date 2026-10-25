@@ -183,13 +183,14 @@
                 </Button>
             </Grid>
 
+            <StackPanel Grid.Row="1" Spacing="8" Margin="0,0,0,16">
+            <views:TaskMailActionsPanel/>
             <AutoSuggestBox x:Uid="TasksPage_Search"
                             x:Name="TaskSearchBox"
-                            Grid.Row="1"
-                            Margin="0,0,0,16"
                             PlaceholderText="Search cached tasks"
                             TextChanged="TaskSearchBox_TextChanged"
                             AutomationProperties.Name="Search cached tasks"/>
+            </StackPanel>
 
             <Grid Grid.Row="2" RowSpacing="14" MinHeight="0">
                 <Grid.RowDefinitions>

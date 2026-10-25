@@ -21,7 +21,7 @@ namespace Task_Flyout.Services
 
         Task CreateEventAsync(string title, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, bool isAllDay, EventRecurrenceKind recurrence = EventRecurrenceKind.None, QuickCreateOptions? options = null);
 
-        Task CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay, QuickCreateOptions? options = null);
+        Task<CreatedTaskReference?> CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay, QuickCreateOptions? options = null);
         Task DeleteItemAsync(string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode = RecurringDeleteMode.Single, DateTime? occurrenceDate = null, string recurringEventId = "", string taskListId = "");
     }
 }

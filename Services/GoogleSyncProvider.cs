@@ -502,11 +502,13 @@ namespace Task_Flyout.Services
         {
             var items = new List<AgendaItem>();
             var range = SyncRangePolicy.NormalizeHalfOpenDateRange(min, max);
+            var list = await tasksSvc.Tasklists.Get("@default").ExecuteAsync(cancellationToken).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(list?.Id)) throw new InvalidOperationException("The default task list is unavailable.");
             string? taskPageToken = null;
             var seenTaskPageTokens = new HashSet<string>(StringComparer.Ordinal);
             do
             {
-                var tasksReq = tasksSvc.Tasks.List("@default");
+                var tasksReq = tasksSvc.Tasks.List(list.Id);
                 tasksReq.ShowCompleted = true; tasksReq.ShowHidden = true; tasksReq.MaxResults = 100; tasksReq.PageToken = taskPageToken;
                 var tasks = await tasksReq.ExecuteAsync(cancellationToken).ConfigureAwait(false);
                 if (tasks?.Items != null)
@@ -527,8 +529,8 @@ namespace Task_Flyout.Services
                             _loader.GetStringOrDefault("TextTask") ?? "Task",
                             t.Notes,
                             ProviderName,
-                            null,
-                            null,
+                            list.Id,
+                            list.Title,
                             taskDate,
                             isDone);
 
@@ -637,14 +639,17 @@ namespace Task_Flyout.Services
             await CalendarSvc!.Events.Insert(newEvent, "primary").ExecuteAsync();
         }
 
-        public async Task CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay, QuickCreateOptions? options = null)
+        public async Task<CreatedTaskReference?> CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay, QuickCreateOptions? options = null)
         {
             var newTask = new Google.Apis.Tasks.v1.Data.Task { Title = title, Notes = options?.Description };
 
             newTask.Due = targetDate.ToString("yyyy-MM-dd'T'00:00:00.000'Z'");
 
             await EnsureAuthorizedAsync();
-            await TasksSvc!.Tasks.Insert(newTask, "@default").ExecuteAsync();
+            var list = await TasksSvc!.Tasklists.Get("@default").ExecuteAsync();
+            if (string.IsNullOrWhiteSpace(list?.Id)) throw new InvalidOperationException("The default task list is unavailable.");
+            var created = await TasksSvc.Tasks.Insert(newTask, list.Id).ExecuteAsync();
+            return string.IsNullOrWhiteSpace(created?.Id) ? null : new CreatedTaskReference(created.Id, list.Id);
         }
 
         public async Task DeleteItemAsync(string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode = RecurringDeleteMode.Single, DateTime? occurrenceDate = null, string recurringEventId = "", string taskListId = "")

@@ -604,6 +604,10 @@ namespace Task_Flyout.Services
             if (provider == null || !IsProviderConnected(provider))
                 throw new InvalidOperationException("The task provider is unavailable.");
             await provider.UpdateTaskStatusAsync(taskId, isCompleted, taskListId);
+            if (isCompleted && App.Current is App app)
+                await app.TaskMailActions.CompleteAsync(provider.ProviderKey, taskListId, taskId);
+            else if (!isCompleted && App.Current is App reopenedApp)
+                await reopenedApp.TaskMailActions.ReopenAsync(provider.ProviderKey, taskListId, taskId);
         }
 
         public async Task UpdateItemAsync(string providerName, string itemId, bool isEvent, string title, string location, string description, DateTime targetDate, TimeSpan? startTime, TimeSpan? endTime, string taskListId = "", string? accountId = null)
@@ -617,7 +621,7 @@ namespace Task_Flyout.Services
         public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, string? providerName = null, string? accountId = null)
             => await CreateItemAsync(title, isEvent, isAllDay, targetDate, startTime, endTime, location, EventRecurrenceKind.None, providerName, accountId);
 
-        public async Task CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, EventRecurrenceKind recurrence, string? providerName = null, string? accountId = null, QuickCreateOptions? options = null)
+        public async Task<CreatedTaskReference?> CreateItemAsync(string title, bool isEvent, bool isAllDay, DateTime targetDate, TimeSpan startTime, TimeSpan endTime, string location, EventRecurrenceKind recurrence, string? providerName = null, string? accountId = null, QuickCreateOptions? options = null)
         {
             var provider = providerName != null
                 ? ResolveProvider(providerName, accountId)
@@ -628,9 +632,11 @@ namespace Task_Flyout.Services
             QuickCreatePolicy.Validate(provider.ProviderName, isEvent, title, options with { Recurrence = recurrence });
 
             if (isEvent)
+            {
                 await provider.CreateEventAsync(title, targetDate, startTime, endTime, location, isAllDay, recurrence, options);
-            else
-                await provider.CreateTaskAsync(title, targetDate, startTime, isAllDay, options with { Recurrence = recurrence });
+                return null;
+            }
+            return await provider.CreateTaskAsync(title, targetDate, startTime, isAllDay, options with { Recurrence = recurrence });
         }
 
         public async Task DeleteItemAsync(string providerName, string itemId, bool isEvent, string taskListId = "", string? accountId = null)
@@ -648,6 +654,7 @@ namespace Task_Flyout.Services
         {
             var account = AccountManager.GetAccount(providerName, accountId);
             if (account == null) return;
+            if (App.Current is App app) await app.TaskMailActions.ForgetAccountAsync(providerKey: account.ProviderKey);
             AccountManager.RemoveAccountById(account.AccountId);
             RemoveProviderFromCache(account.ProviderName, account.AccountId);
             await SaveCacheAsync();

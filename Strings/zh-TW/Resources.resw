@@ -2137,4 +2137,29 @@ Widgets 抑制：就緒 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="QuickCreate_SaveFailed" xml:space="preserve"><value>未能確認建立成功，已保留全部輸入。再次儲存前，請先檢查目標帳戶，避免重複建立。</value></data>
   <data name="QuickCreate_FromSource.Content" xml:space="preserve"><value>建立工作</value></data>
   <data name="QuickCreate_FromSource.AutomationProperties.Name" xml:space="preserve"><value>根據此內容建立工作</value></data>
+  <data name="Cross_ArchiveOption" xml:space="preserve"><value>在 Task Flyout 中完成此工作後，封存 {0} 中的來源郵件。可在工作頁管理或復原。</value></data>
+  <data name="Cross_ConfirmDestination" xml:space="preserve"><value>我確認在 {0}（{1}）中建立。</value></data>
+  <data name="Cross_ConfirmRequired" xml:space="preserve"><value>請確認目標帳戶後儲存。</value></data>
+  <data name="Cross_LinkFailed" xml:space="preserve"><value>工作已建立，但未能啟用郵件自動封存。請勿重複建立，可手動封存來源郵件。</value></data>
+  <data name="Cross_CreateEvent.Content" xml:space="preserve"><value>建立行程</value></data>
+  <data name="Cross_CreateEvent.AutomationProperties.Name" xml:space="preserve"><value>根據此郵件建立行程</value></data>
+  <data name="Cross_ReadLaterFilter.Content" xml:space="preserve"><value>稍後閱讀</value></data>
+  <data name="Cross_ReadLater.Content" xml:space="preserve"><value>加入／移出稍後閱讀</value></data>
+  <data name="Cross_ReadLater.AutomationProperties.Name" xml:space="preserve"><value>切換此文章的稍後閱讀狀態</value></data>
+  <data name="Cross_ReadLaterSaved" xml:space="preserve"><value>已加入稍後閱讀，再次點擊可復原。</value></data>
+  <data name="Cross_ReadLaterRemoved" xml:space="preserve"><value>已移出稍後閱讀，再次點擊可復原。</value></data>
+  <data name="Cross_ReadLaterFailed" xml:space="preserve"><value>未能儲存此修改，請重試。</value></data>
+  <data name="Cross_Actions" xml:space="preserve"><value>關聯郵件操作</value></data>
+  <data name="Cross_StorageFailed" xml:space="preserve"><value>未能儲存或載入關聯郵件操作。請檢查本機儲存空間，操作不會自動重試。</value></data>
+  <data name="Cross_StateReady" xml:space="preserve"><value>在 Task Flyout 中完成此工作後封存郵件。</value></data>
+  <data name="Cross_StateArchiving" xml:space="preserve"><value>工作已完成，正在封存來源郵件…</value></data>
+  <data name="Cross_StateArchived" xml:space="preserve"><value>來源郵件已封存。復原將還原郵件，工作仍保持完成。</value></data>
+  <data name="Cross_StateFailed" xml:space="preserve"><value>工作已完成，但郵件封存失敗。請檢查來源帳戶後重試。</value></data>
+  <data name="Cross_StateUnknown" xml:space="preserve"><value>無法確認郵件操作結果。請檢查信箱，不會自動重試。</value></data>
+  <data name="Cross_StateUndoing" xml:space="preserve"><value>正在還原來源郵件…</value></data>
+  <data name="Cross_StateUndone" xml:space="preserve"><value>已復原封存，此關聯不再自動封存。</value></data>
+  <data name="Cross_RetryArchive" xml:space="preserve"><value>重試封存</value></data>
+  <data name="Cross_UndoArchive" xml:space="preserve"><value>復原封存</value></data>
+  <data name="Cross_CheckMail" xml:space="preserve"><value>檢查郵件</value></data>
+  <data name="Cross_Forget" xml:space="preserve"><value>停用／移除此記錄</value></data>
 </root>

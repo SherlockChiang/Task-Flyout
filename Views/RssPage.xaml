@@ -168,6 +168,7 @@
                             <ComboBoxItem x:Uid="RssPage_FilterAll" Content="All" Tag="All"/>
                             <ComboBoxItem x:Uid="RssPage_FilterUnread" Content="Unread" Tag="Unread"/>
                             <ComboBoxItem x:Uid="RssPage_FilterStarred" Content="Starred" Tag="Starred"/>
+                            <ComboBoxItem x:Uid="Cross_ReadLaterFilter" Content="Read later" Tag="ReadLater"/>
                         </ComboBox>
                         <AutoSuggestBox x:Uid="RssPage_Search"
                                         x:Name="ArticleSearchBox"
@@ -282,8 +283,10 @@
                                 <TextBlock x:Name="ReaderTitleText" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/>
                                 <TextBlock x:Name="ReaderMetaText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                 <TextBlock x:Name="ReaderPrivacyText" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="ReaderActionStatusText" FontSize="12" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                             </StackPanel>
                             <StackPanel Grid.Column="2" Spacing="4">
+                            <Button x:Uid="Cross_ReadLater" Content="Save / remove read later" Click="ToggleReadLater_Click"/>
                             <Button x:Uid="QuickCreate_FromSource" Content="Create task" Click="CreateTaskFromArticle_Click"/>
                             <Button x:Uid="RssPage_OpenArticleInBrowserButton" Click="OpenArticleInBrowserButton_Click">
                                 <StackPanel Orientation="Horizontal" Spacing="6">

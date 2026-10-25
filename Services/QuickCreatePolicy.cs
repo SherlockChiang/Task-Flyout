@@ -7,7 +7,8 @@ namespace Task_Flyout.Services;
 public sealed record QuickCreateOptions(string Description = "", int? ReminderMinutes = null,
     EventRecurrenceKind Recurrence = EventRecurrenceKind.None, string? RequestId = null);
 
-internal sealed record QuickCreateSeed(string Title, string Notes, string? PreferredProviderKey = null);
+public sealed record CreatedTaskReference(string Id, string ListId);
+internal sealed record QuickCreateSeed(string Title, string Notes, string? PreferredProviderKey = null, TaskMailSource? MailSource = null);
 internal sealed record QuickCreateParsed(string Title, DateTime Date, TimeSpan? Time);
 internal readonly record struct QuickCreateCapabilities(bool Supported, bool Time, bool Reminder, bool Recurrence);
 internal readonly record struct QuickCreateRecurrence(DayOfWeek? DayOfWeek, int? DayOfMonth, int? Month);

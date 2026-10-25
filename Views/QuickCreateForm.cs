@@ -30,6 +30,11 @@ public sealed class QuickCreateForm : UserControl
     private readonly ComboBox _reminder = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly ComboBox _recurrence = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly CheckBox _remember = new();
+    private readonly CheckBox _archiveMail = new();
+    private readonly CheckBox _confirmDestination = new();
+    private bool _fromSource;
+    private TaskMailSource? _mailSource;
+    private bool _created;
     private readonly TextBlock _hint = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12 };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12 };
     private readonly Button _save = new();
@@ -76,13 +81,13 @@ public sealed class QuickCreateForm : UserControl
         parse.Click += (_, _) => ParseTitle();
         _save.Content = Text("CalendarDialog.PrimaryButtonText", "Save");
         _save.Style = (Style)Application.Current.Resources["AccentButtonStyle"];
-        _save.Click += async (_, _) => await SaveAsync();
+        _save.Click += async (_, _) => { if (_created) Saved?.Invoke(); else await SaveAsync(); };
         _cancel.Content = Text("CalendarDialog.CloseButtonText", "Cancel");
         _cancel.Click += (_, _) => { Reset(); Canceled?.Invoke(); };
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         actions.Children.Add(_save);
         actions.Children.Add(_cancel);
-        foreach (var control in new UIElement[] { _type, _account, _title, parse, _date, _allDay, _start, _duration, _location, _notes, _reminder, _recurrence, _remember, _hint })
+        foreach (var control in new UIElement[] { _type, _account, _title, parse, _date, _allDay, _start, _duration, _location, _notes, _reminder, _recurrence, _remember, _archiveMail, _confirmDestination, _hint })
             _fields.Children.Add(control);
         var root = new StackPanel { Spacing = 10 };
         root.Children.Add(_fields);
@@ -93,7 +98,7 @@ public sealed class QuickCreateForm : UserControl
         AutomationProperties.SetAutomationId(_save, "QuickCreateSave");
         AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
         _type.SelectionChanged += (_, _) => { if (!_updating) PopulateAccounts(); };
-        _account.SelectionChanged += (_, _) => { if (!_updating) ApplyCapabilities(); };
+        _account.SelectionChanged += (_, _) => { if (!_updating) { _confirmDestination.IsChecked = false; ApplyCapabilities(); } };
         _allDay.Checked += (_, _) => ApplyCapabilities();
         _allDay.Unchecked += (_, _) => ApplyCapabilities();
     }
@@ -121,6 +126,11 @@ public sealed class QuickCreateForm : UserControl
         _location.Text = "";
         _remember.IsChecked = false;
         _preferredKey = seed?.PreferredProviderKey;
+        _mailSource = seed?.MailSource;
+        _fromSource = seed != null;
+        _confirmDestination.IsChecked = false;
+        _archiveMail.IsChecked = false;
+        _archiveMail.Content = new TextBlock { Text = string.Format(Text("Cross_ArchiveOption", "When I complete this task in Task Flyout, archive the source mail in {0}. Manage or undo in Tasks."), _mailSource?.Address), TextWrapping = TextWrapping.Wrap };
         _status.Text = "";
         _updating = false;
         PopulateAccounts();
@@ -132,6 +142,7 @@ public sealed class QuickCreateForm : UserControl
     private void PopulateAccounts()
     {
         if (IsBusy) return;
+        _confirmDestination.IsChecked = false;
         _updating = true;
         string? previous = Account?.ProviderKey;
         _account.Items.Clear();
@@ -156,6 +167,9 @@ public sealed class QuickCreateForm : UserControl
         _start.Header = IsEvent ? Text("TextStartTime", "Start time") : Text("TextDueTime", "Due time");
         _duration.Visibility = IsEvent && capability.Time && _allDay.IsChecked != true ? Visibility.Visible : Visibility.Collapsed;
         _location.Visibility = IsEvent ? Visibility.Visible : Visibility.Collapsed;
+        _archiveMail.Visibility = !IsEvent && _mailSource != null ? Visibility.Visible : Visibility.Collapsed;
+        _confirmDestination.Visibility = _fromSource ? Visibility.Visible : Visibility.Collapsed;
+        _confirmDestination.Content = new TextBlock { Text = string.Format(Text("Cross_ConfirmDestination", "I confirm creation in {0} ({1})."), Account?.DisplayTitle, Account?.ProviderName), TextWrapping = TextWrapping.Wrap };
         _reminder.Visibility = capability.Reminder ? Visibility.Visible : Visibility.Collapsed;
         _recurrence.Visibility = capability.Recurrence ? Visibility.Visible : Visibility.Collapsed;
         if (!capability.Reminder) _reminder.SelectedIndex = 0;
@@ -186,6 +200,8 @@ public sealed class QuickCreateForm : UserControl
     {
         if (IsBusy || App.Current is not App app) return;
         var account = Account;
+        if (_fromSource && _confirmDestination.IsChecked != true)
+        { _status.Text = Text("Cross_ConfirmRequired", "Confirm the destination account before saving."); return; }
         if (account == null || !_date.Date.HasValue || string.IsNullOrWhiteSpace(_title.Text))
         { _status.Text = Text("QuickCreate_Required", "Choose an account and date, and enter a title."); return; }
         var capability = QuickCreatePolicy.Capabilities(account.ProviderName, IsEvent);
@@ -221,10 +237,23 @@ public sealed class QuickCreateForm : UserControl
         _status.Text = Text("TextSyncing", "Syncing...");
         try
         {
-            await app.SyncManager.CreateItemAsync(_title.Text.Trim(), IsEvent, isAllDay, date, _start.Time,
+            var created = await app.SyncManager.CreateItemAsync(_title.Text.Trim(), IsEvent, isAllDay, date, _start.Time,
                 QuickCreatePolicy.EndTime(_start.Time, duration), _location.Text, recurrence, account.ProviderName, account.AccountId,
                 new QuickCreateOptions(_notes.Text, reminder, recurrence, _requestId));
             succeeded = true;
+            if (!IsEvent && _archiveMail.IsChecked == true && _mailSource != null)
+            {
+                try
+                {
+                    if (created == null) throw new InvalidOperationException("The provider did not return a task identity.");
+                    await app.TaskMailActions.AddAsync(account.ProviderKey, created, _title.Text.Trim(), _mailSource);
+                }
+                catch
+                {
+                    _created = true;
+                    _status.Text = Text("Cross_LinkFailed", "The task was created, but automatic mail archiving could not be enabled. Do not create it again; archive the mail manually.");
+                }
+            }
             if (_remember.IsChecked == true)
             {
                 try
@@ -251,7 +280,13 @@ public sealed class QuickCreateForm : UserControl
         {
             Reset();
             _ = RefreshCreatedAccountAsync(app, account, date);
-            Saved?.Invoke();
+            if (_created)
+            {
+                foreach (var field in _fields.Children.OfType<Control>()) field.IsEnabled = false;
+                _save.Content = Text("TextConfirm", "OK");
+                _cancel.Visibility = Visibility.Collapsed;
+            }
+            else Saved?.Invoke();
         }
     }
 

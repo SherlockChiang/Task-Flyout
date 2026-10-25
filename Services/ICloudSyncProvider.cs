@@ -258,8 +258,8 @@ namespace Task_Flyout.Services
             await _client!.CreateResourceAsync(resourceUri, calendarData, CancellationToken.None);
         }
 
-        public Task CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay, QuickCreateOptions? options = null)
-            => Task.FromException(new NotSupportedException("iCloud Calendar does not provide task synchronization."));
+        public Task<CreatedTaskReference?> CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay, QuickCreateOptions? options = null)
+            => Task.FromException<CreatedTaskReference?>(new NotSupportedException("iCloud Calendar does not provide task synchronization."));
 
         public Task DeleteItemAsync(
             string itemId,

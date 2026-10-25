@@ -1081,6 +1081,8 @@ namespace Task_Flyout.Views
             ArticleList.Visibility = Visibility.Collapsed;
             ArticleReaderPanel.Visibility = Visibility.Visible;
             ReaderTitleText.Text = article.Title;
+            ReaderActionStatusText.Text = article.IsReadLater
+                ? _loader.GetStringOrDefault("Cross_ReadLaterSaved") ?? "Saved for later. Click again to undo." : "";
             ReaderMetaText.Text = $"{article.FeedTitle} · {article.PublishedText}";
             ReaderPrivacyText.Text = Windows.Storage.ApplicationData.Current.LocalSettings.Values["AllowRssRemoteResources"] as bool? ?? false
                 ? (_loader.GetStringOrDefault("TextRssRemoteImagesProxied") ?? "Remote images are proxied through Task Flyout and blocked if they resolve to private networks.")
@@ -1431,6 +1433,18 @@ namespace Task_Flyout.Views
             if (_selectedArticle == null) return;
             var seed = QuickCreatePolicy.FromSource(_selectedArticle.Title, _selectedArticle.FeedTitle, _selectedArticle.Link);
             await QuickCreateForm.ShowDialogAsync(XamlRoot, DateTime.Today, isTask: true, seed);
+        }
+
+        private void ToggleReadLater_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedArticle == null) return;
+            try
+            {
+                _rssService.SetArticleReadLater(_selectedArticle, !_selectedArticle.IsReadLater);
+                ReaderActionStatusText.Text = _loader.GetStringOrDefault(_selectedArticle.IsReadLater ? "Cross_ReadLaterSaved" : "Cross_ReadLaterRemoved")
+                    ?? (_selectedArticle.IsReadLater ? "Saved for later. Click again to undo." : "Removed from read later. Click again to undo.");
+            }
+            catch { ReaderActionStatusText.Text = _loader.GetStringOrDefault("Cross_ReadLaterFailed") ?? "Could not save the change. Try again."; }
         }
 
         private void OpenArticleInBrowserButton_Click(object sender, RoutedEventArgs e)

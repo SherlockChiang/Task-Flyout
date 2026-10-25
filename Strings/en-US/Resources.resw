@@ -2137,4 +2137,29 @@ Widgets suppression: ready {8}; snapshot {9}; notification pending {10}</value><
   <data name="QuickCreate_SaveFailed" xml:space="preserve"><value>Could not confirm creation. Your input is kept. Check the destination for duplicates before retrying Save.</value></data>
   <data name="QuickCreate_FromSource.Content" xml:space="preserve"><value>Create task</value></data>
   <data name="QuickCreate_FromSource.AutomationProperties.Name" xml:space="preserve"><value>Create a task from this item</value></data>
+  <data name="Cross_ArchiveOption" xml:space="preserve"><value>When I complete this task in Task Flyout, archive the source mail in {0}. Manage or undo in Tasks.</value></data>
+  <data name="Cross_ConfirmDestination" xml:space="preserve"><value>I confirm creation in {0} ({1}).</value></data>
+  <data name="Cross_ConfirmRequired" xml:space="preserve"><value>Confirm the destination account before saving.</value></data>
+  <data name="Cross_LinkFailed" xml:space="preserve"><value>The task was created, but automatic mail archiving could not be enabled. Do not create it again; archive the mail manually.</value></data>
+  <data name="Cross_CreateEvent.Content" xml:space="preserve"><value>Create event</value></data>
+  <data name="Cross_CreateEvent.AutomationProperties.Name" xml:space="preserve"><value>Create an event from this mail</value></data>
+  <data name="Cross_ReadLaterFilter.Content" xml:space="preserve"><value>Read later</value></data>
+  <data name="Cross_ReadLater.Content" xml:space="preserve"><value>Save / remove read later</value></data>
+  <data name="Cross_ReadLater.AutomationProperties.Name" xml:space="preserve"><value>Toggle read later for this article</value></data>
+  <data name="Cross_ReadLaterSaved" xml:space="preserve"><value>Saved for later. Click again to undo.</value></data>
+  <data name="Cross_ReadLaterRemoved" xml:space="preserve"><value>Removed from read later. Click again to undo.</value></data>
+  <data name="Cross_ReadLaterFailed" xml:space="preserve"><value>Could not save the change. Try again.</value></data>
+  <data name="Cross_Actions" xml:space="preserve"><value>Linked mail actions</value></data>
+  <data name="Cross_StorageFailed" xml:space="preserve"><value>Linked mail actions could not be saved or loaded. Check local storage; automatic retry is paused.</value></data>
+  <data name="Cross_StateReady" xml:space="preserve"><value>Archive when this task is completed in Task Flyout.</value></data>
+  <data name="Cross_StateArchiving" xml:space="preserve"><value>Task completed. Archiving source mail…</value></data>
+  <data name="Cross_StateArchived" xml:space="preserve"><value>Source mail archived. Undo moves it back without reopening the task.</value></data>
+  <data name="Cross_StateFailed" xml:space="preserve"><value>The task is complete, but mail archiving failed. Check the source account and retry.</value></data>
+  <data name="Cross_StateUnknown" xml:space="preserve"><value>The mail operation could not be confirmed. Check the mailbox; it will not be retried automatically.</value></data>
+  <data name="Cross_StateUndoing" xml:space="preserve"><value>Restoring source mail…</value></data>
+  <data name="Cross_StateUndone" xml:space="preserve"><value>Archive undone. Automatic archiving is disabled for this link.</value></data>
+  <data name="Cross_RetryArchive" xml:space="preserve"><value>Retry archive</value></data>
+  <data name="Cross_UndoArchive" xml:space="preserve"><value>Undo archive</value></data>
+  <data name="Cross_CheckMail" xml:space="preserve"><value>Check mail</value></data>
+  <data name="Cross_Forget" xml:space="preserve"><value>Disable / dismiss</value></data>
 </root>

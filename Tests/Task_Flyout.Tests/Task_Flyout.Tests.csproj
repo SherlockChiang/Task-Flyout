@@ -34,6 +34,7 @@
   <ItemGroup>
     <Compile Include="../../Services/AccountSyncHealth.cs" Link="Source/AccountSyncHealth.cs" />
     <Compile Include="../../Services/QuickCreatePolicy.cs" Link="Source/QuickCreatePolicy.cs" />
+    <Compile Include="../../Services/TaskMailActions.cs" Link="Source/TaskMailActions.cs" />
     <Compile Include="..\..\Services\VerificationCodeDetector.cs" Link="Source\VerificationCodeDetector.cs" />
     <Compile Include="..\..\Services\TodayDashboardPolicy.cs" Link="Source\TodayDashboardPolicy.cs" />
     <Compile Include="..\..\Services\FlyoutOverviewPolicy.cs" Link="Source\FlyoutOverviewPolicy.cs" />

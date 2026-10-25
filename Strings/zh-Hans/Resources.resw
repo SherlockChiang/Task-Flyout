@@ -2137,4 +2137,29 @@ Widgets 抑制：就绪 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="QuickCreate_SaveFailed" xml:space="preserve"><value>未能确认创建成功，已保留全部输入。再次保存前，请先检查目标账户，避免重复创建。</value></data>
   <data name="QuickCreate_FromSource.Content" xml:space="preserve"><value>创建任务</value></data>
   <data name="QuickCreate_FromSource.AutomationProperties.Name" xml:space="preserve"><value>根据此内容创建任务</value></data>
+  <data name="Cross_ArchiveOption" xml:space="preserve"><value>在 Task Flyout 中完成此任务后，归档 {0} 中的来源邮件。可在任务页管理或撤销。</value></data>
+  <data name="Cross_ConfirmDestination" xml:space="preserve"><value>我确认在 {0}（{1}）中创建。</value></data>
+  <data name="Cross_ConfirmRequired" xml:space="preserve"><value>请确认目标账户后保存。</value></data>
+  <data name="Cross_LinkFailed" xml:space="preserve"><value>任务已创建，但未能启用邮件自动归档。请勿重复创建，可手动归档来源邮件。</value></data>
+  <data name="Cross_CreateEvent.Content" xml:space="preserve"><value>创建日程</value></data>
+  <data name="Cross_CreateEvent.AutomationProperties.Name" xml:space="preserve"><value>根据此邮件创建日程</value></data>
+  <data name="Cross_ReadLaterFilter.Content" xml:space="preserve"><value>稍后阅读</value></data>
+  <data name="Cross_ReadLater.Content" xml:space="preserve"><value>加入／移出稍后阅读</value></data>
+  <data name="Cross_ReadLater.AutomationProperties.Name" xml:space="preserve"><value>切换此文章的稍后阅读状态</value></data>
+  <data name="Cross_ReadLaterSaved" xml:space="preserve"><value>已加入稍后阅读，再次点击可撤销。</value></data>
+  <data name="Cross_ReadLaterRemoved" xml:space="preserve"><value>已移出稍后阅读，再次点击可撤销。</value></data>
+  <data name="Cross_ReadLaterFailed" xml:space="preserve"><value>未能保存此修改，请重试。</value></data>
+  <data name="Cross_Actions" xml:space="preserve"><value>关联邮件操作</value></data>
+  <data name="Cross_StorageFailed" xml:space="preserve"><value>未能保存或加载关联邮件操作。请检查本地存储，操作不会自动重试。</value></data>
+  <data name="Cross_StateReady" xml:space="preserve"><value>在 Task Flyout 中完成此任务后归档邮件。</value></data>
+  <data name="Cross_StateArchiving" xml:space="preserve"><value>任务已完成，正在归档来源邮件…</value></data>
+  <data name="Cross_StateArchived" xml:space="preserve"><value>来源邮件已归档。撤销将还原邮件，任务仍保持完成。</value></data>
+  <data name="Cross_StateFailed" xml:space="preserve"><value>任务已完成，但邮件归档失败。请检查来源账户后重试。</value></data>
+  <data name="Cross_StateUnknown" xml:space="preserve"><value>无法确认邮件操作结果。请检查邮箱，不会自动重试。</value></data>
+  <data name="Cross_StateUndoing" xml:space="preserve"><value>正在还原来源邮件…</value></data>
+  <data name="Cross_StateUndone" xml:space="preserve"><value>已撤销归档，此关联不再自动归档。</value></data>
+  <data name="Cross_RetryArchive" xml:space="preserve"><value>重试归档</value></data>
+  <data name="Cross_UndoArchive" xml:space="preserve"><value>撤销归档</value></data>
+  <data name="Cross_CheckMail" xml:space="preserve"><value>检查邮件</value></data>
+  <data name="Cross_Forget" xml:space="preserve"><value>停用／移除此记录</value></data>
 </root>

@@ -83,6 +83,18 @@ namespace Task_Flyout
         public WeatherService WeatherService { get; } = new WeatherService();
         public MailService MailService { get; } = new MailService();
         internal TaskMutationCoordinator TaskMutations { get; } = new();
+        private TaskMailActions? _taskMailActions;
+        internal TaskMailActions TaskMailActions => _taskMailActions ??= CreateTaskMailActions();
+
+        private TaskMailActions CreateTaskMailActions()
+        {
+            var service = new TaskMailArchiveService(MailService);
+            string path = AppDataPathHelper.ResolveLocal("task_mail_links.bin");
+            return new TaskMailActions(
+                () => System.IO.File.Exists(path) ? ProtectedLocalStore.ReadText(path)
+                    ?? throw new System.IO.InvalidDataException("Task mail links could not be decrypted.") : null,
+                json => ProtectedLocalStore.WriteText(path, json), service.ArchiveAsync, service.UndoAsync);
+        }
         internal ComposeDraftCoordinator ComposeDrafts { get; } = new();
 
         public async Task<MailAccount> ConnectNewGoogleAccountAsync(

@@ -3132,14 +3132,28 @@ body { background-color: {{background}} !important; }
         }
 
         private async void CreateTaskFromMail_Click(object sender, RoutedEventArgs e)
+            => await CreateFromMailAsync(isTask: true);
+
+        private async void CreateEventFromMail_Click(object sender, RoutedEventArgs e)
+            => await CreateFromMailAsync(isTask: false);
+
+        private async Task CreateFromMailAsync(bool isTask)
         {
             if (_selectedItem == null || _selectedAccount == null) return;
+            if (!string.Equals(_selectedItem.AccountId, _selectedAccount.Id, StringComparison.Ordinal)) return;
             string provider = MailProviderAccountLinkPolicy.GetProviderName(_selectedAccount.Kind);
             string? preferred = string.IsNullOrWhiteSpace(provider) ? null
                 : AccountIdentityPolicy.CreateProviderKey(provider, _selectedAccount.ProviderAccountId);
             var seed = QuickCreatePolicy.FromSource(_selectedItem.Subject,
-                _selectedItem.Sender + " · " + _selectedItem.ReceivedTime, _selectedItem.WebLink, preferred);
-            await QuickCreateForm.ShowDialogAsync(XamlRoot, DateTime.Today, isTask: true, seed);
+                _selectedAccount.Address + " · " + _selectedItem.Sender + " · " + _selectedItem.ReceivedTime, _selectedItem.WebLink, preferred);
+            if (isTask && _selectedAccount.IsSetupComplete && !string.IsNullOrWhiteSpace(_selectedAccount.Address)
+                && (_selectedAccount.Kind != MailAccountKind.Google || _selectedItem.FolderId == "INBOX"))
+                seed = seed with
+                {
+                    MailSource = new TaskMailSource(_selectedAccount.Id, _selectedAccount.Address, _selectedAccount.Kind,
+                    _selectedItem.FolderId, _selectedItem.Id, _selectedItem.ImapUidValidity, _selectedItem.Subject, _selectedItem.IsRead)
+                };
+            await QuickCreateForm.ShowDialogAsync(XamlRoot, DateTime.Today, isTask, seed);
         }
 
         private async void ReplyButton_Click(object sender, RoutedEventArgs e)

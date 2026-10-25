@@ -5,6 +5,70 @@ namespace Task_Flyout.Tests;
 
 public class RssSqliteRepositoryTests : IDisposable
 {
+    [Fact]
+    public void Read_later_survives_refresh_restart_and_read_state_changes()
+    {
+        string path = Path.Combine(_root, "later.db");
+        var repository = new RssSqliteRepository(path);
+        var article = new RssArticleWriteRecord("article", "feed", "Feed", "Title", "", "Summary", "Body", "", "", 20);
+        repository.UpsertArticle(article);
+        repository.UpdateArticleState("article", isReadLater: true);
+        repository.UpdateArticleState("article", isRead: true, isStarred: false);
+        repository.UpsertArticle(article with { Title = "Updated" });
+        var reopened = new RssSqliteRepository(path);
+        var saved = Assert.Single(reopened.QueryArticlesPage(null, null, 0, 10, RssArticleFilter.ReadLater));
+        Assert.True(saved.IsReadLater);
+        Assert.True(saved.IsRead);
+        Assert.False(saved.IsStarred);
+        Assert.Equal("Updated", saved.Title);
+        reopened.UpdateArticleState("article", isReadLater: false);
+        Assert.Empty(reopened.QueryArticlesPage(null, null, 0, 10, RssArticleFilter.ReadLater));
+        Assert.True(Assert.Single(reopened.QueryArticlesPage(null, null, 0, 10)).IsRead);
+    }
+
+    [Fact]
+    public void Read_later_reports_a_deleted_article_instead_of_silent_success()
+    {
+        var repository = new RssSqliteRepository(Path.Combine(_root, "missing.db"));
+        Assert.Throws<InvalidOperationException>(() => repository.UpdateArticleState("missing", isReadLater: true));
+    }
+
+    [Fact]
+    public void Read_later_is_not_evicted_by_routine_article_trimming()
+    {
+        var repository = new RssSqliteRepository(Path.Combine(_root, "retained.db"));
+        repository.UpsertArticle(new RssArticleWriteRecord("older", "feed", "", "Saved", "", "", "", "", "", 1));
+        repository.UpsertArticle(new RssArticleWriteRecord("newer", "feed", "", "New", "", "", "", "", "", 2));
+        repository.UpdateArticleState("older", isReadLater: true);
+        repository.TrimArticles(1);
+        Assert.Equal(2, repository.QueryArticlesPage(null, null, 0, 10).Count);
+        Assert.Equal("older", Assert.Single(repository.QueryArticlesPage(null, null, 0, 10, RssArticleFilter.ReadLater)).Id);
+        repository.UpdateArticleState("older", isReadLater: false);
+        repository.TrimArticles(1);
+        Assert.Equal("newer", Assert.Single(repository.QueryArticlesPage(null, null, 0, 10)).Id);
+    }
+
+    [Fact]
+    public void Read_later_migration_preserves_existing_read_and_starred_state()
+    {
+        string path = Path.Combine(_root, "upgrade.db");
+        var repository = new RssSqliteRepository(path);
+        repository.UpsertArticle(new RssArticleWriteRecord("article", "feed", "", "Old", "", "", "", "", "", 1));
+        repository.UpdateArticleState("article", isRead: true, isStarred: true);
+        using (var connection = repository.OpenConnection())
+        {
+            Execute(connection, "ALTER TABLE rss_articles DROP COLUMN is_read_later;");
+            Execute(connection, "UPDATE metadata SET value = '2' WHERE key = 'schema_version';");
+        }
+        var upgraded = new RssSqliteRepository(path);
+        var item = Assert.Single(upgraded.QueryArticlesPage(null, null, 0, 10));
+        Assert.True(item.IsRead);
+        Assert.True(item.IsStarred);
+        Assert.False(item.IsReadLater);
+        upgraded.UpdateArticleState("article", isReadLater: true);
+        Assert.Single(upgraded.QueryArticlesPage(null, null, 0, 10, RssArticleFilter.ReadLater));
+    }
+
     private readonly string _root = Path.Combine(Path.GetTempPath(), "TaskFlyoutRssRepositoryTests", Guid.NewGuid().ToString("N"));
 
     [Fact]
@@ -64,7 +128,7 @@ SELECT CAST(n AS TEXT), 'feed', '', '', '', '', '', '', '', CASE WHEN n = 1501 T
         using var connection = repository.OpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT value FROM metadata WHERE key = 'schema_version';";
-        Assert.Equal("2", command.ExecuteScalar());
+        Assert.Equal("3", command.ExecuteScalar());
         command.CommandText = "PRAGMA secure_delete;";
         Assert.Equal(1L, command.ExecuteScalar());
         command.CommandText = "PRAGMA busy_timeout;";

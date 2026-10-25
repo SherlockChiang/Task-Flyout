@@ -674,10 +674,11 @@ namespace Task_Flyout.Services
             await _graphClient.Me.Events.PostAsync(newEvent);
         }
 
-        public async Task CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay, QuickCreateOptions? options = null)
+        public async Task<CreatedTaskReference?> CreateTaskAsync(string title, DateTime targetDate, TimeSpan startTime, bool isAllDay, QuickCreateOptions? options = null)
         {
             await EnsureAuthorizedAsync();
             var listId = await GetDefaultTodoListIdAsync();
+            if (string.IsNullOrWhiteSpace(listId)) throw new InvalidOperationException("The default task list is unavailable.");
 
             var newTask = new TodoTask
             {
@@ -694,7 +695,8 @@ namespace Task_Flyout.Services
                     ? CreateMicrosoftRecurrence(taskRecurrence, targetDate) : null
             };
 
-            await _graphClient.Me.Todo.Lists[listId].Tasks.PostAsync(newTask);
+            var created = await _graphClient.Me.Todo.Lists[listId].Tasks.PostAsync(newTask);
+            return string.IsNullOrWhiteSpace(created?.Id) ? null : new CreatedTaskReference(created.Id, listId);
         }
 
         public async Task DeleteItemAsync(string itemId, bool isEvent, RecurringDeleteMode recurringDeleteMode = RecurringDeleteMode.Single, DateTime? occurrenceDate = null, string recurringEventId = "", string taskListId = "")

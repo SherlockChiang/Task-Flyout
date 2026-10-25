@@ -432,6 +432,7 @@ namespace Task_Flyout.Services
 
             var account = _accounts.FirstOrDefault(a => a.Id == accountId);
             if (account == null) return false;
+            if (App.Current is App app) await app.TaskMailActions.ForgetAccountAsync(mailAccountId: accountId);
 
             if (account.UsesOutlookImapOAuth)
                 await GetOutlookImapAuthorization(account).ClearLocalAuthorizationAsync();
@@ -953,14 +954,14 @@ namespace Task_Flyout.Services
 
         public async Task<MailMoveResult> ArchiveOutlookMessageAsync(MailAccount account, MailItem item, CancellationToken cancellationToken = default)
         {
-            string destinationId = await ResolveOutlookWellKnownFolderIdAsync("archive", cancellationToken)
+            string destinationId = await ResolveOutlookWellKnownFolderIdAsync(account, "archive", cancellationToken)
                 ?? throw new InvalidOperationException("The Outlook archive folder is unavailable.");
             return await MoveOutlookMessageAsync(account, item, destinationId, cancellationToken);
         }
 
         public async Task<MailMoveResult> TrashOutlookMessageAsync(MailAccount account, MailItem item, CancellationToken cancellationToken = default)
         {
-            string destinationId = await ResolveOutlookWellKnownFolderIdAsync("deleteditems", cancellationToken)
+            string destinationId = await ResolveOutlookWellKnownFolderIdAsync(account, "deleteditems", cancellationToken)
                 ?? throw new InvalidOperationException("The Outlook Deleted Items folder is unavailable.");
             return await MoveOutlookMessageAsync(account, item, destinationId, cancellationToken);
         }
@@ -973,19 +974,24 @@ namespace Task_Flyout.Services
         {
             if (account.Kind != MailAccountKind.Outlook || !MailMutationCapabilityPolicy.For(account.Kind).Move)
                 throw new NotSupportedException("Only Outlook message moves are supported.");
+            if (!string.Equals(account.Id, item.AccountId, StringComparison.Ordinal))
+                throw new InvalidOperationException("The message does not belong to the selected account.");
             if (string.IsNullOrWhiteSpace(destinationFolderId) || string.Equals(item.FolderId, destinationFolderId, StringComparison.Ordinal))
                 throw new InvalidOperationException("Choose a different destination folder.");
 
-            await EnsureOutlookMailWriteAuthorizedAsync(cancellationToken);
-            if (_outlookClient == null) throw new InvalidOperationException("Outlook authorization failed.");
-
+            var client = await GetOutlookAccountClientAsync(account, requireWrite: true, cancellationToken);
+            var current = await client.Me.Messages[item.Id].GetAsync(request =>
+                request.QueryParameters.Select = new[] { "id", "parentFolderId", "isRead" }, cancellationToken);
+            if (current == null || !string.Equals(current.ParentFolderId, item.FolderId, StringComparison.Ordinal))
+                throw new InvalidOperationException("The message is no longer in the source folder. Refresh the mailbox.");
+            item.IsRead = current.IsRead ?? item.IsRead;
             string sourceFolderId = item.FolderId;
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
             using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
             GraphMessage? moved;
             try
             {
-                moved = await _outlookClient.Me.Messages[item.Id].Move.PostAsync(
+                moved = await client.Me.Messages[item.Id].Move.PostAsync(
                     new MovePostRequestBody { DestinationId = destinationFolderId },
                     requestConfiguration: null,
                     cancellationToken: operationCts.Token);
@@ -1437,11 +1443,10 @@ namespace Task_Flyout.Services
             => timedOut || exception is HttpRequestException or IOException ||
                exception is Microsoft.Kiota.Abstractions.ApiException { ResponseStatusCode: 0 };
 
-        private async Task<string?> ResolveOutlookWellKnownFolderIdAsync(string wellKnownName, CancellationToken cancellationToken)
+        private async Task<string?> ResolveOutlookWellKnownFolderIdAsync(MailAccount account, string wellKnownName, CancellationToken cancellationToken)
         {
-            await EnsureOutlookMailWriteAuthorizedAsync(cancellationToken);
-            if (_outlookClient == null) return null;
-            var folder = await _outlookClient.Me.MailFolders[wellKnownName].GetAsync(request =>
+            var client = await GetOutlookAccountClientAsync(account, requireWrite: true, cancellationToken);
+            var folder = await client.Me.MailFolders[wellKnownName].GetAsync(request =>
                 request.QueryParameters.Select = new[] { "id" }, cancellationToken);
             return string.IsNullOrWhiteSpace(folder?.Id) ? null : folder.Id;
         }
@@ -1781,6 +1786,7 @@ namespace Task_Flyout.Services
                 .ToList();
             foreach (var account in accounts)
             {
+                if (App.Current is App app) _ = app.TaskMailActions.ForgetAccountAsync(mailAccountId: account.Id);
                 DisconnectPollImapClient(account.Id);
                 ClearAccountBackoff(account.Id);
                 ClearAccountCache(account.Id);
@@ -2147,7 +2153,9 @@ namespace Task_Flyout.Services
             using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             try
             {
-                string? deletedItemsId = await ResolveOutlookWellKnownFolderIdAsync("deleteditems", cleanupCts.Token);
+                var deletedFolder = await outlookClient.Me.MailFolders["deleteditems"].GetAsync(
+                    request => request.QueryParameters.Select = new[] { "id" }, cleanupCts.Token);
+                string? deletedItemsId = deletedFolder?.Id;
                 if (string.IsNullOrWhiteSpace(deletedItemsId)) return;
                 await outlookClient.Me.Messages[draftId].Move.PostAsync(
                     new MovePostRequestBody { DestinationId = deletedItemsId },
@@ -3163,8 +3171,14 @@ namespace Task_Flyout.Services
         }
 
         private async Task<GraphServiceClient> GetOutlookSyncClientAsync(MailAccount account, CancellationToken cancellationToken)
+            => await GetOutlookAccountClientAsync(account, requireWrite: false, cancellationToken);
+
+        private async Task<GraphServiceClient> GetOutlookAccountClientAsync(MailAccount account, bool requireWrite, CancellationToken cancellationToken)
         {
-            var client = await GetOutlookMailClientAsync(false, false, cancellationToken);
+            if (App.Current is not App app || app.SyncManager.GetProvider("Microsoft",
+                MailProviderAccountLinkPolicy.ResolveProviderAccountId(account.Kind, account.ProviderAccountId)) is not MicrosoftSyncProvider provider)
+                throw new InvalidOperationException("The selected Outlook provider is unavailable.");
+            var client = await provider.EnsureMailAuthorizedAsync(requireWrite, false, cancellationToken);
             var identity = await client.Me.GetAsync(request =>
                 request.QueryParameters.Select = new[] { "mail", "userPrincipalName" }, cancellationToken);
             if (!AccountSyncSelection.MatchesMailbox(account.Address, identity?.Mail, identity?.UserPrincipalName))

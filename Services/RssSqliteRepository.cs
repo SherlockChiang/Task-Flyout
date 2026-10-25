@@ -18,13 +18,15 @@ namespace Task_Flyout.Services
         string LocalImagePath,
         long PublishedUtcTicks,
         bool IsRead = false,
-        bool IsStarred = false);
+        bool IsStarred = false,
+        bool IsReadLater = false);
 
     public enum RssArticleFilter
     {
         All,
         Unread,
-        Starred
+        Starred,
+        ReadLater
     }
 
     internal sealed record RssFolderRecord(string Id, string Name, int SortOrder);
@@ -59,7 +61,7 @@ namespace Task_Flyout.Services
 
     internal sealed class RssSqliteRepository
     {
-        private const int SchemaVersion = 2;
+        private const int SchemaVersion = 3;
         private const int BusyTimeoutMilliseconds = 5000;
         private const string SensitiveDataMigrationKey = "sensitive_data_dpapi_v1";
         private readonly string _connectionString;
@@ -143,6 +145,7 @@ CREATE TABLE IF NOT EXISTS rss_articles (
 """);
                 TryAddColumn(connection, "rss_articles", "is_read", "INTEGER NOT NULL DEFAULT 0");
                 TryAddColumn(connection, "rss_articles", "is_starred", "INTEGER NOT NULL DEFAULT 0");
+                TryAddColumn(connection, "rss_articles", "is_read_later", "INTEGER NOT NULL DEFAULT 0");
                 ExecuteNonQuery(connection, "CREATE INDEX IF NOT EXISTS idx_rss_articles_published ON rss_articles(published_ticks DESC);");
                 ExecuteNonQuery(connection, "CREATE INDEX IF NOT EXISTS idx_rss_articles_subscription_published ON rss_articles(subscription_id, published_ticks DESC);");
                 ExecuteNonQuery(connection, "CREATE INDEX IF NOT EXISTS idx_rss_articles_read_published ON rss_articles(is_read, published_ticks DESC);");
@@ -323,7 +326,7 @@ CREATE TABLE IF NOT EXISTS rss_articles (
             using var command = connection.CreateCommand();
             command.CommandText = """
 DELETE FROM rss_articles
-WHERE id NOT IN (
+WHERE is_read_later = 0 AND id NOT IN (
     SELECT id FROM rss_articles ORDER BY published_ticks DESC LIMIT $maximumCount
 );
 """;
@@ -435,24 +438,28 @@ WHERE id NOT IN (
             command.ExecuteNonQuery();
         }
 
-        public void UpdateArticleState(string articleId, bool? isRead = null, bool? isStarred = null)
+        public void UpdateArticleState(string articleId, bool? isRead = null, bool? isStarred = null, bool? isReadLater = null)
         {
-            if (string.IsNullOrWhiteSpace(articleId) || (!isRead.HasValue && !isStarred.HasValue)) return;
+            if (string.IsNullOrWhiteSpace(articleId) || (!isRead.HasValue && !isStarred.HasValue && !isReadLater.HasValue)) return;
             Initialize();
             using var connection = OpenConnection();
             using var command = connection.CreateCommand();
             command.CommandText = """
 UPDATE rss_articles
 SET is_read = CASE WHEN $setRead = 1 THEN $isRead ELSE is_read END,
-    is_starred = CASE WHEN $setStarred = 1 THEN $isStarred ELSE is_starred END
+    is_starred = CASE WHEN $setStarred = 1 THEN $isStarred ELSE is_starred END,
+    is_read_later = CASE WHEN $setLater = 1 THEN $isLater ELSE is_read_later END
 WHERE id = $id;
 """;
             command.Parameters.AddWithValue("$setRead", isRead.HasValue ? 1 : 0);
             command.Parameters.AddWithValue("$isRead", isRead == true ? 1 : 0);
             command.Parameters.AddWithValue("$setStarred", isStarred.HasValue ? 1 : 0);
             command.Parameters.AddWithValue("$isStarred", isStarred == true ? 1 : 0);
+            command.Parameters.AddWithValue("$setLater", isReadLater.HasValue ? 1 : 0);
+            command.Parameters.AddWithValue("$isLater", isReadLater == true ? 1 : 0);
             command.Parameters.AddWithValue("$id", articleId);
-            command.ExecuteNonQuery();
+            int affected = command.ExecuteNonQuery();
+            if (isReadLater.HasValue && affected != 1) throw new InvalidOperationException("The article is no longer available.");
         }
 
         public void FlushCheckpoint()
@@ -588,14 +595,14 @@ ON CONFLICT(id) DO UPDATE SET
             using var command = connection.CreateCommand();
             var hasSearch = !string.IsNullOrWhiteSpace(searchText);
             command.CommandText = """
-SELECT a.id, a.subscription_id, a.feed_title, a.title, a.link, a.summary, a.image_url, a.local_image_path, a.published_ticks, a.is_read, a.is_starred
+SELECT a.id, a.subscription_id, a.feed_title, a.title, a.link, a.summary, a.image_url, a.local_image_path, a.published_ticks, a.is_read, a.is_starred, a.is_read_later
 FROM rss_articles a
 WHERE ($hasSubscription = 0 OR a.subscription_id = $subscriptionId)
   AND ($hasFolder = 0 OR EXISTS (
       SELECT 1 FROM rss_subscriptions s
       WHERE s.id = a.subscription_id AND s.folder_id = $folderId
   ))
-  AND ($filter = 0 OR ($filter = 1 AND a.is_read = 0) OR ($filter = 2 AND a.is_starred = 1))
+  AND ($filter = 0 OR ($filter = 1 AND a.is_read = 0) OR ($filter = 2 AND a.is_starred = 1) OR ($filter = 3 AND a.is_read_later = 1))
 ORDER BY a.published_ticks DESC
 """;
             if (!hasSearch)
@@ -627,7 +634,8 @@ ORDER BY a.published_ticks DESC
                     reader.GetString(7),
                     reader.GetInt64(8),
                     reader.GetInt64(9) != 0,
-                    reader.GetInt64(10) != 0);
+                    reader.GetInt64(10) != 0,
+                    reader.GetInt64(11) != 0);
                 if (hasSearch && !LocalSearchMatcher.Matches(searchText, article.Title, article.Summary, article.FeedTitle))
                     continue;
                 if (hasSearch && matchesToSkip-- > 0)

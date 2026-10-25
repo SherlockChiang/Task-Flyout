@@ -107,6 +107,7 @@ namespace Task_Flyout.Services
         public DateTimeOffset PublishedAt { get; set; }
         public bool IsRead { get; set; }
         public bool IsStarred { get; set; }
+        public bool IsReadLater { get; set; }
         public double ReadOpacity => IsRead ? 0.68 : 1;
         public string ReadGlyph => IsRead ? "\uE8C3" : "\uE715";
         public string StarGlyph => IsStarred ? "\uE735" : "\uE734";
@@ -371,7 +372,8 @@ namespace Task_Flyout.Services
                 return GetCachedArticles(subscriptionId, folderId)
                     .Where(article => filter == RssArticleFilter.All
                         || (filter == RssArticleFilter.Unread && !article.IsRead)
-                        || (filter == RssArticleFilter.Starred && article.IsStarred))
+                        || (filter == RssArticleFilter.Starred && article.IsStarred)
+                        || (filter == RssArticleFilter.ReadLater && article.IsReadLater))
                     .Where(article => LocalSearchMatcher.Matches(searchText, article.Title, article.Summary, article.FeedTitle))
                     .Skip(skip)
                     .Take(take)
@@ -549,6 +551,16 @@ namespace Task_Flyout.Services
             var cached = _cache.Articles.FirstOrDefault(item => item.Id == article.Id);
             if (cached != null) cached.IsStarred = isStarred;
             Repository.UpdateArticleState(article.Id, isStarred: isStarred);
+            NotifySearchMetadataChanged();
+        }
+
+        public void SetArticleReadLater(RssArticle article, bool value)
+        {
+            EnsureLoaded();
+            Repository.UpdateArticleState(article.Id, isReadLater: value);
+            article.IsReadLater = value;
+            var cached = _cache.Articles.FirstOrDefault(item => item.Id == article.Id);
+            if (cached != null) cached.IsReadLater = value;
             NotifySearchMetadataChanged();
         }
 
@@ -1454,7 +1466,8 @@ namespace Task_Flyout.Services
                     LocalImagePath = record.LocalImagePath,
                     PublishedAt = FromTicks(record.PublishedUtcTicks),
                     IsRead = record.IsRead,
-                    IsStarred = record.IsStarred
+                    IsStarred = record.IsStarred,
+                    IsReadLater = record.IsReadLater
                 })
                 .ToList();
         }
@@ -1492,7 +1505,8 @@ namespace Task_Flyout.Services
                 LocalImagePath = record.LocalImagePath,
                 PublishedAt = FromTicks(record.PublishedUtcTicks),
                 IsRead = record.IsRead,
-                IsStarred = record.IsStarred
+                IsStarred = record.IsStarred,
+                IsReadLater = record.IsReadLater
             };
 
         private void SaveFolder(RssFolder folder)
