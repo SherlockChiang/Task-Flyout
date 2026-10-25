@@ -17,6 +17,7 @@
         </Grid.Resources>
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Key="K" Modifiers="Control" Invoked="GlobalSearchAccelerator_Invoked"/>
+            <KeyboardAccelerator Key="Left" Modifiers="Menu" Invoked="PageBackAccelerator_Invoked"/>
         </Grid.KeyboardAccelerators>
         <NavigationView x:Name="MainNav" AutomationProperties.AutomationId="MainNavigation" PaneDisplayMode="Auto"
                         CompactPaneLength="48" OpenPaneLength="168" IsPaneOpen="False" IsSettingsVisible="True"

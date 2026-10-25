@@ -13,12 +13,18 @@
     </Page.Resources>
 
     <Grid x:Name="LayoutRoot" AutomationProperties.AutomationId="TasksLayoutRoot" Background="{ThemeResource TaskFlyoutPageBackgroundBrush}" SizeChanged="LayoutRoot_SizeChanged">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition x:Name="AccountColumn" Width="2*" MinWidth="240" MaxWidth="320"/>
             <ColumnDefinition x:Name="TaskContentColumn" Width="5*" MinWidth="360"/>
         </Grid.ColumnDefinitions>
 
-        <Grid x:Name="AccountPane" AutomationProperties.AutomationId="TasksAccountPane" Grid.Column="0"
+        <views:CompactNavigationBar x:Name="StepNavigation" Grid.ColumnSpan="2" Visibility="Collapsed"/>
+        <views:AgendaDetailsPane x:Name="TaskDetails" Grid.Row="1" Grid.ColumnSpan="2" Visibility="Collapsed"/>
+        <Grid x:Name="AccountPane" AutomationProperties.AutomationId="TasksAccountPane" Grid.Column="0" Grid.Row="1"
               Background="{ThemeResource TaskFlyoutSectionBackgroundBrush}"
               BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}"
               BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}"
@@ -35,7 +41,7 @@
 
             <Grid Margin="4,0,0,8">
                 <TextBlock x:Uid="TasksPage_AccountHeader" Text="任务账户" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                <Button x:Uid="TasksPage_BtnCollapseAccounts" HorizontalAlignment="Right" Width="40" Height="40" Padding="0"
+                <Button x:Name="CollapseAccountsButton" x:Uid="TasksPage_BtnCollapseAccounts" HorizontalAlignment="Right" Width="40" Height="40" Padding="0"
                         Background="Transparent" BorderThickness="0"
                         Click="ToggleAccountPane_Click">
                     <FontIcon Glyph="&#xE76B;" FontSize="12"/>
@@ -134,7 +140,7 @@
             <Button Grid.Row="3" x:Uid="MainWindow_BtnForceSync" Content="强制立即同步" HorizontalAlignment="Stretch" Click="BtnForceSync_Click"/>
         </Grid>
 
-        <Grid x:Name="TaskContent" AutomationProperties.AutomationId="TasksContentPane" Grid.Column="1" Padding="28,32,28,32">
+        <Grid x:Name="TaskContent" AutomationProperties.AutomationId="TasksContentPane" Grid.Column="1" Grid.Row="1" Padding="28,32,28,32">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -207,6 +213,7 @@
                     <TextBlock x:Uid="TasksPage_PendingHeader" x:Name="PendingHeaderText" Text="待完成" FontSize="18" FontWeight="SemiBold"/>
                     <ListView Grid.Row="1"
                               x:Name="PendingTasksList"
+                              IsItemClickEnabled="True" ItemClick="TaskList_ItemClick"
                               ItemsSource="{x:Bind PendingTasks}"
                               MaxHeight="360"
                               SelectionMode="None"
@@ -228,7 +235,7 @@
                                         </Grid.ColumnDefinitions>
                                          <CheckBox Grid.Column="0"
                                                    IsChecked="{x:Bind IsCompleted, Mode=TwoWay}"
-                                                   Click="TaskCheckBox_Click"
+                                                   Click="TaskCheckBox_Click" Tapped="TaskAction_Tapped"
                                                    AutomationProperties.Name="{x:Bind Title}"
                                                   VerticalAlignment="Top"
                                                   MinWidth="0"
@@ -253,11 +260,11 @@
                                         </StackPanel>
                                         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
                                             <Button x:Uid="TasksPage_BtnEditTask" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
-                                                    DataContext="{x:Bind}" Click="EditTaskButton_Click">
+                                                    DataContext="{x:Bind}" Click="EditTaskButton_Click" Tapped="TaskAction_Tapped">
                                                 <FontIcon Glyph="&#xE70F;" FontSize="14"/>
                                             </Button>
                                             <Button x:Uid="TasksPage_BtnDeleteTask" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
-                                                    Click="DeleteTaskButton_Click">
+                                                    Click="DeleteTaskButton_Click" Tapped="TaskAction_Tapped">
                                                 <FontIcon Glyph="&#xE74D;" FontSize="14"/>
                                             </Button>
                                         </StackPanel>
@@ -286,6 +293,7 @@
                     <TextBlock x:Uid="TasksPage_CompletedHeader" x:Name="CompletedHeaderText" Text="已完成" FontSize="18" FontWeight="SemiBold"/>
                     <ListView Grid.Row="1"
                               x:Name="CompletedTasksList"
+                              IsItemClickEnabled="True" ItemClick="TaskList_ItemClick"
                               ItemsSource="{x:Bind CompletedTasks}"
                               SelectionMode="None"
                               ScrollViewer.VerticalScrollBarVisibility="Auto">
@@ -307,7 +315,7 @@
                                         </Grid.ColumnDefinitions>
                                          <CheckBox Grid.Column="0"
                                                    IsChecked="{x:Bind IsCompleted, Mode=TwoWay}"
-                                                   Click="TaskCheckBox_Click"
+                                                   Click="TaskCheckBox_Click" Tapped="TaskAction_Tapped"
                                                    AutomationProperties.Name="{x:Bind Title}"
                                                   VerticalAlignment="Top"
                                                   MinWidth="0"
@@ -337,11 +345,11 @@
                                         </StackPanel>
                                         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
                                             <Button x:Uid="TasksPage_BtnEditTask" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
-                                                    DataContext="{x:Bind}" Click="EditTaskButton_Click">
+                                                    DataContext="{x:Bind}" Click="EditTaskButton_Click" Tapped="TaskAction_Tapped">
                                                 <FontIcon Glyph="&#xE70F;" FontSize="14"/>
                                             </Button>
                                             <Button x:Uid="TasksPage_BtnDeleteTask" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
-                                                    Click="DeleteTaskButton_Click">
+                                                    Click="DeleteTaskButton_Click" Tapped="TaskAction_Tapped">
                                                 <FontIcon Glyph="&#xE74D;" FontSize="14"/>
                                             </Button>
                                         </StackPanel>

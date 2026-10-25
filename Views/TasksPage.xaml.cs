@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System;
 using System.Collections.Generic;
@@ -12,7 +13,7 @@ using Task_Flyout.Services;
 
 namespace Task_Flyout.Views
 {
-    public sealed partial class TasksPage : Page
+    public sealed partial class TasksPage : Page, ICompactNavigationPage
     {
         public SuppressableObservableCollection<AgendaItem> PendingTasks { get; } = new();
         public SuppressableObservableCollection<AgendaItem> CompletedTasks { get; } = new();
@@ -22,6 +23,11 @@ namespace Task_Flyout.Views
         private ResourceLoader _loader = new();
         private bool _isAccountPaneCollapsed;
         private ResponsiveLayoutMode _layoutMode = ResponsiveLayoutMode.Wide;
+        private readonly CompactNavigationState _navigation = new();
+        private readonly CompactPaneFocus _paneFocus = new();
+        private AgendaItem? _detailItem;
+        private bool IsCompact => _layoutMode == ResponsiveLayoutMode.Narrow;
+        public bool CanGoBackWithinPage => IsCompact && _navigation.CanGoBack;
         private string? _failedMutationKey;
         private Func<Task>? _retrySucceeded;
         private CancellationTokenSource? _searchCts;
@@ -32,11 +38,17 @@ namespace Task_Flyout.Views
         public TasksPage()
         {
             InitializeComponent();
+            StepNavigation.BackRequested += (_, _) => TryGoBackWithinPage();
+            StepNavigation.ContinueRequested += (_, _) => ShowCompactPane(CompactPane.List);
+            TaskDetails.EditRequested += async (_, _) =>
+            {
+                if (TaskDetails.Item is { } item) await EditTaskAsync(item);
+            };
             if (App.Current is App app)
                 _syncManager = app.SyncManager;
 
             Loaded += TasksPage_Loaded;
-            Unloaded += (_, _) => _searchCts?.Cancel();
+            Unloaded += (_, _) => { _searchCts?.Cancel(); _paneFocus.Cancel(); };
         }
 
         private async void TasksPage_Loaded(object sender, RoutedEventArgs e)
@@ -153,6 +165,12 @@ namespace Task_Flyout.Views
                 TaskSummaryText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
             PendingTasksList.Visibility = PendingTasks.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
             PendingEmptyText.Visibility = PendingTasks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (_detailItem != null)
+            {
+                var current = tasks.FirstOrDefault(item => IsSameTask(item, _detailItem));
+                if (current != null) { _detailItem = current; TaskDetails.Show(current); }
+                else TaskDetails.Clear();
+            }
         }
 
         private async void TaskSearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
@@ -183,7 +201,7 @@ namespace Task_Flyout.Views
         }
 
         private static string GetTaskIdentity(AgendaItem item)
-            => $"{item.ProviderKey}|{item.Id}|{item.Title}|{item.DateKey}";
+            => $"{item.ProviderKey}|{item.CalendarId}|{item.Id}|{item.Title}|{item.DateKey}";
 
         private static DateTime GetTaskSortDate(AgendaItem item)
         {
@@ -251,6 +269,8 @@ namespace Task_Flyout.Views
                 cb.IsEnabled = true;
             }
         }
+
+        private void TaskAction_Tapped(object sender, TappedRoutedEventArgs e) => e.Handled = true;
 
         private static string BuildMutationKey(AgendaItem item, string operation)
             => $"{item.ProviderKey}|{item.CalendarId}|{item.Id}";
@@ -396,10 +416,12 @@ namespace Task_Flyout.Views
         private static bool IsSameTask(AgendaItem a, AgendaItem b)
         {
             if (!string.IsNullOrWhiteSpace(a.Id) && !string.IsNullOrWhiteSpace(b.Id))
-                return string.Equals(a.Provider, b.Provider, StringComparison.OrdinalIgnoreCase)
+                return AccountIdentityPolicy.Matches(a.Provider, a.AccountId, b.Provider, b.AccountId)
+                    && string.Equals(a.CalendarId, b.CalendarId, StringComparison.Ordinal)
                     && string.Equals(a.Id, b.Id, StringComparison.Ordinal);
 
-            return string.Equals(a.Provider, b.Provider, StringComparison.OrdinalIgnoreCase)
+            return AccountIdentityPolicy.Matches(a.Provider, a.AccountId, b.Provider, b.AccountId)
+                && string.Equals(a.CalendarId, b.CalendarId, StringComparison.Ordinal)
                 && string.Equals(a.Title, b.Title, StringComparison.Ordinal)
                 && string.Equals(a.DateKey, b.DateKey, StringComparison.Ordinal);
         }
@@ -489,6 +511,11 @@ namespace Task_Flyout.Views
 
         private void ToggleAccountPane_Click(object sender, RoutedEventArgs e)
         {
+            if (IsCompact)
+            {
+                ShowCompactPane(_navigation.Current == CompactPane.Accounts ? CompactPane.List : CompactPane.Accounts);
+                return;
+            }
             _isAccountPaneCollapsed = !_isAccountPaneCollapsed;
             ApplyResponsiveLayout();
         }
@@ -496,6 +523,25 @@ namespace Task_Flyout.Views
         private async void EditTaskButton_Click(object sender, RoutedEventArgs e)
         {
             if (_syncManager == null || sender is not Button { DataContext: AgendaItem item }) return;
+            if (IsCompact) OpenTaskDetails(item);
+            await EditTaskAsync(item);
+        }
+
+        private void TaskList_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            if (IsCompact && e.ClickedItem is AgendaItem item) OpenTaskDetails(item);
+        }
+
+        private void OpenTaskDetails(AgendaItem item)
+        {
+            _detailItem = item;
+            TaskDetails.Show(item);
+            ShowCompactPane(CompactPane.Detail);
+        }
+
+        private async Task EditTaskAsync(AgendaItem item)
+        {
+            if (_syncManager == null) return;
             var capabilities = TaskEditCapabilityPolicy.ForProvider(item.Provider);
             if (!capabilities.SupportsTitle)
             {
@@ -555,7 +601,12 @@ namespace Task_Flyout.Views
             var dialog = new ContentDialog
             {
                 Title = _loader.GetStringOrDefault("TextEditTask") ?? "Edit Task",
-                Content = panel,
+                Content = new ScrollViewer
+                {
+                    Content = panel,
+                    MaxHeight = Math.Clamp((XamlRoot?.Size.Height ?? 740) - 180, 120, 560),
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+                },
                 PrimaryButtonText = _loader.GetStringOrDefault("CalendarDialog.PrimaryButtonText") ?? "Save",
                 CloseButtonText = _loader.GetStringOrDefault("CalendarDialog.CloseButtonText") ?? "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
@@ -616,10 +667,53 @@ namespace Task_Flyout.Views
                 }
             };
             await dialog.ShowAsync();
+            if (IsCompact && _navigation.Current == CompactPane.Detail)
+                _paneFocus.Restore(CompactPane.Detail, TaskDetails, () => TaskDetails.FocusTarget);
+        }
+
+        public bool TryGoBackWithinPage()
+        {
+            if (!CanGoBackWithinPage) return false;
+            _paneFocus.Remember(_navigation.Current, PaneRoot(_navigation.Current));
+            _navigation.Back();
+            ApplyResponsiveLayout();
+            RestorePaneFocus();
+            return true;
+        }
+
+        private FrameworkElement PaneRoot(CompactPane pane) => pane switch
+        {
+            CompactPane.Accounts => AccountPane,
+            CompactPane.Detail => TaskDetails,
+            _ => TaskContent
+        };
+
+        private void ShowCompactPane(CompactPane pane)
+        {
+            _paneFocus.Remember(_navigation.Current, PaneRoot(_navigation.Current));
+            _navigation.Show(pane);
+            ApplyResponsiveLayout();
+            RestorePaneFocus();
+        }
+
+        private void RestorePaneFocus()
+        {
+            if (!IsCompact) return;
+            _paneFocus.Restore(_navigation.Current, PaneRoot(_navigation.Current), () => _navigation.Current switch
+            {
+                CompactPane.Accounts => null,
+                CompactPane.Detail => TaskDetails.FocusTarget,
+                _ => (_detailItem == null ? null : PendingTasksList.ContainerFromItem(_detailItem) as UIElement
+                    ?? CompletedTasksList.ContainerFromItem(_detailItem) as UIElement) ?? TaskSearchBox
+            });
         }
 
         private void LayoutRoot_SizeChanged(object sender, SizeChangedEventArgs e)
         {
+            bool wasCompact = IsCompact;
+            bool detailHadFocus = CompactPaneFocus.HasFocus(TaskDetails);
+            bool accountsHadFocus = CompactPaneFocus.HasFocus(AccountPane);
+            _paneFocus.Remember(_navigation.Current, PaneRoot(_navigation.Current));
             var mode = ResponsiveLayoutPolicy.GetTasksMode(e.NewSize.Width);
             if (_layoutMode != mode)
             {
@@ -628,26 +722,39 @@ namespace Task_Flyout.Views
                     _isAccountPaneCollapsed = true;
             }
             ApplyResponsiveLayout();
+            if (IsCompact && !wasCompact) RestorePaneFocus();
+            else if (!IsCompact && wasCompact && (detailHadFocus || accountsHadFocus && AccountPane.Visibility == Visibility.Collapsed))
+                _paneFocus.Restore(CompactPane.List, TaskContent, () => TaskSearchBox);
         }
 
         private void ApplyResponsiveLayout()
         {
-            bool showAccounts = !_isAccountPaneCollapsed;
-            bool showContent = _layoutMode != ResponsiveLayoutMode.Narrow || !showAccounts;
+            bool showAccounts = IsCompact ? _navigation.Current == CompactPane.Accounts : !_isAccountPaneCollapsed;
+            bool showContent = IsCompact ? _navigation.Current == CompactPane.List : true;
+            StepNavigation.Update(IsCompact, _navigation,
+                _loader.GetStringOrDefault("Compact_Accounts") ?? "Accounts",
+                _loader.GetStringOrDefault("Compact_Tasks") ?? "Tasks");
+            TaskDetails.Visibility = IsCompact && _navigation.Current == CompactPane.Detail ? Visibility.Visible : Visibility.Collapsed;
+            CollapseAccountsButton.Visibility = IsCompact ? Visibility.Collapsed : Visibility.Visible;
+            ToggleAccountPaneButton.Visibility = IsCompact ? Visibility.Collapsed : Visibility.Visible;
+            AccountColumn.MaxWidth = IsCompact ? double.PositiveInfinity : 320;
             AccountColumn.MinWidth = showAccounts && _layoutMode == ResponsiveLayoutMode.Wide ? 240 : 0;
             AccountColumn.Width = showAccounts
                 ? (_layoutMode == ResponsiveLayoutMode.Narrow ? new GridLength(1, GridUnitType.Star) : new GridLength(2, GridUnitType.Star))
                 : new GridLength(0);
             TaskContentColumn.MinWidth = 0;
-            TaskContentColumn.Width = showContent ? new GridLength(5, GridUnitType.Star) : new GridLength(0);
+            TaskContentColumn.Width = showContent || (IsCompact && _navigation.Current == CompactPane.Detail)
+                ? new GridLength(5, GridUnitType.Star) : new GridLength(0);
             AccountPane.Visibility = showAccounts ? Visibility.Visible : Visibility.Collapsed;
             TaskContent.Visibility = showContent ? Visibility.Visible : Visibility.Collapsed;
             double padding = ResponsiveLayoutPolicy.GetPagePadding(
                 LayoutRoot.ActualWidth,
                 LayoutRoot.ActualHeight);
             TaskContent.Padding = new Thickness(padding);
+            AccountPane.Margin = IsCompact ? new Thickness(padding) : new Thickness(24, 28, 12, 28);
             AddTaskButtonText.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow ? Visibility.Collapsed : Visibility.Visible;
             ToggleAccountPaneIcon.Glyph = showAccounts ? "\uE76B" : "\uE76C";
+            App.MyMainWindow?.UpdatePageBackNavigation();
         }
     }
 

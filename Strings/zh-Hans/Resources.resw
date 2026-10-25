@@ -2178,4 +2178,16 @@ Widgets 抑制：就绪 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="Notification_TaskCompleted" xml:space="preserve"><value>任务已完成。</value></data>
   <data name="Notification_MailRead" xml:space="preserve"><value>邮件已标记为已读。</value></data>
   <data name="Notification_MailQueued" xml:space="preserve"><value>邮件已在本地标记为已读，更改已加入同步队列；可在账户同步中心查看进度。</value></data>
+  <data name="Compact_Back" xml:space="preserve"><value>返回</value></data>
+  <data name="Compact_ShowList" xml:space="preserve"><value>查看列表</value></data>
+  <data name="Compact_Accounts" xml:space="preserve"><value>账户</value></data>
+  <data name="Compact_MailAccounts" xml:space="preserve"><value>邮箱与文件夹</value></data>
+  <data name="Compact_Agenda" xml:space="preserve"><value>日程列表</value></data>
+  <data name="Compact_Tasks" xml:space="preserve"><value>任务列表</value></data>
+  <data name="Compact_Messages" xml:space="preserve"><value>邮件列表</value></data>
+  <data name="Compact_Detail" xml:space="preserve"><value>详情</value></data>
+  <data name="Compact_Edit" xml:space="preserve"><value>编辑</value></data>
+  <data name="Compact_Completed" xml:space="preserve"><value>已完成</value></data>
+  <data name="Compact_Pending" xml:space="preserve"><value>待完成</value></data>
+  <data name="Compact_Unavailable" xml:space="preserve"><value>此项目已不在当前列表中。请返回列表选择其他项目。</value></data>
 </root>

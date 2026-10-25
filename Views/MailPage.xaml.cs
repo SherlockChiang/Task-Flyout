@@ -23,7 +23,7 @@ namespace Task_Flyout.Views
 {
     internal sealed record MailAccountSetupRequest(string AccountId);
 
-    public sealed partial class MailPage : Page
+    public sealed partial class MailPage : Page, ICompactNavigationPage
     {
         private MailAccountSetupRequest? _setupRequest;
 
@@ -72,7 +72,11 @@ namespace Task_Flyout.Views
         private bool _suppressSelectionClear;
         private bool _suppressUnreadToggle;
         private ResponsiveLayoutMode _layoutMode = ResponsiveLayoutMode.Wide;
-        private MailPane _compactMailPane = MailPane.Accounts;
+        private readonly CompactNavigationState _navigation = new(CompactPane.Accounts);
+        private readonly CompactPaneFocus _paneFocus = new();
+        private MailItem? _lastOpenedItem;
+        private MailPane _compactMailPane => (MailPane)(int)_navigation.Current;
+        public bool CanGoBackWithinPage => _layoutMode != ResponsiveLayoutMode.Wide && _navigation.CanGoBack;
         private int _messageLoadVersion;
         private DateTimeOffset? _lastMessageLoadSucceededAt;
         private Task? _refreshAccountsTask;
@@ -103,6 +107,8 @@ namespace Task_Flyout.Views
         {
             this.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
             InitializeComponent();
+            StepNavigation.BackRequested += (_, _) => TryGoBackWithinPage();
+            StepNavigation.ContinueRequested += (_, _) => ShowMailPane(MailPane.Messages);
             _items.CollectionChanged += (_, _) => ApplyMailSearch();
             Loaded += MailPage_Loaded;
             Unloaded += MailPage_Unloaded;
@@ -132,6 +138,9 @@ namespace Task_Flyout.Views
 
         public void DisposeLikeCleanup()
         {
+            _paneFocus.Cancel();
+            _navigation.Show(CompactPane.Accounts);
+            _lastOpenedItem = null;
             _isPageLoaded = false;
             if (_mailService != null)
                 _mailService.CachePublished -= MailService_CachePublished;
@@ -232,11 +241,6 @@ namespace Task_Flyout.Views
             }
             if (!IsOpeningFromNotification)
                 await OfferDraftRecoveryAsync();
-            if (IsOpeningFromNotification && _layoutMode == ResponsiveLayoutMode.Narrow)
-            {
-                _compactMailPane = MailPane.Detail;
-                ApplyResponsiveLayout();
-            }
         }
 
         private async void MailPage_ActualThemeChanged(FrameworkElement sender, object args)
@@ -467,10 +471,12 @@ namespace Task_Flyout.Views
 
         private async Task SelectFirstAvailableFolderAsync()
         {
+            int navigationVersion = _navigation.Version;
             if (AccountTree.RootNodes.Count == 0) return;
 
             var accountNode = AccountTree.RootNodes[0];
             await LoadFoldersForNodeAsync(accountNode);
+            if (!_isPageLoaded || !_navigation.IsCurrent(navigationVersion)) return;
             accountNode.IsExpanded = true;
 
             var folderNode = accountNode.Children.FirstOrDefault(node =>
@@ -481,14 +487,17 @@ namespace Task_Flyout.Views
             var selected = _folderNodes[folderNode];
             SetActiveAccount(selected.Account);
             _selectedFolder = selected.Folder;
-            await LoadMessagesAsync();
             ShowMailPane(MailPane.Messages);
+            await LoadMessagesAsync();
         }
 
         public async Task OpenMessageAsync(string accountId, string folderId, string messageId)
         {
             if (!IsLoaded)
                 await WaitUntilLoadedAsync();
+
+            _navigation.Show(_navigation.Current);
+            int navigationVersion = _navigation.Version;
 
             _searchCts?.Cancel();
             _searchText = "";
@@ -501,6 +510,7 @@ namespace Task_Flyout.Views
             if (_mailService == null) return;
 
             await RefreshAccountsAsync(autoSelect: false);
+            if (!_isPageLoaded || !_navigation.IsCurrent(navigationVersion)) return;
 
             var accountNode = _accountNodes.FirstOrDefault(pair => pair.Value.Id == accountId).Key;
             if (accountNode == null)
@@ -510,6 +520,7 @@ namespace Task_Flyout.Views
             }
 
             await LoadFoldersForNodeAsync(accountNode);
+            if (!_isPageLoaded || !_navigation.IsCurrent(navigationVersion)) return;
             accountNode.IsExpanded = true;
 
             var folderNode = accountNode.Children.FirstOrDefault(node =>
@@ -559,7 +570,11 @@ namespace Task_Flyout.Views
             RemoveMailButton.IsEnabled = true;
             SetUnreadOnlyWithoutReload(false);
 
+            ShowMailPane(MailPane.Messages);
+            navigationVersion = _navigation.Version;
+
             await LoadMessagesAsync(forceRefresh: false, preferredMessageId: messageId, selectFirstWhenNoMatch: false);
+            if (!_isPageLoaded || !_navigation.IsCurrent(navigationVersion)) return;
 
             var target = _items.FirstOrDefault(item =>
                 MailNotificationNavigationPolicy.MessageMatches(
@@ -577,6 +592,7 @@ namespace Task_Flyout.Views
             if (target == null)
             {
                 await LoadMessagesAsync(forceRefresh: true, preferredMessageId: messageId, selectFirstWhenNoMatch: false);
+                if (!_isPageLoaded || !_navigation.IsCurrent(navigationVersion)) return;
                 target = _items.FirstOrDefault(item =>
                     MailNotificationNavigationPolicy.MessageMatches(
                         item, accountId, folderId, messageId));
@@ -588,6 +604,7 @@ namespace Task_Flyout.Views
                 MailListView.ScrollIntoView(target);
                 if (!ReferenceEquals(target, _selectedItem))
                     await OpenMailItemAsync(target);
+                else ShowMailPane(MailPane.Detail, CompactPane.List);
             }
             else
             {
@@ -637,10 +654,14 @@ namespace Task_Flyout.Views
 
             if (_accountNodes.TryGetValue(node, out var account))
             {
+                _navigation.Show(_navigation.Current);
+                int navigationVersion = _navigation.Version;
                 _selectedAccountForRemoval = account;
                 RemoveMailButton.IsEnabled = true;
                 await SelectFirstFolderForAccountNodeAsync(node);
-                ShowMailPane(MailPane.Messages);
+                if (_isPageLoaded && _navigation.IsCurrent(navigationVersion) && _selectedFolder != null
+                    && _selectedAccount?.Id == account.Id)
+                    ShowMailPane(MailPane.Messages);
                 return;
             }
 
@@ -650,8 +671,8 @@ namespace Task_Flyout.Views
             _selectedFolder = selection.Folder;
             _selectedAccountForRemoval = selection.Account;
             RemoveMailButton.IsEnabled = true;
-            await LoadMessagesAsync();
             ShowMailPane(MailPane.Messages);
+            await LoadMessagesAsync();
         }
 
         private void AccountTree_SelectionChanged(TreeView sender, TreeViewSelectionChangedEventArgs args)
@@ -696,7 +717,9 @@ namespace Task_Flyout.Views
 
         private async Task SelectFirstFolderForAccountNodeAsync(TreeViewNode accountNode)
         {
+            int navigationVersion = _navigation.Version;
             await LoadFoldersForNodeAsync(accountNode);
+            if (!_isPageLoaded || !_navigation.IsCurrent(navigationVersion)) return;
             accountNode.IsExpanded = true;
 
             var folderNode = accountNode.Children.FirstOrDefault(node =>
@@ -720,6 +743,7 @@ namespace Task_Flyout.Views
         {
             if (_mailService == null || _selectedAccount == null || _selectedFolder == null) return;
 
+            int navigationVersion = _navigation.Version;
             var loadVersion = ++_messageLoadVersion;
             var account = _selectedAccount;
             var folder = _selectedFolder;
@@ -794,8 +818,11 @@ namespace Task_Flyout.Views
                     selectedItem = null;
                 }
 
-                if (selectedItem != null && !ReferenceEquals(selectedItem, _selectedItem))
-                    _ = OpenMailItemAsync(selectedItem);
+                if (selectedItem != null && !ReferenceEquals(selectedItem, _selectedItem)
+                    && _navigation.IsCurrent(navigationVersion)
+                    && ComposePanel.Visibility != Visibility.Visible && AddAccountPanel.Visibility != Visibility.Visible
+                    && (_layoutMode == ResponsiveLayoutMode.Wide || _compactMailPane == MailPane.Detail))
+                    _ = OpenMailItemAsync(selectedItem, navigate: false);
                 else if (selectedItem == null && _layoutMode != ResponsiveLayoutMode.Wide)
                     ClearDetail();
 
@@ -1195,7 +1222,7 @@ namespace Task_Flyout.Views
 
         private void ShowAddAccountPanel()
         {
-            ShowMailPane(MailPane.Detail);
+            ShowMailPane(MailPane.Detail, CompactPane.Accounts);
             AddAccountPanel.Visibility = Visibility.Visible;
             ComposePanel.Visibility = Visibility.Collapsed;
             DetailPanel.Visibility = Visibility.Collapsed;
@@ -1220,15 +1247,15 @@ namespace Task_Flyout.Views
 
         private async void ComposeButton_Click(object sender, RoutedEventArgs e)
         {
-            ShowMailPane(MailPane.Detail);
             await StartComposeAsync();
         }
 
-        private void ShowMailPane(MailPane pane)
+        private void ShowMailPane(MailPane pane, CompactPane? detailReturn = null)
         {
-            if (_layoutMode == ResponsiveLayoutMode.Wide) return;
-            _compactMailPane = pane;
+            _paneFocus.Remember(_navigation.Current, PaneRoot(_navigation.Current));
+            _navigation.Show((CompactPane)(int)pane, detailReturn);
             ApplyResponsiveLayout();
+            RestorePaneFocus();
         }
 
         private void LayoutRoot_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -1236,43 +1263,78 @@ namespace Task_Flyout.Views
 
         private void UpdateResponsiveLayout(double width, double height)
         {
+            bool wasWide = _layoutMode == ResponsiveLayoutMode.Wide;
+            _paneFocus.Remember(_navigation.Current, PaneRoot(_navigation.Current));
             ComposeBodyBox.MinHeight = height < 600 ? 120 : 220;
             var mode = ResponsiveLayoutPolicy.GetMailMode(width);
             if (_layoutMode != mode)
             {
                 _layoutMode = mode;
-                if (mode != ResponsiveLayoutMode.Wide)
-                    _compactMailPane = _selectedItem != null ? MailPane.Detail
-                        : _selectedFolder != null ? MailPane.Messages : MailPane.Accounts;
             }
             ApplyResponsiveLayout();
+            if (wasWide && _layoutMode != ResponsiveLayoutMode.Wide) RestorePaneFocus();
         }
 
         private void MailBackButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_layoutMode == ResponsiveLayoutMode.Wide) return;
-            _compactMailPane = _compactMailPane == MailPane.Detail ? MailPane.Messages : MailPane.Accounts;
+            TryGoBackWithinPage();
+        }
+
+        public bool TryGoBackWithinPage()
+        {
+            if (!CanGoBackWithinPage) return false;
+            _paneFocus.Remember(_navigation.Current, PaneRoot(_navigation.Current));
+            if (ComposePanel.Visibility == Visibility.Visible) ScheduleComposeDraft();
+            _navigation.Back();
             ApplyResponsiveLayout();
+            RestorePaneFocus();
+            return true;
+        }
+
+        private FrameworkElement PaneRoot(CompactPane pane) => pane switch
+        {
+            CompactPane.Accounts => MailAccountPane,
+            CompactPane.List => MailMessagePane,
+            _ => MailDetailPane
+        };
+
+        private void RestorePaneFocus()
+        {
+            if (_layoutMode == ResponsiveLayoutMode.Wide) return;
+            _paneFocus.Restore(_navigation.Current, PaneRoot(_navigation.Current), () => _navigation.Current switch
+            {
+                CompactPane.Accounts => AccountTree,
+                CompactPane.List => FocusedMessageContainer() ?? MailSearchBox,
+                _ => ComposePanel.Visibility == Visibility.Visible ? ComposeToBox : null
+            });
+        }
+
+        private UIElement? FocusedMessageContainer()
+        {
+            var item = _displayedItems.FirstOrDefault(item => _lastOpenedItem != null
+                && item.AccountId == _lastOpenedItem.AccountId && item.FolderId == _lastOpenedItem.FolderId
+                && item.Id == _lastOpenedItem.Id && item.ImapUidValidity == _lastOpenedItem.ImapUidValidity);
+            return item == null ? null : MailListView.ContainerFromItem(item) as UIElement;
         }
 
         private void MailAccountsButton_Click(object sender, RoutedEventArgs e)
         {
             if (_layoutMode != ResponsiveLayoutMode.Medium) return;
-            _compactMailPane = _compactMailPane == MailPane.Accounts && _selectedFolder != null
+            ShowMailPane(_compactMailPane == MailPane.Accounts && _selectedFolder != null
                 ? MailPane.Messages
-                : MailPane.Accounts;
-            ApplyResponsiveLayout();
+                : MailPane.Accounts);
         }
 
         private void ApplyResponsiveLayout()
         {
             bool wide = _layoutMode == ResponsiveLayoutMode.Wide;
-            bool medium = _layoutMode == ResponsiveLayoutMode.Medium;
             bool showAccounts = wide || !wide && _compactMailPane == MailPane.Accounts;
             bool showMessages = wide || !wide && _compactMailPane == MailPane.Messages;
             bool showDetail = wide || !wide && _compactMailPane == MailPane.Detail;
 
             AccountColumn.MinWidth = wide ? 190 : 0;
+            AccountColumn.MaxWidth = wide ? 280 : double.PositiveInfinity;
+            MessageColumn.MaxWidth = wide ? 440 : double.PositiveInfinity;
             AccountColumn.Width = showAccounts ? (wide ? new GridLength(2, GridUnitType.Star) : new GridLength(1, GridUnitType.Star)) : new GridLength(0);
             MessageColumn.MinWidth = wide ? 280 : 0;
             MessageColumn.Width = showMessages ? new GridLength(wide ? 3 : 1, GridUnitType.Star) : new GridLength(0);
@@ -1282,10 +1344,12 @@ namespace Task_Flyout.Views
             MailAccountPane.Visibility = showAccounts ? Visibility.Visible : Visibility.Collapsed;
             MailMessagePane.Visibility = showMessages ? Visibility.Visible : Visibility.Collapsed;
             MailDetailPane.Visibility = showDetail ? Visibility.Visible : Visibility.Collapsed;
-            MailBackButton.Visibility = (_layoutMode == ResponsiveLayoutMode.Narrow && _compactMailPane != MailPane.Accounts)
-                || (medium && _compactMailPane == MailPane.Detail)
-                ? Visibility.Visible : Visibility.Collapsed;
-            MailAccountsButton.Visibility = medium ? Visibility.Visible : Visibility.Collapsed;
+            MailBackButton.Visibility = Visibility.Collapsed;
+            MailAccountsButton.Visibility = Visibility.Collapsed;
+            StepNavigation.Update(!wide, _navigation,
+                _loader.GetStringOrDefault("Compact_MailAccounts") ?? "Mailboxes and folders",
+                _selectedFolder?.DisplayName ?? (_loader.GetStringOrDefault("Compact_Messages") ?? "Messages"),
+                canContinue: _selectedFolder != null);
             UnreadOnlyToggle.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow ? Visibility.Collapsed : Visibility.Visible;
             ComposeButtonText.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow ? Visibility.Collapsed : Visibility.Visible;
             RefreshButtonText.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow ? Visibility.Collapsed : Visibility.Visible;
@@ -1298,6 +1362,7 @@ namespace Task_Flyout.Views
             Grid.SetColumnSpan(MailHeaderCommands, _layoutMode == ResponsiveLayoutMode.Narrow ? 2 : 1);
             MailHeaderCommands.HorizontalAlignment = _layoutMode == ResponsiveLayoutMode.Narrow
                 ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+            App.MyMainWindow?.UpdatePageBackNavigation();
         }
 
         private void ShowComposePanel(MailItem? replyTo = null)
@@ -1349,10 +1414,12 @@ namespace Task_Flyout.Views
             _mailService ??= (App.Current as App)?.MailService;
             if (ComposePanel.Visibility == Visibility.Visible)
             {
+                ShowMailPane(MailPane.Detail);
                 ComposeToBox.Focus(FocusState.Programmatic);
                 return;
             }
             if (await OfferDraftRecoveryAsync()) return;
+            ShowMailPane(MailPane.Detail);
             ShowComposePanel();
         }
 
@@ -1813,12 +1880,13 @@ namespace Task_Flyout.Views
                 ClearDetail();
         }
 
-        private async Task OpenMailItemAsync(MailItem item)
+        private async Task OpenMailItemAsync(MailItem item, bool navigate = true)
         {
+            if (navigate) _lastOpenedItem = item;
             _selectedItem = item;
             _mailService?.UpdateActiveBodyCacheContext(_selectedAccount?.Id, item);
             ClearRenderedMailBody();
-            ShowMailPane(MailPane.Detail);
+            if (navigate) ShowMailPane(MailPane.Detail, CompactPane.List);
             _bodyLoadCts?.Cancel();
             var bodyCts = CancellationTokenSource.CreateLinkedTokenSource(_pageRequestCts.Token);
             _bodyLoadCts = bodyCts;
@@ -3129,6 +3197,7 @@ body { background-color: {{background}} !important; }
             }
             ComposePanel.Visibility = Visibility.Collapsed;
             ClearDetail();
+            if (CanGoBackWithinPage) TryGoBackWithinPage();
         }
 
         private async void CreateTaskFromMail_Click(object sender, RoutedEventArgs e)
@@ -3233,6 +3302,7 @@ body { background-color: {{background}} !important; }
                 SetComposeStatus(_loader.GetStringOrDefault("TextMailSent") ?? "Email sent.");
                 ComposePanel.Visibility = Visibility.Collapsed;
                 ClearDetail();
+                if (_compactMailPane == MailPane.Detail && CanGoBackWithinPage) TryGoBackWithinPage();
             }
             catch (MailSendStatusUnknownException ex)
             {

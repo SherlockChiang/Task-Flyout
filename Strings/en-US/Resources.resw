@@ -2178,4 +2178,16 @@ Widgets suppression: ready {8}; snapshot {9}; notification pending {10}</value><
   <data name="Notification_TaskCompleted" xml:space="preserve"><value>Task completed.</value></data>
   <data name="Notification_MailRead" xml:space="preserve"><value>Mail marked read.</value></data>
   <data name="Notification_MailQueued" xml:space="preserve"><value>Mail marked read locally. The change is queued for synchronization; check the account sync center for progress.</value></data>
+  <data name="Compact_Back" xml:space="preserve"><value>Back</value></data>
+  <data name="Compact_ShowList" xml:space="preserve"><value>Show list</value></data>
+  <data name="Compact_Accounts" xml:space="preserve"><value>Accounts</value></data>
+  <data name="Compact_MailAccounts" xml:space="preserve"><value>Mailboxes and folders</value></data>
+  <data name="Compact_Agenda" xml:space="preserve"><value>Agenda</value></data>
+  <data name="Compact_Tasks" xml:space="preserve"><value>Tasks</value></data>
+  <data name="Compact_Messages" xml:space="preserve"><value>Messages</value></data>
+  <data name="Compact_Detail" xml:space="preserve"><value>Details</value></data>
+  <data name="Compact_Edit" xml:space="preserve"><value>Edit</value></data>
+  <data name="Compact_Completed" xml:space="preserve"><value>Completed</value></data>
+  <data name="Compact_Pending" xml:space="preserve"><value>Pending</value></data>
+  <data name="Compact_Unavailable" xml:space="preserve"><value>This item is no longer in the current list. Go back to choose another item.</value></data>
 </root>

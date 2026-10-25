@@ -87,6 +87,7 @@
     <Compile Include="..\..\Services\TaskMutationStatusPolicy.cs" Link="Source\TaskMutationStatusPolicy.cs" />
     <Compile Include="..\..\Services\TaskEditCapabilityPolicy.cs" Link="Source\TaskEditCapabilityPolicy.cs" />
     <Compile Include="..\..\Services\ResponsiveLayoutPolicy.cs" Link="Source\ResponsiveLayoutPolicy.cs" />
+    <Compile Include="..\..\Services\CompactNavigationState.cs" Link="Source\CompactNavigationState.cs" />
     <Compile Include="..\..\Services\WindowSizingPolicy.cs" Link="Source\WindowSizingPolicy.cs" />
     <Compile Include="..\..\Services\LocalizationHelper.cs" Link="Source\LocalizationHelper.cs" />
     <Compile Include="..\..\Services\UserSafeErrorMessage.cs" Link="Source\UserSafeErrorMessage.cs" />

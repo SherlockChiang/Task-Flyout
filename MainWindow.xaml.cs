@@ -164,7 +164,7 @@ namespace Task_Flyout
 
         private void ContentFrame_Navigated(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
         {
-            MainNav.IsBackEnabled = ContentFrame.CanGoBack;
+            UpdatePageBackNavigation();
             if (e.SourcePageType != null)
                 _lastContentPageType = e.SourcePageType;
 
@@ -208,10 +208,22 @@ namespace Task_Flyout
 
         private void MainNav_BackRequested(NavigationView sender, NavigationViewBackRequestedEventArgs args)
         {
+            if (ContentFrame.Content is ICompactNavigationPage page && page.TryGoBackWithinPage()) return;
             if (ContentFrame.CanGoBack)
             {
                 ContentFrame.GoBack();
             }
+        }
+
+        internal void UpdatePageBackNavigation()
+            => MainNav.IsBackEnabled = ContentFrame.CanGoBack
+                || ContentFrame.Content is ICompactNavigationPage { CanGoBackWithinPage: true };
+
+        private void PageBackAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+        {
+            if (GlobalSearchOverlay.Visibility == Visibility.Visible) return;
+            if (RootGrid.XamlRoot != null && VisualTreeHelper.GetOpenPopupsForXamlRoot(RootGrid.XamlRoot).Count > 0) return;
+            if (ContentFrame.Content is ICompactNavigationPage page && page.TryGoBackWithinPage()) args.Handled = true;
         }
 
         private void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)

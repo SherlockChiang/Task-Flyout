@@ -87,7 +87,7 @@ namespace Task_Flyout.Views
         public object ConvertBack(object v, Type t, object p, string l) => throw new NotImplementedException();
     }
 
-    public sealed partial class CalendarPage : Page
+    public sealed partial class CalendarPage : Page, ICompactNavigationPage
     {
         private const int MonthCellItemLimit = 3;
         private const double WeekTimelineHeaderHeight = 48;
@@ -107,6 +107,12 @@ namespace Task_Flyout.Views
         private bool _isAccountPaneCollapsed;
         private bool _isTimelinePaneCollapsed;
         private ResponsiveLayoutMode _layoutMode = ResponsiveLayoutMode.Wide;
+        private readonly CompactNavigationState _navigation = new();
+        private readonly CompactPaneFocus _paneFocus = new();
+        private AgendaItem? _detailItem;
+        private bool IsCompact => LayoutRoot != null && ResponsiveLayoutPolicy.ShouldShowCalendarAgendaOnly(LayoutRoot.ActualWidth, LayoutRoot.ActualHeight);
+        private bool _wasCompact;
+        public bool CanGoBackWithinPage => IsCompact && _navigation.CanGoBack;
         private DateTimeOffset? _lastCalendarSyncSucceededAt;
         private CalendarMonthRange _displayedRange;
         private readonly VersionedUiRefreshGate _cacheRefreshGate = new();
@@ -122,6 +128,12 @@ namespace Task_Flyout.Views
             this.InitializeComponent();
             this.Language = Windows.Globalization.ApplicationLanguages.Languages[0];
             _loader = new ResourceLoader();
+            StepNavigation.BackRequested += (_, _) => TryGoBackWithinPage();
+            StepNavigation.ContinueRequested += (_, _) => ShowCompactPane(CompactPane.List);
+            AgendaDetails.EditRequested += async (_, _) =>
+            {
+                if (AgendaDetails.Item is { } item) await ShowEditDialogAsync(item, forceEditor: true);
+            };
             SetWeekdayHeaders();
             if (Application.Current is App app) _syncManager = app.SyncManager;
             this.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(Global_PointerWheelChanged), handledEventsToo: true);
@@ -143,6 +155,7 @@ namespace Task_Flyout.Views
 
         private void CalendarPage_Unloaded(object sender, RoutedEventArgs e)
         {
+            _paneFocus.Cancel();
             _isPageLoaded = false;
             if (_syncManager != null)
                 _syncManager.CachePublished -= SyncManager_CachePublished;
@@ -797,6 +810,11 @@ namespace Task_Flyout.Views
 
         private void ToggleAccountPane_Click(object sender, RoutedEventArgs e)
         {
+            if (IsCompact)
+            {
+                ShowCompactPane(_navigation.Current == CompactPane.Accounts ? CompactPane.List : CompactPane.Accounts);
+                return;
+            }
             _isAccountPaneCollapsed = !_isAccountPaneCollapsed;
             if (_layoutMode != ResponsiveLayoutMode.Wide && !_isAccountPaneCollapsed)
                 _isTimelinePaneCollapsed = true;
@@ -805,6 +823,9 @@ namespace Task_Flyout.Views
 
         private void LayoutRoot_SizeChanged(object sender, SizeChangedEventArgs e)
         {
+            bool detailHadFocus = CompactPaneFocus.HasFocus(AgendaDetails);
+            bool accountsHadFocus = CompactPaneFocus.HasFocus(AccountPane);
+            _paneFocus.Remember(_navigation.Current, PaneRoot(_navigation.Current));
             var mode = ResponsiveLayoutPolicy.GetCalendarMode(e.NewSize.Width);
             if (_layoutMode != mode)
             {
@@ -820,6 +841,13 @@ namespace Task_Flyout.Views
                     _isTimelinePaneCollapsed = true;
             }
             ApplyResponsiveLayout();
+            if (IsCompact && !_wasCompact) RestorePaneFocus();
+            else if (!IsCompact && _wasCompact && detailHadFocus)
+                _paneFocus.Restore(CompactPane.List, TimelinePane.Visibility == Visibility.Visible ? TimelinePane : CalendarContent,
+                    () => TimelinePane.Visibility == Visibility.Visible ? SideBarAgendaList : CalendarViewModeBox);
+            else if (!IsCompact && _wasCompact && accountsHadFocus && AccountPane.Visibility == Visibility.Collapsed)
+                _paneFocus.Restore(CompactPane.List, CalendarContent, () => CalendarViewModeBox);
+            _wasCompact = IsCompact;
         }
 
         private void ApplyResponsiveLayout()
@@ -827,9 +855,16 @@ namespace Task_Flyout.Views
             bool agendaOnly = ResponsiveLayoutPolicy.ShouldShowCalendarAgendaOnly(
                 LayoutRoot.ActualWidth,
                 LayoutRoot.ActualHeight);
-            bool showAccounts = !_isAccountPaneCollapsed;
+            bool showAccounts = agendaOnly ? _navigation.Current == CompactPane.Accounts : !_isAccountPaneCollapsed;
             bool showCalendar = !agendaOnly;
-            bool showTimeline = agendaOnly ? !showAccounts : !_isTimelinePaneCollapsed;
+            bool showTimeline = agendaOnly ? _navigation.Current == CompactPane.List : !_isTimelinePaneCollapsed;
+            StepNavigation.Update(agendaOnly, _navigation,
+                _loader?.GetStringOrDefault("Compact_Accounts") ?? "Accounts",
+                _loader?.GetStringOrDefault("Compact_Agenda") ?? "Agenda");
+            AgendaDetails.Visibility = agendaOnly && _navigation.Current == CompactPane.Detail ? Visibility.Visible : Visibility.Collapsed;
+            CollapseAccountsButton.Visibility = agendaOnly ? Visibility.Collapsed : Visibility.Visible;
+            AccountColumn.MaxWidth = agendaOnly ? double.PositiveInfinity : 320;
+            TimelineColumn.MaxWidth = agendaOnly ? double.PositiveInfinity : 420;
 
             AccountColumn.MinWidth = showAccounts && _layoutMode == ResponsiveLayoutMode.Wide ? 240 : 0;
             AccountColumn.Width = showAccounts
@@ -838,7 +873,7 @@ namespace Task_Flyout.Views
             CalendarColumn.MinWidth = 0;
             CalendarColumn.Width = showCalendar ? new GridLength(5, GridUnitType.Star) : new GridLength(0);
             TimelineColumn.MinWidth = showTimeline && !agendaOnly ? 280 : 0;
-            TimelineColumn.Width = showTimeline
+            TimelineColumn.Width = showTimeline || (agendaOnly && _navigation.Current == CompactPane.Detail)
                 ? new GridLength(agendaOnly ? 1 : 3, GridUnitType.Star)
                 : new GridLength(0);
             AccountPane.Visibility = showAccounts ? Visibility.Visible : Visibility.Collapsed;
@@ -858,8 +893,7 @@ namespace Task_Flyout.Views
             ToggleTimelinePaneIcon.Glyph = showTimeline ? "\uE76C" : "\uE76B";
             ToggleTimelinePaneButton.Visibility = agendaOnly
                 ? Visibility.Collapsed : Visibility.Visible;
-            TimelineAccountsButton.Visibility = agendaOnly
-                ? Visibility.Visible : Visibility.Collapsed;
+            TimelineAccountsButton.Visibility = Visibility.Collapsed;
             CollapseTimelinePaneButton.Visibility = agendaOnly
                 ? Visibility.Collapsed : Visibility.Visible;
             Grid.SetRow(CalendarStatusPanel, 1);
@@ -867,6 +901,43 @@ namespace Task_Flyout.Views
             Grid.SetColumnSpan(CalendarStatusPanel, 2);
             Grid.SetRow(RetryTaskMutationButton, 1);
             Grid.SetColumn(RetryTaskMutationButton, 2);
+            App.MyMainWindow?.UpdatePageBackNavigation();
+        }
+
+        public bool TryGoBackWithinPage()
+        {
+            if (!CanGoBackWithinPage) return false;
+            _paneFocus.Remember(_navigation.Current, PaneRoot(_navigation.Current));
+            _navigation.Back();
+            ApplyResponsiveLayout();
+            RestorePaneFocus();
+            return true;
+        }
+
+        private FrameworkElement PaneRoot(CompactPane pane) => pane switch
+        {
+            CompactPane.Accounts => AccountPane,
+            CompactPane.Detail => AgendaDetails,
+            _ => TimelinePane
+        };
+
+        private void ShowCompactPane(CompactPane pane)
+        {
+            _paneFocus.Remember(_navigation.Current, PaneRoot(_navigation.Current));
+            _navigation.Show(pane);
+            ApplyResponsiveLayout();
+            RestorePaneFocus();
+        }
+
+        private void RestorePaneFocus()
+        {
+            if (!IsCompact) return;
+            _paneFocus.Restore(_navigation.Current, PaneRoot(_navigation.Current), () => _navigation.Current switch
+            {
+                CompactPane.Accounts => null,
+                CompactPane.Detail => AgendaDetails.FocusTarget,
+                _ => (_detailItem == null ? null : SideBarAgendaList.ContainerFromItem(_detailItem) as UIElement) ?? SideBarAgendaList
+            });
         }
 
         private void ToggleTimelinePane_Click(object sender, RoutedEventArgs e)
@@ -1089,6 +1160,14 @@ namespace Task_Flyout.Views
             SelectedDayItems.Clear();
             foreach (var item in nextItems)
                 SelectedDayItems.Add(item);
+            if (_detailItem != null)
+            {
+                var current = nextItems.FirstOrDefault(item => item.Id == _detailItem.Id
+                    && AccountIdentityPolicy.Matches(item.Provider, item.AccountId, _detailItem.Provider, _detailItem.AccountId)
+                    && item.CalendarId == _detailItem.CalendarId && item.DateKey == _detailItem.DateKey);
+                if (current != null) { _detailItem = current; AgendaDetails.Show(current); }
+                else AgendaDetails.Clear();
+            }
         }
 
         private static CalendarMonthRange GetUpcomingRange()
@@ -1428,24 +1507,36 @@ namespace Task_Flyout.Views
             await ShowEditDialogAsync(item);
         }
 
-        private async Task ShowEditDialogAsync(AgendaItem item)
+        private async Task ShowEditDialogAsync(AgendaItem item, bool forceEditor = false)
         {
+            if (IsCompact && !forceEditor)
+            {
+                _detailItem = item;
+                AgendaDetails.Show(item);
+                ShowCompactPane(CompactPane.Detail);
+                return;
+            }
             PrepareDialogForEdit(item);
             EditDialog.XamlRoot = this.XamlRoot;
             PrepareEditDialogSize();
             await EditDialog.ShowAsync();
+            if (IsCompact && _navigation.Current == CompactPane.Detail)
+                _paneFocus.Restore(CompactPane.Detail, AgendaDetails, () => AgendaDetails.FocusTarget);
         }
 
         public void OpenEditDialogFromExternal(AgendaItem item)
         {
             Action showDialog = async () =>
             {
-                PrepareDialogForEdit(item);
-                EditDialog.XamlRoot = this.XamlRoot;
-                PrepareEditDialogSize();
-                try { await EditDialog.ShowAsync(); } catch { }
+                try { await ShowEditDialogAsync(item); } catch { }
             };
-            if (this.XamlRoot == null) this.Loaded += (s, e) => showDialog(); else showDialog();
+            if (this.XamlRoot == null)
+            {
+                RoutedEventHandler? loaded = null;
+                loaded = (_, _) => { Loaded -= loaded; showDialog(); };
+                Loaded += loaded;
+            }
+            else showDialog();
         }
 
         private void PrepareEditDialogSize()
