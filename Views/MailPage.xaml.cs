@@ -1550,7 +1550,7 @@ namespace Task_Flyout.Views
                 Title = _loader.GetStringOrDefault("TextRecoverDraftTitle") ?? "Recover unsent draft?",
                 Content = string.Format(
                     _loader.GetStringOrDefault("TextRecoverDraftContent") ?? "A protected draft from {0} is available.",
-                    draft.UpdatedAt.ToLocalTime().ToString("g")),
+                    draft.UpdatedAt.ToLocalTime().ToString("g", LocalizationHelper.AppCulture)),
                 PrimaryButtonText = _loader.GetStringOrDefault("TextRestore") ?? "Restore",
                 SecondaryButtonText = _loader.GetStringOrDefault("TextDiscard") ?? "Discard",
                 CloseButtonText = _loader.GetStringOrDefault("TextNotNow") ?? "Not now",

@@ -223,10 +223,10 @@ namespace Task_Flyout.Views
         private string FormatSyncObservation(DateTimeOffset? attempt, DateTimeOffset? success, SyncFailureKind failure)
         {
             string text = success.HasValue ? string.Format(
-                _loader.GetStringOrDefault("AddAccount_LastSuccess") ?? "Last success: {0}", success.Value.LocalDateTime.ToString("g"))
+                _loader.GetStringOrDefault("AddAccount_LastSuccess") ?? "Last success: {0}", success.Value.LocalDateTime.ToString("g", LocalizationHelper.AppCulture))
                 : _loader.GetStringOrDefault("SyncCenter_NotSynced") ?? "No successful sync in this session";
             if (attempt.HasValue) text += " · " + string.Format(
-                _loader.GetStringOrDefault("SyncCenter_LastAttempt") ?? "Last attempt: {0}", attempt.Value.LocalDateTime.ToString("g"));
+                _loader.GetStringOrDefault("SyncCenter_LastAttempt") ?? "Last attempt: {0}", attempt.Value.LocalDateTime.ToString("g", LocalizationHelper.AppCulture));
             if (failure != SyncFailureKind.None) text += Environment.NewLine + FailureText(failure);
             return text;
         }

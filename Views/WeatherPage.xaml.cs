@@ -814,7 +814,7 @@ namespace Task_Flyout.Views
                 var id = await IconPackService.Instance.ImportFromZipAsync(file, System.IO.Path.GetFileNameWithoutExtension(file.Name));
                 if (id == null)
                 {
-                    IconPackStatusText.Text = GetSafeString("WeatherPage_IconPackFailed", "Failed: drawable_filter.xml was not found in the ZIP.");
+                    IconPackStatusText.Text = GetSafeString("WeatherPage_IconPackFailed", "This icon pack could not be imported. Check that the ZIP contains a valid drawable_filter.xml and matching PNG files, and meets the size limits.");
                     return;
                 }
 
@@ -827,7 +827,8 @@ namespace Task_Flyout.Views
             {
                 IconPackStatusText.Text = string.Format(
                     GetSafeString("WeatherPage_IconPackError", "Icon-pack operation failed: {0}"),
-                    UserSafeErrorMessage.FromException(ex));
+                    _loader.GetFileErrorDescription(ex));
+                System.Diagnostics.Debug.WriteLine($"Icon-pack import failed: {ex.GetType().Name}");
             }
             finally
             {
@@ -1409,7 +1410,7 @@ namespace Task_Flyout.Views
                 }
 
                 _lastWeatherLoadSucceededAt = DateTimeOffset.Now;
-                SetWeatherStatus(string.Format(GetSafeString("WeatherPage_Updated", "Updated: {0}"), _lastWeatherLoadSucceededAt.Value.LocalDateTime.ToString("g")));
+                SetWeatherStatus(string.Format(GetSafeString("WeatherPage_Updated", "Updated: {0}"), _lastWeatherLoadSucceededAt.Value.LocalDateTime.ToString("g", LocalizationHelper.AppCulture)));
                 UpdateCurrentWeatherCard(info);
                 UpdateDailyForecast(info);
                 WeatherLoadState.Clear();

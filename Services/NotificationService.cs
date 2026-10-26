@@ -170,7 +170,7 @@ namespace Task_Flyout.Services
                             ? (_loader.GetStringOrDefault("TextTaskReminder") ?? "Task Reminder")
                             : (_loader.GetStringOrDefault("TextEventReminder") ?? "Event Reminder"))
                         : item.Title ?? (_loader.GetStringOrDefault("TextEventReminder") ?? "Event Reminder"))
-                    .AddText($"{timeText} · {startTime:g}");
+                    .AddText($"{timeText} · {startTime.ToString("g", LocalizationHelper.AppCulture)}");
                 if (quiet) builder.MuteAudio();
 
                 var actions = NotificationActionPolicy.GetActions(item.IsTask, item.IsCompleted);

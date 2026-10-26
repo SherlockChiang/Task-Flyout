@@ -16,6 +16,12 @@ namespace Task_Flyout.Services
         public static string GetStringOrDefault(this ResourceLoader loader, string resourceId, string fallback)
             => loader.GetStringOrDefault(resourceId) ?? fallback;
 
+        public static string GetFileErrorDescription(this ResourceLoader loader, Exception exception)
+        {
+            var error = FileOperationErrorPolicy.Describe(exception);
+            return loader.GetStringOrDefault(error.ResourceKey, error.Fallback);
+        }
+
         private static string? TryGetString(ResourceLoader loader, string resourceId)
         {
             try { return loader.GetString(resourceId); }

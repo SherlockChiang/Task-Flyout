@@ -1556,7 +1556,7 @@
     <value>正在导入…</value>
   </data>
   <data name="WeatherPage_IconPackFailed" xml:space="preserve">
-    <value>失败：ZIP 中未找到 drawable_filter.xml</value>
+    <value>无法导入此图标包。请确认 ZIP 包含有效的 drawable_filter.xml 和对应的 PNG 文件，且未超过大小限制。</value>
   </data>
   <data name="WeatherPage_IconPackImported" xml:space="preserve">
     <value>导入完成：{0}</value>
@@ -1833,7 +1833,7 @@ iCloud：{2}
   <data name="TextOpmlPreview" xml:space="preserve"><value>新增订阅：{0}&#xA;跳过重复项：{1}&#xA;映射文件夹：{2}&#xA;未加密 HTTP 订阅：{3}</value></data>
   <data name="TextOpmlImportTitle" xml:space="preserve"><value>导入 OPML 订阅</value></data>
   <data name="TextImport" xml:space="preserve"><value>导入</value></data>
-  <data name="TextOpmlImportResult" xml:space="preserve"><value>已导入 {0} 个订阅；跳过 {1} 个；失败 {2} 个。刷新以下载文章。</value></data>
+  <data name="TextOpmlImportResult" xml:space="preserve"><value>已导入 {0} 个订阅；跳过重复项 {1} 个；跳过 HTTP 订阅 {2} 个；失败 {3} 个。刷新以下载文章。</value></data>
   <data name="TextOpmlImportFailed" xml:space="preserve"><value>OPML 导入失败：{0}</value></data>
   <data name="TextOpmlFileType" xml:space="preserve"><value>OPML 订阅列表</value></data>
   <data name="TextOpmlExportResult" xml:space="preserve"><value>已将 {0} 个订阅导出到 {1}。</value></data>
@@ -2326,4 +2326,13 @@ Widgets 抑制：就绪 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="Keyboard_RemoveLocation" xml:space="preserve">
     <value>移除 {0}</value>
   </data>
+  <data name="TextOpmlInvalidDocument" xml:space="preserve"><value>无法将此文件读取为 OPML。请重新导出一份不大于 5 MB 的 OPML 订阅列表后重试。</value></data>
+  <data name="TextOpmlTooManyEntries" xml:space="preserve"><value>一个 OPML 文件最多可包含 {0} 个订阅。</value></data>
+  <data name="TextOpmlDocumentTitle" xml:space="preserve"><value>Task Flyout RSS 订阅</value></data>
+  <data name="FileError_NotFound" xml:space="preserve"><value>文件已不可用，请重新选择。</value></data>
+  <data name="FileError_AccessDenied" xml:space="preserve"><value>文件访问被拒绝，请选择有权访问的位置。</value></data>
+  <data name="FileError_InvalidData" xml:space="preserve"><value>文件格式无效或不受支持，请检查文件后重试。</value></data>
+  <data name="FileError_IO" xml:space="preserve"><value>无法读取或写入文件，请检查可用空间以及文件是否被其他应用占用。</value></data>
+  <data name="FileError_Canceled" xml:space="preserve"><value>文件操作已取消，准备好后可重试。</value></data>
+  <data name="FileError_Unexpected" xml:space="preserve"><value>文件操作未能完成，请重新选择文件或目标位置后重试。</value></data>
 </root>

@@ -1,5 +1,9 @@
+using System.Globalization;
+using System.IO.Compression;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Task_Flyout.Services;
 
 namespace Task_Flyout.Tests;
 
@@ -33,8 +37,117 @@ public class LocalizationResourceTests
                 var englishIndexes = placeholder.Matches(english[key]).Select(match => Regex.Match(match.Value, @"\d+").Value).Order().ToArray();
                 var localizedIndexes = placeholder.Matches(localized[key]).Select(match => Regex.Match(match.Value, @"\d+").Value).Order().ToArray();
                 Assert.Equal(englishIndexes, localizedIndexes);
+                if (englishIndexes.Length > 0)
+                    Assert.Equal(CompositeFormat.Parse(english[key]).MinimumArgumentCount,
+                        CompositeFormat.Parse(localized[key]).MinimumArgumentCount);
             }
         }
+    }
+
+    [Fact]
+    public void Visible_xaml_copy_has_resources_except_invariant_names_and_examples()
+    {
+        string root = FindRepositoryRoot();
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var keys = LoadResourceKeys(Path.Combine(root, "Strings", "en-US", "Resources.resw"));
+        var properties = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Text", "Content", "Label", "Header", "PlaceholderText", "OnContent", "OffContent",
+            "Title", "PrimaryButtonText", "SecondaryButtonText", "CloseButtonText",
+            "AutomationProperties.Name", "ToolTipService.ToolTip"
+        };
+        var invariant = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Task Flyout", "Outlook", "Gmail", "IMAP", "Open-Meteo", "wttr.in",
+            "name@outlook.com", "name@example.com", "imap.example.com", "smtp.example.com",
+            "name@example.com; other@example.com"
+        };
+        var violations = new List<string>();
+        foreach (string path in Directory.EnumerateFiles(root, "*.xaml")
+                     .Concat(Directory.EnumerateFiles(Path.Combine(root, "Views"), "*.xaml")))
+        {
+            foreach (var element in XDocument.Load(path).Descendants())
+            {
+                string? uid = element.Attribute(x + "Uid")?.Value;
+                foreach (var attribute in element.Attributes().Where(attribute => properties.Contains(attribute.Name.LocalName)))
+                {
+                    string value = attribute.Value;
+                    if (value.StartsWith('{') || invariant.Contains(value) || !Regex.IsMatch(value, @"[A-Za-z\u4e00-\u9fff]")) continue;
+                    if (!keys.Contains(uid + "." + attribute.Name.LocalName))
+                        violations.Add($"{Path.GetRelativePath(root, path)}: {uid ?? element.Name.LocalName}.{attribute.Name.LocalName} = {value}");
+                }
+            }
+        }
+        Assert.Empty(violations);
+    }
+
+    [Fact]
+    public void Weather_notifications_and_file_feedback_dynamic_keys_have_translations()
+    {
+        string root = FindRepositoryRoot();
+        // These keys also occur in descriptor tables, ternaries and callback arguments,
+        // which the direct resource-lookup audit cannot see.
+        var resourceLiteral = new Regex("\"((?:Weather(?:Page|Field|Alert|Condition|Wind|Moon)|Notification|SyncCenter|FileError)_[A-Za-z0-9_.]+|TextOpml[A-Za-z0-9]+)\"", RegexOptions.CultureInvariant);
+        var sourceFiles = Directory.EnumerateFiles(Path.Combine(root, "Services"), "*.cs")
+            .Concat(Directory.EnumerateFiles(Path.Combine(root, "Views"), "*.cs"));
+        var required = sourceFiles.SelectMany(path => resourceLiteral.Matches(File.ReadAllText(path))
+                .Select(match => match.Groups[1].Value))
+            .Concat(Enum.GetNames<StandaloneTaskbarUiStatusKind>().Select(name => "WeatherPage_StandaloneStatus_" + name))
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.NotEmpty(required);
+        foreach (string culture in new[] { "en-US", "zh-Hans", "zh-TW" })
+        {
+            var resources = LoadResourceValues(Path.Combine(root, "Strings", culture, "Resources.resw"));
+            foreach (string key in required)
+                Assert.True(resources.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value), $"{culture}: missing {key}");
+        }
+    }
+
+    [Theory]
+    [InlineData("en-US")]
+    [InlineData("zh-Hans")]
+    [InlineData("zh-TW")]
+    public void File_failures_resolve_localized_categories_without_exception_details(string culture)
+    {
+        var resources = LoadResourceValues(Path.Combine(FindRepositoryRoot(), "Strings", culture, "Resources.resw"));
+        var invalidOpml = Assert.Throws<System.Xml.XmlException>(() => RssOpmlService.Parse("<rss/>"));
+        var invalidZip = Assert.Throws<InvalidDataException>(() =>
+        {
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes("not a ZIP file"));
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        });
+        const string details = "private-file-and-runtime-details";
+        Exception[] errors =
+        {
+            invalidOpml, invalidZip, new FileNotFoundException(details), new DirectoryNotFoundException(details),
+            new UnauthorizedAccessException(details), new IOException(details), new OperationCanceledException(details),
+            new Exception(details)
+        };
+        foreach (var exception in errors)
+        {
+            var descriptor = FileOperationErrorPolicy.Describe(exception);
+            Assert.True(resources.TryGetValue(descriptor.ResourceKey, out var text));
+            Assert.DoesNotContain(exception.Message, text!, StringComparison.Ordinal);
+            if (culture != "en-US") Assert.Matches(@"[\u4e00-\u9fff]", text!);
+        }
+        Assert.Equal("FileError_InvalidData", FileOperationErrorPolicy.Describe(invalidOpml).ResourceKey);
+        Assert.Equal("FileError_InvalidData", FileOperationErrorPolicy.Describe(invalidZip).ResourceKey);
+    }
+
+    [Theory]
+    [InlineData("en-US")]
+    [InlineData("zh-Hans")]
+    [InlineData("zh-TW")]
+    public void Opml_export_keeps_localized_title_and_user_content(string culture)
+    {
+        var resources = LoadResourceValues(Path.Combine(FindRepositoryRoot(), "Strings", culture, "Resources.resw"));
+        var entries = new[] { new RssOpmlEntry("News & 新聞", "https://example.test/rss", "Research <2026>") };
+        string xml = RssOpmlService.Export(entries, resources["TextOpmlDocumentTitle"]);
+        Assert.Equal(resources["TextOpmlDocumentTitle"], XDocument.Parse(xml).Root!.Element("head")!.Element("title")!.Value);
+        Assert.Equal(entries, RssOpmlService.Parse(xml));
+        // All four counts must remain visible, including intentional HTTP skips.
+        string summary = string.Format(CultureInfo.GetCultureInfo(culture), resources["TextOpmlImportResult"], 11, 22, 33, 44);
+        foreach (string count in new[] { "11", "22", "33", "44" }) Assert.Contains(count, summary, StringComparison.Ordinal);
     }
 
     [Fact]

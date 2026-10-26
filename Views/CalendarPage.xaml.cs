@@ -367,7 +367,7 @@ namespace Task_Flyout.Views
                 if (SyncContentFeedback.ShowResult(CalendarLoadState, _syncManager, () => SyncMonthDataAsync(true)))
                 {
                     _lastCalendarSyncSucceededAt = DateTimeOffset.Now;
-                    SetCalendarStatus(string.Format(_loader.GetStringOrDefault("TextLastSync") ?? "Last sync: {0}", _lastCalendarSyncSucceededAt.Value.LocalDateTime.ToString("g")));
+                    SetCalendarStatus(string.Format(_loader.GetStringOrDefault("TextLastSync") ?? "Last sync: {0}", _lastCalendarSyncSucceededAt.Value.LocalDateTime.ToString("g", LocalizationHelper.AppCulture)));
                 }
                 else SetCalendarStatus(_loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed", isError: true);
             }

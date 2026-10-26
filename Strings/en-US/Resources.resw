@@ -1556,7 +1556,7 @@
     <value>Importing...</value>
   </data>
   <data name="WeatherPage_IconPackFailed" xml:space="preserve">
-    <value>Failed: drawable_filter.xml not found in zip</value>
+    <value>This icon pack could not be imported. Check that the ZIP contains a valid drawable_filter.xml and matching PNG files, and meets the size limits.</value>
   </data>
   <data name="WeatherPage_IconPackImported" xml:space="preserve">
     <value>Imported: {0}</value>
@@ -1833,7 +1833,7 @@ Weather: {4}</value></data>
   <data name="TextOpmlPreview" xml:space="preserve"><value>New subscriptions: {0}&#xA;Duplicates skipped: {1}&#xA;Folders to map: {2}&#xA;Unencrypted HTTP feeds: {3}</value></data>
   <data name="TextOpmlImportTitle" xml:space="preserve"><value>Import OPML subscriptions</value></data>
   <data name="TextImport" xml:space="preserve"><value>Import</value></data>
-  <data name="TextOpmlImportResult" xml:space="preserve"><value>Imported {0} subscriptions; skipped {1}; failed {2}. Refresh to download articles.</value></data>
+  <data name="TextOpmlImportResult" xml:space="preserve"><value>Imported {0} subscriptions; duplicates skipped: {1}; HTTP feeds skipped: {2}; failed: {3}. Refresh to download articles.</value></data>
   <data name="TextOpmlImportFailed" xml:space="preserve"><value>OPML import failed: {0}</value></data>
   <data name="TextOpmlFileType" xml:space="preserve"><value>OPML subscription list</value></data>
   <data name="TextOpmlExportResult" xml:space="preserve"><value>Exported {0} subscriptions to {1}.</value></data>
@@ -2326,4 +2326,13 @@ Widgets suppression: ready {8}; snapshot {9}; notification pending {10}</value><
   <data name="Keyboard_RemoveLocation" xml:space="preserve">
     <value>Remove {0}</value>
   </data>
+  <data name="TextOpmlInvalidDocument" xml:space="preserve"><value>This file cannot be read as OPML. Export a new OPML subscription list (up to 5 MB) and try again.</value></data>
+  <data name="TextOpmlTooManyEntries" xml:space="preserve"><value>An OPML file can contain at most {0} subscriptions.</value></data>
+  <data name="TextOpmlDocumentTitle" xml:space="preserve"><value>Task Flyout RSS subscriptions</value></data>
+  <data name="FileError_NotFound" xml:space="preserve"><value>The file is no longer available. Select it again.</value></data>
+  <data name="FileError_AccessDenied" xml:space="preserve"><value>Access to the file was denied. Choose a location you can access.</value></data>
+  <data name="FileError_InvalidData" xml:space="preserve"><value>The file format is invalid or unsupported. Check the file and try again.</value></data>
+  <data name="FileError_IO" xml:space="preserve"><value>The file could not be read or written. Check available space and whether another app is using it.</value></data>
+  <data name="FileError_Canceled" xml:space="preserve"><value>The file operation was canceled. Try again when ready.</value></data>
+  <data name="FileError_Unexpected" xml:space="preserve"><value>The file operation could not finish. Select the file or destination again and retry.</value></data>
 </root>

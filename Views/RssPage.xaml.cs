@@ -492,8 +492,25 @@ namespace Task_Flyout.Views
                 if (file == null) return;
 
                 if ((await file.GetBasicPropertiesAsync()).Size > RssOpmlService.MaximumDocumentCharacters)
-                    throw new InvalidOperationException(_loader.GetStringOrDefault("TextOpmlTooLarge") ?? "The OPML file is larger than 5 MB.");
-                var entries = RssOpmlService.Parse(await FileIO.ReadTextAsync(file));
+                {
+                    SetOpmlImportError(_loader.GetStringOrDefault("TextOpmlTooLarge") ?? "The OPML file is larger than 5 MB.");
+                    return;
+                }
+                string xml = await FileIO.ReadTextAsync(file);
+                IReadOnlyList<RssOpmlEntry> entries;
+                try { entries = RssOpmlService.Parse(xml); }
+                catch (System.Xml.XmlException)
+                {
+                    SetOpmlImportError(_loader.GetStringOrDefault("TextOpmlInvalidDocument") ?? "This file cannot be read as OPML. Export a new OPML subscription list (up to 5 MB) and try again.");
+                    return;
+                }
+                catch (InvalidOperationException)
+                {
+                    // Parse only throws this category when the subscription limit is exceeded.
+                    SetOpmlImportError(string.Format(LocalizationHelper.AppCulture,
+                        _loader.GetStringOrDefault("TextOpmlTooManyEntries") ?? "An OPML file can contain at most {0} subscriptions.", RssOpmlService.MaximumEntries));
+                    return;
+                }
                 var preview = RssOpmlService.Preview(entries, _rssService.GetSubscriptions().Select(item => item.Url));
 
                 var allowHttp = new CheckBox
@@ -529,6 +546,7 @@ namespace Task_Flyout.Views
 
                 SetLoading(true);
                 int imported = 0;
+                int skippedHttp = 0;
                 int failed = 0;
                 var folders = _rssService.GetFolders()
                     .GroupBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
@@ -541,7 +559,7 @@ namespace Task_Flyout.Views
                             && uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase);
                         if (isHttp && allowHttp.IsChecked != true)
                         {
-                            failed++;
+                            skippedHttp++;
                             continue;
                         }
 
@@ -569,16 +587,17 @@ namespace Task_Flyout.Views
                 LoadSubscriptions();
                 BuildSubscriptionTree();
                 SubscriptionStatusText.Text = string.Format(
-                    _loader.GetStringOrDefault("TextOpmlImportResult") ?? "Imported {0} subscriptions; skipped {1}; failed {2}. Refresh to download articles.",
+                    LocalizationHelper.AppCulture,
+                    _loader.GetStringOrDefault("TextOpmlImportResult") ?? "Imported {0} subscriptions; duplicates skipped: {1}; HTTP feeds skipped: {2}; failed: {3}. Refresh to download articles.",
                     imported,
                     preview.DuplicateCount,
+                    skippedHttp,
                     failed);
             }
             catch (Exception ex)
             {
-                SubscriptionStatusText.Text = string.Format(
-                    _loader.GetStringOrDefault("TextOpmlImportFailed") ?? "OPML import failed: {0}",
-                    UserSafeErrorMessage.FromException(ex));
+                LogRssError(ex);
+                SetOpmlImportError(_loader.GetFileErrorDescription(ex));
             }
             finally
             {
@@ -593,6 +612,10 @@ namespace Task_Flyout.Views
             if (queryGeneration == _articleQueryGeneration && IsLoaded)
                 await LoadMoreArticlesAsync();
         }
+
+        private void SetOpmlImportError(string reason)
+            => SubscriptionStatusText.Text = string.Format(LocalizationHelper.AppCulture,
+                _loader.GetStringOrDefault("TextOpmlImportFailed") ?? "OPML import failed: {0}", reason);
 
         private async void ExportOpml_Click(object sender, RoutedEventArgs e)
         {
@@ -614,7 +637,8 @@ namespace Task_Flyout.Views
                 var file = await picker.PickSaveFileAsync();
                 if (file == null) return;
 
-                await FileIO.WriteTextAsync(file, RssOpmlService.Export(entries));
+                await FileIO.WriteTextAsync(file, RssOpmlService.Export(entries,
+                    _loader.GetStringOrDefault("TextOpmlDocumentTitle") ?? "Task Flyout RSS subscriptions"));
                 SubscriptionStatusText.Text = string.Format(
                     _loader.GetStringOrDefault("TextOpmlExportResult") ?? "Exported {0} subscriptions to {1}.",
                     Subscriptions.Count,
@@ -624,7 +648,8 @@ namespace Task_Flyout.Views
             {
                 SubscriptionStatusText.Text = string.Format(
                     _loader.GetStringOrDefault("TextOpmlExportFailed") ?? "OPML export failed: {0}",
-                    UserSafeErrorMessage.FromException(ex));
+                    _loader.GetFileErrorDescription(ex));
+                LogRssError(ex);
             }
         }
 
