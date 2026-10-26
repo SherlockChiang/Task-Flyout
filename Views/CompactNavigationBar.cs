@@ -17,14 +17,14 @@ public sealed class CompactNavigationBar : UserControl
 {
     private readonly ResourceLoader _loader = new();
     private readonly TextBlock _step = new() { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
-    private readonly Button _back = new();
-    private readonly Button _continue = new();
+    private readonly Button _back = new() { MinHeight = VisualResources.Number("ButtonHeight") };
+    private readonly Button _continue = new() { MinHeight = VisualResources.Number("ButtonHeight") };
     public event EventHandler? BackRequested;
     public event EventHandler? ContinueRequested;
 
     public CompactNavigationBar()
     {
-        var grid = new Grid { ColumnSpacing = 8, Padding = new Thickness(12, 8, 12, 0) };
+        var grid = new Grid { ColumnSpacing = VisualResources.Number("SpaceSmall"), Padding = new Thickness(12, 8, 12, 0) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });

@@ -580,7 +580,7 @@ namespace Task_Flyout.Views
             {
                 Text = _loader.GetStringOrDefault("TextTaskUnsupportedFields") ?? "Due time, recurrence, and moving between accounts or lists are not supported by the connected provider and will not be changed.",
                 TextWrapping = TextWrapping.Wrap,
-                FontSize = 12,
+                FontSize = VisualResources.Number("FontCaption"),
                 Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorTertiaryBrush"]
             };
             var validation = new TextBlock
@@ -589,7 +589,7 @@ namespace Task_Flyout.Views
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]
             };
-            var panel = new StackPanel { Spacing = 12, MaxWidth = 440 };
+            var panel = new StackPanel { Spacing = VisualResources.Number("SpaceMedium"), MaxWidth = 440 };
             panel.Children.Add(identityText);
             panel.Children.Add(titleBox);
             panel.Children.Add(notesBox);
@@ -753,7 +753,7 @@ namespace Task_Flyout.Views
             TaskContent.Padding = new Thickness(padding);
             AccountPane.Margin = IsCompact ? new Thickness(padding) : new Thickness(24, 28, 12, 28);
             AddTaskButtonText.Visibility = _layoutMode == ResponsiveLayoutMode.Narrow ? Visibility.Collapsed : Visibility.Visible;
-            ToggleAccountPaneIcon.Glyph = showAccounts ? "\uE76B" : "\uE76C";
+            ToggleAccountPaneIcon.Glyph = showAccounts ? AppIcons.ChevronLeft : AppIcons.ChevronRight;
             App.MyMainWindow?.UpdatePageBackNavigation();
         }
     }

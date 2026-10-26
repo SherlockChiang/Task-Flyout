@@ -92,6 +92,16 @@ namespace Task_Flyout
             SizeToCurrentWorkArea();
 
             ContentFrame.Navigated += ContentFrame_Navigated;
+            MainNav.Loaded += (_, _) =>
+            {
+                if (MainNav.SettingsItem is NavigationViewItem settingsItem)
+                    settingsItem.Icon = new FontIcon
+                    {
+                        Glyph = AppIcons.Settings,
+                        FontFamily = VisualResources.IconFont,
+                        FontSize = VisualResources.Number("IconNavigation")
+                    };
+            };
             GlobalSearchResultsSource.Source = _globalSearchGroups;
 
             _ = RefreshWeatherNavIconAsync();
@@ -853,21 +863,21 @@ namespace Task_Flyout
 
         private void AddGlobalSearchCommands(List<GlobalSearchCandidate> candidates)
         {
-            AddCommand(candidates, "15-open-today", "Today_OpenToday", "Open Today", "\uE80F");
-            AddCommand(candidates, "01-new-task", "GlobalSearch_CommandNewTask", "New task", "\uE73E");
-            AddCommand(candidates, "02-new-event", "GlobalSearch_CommandNewEvent", "New event", "\uE787");
-            AddCommand(candidates, "03-compose-mail", "GlobalSearch_CommandComposeMail", "Compose mail", "\uE70F");
-            AddCommand(candidates, "04-sync-calendar", "GlobalSearch_CommandSyncCalendar", "Sync calendar", "\uE895");
-            AddCommand(candidates, "05-sync-tasks", "GlobalSearch_CommandSyncTasks", "Sync tasks", "\uE895");
-            AddCommand(candidates, "06-open-calendar", "GlobalSearch_CommandOpenCalendar", "Open calendar", "\uE787");
-            AddCommand(candidates, "07-open-tasks", "GlobalSearch_CommandOpenTasks", "Open tasks", "\uE73E");
-            AddCommand(candidates, "08-open-mail", "GlobalSearch_CommandOpenMail", "Open mail", "\uE715");
-            AddCommand(candidates, "09-open-rss", "GlobalSearch_CommandOpenRss", "Open RSS", "\uE789");
-            AddCommand(candidates, "10-open-settings", "GlobalSearch_CommandOpenSettings", "Open settings", "\uE713");
-            AddCommand(candidates, "11-open-accounts", "GlobalSearch_CommandOpenAccounts", "Open accounts", "\uE77B");
-            AddCommand(candidates, "12-cache-settings", "GlobalSearch_CommandCacheSettings", "Manage cache settings", "\uE74D");
-            AddCommand(candidates, "13-open-weather", "GlobalSearch_CommandOpenWeather", "Open weather", "\uE706");
-            AddCommand(candidates, "14-toggle-weather-bar", "GlobalSearch_CommandToggleWeatherBar", "Toggle Weather Bar", "\uE7F4");
+            AddCommand(candidates, "15-open-today", "Today_OpenToday", "Open Today", AppIcons.Home);
+            AddCommand(candidates, "01-new-task", "GlobalSearch_CommandNewTask", "New task", AppIcons.Tasks);
+            AddCommand(candidates, "02-new-event", "GlobalSearch_CommandNewEvent", "New event", AppIcons.Calendar);
+            AddCommand(candidates, "03-compose-mail", "GlobalSearch_CommandComposeMail", "Compose mail", AppIcons.Compose);
+            AddCommand(candidates, "04-sync-calendar", "GlobalSearch_CommandSyncCalendar", "Sync calendar", AppIcons.Sync);
+            AddCommand(candidates, "05-sync-tasks", "GlobalSearch_CommandSyncTasks", "Sync tasks", AppIcons.Sync);
+            AddCommand(candidates, "06-open-calendar", "GlobalSearch_CommandOpenCalendar", "Open calendar", AppIcons.Calendar);
+            AddCommand(candidates, "07-open-tasks", "GlobalSearch_CommandOpenTasks", "Open tasks", AppIcons.Tasks);
+            AddCommand(candidates, "08-open-mail", "GlobalSearch_CommandOpenMail", "Open mail", AppIcons.Mail);
+            AddCommand(candidates, "09-open-rss", "GlobalSearch_CommandOpenRss", "Open RSS", AppIcons.Rss);
+            AddCommand(candidates, "10-open-settings", "GlobalSearch_CommandOpenSettings", "Open settings", AppIcons.Settings);
+            AddCommand(candidates, "11-open-accounts", "GlobalSearch_CommandOpenAccounts", "Open accounts", AppIcons.Person);
+            AddCommand(candidates, "12-cache-settings", "GlobalSearch_CommandCacheSettings", "Manage cache settings", AppIcons.Delete);
+            AddCommand(candidates, "13-open-weather", "GlobalSearch_CommandOpenWeather", "Open weather", AppIcons.Sunny);
+            AddCommand(candidates, "14-toggle-weather-bar", "GlobalSearch_CommandToggleWeatherBar", "Toggle Weather Bar", AppIcons.Window);
         }
 
         private void AddCommand(List<GlobalSearchCandidate> candidates, string id, string resourceKey, string fallback, string glyph)
@@ -944,7 +954,7 @@ namespace Task_Flyout
                 foreach (var item in group)
                 {
                     var glyph = item.Group == GlobalSearchGroupKind.Commands && _globalSearchPayloads.TryGetValue(item.Id, out var payload)
-                        ? payload as string ?? "\uE71D"
+                        ? payload as string ?? AppIcons.Command
                         : GetGlobalSearchGlyph(item.Group);
                     resultGroup.Add(new GlobalSearchResultViewModel(item, glyph));
                 }
@@ -966,11 +976,11 @@ namespace Task_Flyout
 
         private static string GetGlobalSearchGlyph(GlobalSearchGroupKind group) => group switch
         {
-            GlobalSearchGroupKind.Tasks => "\uE73E",
-            GlobalSearchGroupKind.Calendar => "\uE787",
-            GlobalSearchGroupKind.Mail => "\uE715",
-            GlobalSearchGroupKind.Rss => "\uE789",
-            _ => "\uE71D"
+            GlobalSearchGroupKind.Tasks => AppIcons.Tasks,
+            GlobalSearchGroupKind.Calendar => AppIcons.Calendar,
+            GlobalSearchGroupKind.Mail => AppIcons.Mail,
+            GlobalSearchGroupKind.Rss => AppIcons.Rss,
+            _ => AppIcons.Command
         };
 
         private void GlobalSearchBox_KeyDown(object sender, KeyRoutedEventArgs e)
@@ -1179,8 +1189,6 @@ namespace Task_Flyout
             }
         }
 
-        private const string FluentIconsFont = "ms-appx:///Assets/FluentSystemIcons-Filled.ttf#FluentSystemIcons-Filled";
-
         public async Task RefreshWeatherNavIconAsync()
         {
             try
@@ -1194,7 +1202,7 @@ namespace Task_Flyout
                 DispatcherQueue.TryEnqueue(() =>
                 {
                     WeatherNavIcon.Glyph = WeatherCodeToFluentGlyph(info.RawWeatherCode);
-                    WeatherNavIcon.FontFamily = new FontFamily(FluentIconsFont);
+                    WeatherNavIcon.FontFamily = VisualResources.IconFont;
                 });
             }
             catch (Exception ex)
@@ -1210,32 +1218,32 @@ namespace Task_Flyout
             return code switch
             {
                 // Sunny / Clear
-                0 or 113 => "\uF8BA",                          // weather_sunny
+                0 or 113 => AppIcons.Sunny,                          // weather_sunny
                 // Partly cloudy
-                1 or 2 or 116 => "\uF899",                     // weather_partly_cloudy_day
+                1 or 2 or 116 => AppIcons.PartlyCloudy,                     // weather_partly_cloudy_day
                 // Cloudy / Overcast
-                3 or 119 or 122 => "\uF887",                    // weather_cloudy
+                3 or 119 or 122 => AppIcons.Cloudy,                    // weather_cloudy
                 // Fog / Mist
-                45 or 48 or 143 or 248 or 260 => "\uF88D",     // weather_fog
+                45 or 48 or 143 or 248 or 260 => AppIcons.Fog,     // weather_fog
                 // Drizzle / Light rain
                 51 or 53 or 55 or 56 or 57
-                    or 176 or 263 or 266 or 293 or 296 => "\uF8A2", // weather_rain_showers_day
+                    or 176 or 263 or 266 or 293 or 296 => AppIcons.Showers, // weather_rain_showers_day
                 // Rain
                 61 or 63 or 65 or 66 or 67 or 80 or 81 or 82
                     or 299 or 302 or 305 or 308
-                    or 356 or 359 => "\uF89F",                  // weather_rain
+                    or 356 or 359 => AppIcons.Rain,                  // weather_rain
                 // Snow
                 71 or 73 or 75 or 77 or 85 or 86
                     or 179 or 227 or 323 or 326 or 329 or 332
-                    or 335 or 338 or 368 or 371 => "\uF8AB",   // weather_snow
+                    or 335 or 338 or 368 or 371 => AppIcons.Snow,   // weather_snow
                 // Thunderstorm
                 95 or 96 or 99
-                    or 200 or 386 or 389 or 392 or 395 => "\uF8B7", // weather_squalls (thunder)
+                    or 200 or 386 or 389 or 392 or 395 => AppIcons.Thunderstorm, // weather_thunderstorm
                 // Sleet / Ice
                 182 or 185 or 281 or 284 or 311 or 314
                     or 317 or 350 or 362 or 365
-                    or 374 or 377 => "\uF8A8",                  // weather_rain_snow
-                _ => "\uF8BA"                                    // default: sunny
+                    or 374 or 377 => AppIcons.Sleet,                  // weather_rain_snow
+                _ => AppIcons.Sunny                                    // default: sunny
             };
         }
     }

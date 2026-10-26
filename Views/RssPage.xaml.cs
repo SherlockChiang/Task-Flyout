@@ -380,7 +380,7 @@ namespace Task_Flyout.Views
             {
                 Text = _loader.GetStringOrDefault("TextInsecureHttpRssWarning") ?? "HTTP feeds can be read or modified by other devices on the network. HTTPS is recommended.",
                 TextWrapping = TextWrapping.Wrap,
-                FontSize = 12,
+                FontSize = VisualResources.Number("FontCaption"),
                 Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
             };
             var localNetworkCheckBox = new CheckBox
@@ -392,10 +392,10 @@ namespace Task_Flyout.Views
             {
                 Text = _loader.GetStringOrDefault("TextLocalNetworkRssWarning") ?? "Enable only for a trusted feed on your home or work network. Redirects to a different local host or port remain blocked.",
                 TextWrapping = TextWrapping.Wrap,
-                FontSize = 12,
+                FontSize = VisualResources.Number("FontCaption"),
                 Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
             };
-            var panel = new StackPanel { Spacing = 12 };
+            var panel = new StackPanel { Spacing = VisualResources.Number("SpaceMedium") };
             panel.Children.Add(urlBox);
             panel.Children.Add(folderBox);
             panel.Children.Add(insecureHttpCheckBox);
@@ -490,7 +490,7 @@ namespace Task_Flyout.Views
                         preview.InsecureHttpCount),
                     TextWrapping = TextWrapping.Wrap
                 };
-                var panel = new StackPanel { Spacing = 12 };
+                var panel = new StackPanel { Spacing = VisualResources.Number("SpaceMedium") };
                 panel.Children.Add(previewText);
                 panel.Children.Add(allowHttp);
                 var dialog = new ContentDialog

@@ -18,7 +18,7 @@ public sealed class TaskMailActionsPanel : UserControl
 
     public TaskMailActionsPanel()
     {
-        var panel = new StackPanel { Spacing = 8 };
+        var panel = new StackPanel { Spacing = VisualResources.Number("SpaceSmall") };
         panel.Children.Add(_error);
         panel.Children.Add(_rows);
         _expander = new Expander
@@ -47,11 +47,11 @@ public sealed class TaskMailActionsPanel : UserControl
         if (actions.StorageFailed || links.Any(link => link.Phase is TaskMailPhase.Failed or TaskMailPhase.Unknown)) _expander.IsExpanded = true;
         foreach (var link in links)
         {
-            var row = new StackPanel { Spacing = 4 };
+            var row = new StackPanel { Spacing = VisualResources.Number("SpaceXSmall") };
             row.Children.Add(new TextBlock { Text = link.TaskTitle + " · " + link.Source.Address, TextWrapping = TextWrapping.Wrap });
-            row.Children.Add(new TextBlock { Text = link.Source.Subject, TextWrapping = TextWrapping.Wrap, FontSize = 12 });
-            row.Children.Add(new TextBlock { Text = Text("Cross_State" + link.Phase, link.Phase.ToString()), TextWrapping = TextWrapping.Wrap, FontSize = 12 });
-            var buttons = new StackPanel { Spacing = 4 };
+            row.Children.Add(new TextBlock { Text = link.Source.Subject, TextWrapping = TextWrapping.Wrap, FontSize = VisualResources.Number("FontCaption") });
+            row.Children.Add(new TextBlock { Text = Text("Cross_State" + link.Phase, link.Phase.ToString()), TextWrapping = TextWrapping.Wrap, FontSize = VisualResources.Number("FontCaption") });
+            var buttons = new StackPanel { Spacing = VisualResources.Number("SpaceXSmall") };
             bool busy = link.Phase is TaskMailPhase.Archiving or TaskMailPhase.Undoing;
             if (link.Phase == TaskMailPhase.Failed)
                 AddButton(buttons, "Cross_RetryArchive", "Retry archive", () => actions.RetryAsync(link.Key));
@@ -77,7 +77,7 @@ public sealed class TaskMailActionsPanel : UserControl
 
     private void AddButton(StackPanel panel, string key, string fallback, Func<Task> action)
     {
-        var button = new Button { Content = Text(key, fallback) };
+        var button = new Button { Content = Text(key, fallback), MinHeight = VisualResources.Number("ButtonHeight") };
         button.Click += async (_, _) =>
         {
             button.IsEnabled = false;

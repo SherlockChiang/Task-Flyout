@@ -71,10 +71,10 @@ namespace Task_Flyout.Services
 
         public string IconGlyph => Kind switch
         {
-            MailAccountKind.Outlook => "\uE715",
-            MailAccountKind.Google => "\uE77B",
-            MailAccountKind.Imap => "\uE8D4",
-            _ => "\uE715"
+            MailAccountKind.Outlook => AppIcons.Mail,
+            MailAccountKind.Google => AppIcons.Person,
+            MailAccountKind.Imap => AppIcons.Server,
+            _ => AppIcons.Mail
         };
 
         public string DisplayTitle => string.IsNullOrWhiteSpace(DisplayName) ? ProviderName : DisplayName;

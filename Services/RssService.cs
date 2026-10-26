@@ -109,8 +109,8 @@ namespace Task_Flyout.Services
         public bool IsStarred { get; set; }
         public bool IsReadLater { get; set; }
         public double ReadOpacity => IsRead ? 0.68 : 1;
-        public string ReadGlyph => IsRead ? "\uE8C3" : "\uE715";
-        public string StarGlyph => IsStarred ? "\uE735" : "\uE734";
+        public string ReadGlyph => IsRead ? AppIcons.MailRead : AppIcons.Mail;
+        public string StarGlyph => IsStarred ? AppIcons.Star : AppIcons.StarOff;
         public string PublishedText => PublishedAt == default ? "" : PublishedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 
         [System.Text.Json.Serialization.JsonIgnore]

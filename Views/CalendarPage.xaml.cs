@@ -443,7 +443,7 @@ namespace Task_Flyout.Views
                             new TextBlock
                             {
                                 Text = date.ToString("ddd", LocalizationHelper.AppCulture),
-                                FontSize = 12,
+                                FontSize = VisualResources.Number("FontCaption"),
                                 Foreground = secondaryBrush,
                                 HorizontalAlignment = HorizontalAlignment.Center
                             },
@@ -889,8 +889,8 @@ namespace Task_Flyout.Views
             TimelinePane.Margin = agendaOnly
                 ? new Thickness(padding)
                 : new Thickness(12, 28, 24, 28);
-            ToggleAccountPaneIcon.Glyph = showAccounts ? "\uE76B" : "\uE76C";
-            ToggleTimelinePaneIcon.Glyph = showTimeline ? "\uE76C" : "\uE76B";
+            ToggleAccountPaneIcon.Glyph = showAccounts ? AppIcons.ChevronLeft : AppIcons.ChevronRight;
+            ToggleTimelinePaneIcon.Glyph = showTimeline ? AppIcons.ChevronRight : AppIcons.ChevronLeft;
             ToggleTimelinePaneButton.Visibility = agendaOnly
                 ? Visibility.Collapsed : Visibility.Visible;
             TimelineAccountsButton.Visibility = Visibility.Collapsed;
@@ -1728,7 +1728,7 @@ namespace Task_Flyout.Views
                 DefaultButton = ContentDialogButton.Close
             };
 
-            var panel = new StackPanel { Spacing = 8 };
+            var panel = new StackPanel { Spacing = VisualResources.Number("SpaceSmall") };
             panel.Children.Add(new TextBlock
             {
                 Text = _loader.GetStringOrDefault("TextDeleteRecurringPrompt") ?? "Select the scope of deletion.",

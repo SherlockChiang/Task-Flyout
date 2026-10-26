@@ -239,11 +239,11 @@ namespace Task_Flyout.Views
             {
                 var root = new StackPanel { Spacing = 6, Padding = new Thickness(0, 8, 0, 8) };
                 var heading = new TextBlock { FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
-                var status = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap };
-                var actions = new StackPanel { Spacing = 8, Orientation = Orientation.Horizontal };
-                var retry = new Button { Content = _loader.GetStringOrDefault("SyncCenter_RetryAccount") ?? "Retry sync" };
+                var status = new TextBlock { FontSize = VisualResources.Number("FontCaption"), TextWrapping = TextWrapping.Wrap };
+                var actions = new StackPanel { Spacing = VisualResources.Number("SpaceSmall"), Orientation = Orientation.Horizontal };
+                var retry = new Button { Content = _loader.GetStringOrDefault("SyncCenter_RetryAccount") ?? "Retry sync", MinHeight = VisualResources.Number("ButtonHeight") };
                 retry.Click += async (_, _) => await RetryAccountAsync(key, accountId, mail);
-                var reconnect = new Button { Tag = accountId };
+                var reconnect = new Button { Tag = accountId, MinHeight = VisualResources.Number("ButtonHeight") };
                 if (mail) reconnect.Click += ReconnectMailButton_Click;
                 else reconnect.Click += ReconnectAccountButton_Click;
                 actions.Children.Add(retry);
@@ -348,20 +348,21 @@ namespace Task_Flyout.Views
 
         private StackPanel CreateDisabledContent(string name, string color, string status)
         {
-            var sp = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16 };
+            var sp = new StackPanel { Orientation = Orientation.Horizontal, Spacing = VisualResources.Number("SpaceLarge") };
             sp.Children.Add(new FontIcon
             {
-                Glyph = "\uE77B",
+                Glyph = AppIcons.Person,
+                FontFamily = VisualResources.IconFont,
                 Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
                     Microsoft.UI.Colors.Gray),
                 FontSize = 24
             });
-            var inner = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center, MinWidth = 0 };
-            inner.Children.Add(new TextBlock { Text = name, FontSize = 16, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+            var inner = new StackPanel { Spacing = VisualResources.Number("SpaceTiny"), VerticalAlignment = VerticalAlignment.Center, MinWidth = 0 };
+            inner.Children.Add(new TextBlock { Text = name, FontSize = VisualResources.Number("FontSection"), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             inner.Children.Add(new TextBlock
             {
                 Text = status,
-                FontSize = 12,
+                FontSize = VisualResources.Number("FontCaption"),
                 TextWrapping = TextWrapping.WrapWholeWords,
                 Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray)
             });
@@ -463,7 +464,7 @@ namespace Task_Flyout.Views
             double availableWidth = XamlRoot?.Size.Width ?? 420;
             var panel = new StackPanel
             {
-                Spacing = 12,
+                Spacing = VisualResources.Number("SpaceMedium"),
                 Width = Math.Max(160, Math.Min(360, availableWidth - 96))
             };
             panel.Children.Add(new TextBlock

@@ -11,20 +11,20 @@ namespace Task_Flyout.Views;
 public sealed class AgendaDetailsPane : UserControl
 {
     private readonly ResourceLoader _loader = new();
-    private readonly TextBlock _title = new() { FontSize = 24, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
+    private readonly TextBlock _title = new() { FontSize = VisualResources.Number("FontHeading"), TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
     private readonly TextBlock _identity = new() { TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _time = new() { TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _location = new() { TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
     private readonly TextBlock _notes = new() { TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
-    private readonly Button _edit = new();
+    private readonly Button _edit = new() { MinHeight = VisualResources.Number("ButtonHeight") };
     public event EventHandler? EditRequested;
     internal AgendaItem? Item { get; private set; }
     internal UIElement FocusTarget => _edit.IsEnabled ? _edit : this;
 
     public AgendaDetailsPane()
     {
-        var panel = new StackPanel { Spacing = 12, Padding = new Thickness(16) };
+        var panel = new StackPanel { Spacing = VisualResources.Number("SpaceMedium"), Padding = new Thickness(16) };
         _edit.Content = _loader.GetStringOrDefault("Compact_Edit") ?? "Edit";
         IsTabStop = true;
         AutomationProperties.SetName(this, _loader.GetStringOrDefault("Compact_Detail") ?? "Details");

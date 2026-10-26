@@ -14,7 +14,7 @@
         </Grid.RowDefinitions>
 
         <views:CompactNavigationBar x:Name="StepNavigation" Visibility="Collapsed"/>
-        <Grid x:Name="MailHeaderGrid" Grid.Row="1" ColumnSpacing="16" RowSpacing="8">
+        <Grid x:Name="MailHeaderGrid" Grid.Row="1" ColumnSpacing="{StaticResource TaskFlyoutSpaceLarge}" RowSpacing="{StaticResource TaskFlyoutSpaceSmall}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -24,36 +24,36 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <StackPanel x:Name="MailHeaderTitle" Spacing="2" MinWidth="0">
+            <StackPanel x:Name="MailHeaderTitle" Spacing="{StaticResource TaskFlyoutSpaceTiny}" MinWidth="0">
                 <TextBlock x:Name="TitleText" x:Uid="MailPage_Title" Text="邮件" Style="{StaticResource TitleTextBlockStyle}"/>
-                <TextBlock x:Name="SubtitleText" x:Uid="MailPage_Subtitle" Text="账户、文件夹与收件箱" FontSize="13"
+                <TextBlock x:Name="SubtitleText" x:Uid="MailPage_Subtitle" Text="账户、文件夹与收件箱" FontSize="{StaticResource TaskFlyoutFontSecondary}"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
 
-            <StackPanel x:Name="MailHeaderCommands" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <Button x:Uid="MailPage_AccountsButton" x:Name="MailAccountsButton" AutomationProperties.AutomationId="MailAccountsButton" Visibility="Collapsed" Click="MailAccountsButton_Click" Padding="10,6">
-                    <FontIcon Glyph="&#xE716;" FontSize="14"/>
+            <StackPanel x:Name="MailHeaderCommands" Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource TaskFlyoutSpaceSmall}" VerticalAlignment="Center">
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_AccountsButton" x:Name="MailAccountsButton" AutomationProperties.AutomationId="MailAccountsButton" Visibility="Collapsed" Click="MailAccountsButton_Click" Padding="10,6">
+                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconPeople}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
                 </Button>
-                <Button x:Uid="MailPage_BackButton" x:Name="MailBackButton" Visibility="Collapsed" Click="MailBackButton_Click" Padding="10,6">
-                    <FontIcon Glyph="&#xE72B;" FontSize="14"/>
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_BackButton" x:Name="MailBackButton" Visibility="Collapsed" Click="MailBackButton_Click" Padding="10,6">
+                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconBack}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
                 </Button>
                 <ToggleSwitch x:Uid="MailPage_UnreadOnlyToggle" x:Name="UnreadOnlyToggle" Header="仅未读" Toggled="UnreadOnlyToggle_Toggled"/>
-                <Button x:Uid="MailPage_ComposeButton" x:Name="ComposeButton" AutomationProperties.AutomationId="MailComposeButton" Click="ComposeButton_Click">
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_ComposeButton" x:Name="ComposeButton" AutomationProperties.AutomationId="MailComposeButton" Click="ComposeButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon Glyph="&#xE724;" FontSize="14"/>
+                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconCompose}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
                         <TextBlock x:Uid="MailPage_Compose" x:Name="ComposeButtonText" Text="写邮件"/>
                     </StackPanel>
                 </Button>
-                <Button x:Uid="MailPage_RefreshButton" x:Name="RefreshButton" Click="RefreshButton_Click">
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_RefreshButton" x:Name="RefreshButton" Click="RefreshButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon Glyph="&#xE72C;" FontSize="14"/>
+                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconSync}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
                         <TextBlock x:Uid="MailPage_Refresh" x:Name="RefreshButtonText" Text="刷新"/>
                     </StackPanel>
                 </Button>
             </StackPanel>
         </Grid>
 
-        <Grid x:Name="MailColumnsGrid" Grid.Row="2" ColumnSpacing="12" MinHeight="0">
+        <Grid x:Name="MailColumnsGrid" Grid.Row="2" ColumnSpacing="{StaticResource TaskFlyoutSpaceMedium}" MinHeight="0">
             <Grid.ColumnDefinitions>
                 <!-- Proportional so nothing is squeezed unreadable on small screens; the
                      side panes cap on wide screens and the message body keeps a readable floor. -->
@@ -85,16 +85,16 @@
                               DragItemsCompleted="AccountTree_DragItemsCompleted"/>
                 </Border>
 
-                <Button x:Uid="MailPage_RemoveMailButton" Grid.Row="1" x:Name="RemoveMailButton" HorizontalAlignment="Stretch" IsEnabled="False" Click="RemoveMailButton_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                        <FontIcon Glyph="&#xE74D;" FontSize="14"/>
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_RemoveMailButton" Grid.Row="1" x:Name="RemoveMailButton" HorizontalAlignment="Stretch" IsEnabled="False" Click="RemoveMailButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource TaskFlyoutSpaceSmall}" HorizontalAlignment="Center">
+                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconDelete}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
                         <TextBlock x:Uid="MailPage_DeleteAccount" Text="删除当前邮箱"/>
                     </StackPanel>
                 </Button>
 
-                <Button x:Uid="MailPage_AddMailButton" Grid.Row="2" x:Name="AddMailButton" HorizontalAlignment="Stretch" Click="AddMailButton_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                        <FontIcon Glyph="&#xE710;" FontSize="14"/>
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_AddMailButton" Grid.Row="2" x:Name="AddMailButton" HorizontalAlignment="Stretch" Click="AddMailButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource TaskFlyoutSpaceSmall}" HorizontalAlignment="Center">
+                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconAdd}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
                         <TextBlock x:Uid="MailPage_AddAccount" Text="添加新邮箱"/>
                     </StackPanel>
                 </Button>
@@ -106,7 +106,7 @@
                     BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}"
                     CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
                     Padding="{StaticResource TaskFlyoutCompactSectionPadding}">
-                <Grid RowSpacing="8">
+                <Grid RowSpacing="{StaticResource TaskFlyoutSpaceSmall}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -114,14 +114,14 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <Grid ColumnSpacing="12" Padding="6,4">
+                    <Grid ColumnSpacing="{StaticResource TaskFlyoutSpaceMedium}" Padding="6,4">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock x:Uid="MailPage_InboxHeader" x:Name="MessageListTitle" Text="收件箱" FontWeight="SemiBold"/>
-                             <TextBlock x:Uid="MailPage_SelectFolderPrompt" x:Name="MessageListSubtitle" Text="请选择左侧文件夹" FontSize="12"
+                             <TextBlock x:Uid="MailPage_SelectFolderPrompt" x:Name="MessageListSubtitle" Text="请选择左侧文件夹" FontSize="{StaticResource TaskFlyoutFontCaption}"
                                          Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.LiveSetting="Polite"/>
                             <AutoSuggestBox x:Uid="MailPage_Search"
                                             x:Name="MailSearchBox"
@@ -134,14 +134,14 @@
                     </Grid>
 
                     <CommandBar Grid.Row="1" x:Name="MailMutationCommandBar" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True">
-                        <AppBarButton x:Uid="MailPage_MarkRead" Label="Mark read" Click="MarkReadButton_Click"><AppBarButton.Icon><FontIcon Glyph="&#xE8C3;"/></AppBarButton.Icon></AppBarButton>
-                        <AppBarButton x:Uid="MailPage_MarkUnread" Label="Mark unread" Click="MarkUnreadButton_Click"><AppBarButton.Icon><FontIcon Glyph="&#xE715;"/></AppBarButton.Icon></AppBarButton>
-                        <AppBarButton x:Uid="MailPage_Flag" Label="Flag" Click="FlagButton_Click"><AppBarButton.Icon><FontIcon Glyph="&#xE7C1;"/></AppBarButton.Icon></AppBarButton>
-                        <AppBarButton x:Uid="MailPage_Unflag" Label="Unflag" Click="UnflagButton_Click"><AppBarButton.Icon><FontIcon Glyph="&#xE734;"/></AppBarButton.Icon></AppBarButton>
+                        <AppBarButton x:Uid="MailPage_MarkRead" Label="Mark read" Click="MarkReadButton_Click"><AppBarButton.Icon><FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconMailRead}"/></AppBarButton.Icon></AppBarButton>
+                        <AppBarButton x:Uid="MailPage_MarkUnread" Label="Mark unread" Click="MarkUnreadButton_Click"><AppBarButton.Icon><FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconMail}"/></AppBarButton.Icon></AppBarButton>
+                        <AppBarButton x:Uid="MailPage_Flag" Label="Flag" Click="FlagButton_Click"><AppBarButton.Icon><FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconFlag}"/></AppBarButton.Icon></AppBarButton>
+                        <AppBarButton x:Uid="MailPage_Unflag" Label="Unflag" Click="UnflagButton_Click"><AppBarButton.Icon><FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconFlagOff}"/></AppBarButton.Icon></AppBarButton>
                         <AppBarSeparator x:Name="OutlookMoveSeparator" Visibility="Collapsed"/>
-                        <AppBarButton x:Uid="MailPage_Archive" x:Name="ArchiveButton" Label="Archive" Visibility="Collapsed" IsEnabled="False" Click="ArchiveButton_Click"><AppBarButton.Icon><FontIcon Glyph="&#xE7B8;"/></AppBarButton.Icon></AppBarButton>
-                        <AppBarButton x:Uid="MailPage_Move" x:Name="MoveButton" Label="Move" Visibility="Collapsed" IsEnabled="False" Click="MoveButton_Click"><AppBarButton.Icon><FontIcon Glyph="&#xE8DE;"/></AppBarButton.Icon></AppBarButton>
-                        <AppBarButton x:Uid="MailPage_Delete" x:Name="DeleteButton" Label="Delete" Visibility="Collapsed" IsEnabled="False" Click="DeleteButton_Click"><AppBarButton.Icon><FontIcon Glyph="&#xE74D;"/></AppBarButton.Icon></AppBarButton>
+                        <AppBarButton x:Uid="MailPage_Archive" x:Name="ArchiveButton" Label="Archive" Visibility="Collapsed" IsEnabled="False" Click="ArchiveButton_Click"><AppBarButton.Icon><FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconArchive}"/></AppBarButton.Icon></AppBarButton>
+                        <AppBarButton x:Uid="MailPage_Move" x:Name="MoveButton" Label="Move" Visibility="Collapsed" IsEnabled="False" Click="MoveButton_Click"><AppBarButton.Icon><FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconMove}"/></AppBarButton.Icon></AppBarButton>
+                        <AppBarButton x:Uid="MailPage_Delete" x:Name="DeleteButton" Label="Delete" Visibility="Collapsed" IsEnabled="False" Click="DeleteButton_Click"><AppBarButton.Icon><FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconDelete}"/></AppBarButton.Icon></AppBarButton>
                     </CommandBar>
 
                     <ListView Grid.Row="2"
@@ -159,40 +159,40 @@
                         </ListView.ItemContainerStyle>
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:MailItem">
-                                <Grid MinHeight="82" ColumnSpacing="10" Padding="8">
+                                <Grid MinHeight="82" ColumnSpacing="10" Padding="{StaticResource TaskFlyoutCompactSectionPadding}">
                                      <Grid.ColumnDefinitions>
                                          <ColumnDefinition Width="Auto"/>
                                          <ColumnDefinition Width="*"/>
                                          <ColumnDefinition Width="Auto"/>
                                          <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="{x:Bind ReadMarker, Mode=OneWay}" FontSize="12"
+                                    <TextBlock Grid.Column="0" Text="{x:Bind ReadMarker, Mode=OneWay}" FontSize="{StaticResource TaskFlyoutFontCaption}"
                                                Foreground="{ThemeResource SystemAccentColor}"
                                                VerticalAlignment="Top" Margin="0,3,0,0"/>
-                                    <StackPanel Grid.Column="1" Spacing="4">
-                                        <TextBlock Text="{x:Bind Sender}" FontWeight="SemiBold" FontSize="13"
+                                    <StackPanel Grid.Column="1" Spacing="{StaticResource TaskFlyoutSpaceXSmall}">
+                                        <TextBlock Text="{x:Bind Sender}" FontWeight="SemiBold" FontSize="{StaticResource TaskFlyoutFontSecondary}"
                                                    TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock Text="{x:Bind Subject}" FontSize="13" TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock Text="{x:Bind Preview}" FontSize="12"
+                                        <TextBlock Text="{x:Bind Subject}" FontSize="{StaticResource TaskFlyoutFontSecondary}" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{x:Bind Preview}" FontSize="{StaticResource TaskFlyoutFontCaption}"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                    TextTrimming="CharacterEllipsis"/>
                                     </StackPanel>
-                                     <TextBlock Grid.Column="2" Text="{x:Bind FlagMarker, Mode=OneWay}" FontSize="14"
+                                     <TextBlock Grid.Column="2" Text="{x:Bind FlagMarker, Mode=OneWay}" FontSize="{StaticResource TaskFlyoutFontBody}"
                                                 Foreground="{ThemeResource SystemAccentColor}" VerticalAlignment="Top"/>
-                                     <StackPanel Grid.Column="3" Spacing="4" HorizontalAlignment="Right">
-                                        <TextBlock Text="{x:Bind ReceivedTime}" FontSize="12"
+                                     <StackPanel Grid.Column="3" Spacing="{StaticResource TaskFlyoutSpaceXSmall}" HorizontalAlignment="Right">
+                                        <TextBlock Text="{x:Bind ReceivedTime}" FontSize="{StaticResource TaskFlyoutFontCaption}"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                        <TextBlock Text="{x:Bind AttachmentMarker}" FontSize="12" HorizontalAlignment="Right"/>
+                                        <TextBlock Text="{x:Bind AttachmentMarker}" FontSize="{StaticResource TaskFlyoutFontCaption}" HorizontalAlignment="Right"/>
                                     </StackPanel>
                                 </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
 
-                    <Button x:Uid="MailPage_LoadMoreButton" Grid.Row="3" x:Name="LoadMoreButton" Visibility="Collapsed"
+                    <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_LoadMoreButton" Grid.Row="3" x:Name="LoadMoreButton" Visibility="Collapsed"
                             HorizontalAlignment="Stretch" Click="LoadMoreButton_Click" Margin="4,0">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <FontIcon Glyph="&#xE74B;" FontSize="12"/>
+                            <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconAttach}" FontSize="{StaticResource TaskFlyoutIconSmall}"/>
                             <TextBlock x:Uid="MailPage_LoadMore" Text="加载更多邮件"/>
                         </StackPanel>
                     </Button>
@@ -206,8 +206,8 @@
                     CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
                     Padding="{StaticResource TaskFlyoutSectionPadding}">
                 <Grid>
-                    <StackPanel x:Name="EmptyDetailPanel" Spacing="8" VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <FontIcon Glyph="&#xE715;" FontSize="36" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                    <StackPanel x:Name="EmptyDetailPanel" Spacing="{StaticResource TaskFlyoutSpaceSmall}" VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconMail}" FontSize="{StaticResource TaskFlyoutIconEmpty}" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
                         <TextBlock x:Uid="MailPage_SelectMailPrompt" Text="选择一封邮件查看预览" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
 
@@ -221,83 +221,83 @@
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        <TextBlock x:Name="DetailSubject" FontSize="20" FontWeight="SemiBold" TextWrapping="WrapWholeWords"/>
-                        <Grid Grid.Row="1" ColumnSpacing="12">
+                        <TextBlock x:Name="DetailSubject" FontSize="{StaticResource TaskFlyoutFontSubtitle}" FontWeight="SemiBold" TextWrapping="WrapWholeWords"/>
+                        <Grid Grid.Row="1" ColumnSpacing="{StaticResource TaskFlyoutSpaceMedium}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Spacing="3">
-                                <TextBlock x:Uid="MailPage_SenderLabel" Text="发件人" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
-                                <TextBlock x:Name="DetailSender" FontSize="14" TextWrapping="WrapWholeWords"/>
+                                <TextBlock x:Uid="MailPage_SenderLabel" Text="发件人" FontSize="{StaticResource TaskFlyoutFontCaption}" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                                <TextBlock x:Name="DetailSender" FontSize="{StaticResource TaskFlyoutFontBody}" TextWrapping="WrapWholeWords"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="3" HorizontalAlignment="Right">
-                                <TextBlock x:Uid="MailPage_DateLabel" Text="时间" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Right"/>
-                                <TextBlock x:Name="DetailTime" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Right"/>
+                                <TextBlock x:Uid="MailPage_DateLabel" Text="时间" FontSize="{StaticResource TaskFlyoutFontCaption}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Right"/>
+                                <TextBlock x:Name="DetailTime" FontSize="{StaticResource TaskFlyoutFontSecondary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Right"/>
                             </StackPanel>
                         </Grid>
                         <StackPanel Grid.Row="2" Spacing="3">
-                            <TextBlock x:Uid="MailPage_ToHeader" Text="收件人" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
-                            <TextBlock x:Name="DetailRecipient" FontSize="13" TextWrapping="WrapWholeWords"
+                            <TextBlock x:Uid="MailPage_ToHeader" Text="收件人" FontSize="{StaticResource TaskFlyoutFontCaption}" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                            <TextBlock x:Name="DetailRecipient" FontSize="{StaticResource TaskFlyoutFontSecondary}" TextWrapping="WrapWholeWords"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                         </StackPanel>
                         <Border Grid.Row="3" Height="1" Background="{ThemeResource TaskFlyoutDividerBrush}"/>
                         <Border x:Name="RemoteImageBanner" Grid.Row="4" Visibility="Collapsed"
                                 Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
                                 BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}"
-                                CornerRadius="6" Padding="10,6">
+                                CornerRadius="{StaticResource TaskFlyoutControlCornerRadius}" Padding="10,6">
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <FontIcon Grid.Column="0" Glyph="&#xE72E;" FontSize="14" VerticalAlignment="Center"
+                                <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Grid.Column="0" Glyph="{StaticResource AppIconShield}" FontSize="{StaticResource TaskFlyoutIconBody}" VerticalAlignment="Center"
                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                 <TextBlock Grid.Column="1" x:Uid="MailPage_RemoteImagesBlocked" Text="已阻止远程图片和跟踪像素。显示图片仅本次生效；信任此来源会持续允许远程内容。"
-                                           FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"
+                                           FontSize="{StaticResource TaskFlyoutFontSecondary}" VerticalAlignment="Center" TextWrapping="Wrap"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                <Button x:Uid="MailPage_ShowRemoteImagesButton" Grid.Column="2" x:Name="ShowRemoteImagesButton" Click="ShowRemoteImagesButton_Click" Padding="10,4">
-                                    <TextBlock x:Uid="MailPage_BtnShowImages" Text="显示图片" FontSize="13"/>
+                                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_ShowRemoteImagesButton" Grid.Column="2" x:Name="ShowRemoteImagesButton" Click="ShowRemoteImagesButton_Click" Padding="10,4">
+                                    <TextBlock x:Uid="MailPage_BtnShowImages" Text="显示图片" FontSize="{StaticResource TaskFlyoutFontSecondary}"/>
                                 </Button>
                             </Grid>
                         </Border>
                         <Grid Grid.Row="5" MinHeight="0">
                             <Grid x:Name="DetailHtmlViewHost" Visibility="Collapsed"/>
                             <ScrollViewer x:Name="DetailTextScrollViewer" VerticalScrollBarVisibility="Auto">
-                                <TextBlock x:Name="DetailPreview" FontSize="14" TextWrapping="WrapWholeWords"
+                                <TextBlock x:Name="DetailPreview" FontSize="{StaticResource TaskFlyoutFontBody}" TextWrapping="WrapWholeWords"
                                            LineHeight="22"/>
                             </ScrollViewer>
                         </Grid>
-                        <Grid x:Name="MailDetailActions" Grid.Row="6" ColumnSpacing="8">
+                        <Grid x:Name="MailDetailActions" Grid.Row="6" ColumnSpacing="{StaticResource TaskFlyoutSpaceSmall}">
                             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-                                <Button x:Uid="QuickCreate_FromSource" Content="Create task" Click="CreateTaskFromMail_Click"/>
-                                <Button x:Uid="Cross_CreateEvent" Content="Create event" Click="CreateEventFromMail_Click"/>
+                            <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="{StaticResource TaskFlyoutSpaceSmall}" Margin="{StaticResource TaskFlyoutRowMargin}">
+                                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="QuickCreate_FromSource" Content="Create task" Click="CreateTaskFromMail_Click"/>
+                                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="Cross_CreateEvent" Content="Create event" Click="CreateEventFromMail_Click"/>
                             </StackPanel>
-                            <Button x:Uid="MailPage_TrustSenderButton" x:Name="TrustSenderButton" MinWidth="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="TrustSenderButton_Click">
+                            <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_TrustSenderButton" x:Name="TrustSenderButton" MinWidth="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="TrustSenderButton_Click">
                                 <Grid ColumnSpacing="6">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                    <FontIcon Glyph="&#xE72E;" FontSize="14"/>
+                                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconShield}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
                                     <TextBlock x:Uid="MailPage_BtnTrustSender" x:Name="TrustSenderButtonText" Grid.Column="1" Text="信任此来源" TextWrapping="WrapWholeWords"/>
                                 </Grid>
                             </Button>
-                            <Button x:Uid="MailPage_ReplyButton" x:Name="ReplyButton" Grid.Column="1" MinWidth="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="ReplyButton_Click">
+                            <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_ReplyButton" x:Name="ReplyButton" Grid.Column="1" MinWidth="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="ReplyButton_Click">
                                 <Grid ColumnSpacing="6">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                    <FontIcon Glyph="&#xE97A;" FontSize="14"/>
+                                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconReply}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
                                     <TextBlock x:Uid="MailPage_BtnReply" Grid.Column="1" Text="回复" TextWrapping="WrapWholeWords"/>
                                 </Grid>
                             </Button>
-                            <Button x:Uid="MailPage_OpenInBrowserButton" x:Name="OpenInBrowserButton" Grid.Column="2" MinWidth="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="OpenInBrowserButton_Click">
+                            <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_OpenInBrowserButton" x:Name="OpenInBrowserButton" Grid.Column="2" MinWidth="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="OpenInBrowserButton_Click">
                                 <Grid ColumnSpacing="6">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                    <FontIcon Glyph="&#xE8A7;" FontSize="14"/>
+                                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconOpen}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
                                     <TextBlock x:Uid="MailPage_BtnOpenInBrowser" Grid.Column="1" Text="在浏览器中打开" TextWrapping="WrapWholeWords"/>
                                 </Grid>
                             </Button>
@@ -308,8 +308,8 @@
                           Background="{ThemeResource TaskFlyoutCardBackgroundBrush}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel MaxWidth="560" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="18">
-                                <StackPanel Spacing="4">
-                                    <TextBlock x:Name="AddTitleText" x:Uid="MailPage_AddAccountTitle" Text="添加邮箱账户" FontSize="24" FontWeight="SemiBold"/>
+                                <StackPanel Spacing="{StaticResource TaskFlyoutSpaceXSmall}">
+                                    <TextBlock x:Name="AddTitleText" x:Uid="MailPage_AddAccountTitle" Text="添加邮箱账户" FontSize="{StaticResource TaskFlyoutFontHeading}" FontWeight="SemiBold"/>
                                     <TextBlock x:Name="AddSubtitleText" x:Uid="MailPage_AddAccountSubtitle" Text="选择邮箱类型。Outlook 和 Gmail 使用 OAuth；IMAP 需要填写服务器设置。"
                                                TextWrapping="WrapWholeWords"
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
@@ -322,35 +322,35 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <Button x:Uid="MailPage_AddOutlookButton" x:Name="AddOutlookButton" Padding="14" HorizontalAlignment="Stretch" Click="AddOutlookButton_Click">
-                                        <StackPanel Spacing="8">
-                                            <FontIcon Glyph="&#xE715;" FontSize="24"/>
+                                    <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_AddOutlookButton" x:Name="AddOutlookButton" Padding="14" HorizontalAlignment="Stretch" Click="AddOutlookButton_Click">
+                                        <StackPanel Spacing="{StaticResource TaskFlyoutSpaceSmall}">
+                                            <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconMail}" FontSize="{StaticResource TaskFlyoutIconLarge}"/>
                                             <TextBlock Text="Outlook" FontWeight="SemiBold"/>
-                                            <TextBlock x:Uid="MailPage_BtnMSAccount" Text="Microsoft 账户" FontSize="12" TextWrapping="WrapWholeWords"
+                                            <TextBlock x:Uid="MailPage_BtnMSAccount" Text="Microsoft 账户" FontSize="{StaticResource TaskFlyoutFontCaption}" TextWrapping="WrapWholeWords"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         </StackPanel>
                                     </Button>
 
-                                    <Button x:Uid="MailPage_AddGmailButton" Grid.Column="1" x:Name="AddGmailButton" Padding="14" HorizontalAlignment="Stretch" Click="AddGmailButton_Click">
-                                        <StackPanel Spacing="8">
-                                            <FontIcon Glyph="&#xE77B;" FontSize="24"/>
+                                    <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_AddGmailButton" Grid.Column="1" x:Name="AddGmailButton" Padding="14" HorizontalAlignment="Stretch" Click="AddGmailButton_Click">
+                                        <StackPanel Spacing="{StaticResource TaskFlyoutSpaceSmall}">
+                                            <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconPerson}" FontSize="{StaticResource TaskFlyoutIconLarge}"/>
                                             <TextBlock Text="Gmail" FontWeight="SemiBold"/>
-                                            <TextBlock x:Uid="MailPage_BtnGoogleAccount" Text="Google OAuth" FontSize="12" TextWrapping="WrapWholeWords"
+                                            <TextBlock x:Uid="MailPage_BtnGoogleAccount" Text="Google OAuth" FontSize="{StaticResource TaskFlyoutFontCaption}" TextWrapping="WrapWholeWords"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         </StackPanel>
                                     </Button>
 
-                                    <Button x:Uid="MailPage_AddImapButton" Grid.Column="2" x:Name="AddImapButton" Padding="14" HorizontalAlignment="Stretch" Click="AddImapButton_Click">
-                                        <StackPanel Spacing="8">
-                                            <FontIcon Glyph="&#xE8D4;" FontSize="24"/>
+                                    <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_AddImapButton" Grid.Column="2" x:Name="AddImapButton" Padding="14" HorizontalAlignment="Stretch" Click="AddImapButton_Click">
+                                        <StackPanel Spacing="{StaticResource TaskFlyoutSpaceSmall}">
+                                            <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconServer}" FontSize="{StaticResource TaskFlyoutIconLarge}"/>
                                             <TextBlock Text="IMAP" FontWeight="SemiBold"/>
-                                            <TextBlock x:Uid="MailPage_BtnCustomAccount" Text="自定义邮箱" FontSize="12" TextWrapping="WrapWholeWords"
+                                            <TextBlock x:Uid="MailPage_BtnCustomAccount" Text="自定义邮箱" FontSize="{StaticResource TaskFlyoutFontCaption}" TextWrapping="WrapWholeWords"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         </StackPanel>
                                     </Button>
                                 </Grid>
 
-                                <Button x:Name="AddOutlookImapButton" x:Uid="MailPage_AddOutlookImapButton"
+                                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="AddOutlookImapButton" x:Uid="MailPage_AddOutlookImapButton"
                                         Content="Outlook IMAP（OAuth2）" HorizontalAlignment="Stretch"
                                         Click="AddOutlookImapButton_Click"/>
 
@@ -365,7 +365,7 @@
                                         <ComboBoxItem x:Uid="MailPage_OutlookImapPersonal" Content="个人 Outlook.com"/>
                                         <ComboBoxItem x:Uid="MailPage_OutlookImapOrganization" Content="工作或学校 Microsoft 365"/>
                                     </ComboBox>
-                                    <Button x:Name="ConnectOutlookImapButton" x:Uid="MailPage_ConnectOutlookImapButton"
+                                    <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="ConnectOutlookImapButton" x:Uid="MailPage_ConnectOutlookImapButton"
                                             Content="登录并连接 IMAP" Click="ConnectOutlookImapButton_Click"/>
                                 </StackPanel>
 
@@ -395,22 +395,22 @@
                                     </Grid>
                                     <TextBox x:Name="SmtpUserNameBox" x:Uid="MailPage_SmtpUserName" Header="SMTP 用户名" PlaceholderText="默认使用 IMAP 用户名"/>
                                     <ToggleSwitch x:Name="SmtpSslToggle" x:Uid="MailPage_SmtpSsl" Header="SMTP 使用 SSL/TLS" IsOn="False"/>
-                                    <Grid ColumnSpacing="8">
+                                    <Grid ColumnSpacing="{StaticResource TaskFlyoutSpaceSmall}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
-                                        <Button x:Uid="MailPage_BtnCancel" MinWidth="0" HorizontalAlignment="Stretch" Content="取消" Click="CancelImapButton_Click"/>
-                                        <Button x:Name="SaveImapButton" x:Uid="MailPage_BtnSaveImap" Grid.Column="1" MinWidth="0" HorizontalAlignment="Stretch" Click="SaveImapButton_Click">
+                                        <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_BtnCancel" MinWidth="0" HorizontalAlignment="Stretch" Content="取消" Click="CancelImapButton_Click"/>
+                                        <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="SaveImapButton" x:Uid="MailPage_BtnSaveImap" Grid.Column="1" MinWidth="0" HorizontalAlignment="Stretch" Click="SaveImapButton_Click">
                                             <TextBlock x:Uid="MailPage_BtnSaveImapText" Text="连接并保存 IMAP 账户" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
                                         </Button>
                                     </Grid>
                                 </StackPanel>
 
-                                <TextBlock x:Name="AddStatusText" Text="" FontSize="13"
+                                <TextBlock x:Name="AddStatusText" Text="" FontSize="{StaticResource TaskFlyoutFontSecondary}"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                            TextWrapping="WrapWholeWords"/>
-                                <Button x:Name="CancelAccountAuthorizationButton" x:Uid="MailPage_BtnCancel"
+                                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="CancelAccountAuthorizationButton" x:Uid="MailPage_BtnCancel"
                                         Content="Cancel" Visibility="Collapsed" HorizontalAlignment="Left"
                                         Click="CancelAccountAuthorizationButton_Click"/>
                             </StackPanel>
@@ -422,44 +422,44 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled"
                                       HorizontalScrollMode="Disabled">
-                            <StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Top" Spacing="12">
-                                <Grid ColumnSpacing="12">
+                            <StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Top" Spacing="{StaticResource TaskFlyoutSpaceMedium}">
+                                <Grid ColumnSpacing="{StaticResource TaskFlyoutSpaceMedium}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="ComposeTitleText" x:Uid="MailPage_ComposeTitle" Text="写邮件" FontSize="24" FontWeight="SemiBold"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                                        <Button x:Name="CancelComposeButton" x:Uid="MailPage_BtnCancelCompose" Content="取消" Click="CancelComposeButton_Click"/>
-                                        <Button x:Name="SendComposeButton" x:Uid="MailPage_SendComposeButton" Click="SendComposeButton_Click">
+                                    <TextBlock x:Name="ComposeTitleText" x:Uid="MailPage_ComposeTitle" Text="写邮件" FontSize="{StaticResource TaskFlyoutFontHeading}" FontWeight="SemiBold"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource TaskFlyoutSpaceSmall}">
+                                        <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="CancelComposeButton" x:Uid="MailPage_BtnCancelCompose" Content="取消" Click="CancelComposeButton_Click"/>
+                                        <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="SendComposeButton" x:Uid="MailPage_SendComposeButton" Click="SendComposeButton_Click">
                                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                                <FontIcon Glyph="&#xE724;" FontSize="14"/>
+                                                <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconCompose}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
                                                 <TextBlock x:Uid="MailPage_TextSend" Text="发送"/>
                                             </StackPanel>
                                         </Button>
                                     </StackPanel>
                                 </Grid>
-                                <TextBlock x:Uid="MailPage_ComposeConsentHint" Text="Gmail 可能请求发送权限；Outlook 可能请求邮件读写和发送权限，以创建可追踪草稿并避免重复发送。" FontSize="12"
+                                <TextBlock x:Uid="MailPage_ComposeConsentHint" Text="Gmail 可能请求发送权限；Outlook 可能请求邮件读写和发送权限，以创建可追踪草稿并避免重复发送。" FontSize="{StaticResource TaskFlyoutFontCaption}"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="WrapWholeWords"/>
                                 <ComboBox x:Name="ComposeFromBox" x:Uid="MailPage_ComposeFrom" Header="发件人" HorizontalAlignment="Stretch" SelectionChanged="ComposeField_Changed"/>
                                 <TextBox x:Name="ComposeToBox" x:Uid="MailPage_ComposeTo" Header="收件人" PlaceholderText="name@example.com; other@example.com" TextChanged="ComposeField_Changed"/>
                                 <TextBox x:Name="ComposeSubjectBox" x:Uid="MailPage_ComposeSubject" Header="标题" TextChanged="ComposeField_Changed"/>
                                 <TextBox x:Name="ComposeBodyBox" x:Uid="MailPage_ComposeBody" Header="内容" AcceptsReturn="True"
                                          TextWrapping="Wrap" MinHeight="220" TextChanged="ComposeField_Changed"/>
-                                <StackPanel Spacing="8">
-                                    <Grid ColumnSpacing="8">
+                                <StackPanel Spacing="{StaticResource TaskFlyoutSpaceSmall}">
+                                    <Grid ColumnSpacing="{StaticResource TaskFlyoutSpaceSmall}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
-                                        <Button x:Uid="MailPage_AddAttachments" x:Name="AddAttachmentsButton" Content="Add attachments" Click="AddAttachmentsButton_Click"/>
+                                        <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_AddAttachments" x:Name="AddAttachmentsButton" Content="Add attachments" Click="AddAttachmentsButton_Click"/>
                                         <TextBlock x:Name="AttachmentSummaryText" Grid.Column="1" VerticalAlignment="Center"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                     </Grid>
                                     <ItemsControl x:Name="AttachmentList" ItemsSource="{x:Bind ComposeAttachments}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="models:MailAttachmentData">
-                                                <Grid ColumnSpacing="8" Padding="4">
+                                                <Grid ColumnSpacing="{StaticResource TaskFlyoutSpaceSmall}" Padding="4">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
@@ -467,9 +467,9 @@
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Text="{x:Bind FileName}" TextTrimming="CharacterEllipsis"/>
                                                     <TextBlock Grid.Column="1" Text="{x:Bind SizeText}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                                    <Button x:Uid="MailPage_RemoveAttachment" Grid.Column="2" Width="28" Height="28" Padding="0" DataContext="{x:Bind}"
+                                                    <Button x:Uid="MailPage_RemoveAttachment" Grid.Column="2" Width="{StaticResource TaskFlyoutButtonCompactHeight}" Height="{StaticResource TaskFlyoutButtonCompactHeight}" Padding="0" DataContext="{x:Bind}"
                                                             Click="RemoveAttachmentButton_Click" AutomationProperties.Name="Remove attachment">
-                                                        <FontIcon Glyph="&#xE711;" FontSize="12"/>
+                                                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconDismiss}" FontSize="{StaticResource TaskFlyoutIconSmall}"/>
                                                     </Button>
                                                 </Grid>
                                             </DataTemplate>
@@ -477,7 +477,7 @@
                                     </ItemsControl>
                                     <ProgressBar x:Name="AttachmentProgress" Visibility="Collapsed" IsIndeterminate="True"/>
                                 </StackPanel>
-                                 <TextBlock x:Name="ComposeStatusText" x:Uid="MailPage_ComposeStatus" FontSize="13"
+                                 <TextBlock x:Name="ComposeStatusText" x:Uid="MailPage_ComposeStatus" FontSize="{StaticResource TaskFlyoutFontSecondary}"
                                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                             TextWrapping="WrapWholeWords" AutomationProperties.LiveSetting="Polite"/>
                             </StackPanel>
@@ -489,7 +489,7 @@
         <InfoBar x:Name="MailUndoBar" Grid.Row="1" IsOpen="False" IsClosable="True" Severity="Success"
                  HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="16" MaxWidth="560">
             <InfoBar.ActionButton>
-                <Button x:Uid="MailPage_Undo" Content="Undo" Click="UndoMailMutationButton_Click"/>
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="MailPage_Undo" Content="Undo" Click="UndoMailMutationButton_Click"/>
             </InfoBar.ActionButton>
         </InfoBar>
     </Grid>

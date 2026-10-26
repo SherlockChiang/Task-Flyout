@@ -28,36 +28,36 @@
             <NavigationView.MenuItems>
                 <NavigationViewItem x:Uid="MainWindow_NavToday" AutomationProperties.AutomationId="NavToday" Content="Today" Tag="Today">
                     <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="Home"/>
+                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconHome}" FontSize="{StaticResource TaskFlyoutIconNavigation}"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem x:Uid="MainWindow_NavCalendar" AutomationProperties.AutomationId="NavCalendar" Content="主日历视图" Tag="Calendar">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE263;" FontFamily="ms-appx:///Assets/FluentSystemIcons-Filled.ttf#FluentSystemIcons-Filled"/>
+                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconCalendar}" FontSize="{StaticResource TaskFlyoutIconNavigation}"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
                 <NavigationViewItem x:Uid="MainWindow_NavTasks" x:Name="TasksNavItem" AutomationProperties.AutomationId="NavTasks" Content="任务" Tag="Tasks">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE73E;" FontFamily="Segoe MDL2 Assets"/>
+                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconTasks}" FontSize="{StaticResource TaskFlyoutIconNavigation}"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
                 <NavigationViewItem x:Uid="MainWindow_NavWeather" x:Name="WeatherNavItem" Content="天气" Tag="Weather">
                     <NavigationViewItem.Icon>
-                        <FontIcon x:Name="WeatherNavIcon" Glyph="&#xF8BA;" FontFamily="ms-appx:///Assets/FluentSystemIcons-Filled.ttf#FluentSystemIcons-Filled"/>
+                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" x:Name="WeatherNavIcon" Glyph="{StaticResource AppIconSunny}" FontSize="{StaticResource TaskFlyoutIconNavigation}"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
                 <NavigationViewItem x:Uid="MainWindow_NavMail" x:Name="MailNavItem" AutomationProperties.AutomationId="NavMail" Content="邮件" Tag="Mail">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE715;" FontFamily="Segoe MDL2 Assets"/>
+                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconMail}" FontSize="{StaticResource TaskFlyoutIconNavigation}"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
                 <NavigationViewItem x:Uid="MainWindow_NavRss" x:Name="RssNavItem" Content="RSS" Tag="Rss">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE789;" FontFamily="Segoe MDL2 Assets"/>
+                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconRss}" FontSize="{StaticResource TaskFlyoutIconNavigation}"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
@@ -71,7 +71,7 @@
                 <InfoBar x:Name="NotificationActionStatus" IsOpen="False" IsClosable="True" Margin="12,8"
                          AutomationProperties.LiveSetting="Polite">
                     <InfoBar.ActionButton>
-                        <Button x:Name="NotificationActionRetry" x:Uid="Notification_Retry" Content="Retry"
+                        <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="NotificationActionRetry" x:Uid="Notification_Retry" Content="Retry"
                                 Click="NotificationActionRetry_Click" Visibility="Collapsed"/>
                     </InfoBar.ActionButton>
                 </InfoBar>
@@ -94,23 +94,23 @@
                     MaxWidth="720"
                     MaxHeight="640"
                     Margin="20,72,20,20"
-                    Padding="16"
+                    Padding="{StaticResource TaskFlyoutSectionPadding}"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Top"
                     Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
                     BorderThickness="1"
-                    CornerRadius="12">
+                    CornerRadius="{StaticResource TaskFlyoutPopupCornerRadius}">
                 <Border.Shadow>
                     <ThemeShadow/>
                 </Border.Shadow>
-                <Grid RowSpacing="12">
+                <Grid RowSpacing="{StaticResource TaskFlyoutSpaceMedium}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <Grid ColumnSpacing="8">
+                    <Grid ColumnSpacing="{StaticResource TaskFlyoutSpaceSmall}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="20"/>
@@ -120,19 +120,22 @@
                                         x:Uid="GlobalSearch_SearchBox"
                                         AutomationProperties.AutomationId="GlobalSearchBox"
                                         PlaceholderText="Search local data or run a command"
-                                        QueryIcon="Find"
                                         TextChanged="GlobalSearchBox_TextChanged"
-                                        KeyDown="GlobalSearchBox_KeyDown"/>
+                                        KeyDown="GlobalSearchBox_KeyDown">
+                            <AutoSuggestBox.QueryIcon>
+                                <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconSearch}"/>
+                            </AutoSuggestBox.QueryIcon>
+                        </AutoSuggestBox>
                         <Button x:Name="GlobalSearchCloseButton"
                                 x:Uid="GlobalSearch_Close"
                                 AutomationProperties.AutomationId="GlobalSearchCloseButton"
                                 Grid.Column="2"
-                                Width="40"
-                                Height="40"
+                                Width="{StaticResource TaskFlyoutButtonIconSize}"
+                                Height="{StaticResource TaskFlyoutButtonIconSize}"
                                 Padding="0"
                                 Click="GlobalSearchCloseButton_Click"
                                 ToolTipService.ToolTip="Close">
-                            <FontIcon Glyph="&#xE711;"/>
+                            <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconDismiss}" FontSize="{StaticResource TaskFlyoutIconNavigation}"/>
                         </Button>
                         <ProgressRing x:Name="GlobalSearchIndexProgress" Grid.Column="1"
                                       Width="16" Height="16" IsActive="False"/>
@@ -149,7 +152,7 @@
                             <GroupStyle>
                                 <GroupStyle.HeaderTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding Name}" Margin="12,12,12,4" FontSize="12" FontWeight="SemiBold"
+                                        <TextBlock Text="{Binding Name}" Margin="12,12,12,4" FontSize="{StaticResource TaskFlyoutFontCaption}" FontWeight="SemiBold"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                     </DataTemplate>
                                 </GroupStyle.HeaderTemplate>
@@ -157,15 +160,15 @@
                         </ListView.GroupStyle>
                         <ListView.ItemTemplate>
                             <DataTemplate>
-                                <Grid AutomationProperties.AutomationId="{Binding AutomationId}" Padding="8,6" ColumnSpacing="12">
+                                <Grid AutomationProperties.AutomationId="{Binding AutomationId}" Padding="8,6" ColumnSpacing="{StaticResource TaskFlyoutSpaceMedium}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="32"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <FontIcon Glyph="{Binding Glyph}" FontSize="18" VerticalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" Spacing="2">
+                                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{Binding Glyph}" FontSize="{StaticResource TaskFlyoutIconBody}" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" Spacing="{StaticResource TaskFlyoutSpaceTiny}">
                                         <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock Text="{Binding Detail}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        <TextBlock Text="{Binding Detail}" FontSize="{StaticResource TaskFlyoutFontCaption}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                    TextTrimming="CharacterEllipsis"/>
                                     </StackPanel>
                                 </Grid>
@@ -177,7 +180,7 @@
                                AutomationProperties.AutomationId="GlobalSearchHint"
                                Grid.Row="2"
                                 Text="Local cached data only · Enter to open · Esc to close"
-                                FontSize="12"
+                                FontSize="{StaticResource TaskFlyoutFontCaption}"
                                 TextAlignment="Center"
                                 TextWrapping="WrapWholeWords"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>

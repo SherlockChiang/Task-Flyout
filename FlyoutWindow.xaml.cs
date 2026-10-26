@@ -15,6 +15,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Models;
 using Task_Flyout.Services;
+using Task_Flyout.Views;
 using Windows.UI;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System.Globalization;
@@ -1730,12 +1731,12 @@ namespace Task_Flyout
             void AddChip(string glyph, string text)
             {
                 if (string.IsNullOrEmpty(text)) return;
-                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new Thickness(0, 0, 12, 0) };
+                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = VisualResources.Number("SpaceXSmall"), Margin = new Thickness(0, 0, 12, 0) };
                 panel.Children.Add(new FontIcon
                 {
                     Glyph = glyph,
-                    FontSize = 11,
-                    FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+                    FontSize = VisualResources.Number("IconSmall"),
+                    FontFamily = Views.VisualResources.IconFont,
                     Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
                     VerticalAlignment = VerticalAlignment.Center
                 });
@@ -1750,32 +1751,32 @@ namespace Task_Flyout
             }
 
             if (fields.Contains("feelslike") && !string.IsNullOrEmpty(info.FeelsLike))
-                AddChip("\uE9CA", info.FeelsLike);
+                AddChip(AppIcons.Temperature, info.FeelsLike);
             if (fields.Contains("humidity") && !string.IsNullOrEmpty(info.Humidity))
-                AddChip("\uE945", info.Humidity);
+                AddChip(AppIcons.Humidity, info.Humidity);
             if (fields.Contains("wind") && !string.IsNullOrEmpty(info.WindSpeed))
-                AddChip("\uEBE7", info.WindSpeed);
+                AddChip(AppIcons.Wind, info.WindSpeed);
             if (fields.Contains("uv") && !string.IsNullOrEmpty(info.UVIndex))
-                AddChip("\uE706", $"UV {info.UVIndex}");
+                AddChip(AppIcons.Sunny, $"UV {info.UVIndex}");
             if (fields.Contains("visibility") && !string.IsNullOrEmpty(info.Visibility))
-                AddChip("\uE7B3", info.Visibility);
+                AddChip(AppIcons.Visibility, info.Visibility);
             if (fields.Contains("pressure") && !string.IsNullOrEmpty(info.Pressure))
-                AddChip("\uEC49", info.Pressure);
+                AddChip(AppIcons.Pressure, info.Pressure);
             if (fields.Contains("airquality") && !string.IsNullOrEmpty(info.AirQuality))
-                AddChip("\uE9CA", $"AQI {info.AirQuality}");
+                AddChip(AppIcons.AirQuality, $"AQI {info.AirQuality}");
             if (fields.Contains("pollen") && !string.IsNullOrEmpty(info.Pollen))
-                AddChip("\uE710", string.Format(
+                AddChip(AppIcons.Pollen, string.Format(
                     _loader.GetStringOrDefault("WeatherField_PollenValueFormat") ?? "Pollen {0}",
                     info.Pollen));
             if (fields.Contains("sun") && !string.IsNullOrEmpty(info.Sunrise))
-                AddChip("\uE706", $"{info.Sunrise} / {info.Sunset}");
+                AddChip(AppIcons.Sunny, $"{info.Sunrise} / {info.Sunset}");
             if (fields.Contains("moon") && !string.IsNullOrEmpty(info.MoonPhase))
-                AddChip("\uE708", info.MoonPhase);
+                AddChip(AppIcons.Moon, info.MoonPhase);
             if (fields.Contains("precipitation"))
             {
                 var hw = info.HourlyForecast?.FirstOrDefault();
                 if (hw != null && !string.IsNullOrEmpty(hw.PrecipProbability))
-                    AddChip("\uE790", hw.PrecipProbability);
+                    AddChip(AppIcons.Rain, hw.PrecipProbability);
             }
 
             WeatherDetailStrip.Visibility = WeatherDetailStrip.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -1797,7 +1798,7 @@ namespace Task_Flyout
         {
             _isPinned = !_isPinned;
             // E718 = Pin (pinned), E77A = Unpin (unpinned)
-            PinIcon.Glyph = _isPinned ? "\uE718" : "\uE77A";
+            PinIcon.Glyph = _isPinned ? AppIcons.Unpin : AppIcons.Pin;
             HideOnLostFocus = !_isPinned;
         }
 

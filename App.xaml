@@ -47,6 +47,108 @@
             <CornerRadius x:Key="TaskFlyoutSectionCornerRadius">8</CornerRadius>
             <Thickness x:Key="TaskFlyoutSectionBorderThickness">1</Thickness>
 
+            <!-- Shared app visual tokens. Keep glyph resources aligned with Services/AppIcons.cs. -->
+            <x:Double x:Key="TaskFlyoutFontCaption">12</x:Double>
+            <x:Double x:Key="TaskFlyoutFontSecondary">13</x:Double>
+            <x:Double x:Key="TaskFlyoutFontBody">14</x:Double>
+            <x:Double x:Key="TaskFlyoutFontSection">16</x:Double>
+            <x:Double x:Key="TaskFlyoutFontSubtitle">20</x:Double>
+            <x:Double x:Key="TaskFlyoutFontHeading">24</x:Double>
+            <x:Double x:Key="TaskFlyoutFontTitle">32</x:Double>
+            <x:Double x:Key="TaskFlyoutIconSmall">12</x:Double>
+            <x:Double x:Key="TaskFlyoutIconBody">16</x:Double>
+            <x:Double x:Key="TaskFlyoutIconNavigation">20</x:Double>
+            <x:Double x:Key="TaskFlyoutIconLarge">24</x:Double>
+            <x:Double x:Key="TaskFlyoutIconEmpty">32</x:Double>
+            <x:Double x:Key="TaskFlyoutSpaceTiny">2</x:Double>
+            <x:Double x:Key="TaskFlyoutSpaceXSmall">4</x:Double>
+            <x:Double x:Key="TaskFlyoutSpaceSmall">8</x:Double>
+            <x:Double x:Key="TaskFlyoutSpaceMedium">12</x:Double>
+            <x:Double x:Key="TaskFlyoutSpaceLarge">16</x:Double>
+            <x:Double x:Key="TaskFlyoutSpaceSection">20</x:Double>
+            <x:Double x:Key="TaskFlyoutSpacePage">28</x:Double>
+            <x:Double x:Key="TaskFlyoutButtonCompactHeight">28</x:Double>
+            <x:Double x:Key="TaskFlyoutButtonHeight">32</x:Double>
+            <x:Double x:Key="TaskFlyoutButtonToolbarHeight">36</x:Double>
+            <x:Double x:Key="TaskFlyoutButtonIconSize">40</x:Double>
+            <CornerRadius x:Key="TaskFlyoutControlCornerRadius">4</CornerRadius>
+            <CornerRadius x:Key="TaskFlyoutPopupCornerRadius">12</CornerRadius>
+            <CornerRadius x:Key="TaskFlyoutLeadingButtonCornerRadius">4,0,0,4</CornerRadius>
+            <CornerRadius x:Key="TaskFlyoutTrailingButtonCornerRadius">0,4,4,0</CornerRadius>
+            <Thickness x:Key="TaskFlyoutTrailingIconMargin">0,0,12,0</Thickness>
+            <Thickness x:Key="TaskFlyoutLeadingActionMargin">8,0,0,0</Thickness>
+            <Thickness x:Key="TaskFlyoutRowMargin">0,8,0,0</Thickness>
+            <FontFamily x:Key="TaskFlyoutIconFont">ms-appx:///Assets/FluentSystemIcons-Filled.ttf#FluentSystemIcons-Filled</FontFamily>
+            <x:String x:Key="AppIconServer">&#xF781;</x:String>
+            <x:String x:Key="AppIconHome">&#xF487;</x:String>
+            <x:String x:Key="AppIconCalendar">&#xE262;</x:String>
+            <x:String x:Key="AppIconTasks">&#xEC97;</x:String>
+            <x:String x:Key="AppIconMail">&#xF510;</x:String>
+            <x:String x:Key="AppIconRss">&#xEA45;</x:String>
+            <x:String x:Key="AppIconPerson">&#xF5C7;</x:String>
+            <x:String x:Key="AppIconCloud">&#xF2E4;</x:String>
+            <x:String x:Key="AppIconPeople">&#xF5B2;</x:String>
+            <x:String x:Key="AppIconAdd">&#xF109;</x:String>
+            <x:String x:Key="AppIconDismiss">&#xF369;</x:String>
+            <x:String x:Key="AppIconChevronLeft">&#xF2AA;</x:String>
+            <x:String x:Key="AppIconChevronRight">&#xF2B0;</x:String>
+            <x:String x:Key="AppIconEdit">&#xF3DC;</x:String>
+            <x:String x:Key="AppIconDelete">&#xF34C;</x:String>
+            <x:String x:Key="AppIconLocation">&#xF502;</x:String>
+            <x:String x:Key="AppIconInfo">&#xF4AA;</x:String>
+            <x:String x:Key="AppIconSettings">&#xF6B2;</x:String>
+            <x:String x:Key="AppIconSync">&#xF190;</x:String>
+            <x:String x:Key="AppIconPin">&#xF60B;</x:String>
+            <x:String x:Key="AppIconUnpin">&#xF60D;</x:String>
+            <x:String x:Key="AppIconBack">&#xF15B;</x:String>
+            <x:String x:Key="AppIconForward">&#xF181;</x:String>
+            <x:String x:Key="AppIconAttach">&#xF1A9;</x:String>
+            <x:String x:Key="AppIconMailRead">&#xF52B;</x:String>
+            <x:String x:Key="AppIconFlag">&#xF40A;</x:String>
+            <x:String x:Key="AppIconFlagOff">&#xE623;</x:String>
+            <x:String x:Key="AppIconStar">&#xF718;</x:String>
+            <x:String x:Key="AppIconStarOff">&#xF728;</x:String>
+            <x:String x:Key="AppIconArchive">&#xF139;</x:String>
+            <x:String x:Key="AppIconMove">&#xE659;</x:String>
+            <x:String x:Key="AppIconSave">&#xF689;</x:String>
+            <x:String x:Key="AppIconDownload">&#xF150;</x:String>
+            <x:String x:Key="AppIconUpload">&#xF1A4;</x:String>
+            <x:String x:Key="AppIconMore">&#xE832;</x:String>
+            <x:String x:Key="AppIconOpen">&#xF58C;</x:String>
+            <x:String x:Key="AppIconSend">&#xF6A2;</x:String>
+            <x:String x:Key="AppIconCompose">&#xF529;</x:String>
+            <x:String x:Key="AppIconGlobe">&#xF45E;</x:String>
+            <x:String x:Key="AppIconFolder">&#xF41C;</x:String>
+            <x:String x:Key="AppIconSearch">&#xF699;</x:String>
+            <x:String x:Key="AppIconCommand">&#xE751;</x:String>
+            <x:String x:Key="AppIconSunny">&#xF8B9;</x:String>
+            <x:String x:Key="AppIconPartlyCloudy">&#xF898;</x:String>
+            <x:String x:Key="AppIconCloudy">&#xF886;</x:String>
+            <x:String x:Key="AppIconFog">&#xF88C;</x:String>
+            <x:String x:Key="AppIconShowers">&#xF8A1;</x:String>
+            <x:String x:Key="AppIconRain">&#xF89E;</x:String>
+            <x:String x:Key="AppIconSnow">&#xF8AA;</x:String>
+            <x:String x:Key="AppIconThunderstorm">&#xF8BC;</x:String>
+            <x:String x:Key="AppIconSleet">&#xF8A7;</x:String>
+            <x:String x:Key="AppIconTemperature">&#xF7A7;</x:String>
+            <x:String x:Key="AppIconHumidity">&#xE59C;</x:String>
+            <x:String x:Key="AppIconWind">&#xF8B6;</x:String>
+            <x:String x:Key="AppIconVisibility">&#xE5FF;</x:String>
+            <x:String x:Key="AppIconPressure">&#xF4D1;</x:String>
+            <x:String x:Key="AppIconPollen">&#xE768;</x:String>
+            <x:String x:Key="AppIconMoon">&#xF895;</x:String>
+            <x:String x:Key="AppIconCurrentLocation">&#xE86C;</x:String>
+            <x:String x:Key="AppIconCheckmark">&#xF294;</x:String>
+            <x:String x:Key="AppIconReply">&#xF177;</x:String>
+            <x:String x:Key="AppIconWindow">&#xF8CD;</x:String>
+            <x:String x:Key="AppIconShield">&#xEAD1;</x:String>
+            <x:String x:Key="AppIconAirQuality">&#xEE41;</x:String>
+            <x:String x:Key="AppIconDescription">&#xE563;</x:String>
+            <Style x:Key="TaskFlyoutIconStyle" TargetType="FontIcon">
+                <Setter Property="FontFamily" Value="{StaticResource TaskFlyoutIconFont}"/>
+                <Setter Property="FontSize" Value="{StaticResource TaskFlyoutIconBody}"/>
+            </Style>
+
             <tb:TaskbarIcon x:Key="MyTrayIcon"
                 ToolTipText="Task Flyout">
                 <tb:TaskbarIcon.ContextFlyout>
@@ -60,13 +162,13 @@
                         <MenuFlyoutSeparator/>
                         <MenuFlyoutItem x:Uid="TrayMenu_ShowMain" x:Name="MenuShowMain" Text="显示主页面">
                             <MenuFlyoutItem.Icon>
-                                <SymbolIcon Symbol="Setting"/>
+                                <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconSettings}"/>
                             </MenuFlyoutItem.Icon>
                         </MenuFlyoutItem>
                         <MenuFlyoutSeparator/>
                         <MenuFlyoutItem x:Uid="TrayMenu_Exit" x:Name="MenuExit" Text="退出">
                             <MenuFlyoutItem.Icon>
-                                <SymbolIcon Symbol="Cancel"/>
+                                <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconDismiss}"/>
                             </MenuFlyoutItem.Icon>
                         </MenuFlyoutItem>
                     </MenuFlyout>

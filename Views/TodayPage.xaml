@@ -4,13 +4,13 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:views="using:Task_Flyout.Views">
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-        <StackPanel Padding="24" Spacing="20" MaxWidth="1100" HorizontalAlignment="Stretch">
-            <StackPanel Spacing="4">
-                <TextBlock x:Uid="TodayPage_Title" Text="Today" FontSize="32" FontWeight="SemiBold"/>
+        <StackPanel Padding="{StaticResource TaskFlyoutPanelPadding}" Spacing="{StaticResource TaskFlyoutSpaceSection}" MaxWidth="1100" HorizontalAlignment="Stretch">
+            <StackPanel Spacing="{StaticResource TaskFlyoutSpaceXSmall}">
+                <TextBlock x:Uid="TodayPage_Title" Text="Today" FontSize="{StaticResource TaskFlyoutFontTitle}" FontWeight="SemiBold"/>
                 <TextBlock x:Name="DateText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                 <TextBlock x:Uid="TodayPage_CacheHint" Text="Your latest local data. Open a section to sync with its service." TextWrapping="Wrap"/>
             </StackPanel>
-            <Grid x:Name="QuickActions" ColumnSpacing="8" RowSpacing="8">
+            <Grid x:Name="QuickActions" ColumnSpacing="{StaticResource TaskFlyoutSpaceSmall}" RowSpacing="{StaticResource TaskFlyoutSpaceSmall}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
@@ -21,14 +21,14 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <Button x:Name="NewTaskButton" x:Uid="TodayPage_NewTask" Content="Add task" HorizontalAlignment="Stretch"
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="NewTaskButton" x:Uid="TodayPage_NewTask" Content="Add task" HorizontalAlignment="Stretch"
                         AutomationProperties.AutomationId="TodayNewTask" Click="NewTaskButton_Click"/>
-                <Button x:Name="NewEventButton" x:Uid="TodayPage_NewEvent" Grid.Column="1" Content="New event" HorizontalAlignment="Stretch"
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="NewEventButton" x:Uid="TodayPage_NewEvent" Grid.Column="1" Content="New event" HorizontalAlignment="Stretch"
                         AutomationProperties.AutomationId="TodayNewEvent" Click="NewEventButton_Click"/>
-                <Button x:Name="ComposeButton" x:Uid="TodayPage_Compose" Grid.Column="2" Content="Write mail" HorizontalAlignment="Stretch"
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="ComposeButton" x:Uid="TodayPage_Compose" Grid.Column="2" Content="Write mail" HorizontalAlignment="Stretch"
                         AutomationProperties.AutomationId="TodayCompose" Click="ComposeButton_Click"/>
             </Grid>
-            <Grid x:Name="CardsGrid" SizeChanged="CardsGrid_SizeChanged" ColumnSpacing="16" RowSpacing="16">
+            <Grid x:Name="CardsGrid" SizeChanged="CardsGrid_SizeChanged" ColumnSpacing="{StaticResource TaskFlyoutSpaceLarge}" RowSpacing="{StaticResource TaskFlyoutSpaceLarge}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
@@ -46,7 +46,7 @@
                 <views:TodayCard x:Name="WeatherCard" Grid.Row="1" Grid.Column="1" VerticalAlignment="Top"/>
                 <views:TodayCard x:Name="RssCard" Grid.Row="2" VerticalAlignment="Top"/>
             </Grid>
-            <Button x:Name="RefreshButton" x:Uid="TodayPage_Refresh" Content="Refresh local overview"
+            <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="RefreshButton" x:Uid="TodayPage_Refresh" Content="Refresh local overview"
                     AutomationProperties.AutomationId="TodayRefresh" Click="RefreshButton_Click"/>
         </StackPanel>
     </ScrollViewer>

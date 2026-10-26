@@ -336,30 +336,30 @@ namespace Task_Flyout.Views
             void AddChip(string glyph, string text)
             {
                 if (string.IsNullOrEmpty(text)) return;
-                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = VisualResources.Number("SpaceXSmall") };
                 panel.Children.Add(new FontIcon
                 {
                     Glyph = glyph,
-                    FontSize = 12,
-                    FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+                    FontSize = VisualResources.Number("IconSmall"),
+                    FontFamily = VisualResources.IconFont,
                     Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
                     VerticalAlignment = VerticalAlignment.Center
                 });
                 panel.Children.Add(new TextBlock
                 {
                     Text = text,
-                    FontSize = 12,
+                    FontSize = VisualResources.Number("FontCaption"),
                     Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
                     VerticalAlignment = VerticalAlignment.Center
                 });
                 CurrentDetailsPanel.Children.Add(panel);
             }
 
-            AddChip("\uE9CA", info.FeelsLike);
-            AddChip("\uE945", info.Humidity);
-            AddChip("\uEBE7", info.WindSpeed);
+            AddChip(AppIcons.Temperature, info.FeelsLike);
+            AddChip(AppIcons.Humidity, info.Humidity);
+            AddChip(AppIcons.Wind, info.WindSpeed);
             if (!string.IsNullOrEmpty(info.UVIndex))
-                AddChip("\uE706", $"UV {info.UVIndex}");
+                AddChip(AppIcons.Sunny, $"UV {info.UVIndex}");
 
             CurrentWeatherCard.Visibility = Visibility.Visible;
         }
@@ -394,12 +394,12 @@ namespace Task_Flyout.Views
 
             foreach (var field in WeatherService.AllFlyoutFields)
             {
-                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = VisualResources.Number("SpaceSmall") };
                 var icon = new FontIcon
                 {
                     Glyph = field.Glyph,
-                    FontSize = 14,
-                    FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+                    FontSize = VisualResources.Number("IconBody"),
+                    FontFamily = VisualResources.IconFont,
                     VerticalAlignment = VerticalAlignment.Center,
                     Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
                 };
@@ -416,7 +416,7 @@ namespace Task_Flyout.Views
                 var label = new TextBlock
                 {
                     Text = GetSafeString(field.ResourceKey, field.EnLabel),
-                    FontSize = 13,
+                    FontSize = VisualResources.Number("FontSecondary"),
                     VerticalAlignment = VerticalAlignment.Center
                 };
 
@@ -451,7 +451,7 @@ namespace Task_Flyout.Views
 
             foreach (var field in WeatherService.AllBarFields)
             {
-                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = VisualResources.Number("SpaceSmall") };
                 var toggle = new ToggleSwitch
                 {
                     IsOn = enabled.Contains(field.Key),
@@ -465,7 +465,7 @@ namespace Task_Flyout.Views
                 var label = new TextBlock
                 {
                     Text = GetSafeString(field.ResourceKey, field.EnLabel),
-                    FontSize = 13,
+                    FontSize = VisualResources.Number("FontSecondary"),
                     VerticalAlignment = VerticalAlignment.Center
                 };
 
@@ -497,7 +497,7 @@ namespace Task_Flyout.Views
 
             foreach (var entry in WeatherService.AllAlertTypes)
             {
-                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = VisualResources.Number("SpaceSmall") };
                 var toggle = new ToggleSwitch
                 {
                     IsOn = enabled.Contains(entry.Type),
@@ -511,7 +511,7 @@ namespace Task_Flyout.Views
                 var label = new TextBlock
                 {
                     Text = GetSafeString(entry.ResourceKey, entry.EnLabel),
-                    FontSize = 13,
+                    FontSize = VisualResources.Number("FontSecondary"),
                     VerticalAlignment = VerticalAlignment.Center
                 };
 
@@ -863,7 +863,7 @@ namespace Task_Flyout.Views
             var locations = _weatherService.SavedLocations;
             foreach (var location in locations)
             {
-                var row = new Grid { ColumnSpacing = 8, Tag = location.Id };
+                var row = new Grid { ColumnSpacing = VisualResources.Number("SpaceSmall"), Tag = location.Id };
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -1296,12 +1296,12 @@ namespace Task_Flyout.Views
             void AddField(string glyph, string label, string? value)
             {
                 if (string.IsNullOrEmpty(value)) return;
-                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Padding = new Thickness(4, 6, 4, 6) };
+                var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = VisualResources.Number("SpaceSmall"), Padding = new Thickness(4, 6, 4, 6) };
                 panel.Children.Add(new FontIcon
                 {
                     Glyph = glyph,
-                    FontSize = 14,
-                    FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+                    FontSize = VisualResources.Number("IconBody"),
+                    FontFamily = VisualResources.IconFont,
                     Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
                     VerticalAlignment = VerticalAlignment.Center
                 });
@@ -1310,26 +1310,26 @@ namespace Task_Flyout.Views
                     Children =
                     {
                         new TextBlock { Text = label, FontSize = 11, Foreground = (Brush)Application.Current.Resources["TextFillColorTertiaryBrush"] },
-                        new TextBlock { Text = value, FontSize = 13, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold }
+                        new TextBlock { Text = value, FontSize = VisualResources.Number("FontSecondary"), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold }
                     }
                 });
                 items.Add(panel);
             }
 
-            AddField("\uE9CA", GetSafeString("WeatherPage_FeelsLike", "Feels like"), hw.FeelsLike);
-            AddField("\uE945", GetSafeString("WeatherPage_Humidity", "Humidity"), hw.Humidity);
-            AddField("\uEBE7", GetSafeString("WeatherPage_Wind", "Wind"), $"{hw.WindSpeed} {hw.WindDirection}");
-            AddField("\uE790", GetSafeString("WeatherPage_PrecipProb", "Precipitation probability"), hw.PrecipProbability);
-            AddField("\uE790", GetSafeString("WeatherPage_Precipitation", "Precipitation"), hw.Precipitation);
-            AddField("\uE706", GetSafeString("WeatherPage_UVIndex", "UV index"), hw.UVIndex);
-            AddField("\uE7B3", GetSafeString("WeatherPage_Visibility", "Visibility"), hw.Visibility);
-            AddField("\uEC49", GetSafeString("WeatherPage_Pressure", "Pressure"), hw.Pressure);
-            AddField("\uE9CA", GetSafeString("WeatherPage_AQI", "Air quality"), FormatAqi(hw.AirQuality));
-            AddField("\uE9CA", "PM2.5", hw.PM25);
-            AddField("\uE9CA", "PM10", hw.PM10);
-            AddField("\uE710", GetSafeString("WeatherPage_GrassPollen", "Grass pollen"), hw.PollenGrass);
-            AddField("\uE710", GetSafeString("WeatherPage_BirchPollen", "Birch pollen"), hw.PollenBirch);
-            AddField("\uE710", GetSafeString("WeatherPage_RagweedPollen", "Ragweed pollen"), hw.PollenRagweed);
+            AddField(AppIcons.Temperature, GetSafeString("WeatherPage_FeelsLike", "Feels like"), hw.FeelsLike);
+            AddField(AppIcons.Humidity, GetSafeString("WeatherPage_Humidity", "Humidity"), hw.Humidity);
+            AddField(AppIcons.Wind, GetSafeString("WeatherPage_Wind", "Wind"), $"{hw.WindSpeed} {hw.WindDirection}");
+            AddField(AppIcons.Rain, GetSafeString("WeatherPage_PrecipProb", "Precipitation probability"), hw.PrecipProbability);
+            AddField(AppIcons.Rain, GetSafeString("WeatherPage_Precipitation", "Precipitation"), hw.Precipitation);
+            AddField(AppIcons.Sunny, GetSafeString("WeatherPage_UVIndex", "UV index"), hw.UVIndex);
+            AddField(AppIcons.Visibility, GetSafeString("WeatherPage_Visibility", "Visibility"), hw.Visibility);
+            AddField(AppIcons.Pressure, GetSafeString("WeatherPage_Pressure", "Pressure"), hw.Pressure);
+            AddField(AppIcons.AirQuality, GetSafeString("WeatherPage_AQI", "Air quality"), FormatAqi(hw.AirQuality));
+            AddField(AppIcons.AirQuality, "PM2.5", hw.PM25);
+            AddField(AppIcons.AirQuality, "PM10", hw.PM10);
+            AddField(AppIcons.Pollen, GetSafeString("WeatherPage_GrassPollen", "Grass pollen"), hw.PollenGrass);
+            AddField(AppIcons.Pollen, GetSafeString("WeatherPage_BirchPollen", "Birch pollen"), hw.PollenBirch);
+            AddField(AppIcons.Pollen, GetSafeString("WeatherPage_RagweedPollen", "Ragweed pollen"), hw.PollenRagweed);
 
             DetailFieldsRepeater.ItemsSource = items;
         }

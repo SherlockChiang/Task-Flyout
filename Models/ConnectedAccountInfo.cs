@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
+using Task_Flyout.Services;
 
 namespace Task_Flyout.Models
 {
@@ -82,10 +83,10 @@ namespace Task_Flyout.Models
         [JsonIgnore]
         public string IconGlyph => ProviderName switch
         {
-            "Google" => "\uE77B",
-            "Microsoft" => "\uE77B",
-            "iCloud" => "\uE787",
-            _ => "\uE77B"
+            "Google" => AppIcons.Person,
+            "Microsoft" => AppIcons.Person,
+            "iCloud" => AppIcons.Cloud,
+            _ => AppIcons.Person
         };
 
         [JsonIgnore]

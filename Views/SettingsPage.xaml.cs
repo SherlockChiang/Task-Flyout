@@ -320,7 +320,7 @@ namespace Task_Flyout.Views
                 ColorPalettePanel.Children.Add(new TextBlock
                 {
                     Text = GetSafeString("TextNoAccount", "No accounts connected yet"),
-                    FontSize = 13,
+                    FontSize = VisualResources.Number("FontSecondary"),
                     Opacity = 0.5
                 });
                 return;
@@ -331,14 +331,15 @@ namespace Task_Flyout.Views
                 var headerPanel = new StackPanel
                 {
                     Orientation = Orientation.Horizontal,
-                    Spacing = 8,
+                    Spacing = VisualResources.Number("SpaceSmall"),
                     Margin = new Thickness(0, 8, 0, 4)
                 };
                 var accentColor = (Windows.UI.Color)Application.Current.Resources["SystemAccentColor"];
                 var accountIcon = new FontIcon
                 {
-                    Glyph = "\uE77B",
-                    FontSize = 15,
+                    Glyph = AppIcons.Person,
+                    FontFamily = VisualResources.IconFont,
+                    FontSize = VisualResources.Number("IconBody"),
                     Foreground = new SolidColorBrush(accentColor),
                     VerticalAlignment = VerticalAlignment.Center
                 };
@@ -347,7 +348,7 @@ namespace Task_Flyout.Views
                 {
                     Text = account.ProviderName,
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                    FontSize = 14,
+                    FontSize = VisualResources.Number("FontBody"),
                     VerticalAlignment = VerticalAlignment.Center
                 };
                 headerPanel.Children.Add(accountHeader);
@@ -395,7 +396,7 @@ namespace Task_Flyout.Views
             var text = new TextBlock
             {
                 Text = label,
-                FontSize = 13,
+                FontSize = VisualResources.Number("FontSecondary"),
                 MaxWidth = 240,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
@@ -477,7 +478,7 @@ namespace Task_Flyout.Views
             {
                 Width = 48,
                 Height = 48,
-                CornerRadius = new CornerRadius(8),
+                CornerRadius = VisualResources.Corner("SectionCornerRadius"),
                 Background = new SolidColorBrush(parsedCurrentColor),
                 BorderBrush = GetThemeBrush("TaskFlyoutSectionBorderBrush", Microsoft.UI.Colors.Gray),
                 BorderThickness = new Thickness(1)
@@ -485,19 +486,19 @@ namespace Task_Flyout.Views
             var previewHexText = new TextBlock
             {
                 Text = currentColor.ToUpperInvariant(),
-                FontSize = 14,
+                FontSize = VisualResources.Number("FontBody"),
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
             };
             var previewCard = new Grid
             {
-                ColumnSpacing = 12,
+                ColumnSpacing = VisualResources.Number("SpaceMedium"),
                 Padding = new Thickness(10),
                 Background = GetThemeBrush("TaskFlyoutSectionBackgroundBrush", Microsoft.UI.Colors.Transparent)
             };
             previewCard.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             previewCard.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             previewCard.Children.Add(previewSwatch);
-            var previewText = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 2 };
+            var previewText = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = VisualResources.Number("SpaceTiny") };
             previewText.Children.Add(new TextBlock
             {
                 Text = "HEX",
@@ -509,7 +510,7 @@ namespace Task_Flyout.Views
             previewCard.Children.Add(previewText);
             panel.Children.Add(new Border
             {
-                CornerRadius = new CornerRadius(8),
+                CornerRadius = VisualResources.Corner("SectionCornerRadius"),
                 BorderBrush = GetThemeBrush("TaskFlyoutSectionBorderBrush", Microsoft.UI.Colors.Gray),
                 BorderThickness = new Thickness(1),
                 Child = previewCard
@@ -549,8 +550,9 @@ namespace Task_Flyout.Views
                 var swatchColor = ColorHelper.ParseHex(hex);
                 var indicator = new FontIcon
                 {
-                    Glyph = "\uE73E",
-                    FontSize = 13,
+                    Glyph = AppIcons.Checkmark,
+                    FontFamily = VisualResources.IconFont,
+                    FontSize = VisualResources.Number("IconBody"),
                     Foreground = new SolidColorBrush(ColorHelper.ShouldUseWhiteText(hex)
                         ? Microsoft.UI.Colors.White
                         : Microsoft.UI.Colors.Black),
@@ -565,7 +567,7 @@ namespace Task_Flyout.Views
                     Padding = new Thickness(5),
                     Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
                     BorderThickness = new Thickness(0),
-                    CornerRadius = new CornerRadius(6),
+                    CornerRadius = VisualResources.Corner("ControlCornerRadius"),
                     Content = new Grid
                     {
                         Children =
@@ -574,7 +576,7 @@ namespace Task_Flyout.Views
                             {
                                 Width = 32,
                                 Height = 32,
-                                CornerRadius = new CornerRadius(6),
+                                CornerRadius = VisualResources.Corner("ControlCornerRadius"),
                                 Background = new SolidColorBrush(swatchColor),
                                 BorderThickness = new Thickness(1),
                                 BorderBrush = GetThemeBrush("TaskFlyoutSectionBorderBrush", Microsoft.UI.Colors.Gray)

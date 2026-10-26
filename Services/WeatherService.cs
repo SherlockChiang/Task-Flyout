@@ -707,15 +707,15 @@ namespace Task_Flyout.Services
             EnsureLocationLoaded();
             string currentKey;
             lock (_contextLock)
-            lock (_locationLock)
-            {
-                string providerCity = _favorites.Locations
-                    .FirstOrDefault(x => x.Id == _favorites.ActiveId)?.DisplayLabel
-                    ?? _location.City;
-                currentKey = $"{WeatherSource}|{providerCity}|" +
-                    $"{_location.Latitude.ToString(CultureInfo.InvariantCulture)}|" +
-                    _location.Longitude.ToString(CultureInfo.InvariantCulture);
-            }
+                lock (_locationLock)
+                {
+                    string providerCity = _favorites.Locations
+                        .FirstOrDefault(x => x.Id == _favorites.ActiveId)?.DisplayLabel
+                        ?? _location.City;
+                    currentKey = $"{WeatherSource}|{providerCity}|" +
+                        $"{_location.Latitude.ToString(CultureInfo.InvariantCulture)}|" +
+                        _location.Longitude.ToString(CultureInfo.InvariantCulture);
+                }
 
             lock (_weatherLock)
             {
@@ -1190,20 +1190,20 @@ namespace Task_Flyout.Services
         {
             EnsureLocationLoaded();
             lock (_contextLock)
-            lock (_locationLock)
-            {
-                return new WeatherRequestContext(
-                    Volatile.Read(ref _weatherDataGeneration),
-                    _favorites.ActiveId,
-                    IsEnabled,
-                    WeatherSource,
-                    _favorites.Locations.FirstOrDefault(x => x.Id == _favorites.ActiveId)?.Label ?? _location.City,
-                    _favorites.Locations.FirstOrDefault(x => x.Id == _favorites.ActiveId)?.DisplayLabel ?? _location.City,
-                    _location.Latitude,
-                    _location.Longitude,
-                    IconFontFamily,
-                    _weatherContextCancellation.Token);
-            }
+                lock (_locationLock)
+                {
+                    return new WeatherRequestContext(
+                        Volatile.Read(ref _weatherDataGeneration),
+                        _favorites.ActiveId,
+                        IsEnabled,
+                        WeatherSource,
+                        _favorites.Locations.FirstOrDefault(x => x.Id == _favorites.ActiveId)?.Label ?? _location.City,
+                        _favorites.Locations.FirstOrDefault(x => x.Id == _favorites.ActiveId)?.DisplayLabel ?? _location.City,
+                        _location.Latitude,
+                        _location.Longitude,
+                        IconFontFamily,
+                        _weatherContextCancellation.Token);
+                }
         }
 
         private void InvalidateWeatherContext()
@@ -2113,19 +2113,19 @@ namespace Task_Flyout.Services
 
         public static readonly (string Key, string ResourceKey, string EnLabel, string Glyph)[] AllFlyoutFields = new[]
         {
-            ("temperature",    "WeatherField_Temperature",   "Temperature",    "\uE9CA"),
-            ("feelslike",      "WeatherField_FeelsLike",     "Feels like",     "\uE9CA"),
-            ("description",    "WeatherField_Description",   "Description",    "\uE286"),
-            ("humidity",       "WeatherField_Humidity",      "Humidity",       "\uE945"),
-            ("wind",           "WeatherField_Wind",          "Wind",           "\uEBE7"),
-            ("precipitation",  "WeatherField_Precipitation", "Precipitation",  "\uE790"),
-            ("uv",             "WeatherField_UVIndex",       "UV Index",       "\uE706"),
-            ("visibility",     "WeatherField_Visibility",    "Visibility",     "\uE7B3"),
-            ("pressure",       "WeatherField_Pressure",      "Pressure",       "\uEC49"),
-            ("airquality",     "WeatherField_AirQuality",    "Air Quality",    "\uE9CA"),
-            ("pollen",         "WeatherField_Pollen",        "Pollen",         "\uE710"),
-            ("sun",            "WeatherField_Sun",           "Sunrise/Sunset", "\uE706"),
-            ("moon",           "WeatherField_Moon",          "Moon Phase",     "\uE708"),
+            ("temperature",    "WeatherField_Temperature",   "Temperature",    AppIcons.Temperature),
+            ("feelslike",      "WeatherField_FeelsLike",     "Feels like",     AppIcons.Temperature),
+            ("description",    "WeatherField_Description",   "Description",    AppIcons.Description),
+            ("humidity",       "WeatherField_Humidity",      "Humidity",       AppIcons.Humidity),
+            ("wind",           "WeatherField_Wind",          "Wind",           AppIcons.Wind),
+            ("precipitation",  "WeatherField_Precipitation", "Precipitation",  AppIcons.Rain),
+            ("uv",             "WeatherField_UVIndex",       "UV Index",       AppIcons.Sunny),
+            ("visibility",     "WeatherField_Visibility",    "Visibility",     AppIcons.Visibility),
+            ("pressure",       "WeatherField_Pressure",      "Pressure",       AppIcons.Pressure),
+            ("airquality",     "WeatherField_AirQuality",    "Air Quality",    AppIcons.AirQuality),
+            ("pollen",         "WeatherField_Pollen",        "Pollen",         AppIcons.Pollen),
+            ("sun",            "WeatherField_Sun",           "Sunrise/Sunset", AppIcons.Sunny),
+            ("moon",           "WeatherField_Moon",          "Moon Phase",     AppIcons.Moon),
         };
     }
 }

@@ -12,72 +12,72 @@
     <Grid x:Name="AddAccountLayoutRoot" Padding="{StaticResource TaskFlyoutPagePadding}" HorizontalAlignment="Stretch">
         <StackPanel x:Name="AddAccountContent" Spacing="24">
             <TextBlock x:Uid="AddAccount_Title" Text="Accounts and sync" FontSize="28" FontWeight="SemiBold"/>
-            <TextBlock x:Uid="AddAccount_Subtitle" Text="Review account sync and pending changes" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="14" TextWrapping="WrapWholeWords"/>
+            <TextBlock x:Uid="AddAccount_Subtitle" Text="Review account sync and pending changes" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="{StaticResource TaskFlyoutFontBody}" TextWrapping="WrapWholeWords"/>
 
             <Border Padding="{StaticResource TaskFlyoutSectionPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}">
-                <StackPanel Spacing="8">
-                    <TextBlock x:Uid="AddAccount_ChecklistTitle" Text="Setup checklist" FontSize="14" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="ChecklistText" Text="" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/>
-                    <TextBlock x:Name="ConnectedAccountsTitle" x:Uid="AddAccount_ConnectedAccountsTitle" Text="Connected accounts" FontSize="12" FontWeight="SemiBold"/>
-                    <StackPanel x:Name="ConnectedAccountActions" Spacing="4"/>
-                    <TextBlock x:Name="HealthText" Text="" TextWrapping="Wrap" FontSize="12"/>
-                    <StackPanel Spacing="8">
-                        <Button x:Name="RetrySyncButton" x:Uid="AddAccount_RetrySync" Content="Retry sync" Click="RetrySyncButton_Click" Padding="10,4"/>
-                        <Button x:Name="OpenMailSetupButton" Click="OpenMailSetupButton_Click" Padding="10,4">
-                            <TextBlock x:Uid="AddAccount_OpenMailSetup" Text="Open Mail setup" FontSize="12"/>
+                <StackPanel Spacing="{StaticResource TaskFlyoutSpaceSmall}">
+                    <TextBlock x:Uid="AddAccount_ChecklistTitle" Text="Setup checklist" FontSize="{StaticResource TaskFlyoutFontBody}" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="ChecklistText" Text="" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="{StaticResource TaskFlyoutFontCaption}"/>
+                    <TextBlock x:Name="ConnectedAccountsTitle" x:Uid="AddAccount_ConnectedAccountsTitle" Text="Connected accounts" FontSize="{StaticResource TaskFlyoutFontCaption}" FontWeight="SemiBold"/>
+                    <StackPanel x:Name="ConnectedAccountActions" Spacing="{StaticResource TaskFlyoutSpaceXSmall}"/>
+                    <TextBlock x:Name="HealthText" Text="" TextWrapping="Wrap" FontSize="{StaticResource TaskFlyoutFontCaption}"/>
+                    <StackPanel Spacing="{StaticResource TaskFlyoutSpaceSmall}">
+                        <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="RetrySyncButton" x:Uid="AddAccount_RetrySync" Content="Retry sync" Click="RetrySyncButton_Click" Padding="10,4"/>
+                        <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="OpenMailSetupButton" Click="OpenMailSetupButton_Click" Padding="10,4">
+                            <TextBlock x:Uid="AddAccount_OpenMailSetup" Text="Open Mail setup" FontSize="{StaticResource TaskFlyoutFontCaption}"/>
                         </Button>
-                        <Button x:Name="OpenWeatherSetupButton" Click="OpenWeatherSetupButton_Click" Padding="10,4">
-                            <TextBlock x:Uid="AddAccount_OpenWeatherSetup" Text="Open Weather setup" FontSize="12"/>
+                        <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="OpenWeatherSetupButton" Click="OpenWeatherSetupButton_Click" Padding="10,4">
+                            <TextBlock x:Uid="AddAccount_OpenWeatherSetup" Text="Open Weather setup" FontSize="{StaticResource TaskFlyoutFontCaption}"/>
                         </Button>
                     </StackPanel>
                 </StackPanel>
             </Border>
 
             <!-- Google -->
-            <Button x:Name="BtnGoogle" HorizontalAlignment="Stretch" Padding="16" Click="BtnGoogle_Click"
+            <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="BtnGoogle" HorizontalAlignment="Stretch" Padding="{StaticResource TaskFlyoutSectionPadding}" Click="BtnGoogle_Click"
                     HorizontalContentAlignment="Left">
-                <StackPanel Orientation="Horizontal" Spacing="16">
-                    <FontIcon Glyph="&#xE77B;" Foreground="#EA4335" FontSize="24"/>
-                     <StackPanel Spacing="2" VerticalAlignment="Center" MinWidth="0">
-                        <TextBlock x:Uid="AddAccount_GoogleTitle" Text="Google" FontSize="16" FontWeight="SemiBold"/>
-                        <TextBlock x:Uid="AddAccount_GoogleDesc" Text="Google 日历与任务" FontSize="12"
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource TaskFlyoutSpaceLarge}">
+                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconPerson}" Foreground="#EA4335" FontSize="{StaticResource TaskFlyoutIconLarge}"/>
+                     <StackPanel Spacing="{StaticResource TaskFlyoutSpaceTiny}" VerticalAlignment="Center" MinWidth="0">
+                        <TextBlock x:Uid="AddAccount_GoogleTitle" Text="Google" FontSize="{StaticResource TaskFlyoutFontSection}" FontWeight="SemiBold"/>
+                        <TextBlock x:Uid="AddAccount_GoogleDesc" Text="Google 日历与任务" FontSize="{StaticResource TaskFlyoutFontCaption}"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="WrapWholeWords"/>
                     </StackPanel>
                 </StackPanel>
             </Button>
 
             <!-- Microsoft -->
-            <Button x:Name="BtnMicrosoft" HorizontalAlignment="Stretch" Padding="16" Click="BtnMicrosoft_Click"
+            <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="BtnMicrosoft" HorizontalAlignment="Stretch" Padding="{StaticResource TaskFlyoutSectionPadding}" Click="BtnMicrosoft_Click"
                     HorizontalContentAlignment="Left">
-                <StackPanel Orientation="Horizontal" Spacing="16">
-                    <FontIcon Glyph="&#xE77B;" Foreground="#0078D4" FontSize="24"/>
-                     <StackPanel Spacing="2" VerticalAlignment="Center" MinWidth="0">
-                        <TextBlock x:Uid="AddAccount_MSTitle" Text="Microsoft" FontSize="16" FontWeight="SemiBold"/>
-                        <TextBlock x:Uid="AddAccount_MSDesc" Text="Outlook 日历与 To Do" FontSize="12"
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource TaskFlyoutSpaceLarge}">
+                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconPerson}" Foreground="#0078D4" FontSize="{StaticResource TaskFlyoutIconLarge}"/>
+                     <StackPanel Spacing="{StaticResource TaskFlyoutSpaceTiny}" VerticalAlignment="Center" MinWidth="0">
+                        <TextBlock x:Uid="AddAccount_MSTitle" Text="Microsoft" FontSize="{StaticResource TaskFlyoutFontSection}" FontWeight="SemiBold"/>
+                        <TextBlock x:Uid="AddAccount_MSDesc" Text="Outlook 日历与 To Do" FontSize="{StaticResource TaskFlyoutFontCaption}"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="WrapWholeWords"/>
                     </StackPanel>
                 </StackPanel>
             </Button>
 
             <!-- iCloud -->
-            <Button x:Name="BtnICloud" HorizontalAlignment="Stretch" Padding="16" Click="BtnICloud_Click"
+            <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="BtnICloud" HorizontalAlignment="Stretch" Padding="{StaticResource TaskFlyoutSectionPadding}" Click="BtnICloud_Click"
                     HorizontalContentAlignment="Left">
-                <StackPanel Orientation="Horizontal" Spacing="16">
-                    <FontIcon Glyph="&#xE787;" Foreground="#6E6E73" FontSize="24"/>
-                    <StackPanel Spacing="2" VerticalAlignment="Center" MinWidth="0">
-                        <TextBlock x:Uid="AddAccount_ICloudTitle" Text="iCloud" FontSize="16" FontWeight="SemiBold"/>
-                        <TextBlock x:Uid="AddAccount_ICloudDesc" Text="iCloud Calendar" FontSize="12"
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource TaskFlyoutSpaceLarge}">
+                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconCloud}" Foreground="#6E6E73" FontSize="{StaticResource TaskFlyoutIconLarge}"/>
+                    <StackPanel Spacing="{StaticResource TaskFlyoutSpaceTiny}" VerticalAlignment="Center" MinWidth="0">
+                        <TextBlock x:Uid="AddAccount_ICloudTitle" Text="iCloud" FontSize="{StaticResource TaskFlyoutFontSection}" FontWeight="SemiBold"/>
+                        <TextBlock x:Uid="AddAccount_ICloudDesc" Text="iCloud Calendar" FontSize="{StaticResource TaskFlyoutFontCaption}"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="WrapWholeWords"/>
                     </StackPanel>
                 </StackPanel>
             </Button>
 
             <ProgressRing x:Name="AuthProgress" IsActive="False" Width="32" Height="32"/>
-            <TextBlock x:Name="StatusText" Text="" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"
+            <TextBlock x:Name="StatusText" Text="" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="{StaticResource TaskFlyoutFontCaption}"
                        HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="WrapWholeWords"/>
-            <StackPanel x:Name="OnboardingActions" Spacing="8" HorizontalAlignment="Stretch">
-                <Button x:Uid="AddAccount_Skip" Content="Skip for now" Click="SkipButton_Click"/>
-                <Button x:Uid="AddAccount_Finish" Content="Finish setup" Style="{StaticResource AccentButtonStyle}" Click="FinishButton_Click"/>
+            <StackPanel x:Name="OnboardingActions" Spacing="{StaticResource TaskFlyoutSpaceSmall}" HorizontalAlignment="Stretch">
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="AddAccount_Skip" Content="Skip for now" Click="SkipButton_Click"/>
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="AddAccount_Finish" Content="Finish setup" Style="{StaticResource AccentButtonStyle}" Click="FinishButton_Click"/>
             </StackPanel>
         </StackPanel>
     </Grid>

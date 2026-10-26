@@ -35,10 +35,10 @@ public sealed class QuickCreateForm : UserControl
     private bool _fromSource;
     private TaskMailSource? _mailSource;
     private bool _created;
-    private readonly TextBlock _hint = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12 };
-    private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12 };
-    private readonly Button _save = new();
-    private readonly Button _cancel = new();
+    private readonly TextBlock _hint = new() { TextWrapping = TextWrapping.Wrap, FontSize = VisualResources.Number("FontCaption") };
+    private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, FontSize = VisualResources.Number("FontCaption") };
+    private readonly Button _save = new() { MinHeight = VisualResources.Number("ButtonHeight") };
+    private readonly Button _cancel = new() { MinHeight = VisualResources.Number("ButtonHeight") };
     private bool _updating;
     private bool _hasDraft;
     private string? _preferredKey;
@@ -77,14 +77,14 @@ public sealed class QuickCreateForm : UserControl
         _recurrence.Items.Add(Text("CalendarDialog_RecurrenceMonthly.Content", "Monthly"));
         _recurrence.Items.Add(Text("CalendarDialog_RecurrenceYearly.Content", "Yearly"));
         _remember.Content = new TextBlock { Text = Text("QuickCreate_Remember", "Use this account and duration by default"), TextWrapping = TextWrapping.Wrap };
-        var parse = new Button { Content = Text("QuickCreate_Parse", "Recognize date and time") };
+        var parse = new Button { Content = Text("QuickCreate_Parse", "Recognize date and time"), MinHeight = VisualResources.Number("ButtonHeight") };
         parse.Click += (_, _) => ParseTitle();
         _save.Content = Text("CalendarDialog.PrimaryButtonText", "Save");
         _save.Style = (Style)Application.Current.Resources["AccentButtonStyle"];
         _save.Click += async (_, _) => { if (_created) Saved?.Invoke(); else await SaveAsync(); };
         _cancel.Content = Text("CalendarDialog.CloseButtonText", "Cancel");
         _cancel.Click += (_, _) => { Reset(); Canceled?.Invoke(); };
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = VisualResources.Number("SpaceSmall") };
         actions.Children.Add(_save);
         actions.Children.Add(_cancel);
         foreach (var control in new UIElement[] { _type, _account, _title, parse, _date, _allDay, _start, _duration, _location, _notes, _reminder, _recurrence, _remember, _archiveMail, _confirmDestination, _hint })

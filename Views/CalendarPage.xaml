@@ -47,16 +47,16 @@
 
             <Grid Margin="4,0,0,8">
                 <TextBlock x:Uid="CalendarPage_AccountHeader" Text="日程账户" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                <Button x:Name="CollapseAccountsButton" x:Uid="CalendarPage_BtnCollapseAccounts" AutomationProperties.AutomationId="CalendarCollapseAccounts" HorizontalAlignment="Right" Width="40" Height="40" Padding="0" Background="Transparent" BorderThickness="0"
+                <Button x:Name="CollapseAccountsButton" x:Uid="CalendarPage_BtnCollapseAccounts" AutomationProperties.AutomationId="CalendarCollapseAccounts" HorizontalAlignment="Right" Width="{StaticResource TaskFlyoutButtonIconSize}" Height="{StaticResource TaskFlyoutButtonIconSize}" Padding="0" Background="Transparent" BorderThickness="0"
                         Click="ToggleAccountPane_Click">
-                    <FontIcon Glyph="&#xE76B;" FontSize="12"/>
+                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconChevronLeft}" FontSize="{StaticResource TaskFlyoutIconSmall}"/>
                 </Button>
             </Grid>
 
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                 <ItemsRepeater x:Name="AccountListRepeater">
                     <ItemsRepeater.Layout>
-                        <StackLayout Spacing="4"/>
+                        <StackLayout Spacing="{StaticResource TaskFlyoutSpaceXSmall}"/>
                     </ItemsRepeater.Layout>
                     <ItemsRepeater.ItemTemplate>
                         <DataTemplate>
@@ -80,13 +80,13 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <FontIcon Grid.Column="0" Glyph="{Binding IconGlyph}" FontSize="15" Margin="0,0,12,0"
+                                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Grid.Column="0" Glyph="{Binding IconGlyph}" FontSize="{StaticResource TaskFlyoutIconBody}" Margin="{StaticResource TaskFlyoutTrailingIconMargin}"
                                                   Foreground="{ThemeResource SystemAccentColor}" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="1" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"
+                                        <TextBlock Grid.Column="1" FontWeight="Bold" FontSize="{StaticResource TaskFlyoutFontBody}" VerticalAlignment="Center"
                                                    Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis"/>
-                                        <Button Grid.Column="2" x:Uid="CalendarPage_BtnRemoveAccount" Width="40" Height="40" Padding="0" Background="Transparent" BorderThickness="0"
+                                        <Button Grid.Column="2" x:Uid="CalendarPage_BtnRemoveAccount" Width="{StaticResource TaskFlyoutButtonIconSize}" Height="{StaticResource TaskFlyoutButtonIconSize}" Padding="0" Background="Transparent" BorderThickness="0"
                                                 Tag="{Binding AccountId}" Click="BtnRemoveAccount_Click" VerticalAlignment="Center">
-                                            <FontIcon Glyph="&#xE711;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                                            <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconDismiss}" FontSize="{StaticResource TaskFlyoutIconSmall}" Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
                                         </Button>
                                     </Grid>
                                 </Expander.Header>
@@ -99,17 +99,17 @@
                                             </ItemsRepeater.Layout>
                                             <ItemsRepeater.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Grid Margin="32,0,0,8" ColumnSpacing="8">
+                                                    <Grid Margin="32,0,0,8" ColumnSpacing="{StaticResource TaskFlyoutSpaceSmall}">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="Auto"/>
                                                             <ColumnDefinition Width="*"/>
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
-                                                        <Border Grid.Column="0" Width="16" Height="16" CornerRadius="8"
+                                                        <Border Grid.Column="0" Width="16" Height="16" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
                                                                 VerticalAlignment="Center"
                                                                 Background="{Binding ColorHex, Converter={StaticResource ProviderToBrushConverter}}"/>
                                                         <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
-                                                                   TextTrimming="CharacterEllipsis" FontSize="13"
+                                                                   TextTrimming="CharacterEllipsis" FontSize="{StaticResource TaskFlyoutFontSecondary}"
                                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                                         <ToggleSwitch Grid.Column="2" IsOn="{Binding IsVisible, Mode=TwoWay}"
                                                                        OffContent="" OnContent="" MinWidth="0" Margin="0"
@@ -120,17 +120,17 @@
                                             </ItemsRepeater.ItemTemplate>
                                         </ItemsRepeater>
 
-                                        <Grid Margin="32,0,0,8" ColumnSpacing="8" Visibility="{Binding TaskSettingsVisibility}">
+                                        <Grid Margin="32,0,0,8" ColumnSpacing="{StaticResource TaskFlyoutSpaceSmall}" Visibility="{Binding TaskSettingsVisibility}">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <Border Grid.Column="0" Width="16" Height="16" CornerRadius="8"
+                                            <Border Grid.Column="0" Width="16" Height="16" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}"
                                                     VerticalAlignment="Center"
                                                     Background="{Binding TaskColorHex, Converter={StaticResource ProviderToBrushConverter}}"/>
                                             <TextBlock x:Uid="CalendarPage_TodoHeader" Grid.Column="1" Text="待办任务" VerticalAlignment="Center"
-                                                       TextTrimming="CharacterEllipsis" FontSize="13"
+                                                       TextTrimming="CharacterEllipsis" FontSize="{StaticResource TaskFlyoutFontSecondary}"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                             <ToggleSwitch x:Uid="CalendarPage_TaskVisibilityToggle" Grid.Column="2" IsOn="{Binding ShowTasks, Mode=TwoWay}"
                                                            OffContent="" OnContent="" MinWidth="0" Margin="0"
@@ -144,14 +144,14 @@
                 </ItemsRepeater>
             </ScrollViewer>
 
-            <Button Grid.Row="2" x:Name="BtnAddAccount" HorizontalAlignment="Stretch" Click="BtnAddAccount_Click" Margin="0,8,0,0">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE710;" FontSize="14"/>
+            <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" Grid.Row="2" x:Name="BtnAddAccount" HorizontalAlignment="Stretch" Click="BtnAddAccount_Click" Margin="{StaticResource TaskFlyoutRowMargin}">
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource TaskFlyoutSpaceSmall}">
+                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconAdd}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
                     <TextBlock x:Uid="CalendarPage_AddAccount" Text="添加账户"/>
                 </StackPanel>
             </Button>
 
-            <Button Grid.Row="3" x:Uid="MainWindow_BtnForceSync" Content="强制立即同步" HorizontalAlignment="Stretch" Click="BtnForceSync_Click"/>
+            <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" Grid.Row="3" x:Uid="MainWindow_BtnForceSync" Content="强制立即同步" HorizontalAlignment="Stretch" Click="BtnForceSync_Click"/>
         </Grid>
 
         <Grid x:Name="CalendarContent" AutomationProperties.AutomationId="CalendarContentPane" Grid.Column="1" Grid.Row="1" Padding="28,32,28,32">
@@ -161,7 +161,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Grid x:Name="CalendarToolbar" Grid.Row="0" ColumnSpacing="12" RowSpacing="8" Margin="0,0,0,24">
+            <Grid x:Name="CalendarToolbar" Grid.Row="0" ColumnSpacing="{StaticResource TaskFlyoutSpaceMedium}" RowSpacing="{StaticResource TaskFlyoutSpaceSmall}" Margin="0,0,0,24">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -173,12 +173,12 @@
                 </Grid.ColumnDefinitions>
                 <ScrollViewer Grid.Column="0" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Hidden"
                               VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
-                <StackPanel Orientation="Horizontal" Spacing="12">
-                <Button x:Uid="CalendarPage_BtnToggleAccounts" x:Name="ToggleAccountPaneButton" AutomationProperties.AutomationId="CalendarToggleAccounts" Width="40" Height="36" Padding="0" Background="Transparent" BorderThickness="0"
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource TaskFlyoutSpaceMedium}">
+                <Button x:Uid="CalendarPage_BtnToggleAccounts" x:Name="ToggleAccountPaneButton" AutomationProperties.AutomationId="CalendarToggleAccounts" Width="{StaticResource TaskFlyoutButtonIconSize}" Height="{StaticResource TaskFlyoutButtonToolbarHeight}" Padding="0" Background="Transparent" BorderThickness="0"
                         Click="ToggleAccountPane_Click">
-                    <FontIcon x:Name="ToggleAccountPaneIcon" Glyph="&#xE76B;" FontSize="12"/>
+                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" x:Name="ToggleAccountPaneIcon" Glyph="{StaticResource AppIconChevronLeft}" FontSize="{StaticResource TaskFlyoutIconSmall}"/>
                 </Button>
-                <Button x:Name="BtnMonthYear" Content="" FontSize="28" FontWeight="Bold" Background="Transparent" BorderThickness="0"
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="BtnMonthYear" Content="" FontSize="28" FontWeight="Bold" Background="Transparent" BorderThickness="0"
                         Padding="8,4" Margin="-8,0,0,0" Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                         Click="BtnMonthYear_Click"/>
 
@@ -188,38 +188,38 @@
                     <ComboBoxItem x:Uid="CalendarPage_ViewYear" Content="年" Tag="Year"/>
                 </ComboBox>
 
-                <Border Background="{ThemeResource ControlFillColorDefaultBrush}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" CornerRadius="6" VerticalAlignment="Center" Margin="12,0,0,0">
+                <Border Background="{ThemeResource ControlFillColorDefaultBrush}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" CornerRadius="{StaticResource TaskFlyoutControlCornerRadius}" VerticalAlignment="Center" Margin="12,0,0,0">
                     <StackPanel Orientation="Horizontal">
-                        <Button Click="BtnPrevMonth_Click" Background="Transparent" BorderThickness="0" Width="40" Height="36" CornerRadius="6,0,0,6">
-                            <FontIcon Glyph="&#xE76B;" FontSize="12"/>
+                        <Button Click="BtnPrevMonth_Click" Background="Transparent" BorderThickness="0" Width="{StaticResource TaskFlyoutButtonIconSize}" Height="{StaticResource TaskFlyoutButtonToolbarHeight}" CornerRadius="{StaticResource TaskFlyoutLeadingButtonCornerRadius}">
+                            <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconChevronLeft}" FontSize="{StaticResource TaskFlyoutIconSmall}"/>
                         </Button>
                         <MenuFlyoutSeparator Margin="0,8" Background="{ThemeResource TaskFlyoutDividerBrush}"/>
-                        <Button Click="BtnNextMonth_Click" Background="Transparent" BorderThickness="0" Width="40" Height="36" CornerRadius="0,6,6,0">
-                            <FontIcon Glyph="&#xE76C;" FontSize="12"/>
+                        <Button Click="BtnNextMonth_Click" Background="Transparent" BorderThickness="0" Width="{StaticResource TaskFlyoutButtonIconSize}" Height="{StaticResource TaskFlyoutButtonToolbarHeight}" CornerRadius="{StaticResource TaskFlyoutTrailingButtonCornerRadius}">
+                            <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconChevronRight}" FontSize="{StaticResource TaskFlyoutIconSmall}"/>
                         </Button>
                     </StackPanel>
                 </Border>
-                <Button x:Uid="CalendarPage_BtnToday" Content="今天" Click="BtnToday_Click" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" Margin="8,0,0,0" FontWeight="SemiBold" CornerRadius="6"/>
-                <Button x:Uid="CalendarPage_BtnToggleTimeline" x:Name="ToggleTimelinePaneButton" Width="40" Height="36" Padding="0" Background="Transparent" BorderThickness="0"
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="CalendarPage_BtnToday" Content="今天" Click="BtnToday_Click" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" Margin="{StaticResource TaskFlyoutLeadingActionMargin}" FontWeight="SemiBold" CornerRadius="{StaticResource TaskFlyoutControlCornerRadius}"/>
+                <Button x:Uid="CalendarPage_BtnToggleTimeline" x:Name="ToggleTimelinePaneButton" Width="{StaticResource TaskFlyoutButtonIconSize}" Height="{StaticResource TaskFlyoutButtonToolbarHeight}" Padding="0" Background="Transparent" BorderThickness="0"
                         Click="ToggleTimelinePane_Click">
-                    <FontIcon x:Name="ToggleTimelinePaneIcon" Glyph="&#xE76C;" FontSize="12"/>
+                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" x:Name="ToggleTimelinePaneIcon" Glyph="{StaticResource AppIconChevronRight}" FontSize="{StaticResource TaskFlyoutIconSmall}"/>
                 </Button>
                 </StackPanel>
                 </ScrollViewer>
                 <Grid x:Name="CalendarStatusPanel" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
-                      ColumnSpacing="8" MinWidth="0" VerticalAlignment="Center">
+                      ColumnSpacing="{StaticResource TaskFlyoutSpaceSmall}" MinWidth="0" VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <ProgressRing x:Name="SyncProgress" IsActive="False" Width="20" Height="20" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="CalendarStatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    <TextBlock x:Name="CalendarStatusText" FontSize="{StaticResource TaskFlyoutFontCaption}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                Grid.Column="1" MinWidth="0" VerticalAlignment="Center"
                                TextWrapping="WrapWholeWords" MaxLines="2" TextTrimming="CharacterEllipsis"
                                ToolTipService.ToolTip="{Binding Text, ElementName=CalendarStatusText}"
                                AutomationProperties.LiveSetting="Polite"/>
                 </Grid>
-                <Button x:Uid="TaskMutation_Retry" x:Name="RetryTaskMutationButton" Grid.Row="1" Grid.Column="2" Content="Retry" Visibility="Collapsed"
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="TaskMutation_Retry" x:Name="RetryTaskMutationButton" Grid.Row="1" Grid.Column="2" Content="Retry" Visibility="Collapsed"
                         VerticalAlignment="Center" Click="RetryTaskMutationButton_Click" Padding="10,4"/>
             </Grid>
 
@@ -235,13 +235,13 @@
                 </Grid.ColumnDefinitions>
                 <!-- Weekday headers are filled at runtime from the app-language culture
                      (see SetWeekdayHeaders) so they localize beyond the bundled resw files. -->
-                <TextBlock x:Name="WeekHeader0" Grid.Column="0" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
-                <TextBlock x:Name="WeekHeader1" Grid.Column="1" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
-                <TextBlock x:Name="WeekHeader2" Grid.Column="2" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
-                <TextBlock x:Name="WeekHeader3" Grid.Column="3" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
-                <TextBlock x:Name="WeekHeader4" Grid.Column="4" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
-                <TextBlock x:Name="WeekHeader5" Grid.Column="5" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
-                <TextBlock x:Name="WeekHeader6" Grid.Column="6" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="13"/>
+                <TextBlock x:Name="WeekHeader0" Grid.Column="0" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="{StaticResource TaskFlyoutFontSecondary}"/>
+                <TextBlock x:Name="WeekHeader1" Grid.Column="1" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="{StaticResource TaskFlyoutFontSecondary}"/>
+                <TextBlock x:Name="WeekHeader2" Grid.Column="2" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="{StaticResource TaskFlyoutFontSecondary}"/>
+                <TextBlock x:Name="WeekHeader3" Grid.Column="3" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="{StaticResource TaskFlyoutFontSecondary}"/>
+                <TextBlock x:Name="WeekHeader4" Grid.Column="4" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="{StaticResource TaskFlyoutFontSecondary}"/>
+                <TextBlock x:Name="WeekHeader5" Grid.Column="5" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="{StaticResource TaskFlyoutFontSecondary}"/>
+                <TextBlock x:Name="WeekHeader6" Grid.Column="6" HorizontalAlignment="Center" Opacity="0.8" FontWeight="SemiBold" FontSize="{StaticResource TaskFlyoutFontSecondary}"/>
             </Grid>
 
             <GridView x:Name="CalendarGrid" Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ItemsSource="{x:Bind DayCells}" SizeChanged="CalendarGrid_SizeChanged" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="CalendarGrid_ItemClick" ScrollViewer.VerticalScrollBarVisibility="Hidden" ScrollViewer.VerticalScrollMode="Disabled">
@@ -252,7 +252,7 @@
                 </GridView.ItemsPanel>
                 <GridView.ItemTemplate>
                     <DataTemplate x:DataType="models:DayCellViewModel">
-                        <Border Margin="3" Padding="8" CornerRadius="8" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" BorderThickness="0" Background="{x:Bind IsToday, Mode=OneTime, Converter={StaticResource BoolToTodayBrushConverter}}">
+                        <Border Margin="3" Padding="{StaticResource TaskFlyoutCompactSectionPadding}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" BorderThickness="0" Background="{x:Bind IsToday, Mode=OneTime, Converter={StaticResource BoolToTodayBrushConverter}}">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="24"/>
@@ -263,7 +263,7 @@
                                 <ItemsControl Grid.Row="1" ItemsSource="{x:Bind Items, Mode=OneTime}" Margin="0,4,0,0">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="models:AgendaItem">
-                                            <Border Background="{x:Bind ColorHex, Mode=OneTime, Converter={StaticResource ProviderToBrushConverter}}" Margin="0,2" Padding="6,4" CornerRadius="4">
+                                            <Border Background="{x:Bind ColorHex, Mode=OneTime, Converter={StaticResource ProviderToBrushConverter}}" Margin="0,2" Padding="6,4" CornerRadius="{StaticResource TaskFlyoutControlCornerRadius}">
                                                 <TextBlock Text="{x:Bind Title, Mode=OneTime}"
                                                            Foreground="{x:Bind ColorHex, Mode=OneTime, Converter={StaticResource ProviderToTextBrushConverter}}"
                                                            FontSize="11" FontWeight="Medium" TextTrimming="CharacterEllipsis"/>
@@ -310,7 +310,7 @@
                                 Background="{ThemeResource TaskFlyoutSectionBackgroundBrush}"
                                 BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}"
                                 BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}">
-                            <Grid RowSpacing="8">
+                            <Grid RowSpacing="{StaticResource TaskFlyoutSpaceSmall}">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
@@ -318,7 +318,7 @@
                                 <Grid>
                                     <TextBlock Text="{x:Bind Title}" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                     <TextBlock Text="{x:Bind CountText}" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                               FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                               FontSize="{StaticResource TaskFlyoutFontCaption}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                 </Grid>
                                 <ItemsRepeater Grid.Row="1" ItemsSource="{x:Bind Days}" Margin="0,4,0,0">
                                     <ItemsRepeater.Layout>
@@ -343,16 +343,16 @@
             </GridView>
 
             <StackPanel x:Name="NoAccountEmptyState" Grid.Row="2" Visibility="Collapsed"
-                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="320">
-                <FontIcon Glyph="&#xE77B;" FontSize="32" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="{StaticResource TaskFlyoutSpaceMedium}" MaxWidth="320">
+                <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconPerson}" FontSize="{StaticResource TaskFlyoutIconEmpty}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                 <TextBlock x:Uid="CalendarPage_NoAccountTitle" Text="还没有连接日程账户" FontSize="18" FontWeight="SemiBold"
                            TextAlignment="Center" HorizontalAlignment="Center"/>
                 <TextBlock x:Uid="CalendarPage_NoAccountSub" Text="连接 Google 或 Microsoft 后，这里会显示日程和待办。"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"
                            TextAlignment="Center" HorizontalAlignment="Center"/>
-                <Button HorizontalAlignment="Center" Style="{StaticResource AccentButtonStyle}" Click="BtnAddAccount_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon Glyph="&#xE710;" FontSize="14"/>
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" HorizontalAlignment="Center" Style="{StaticResource AccentButtonStyle}" Click="BtnAddAccount_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource TaskFlyoutSpaceSmall}">
+                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconAdd}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
                         <TextBlock x:Uid="CalendarPage_AddAccount" Text="添加账户"/>
                     </StackPanel>
                 </Button>
@@ -370,28 +370,28 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <Grid Grid.Row="0" Margin="4,0,0,20" ColumnSpacing="4">
+            <Grid Grid.Row="0" Margin="4,0,0,20" ColumnSpacing="{StaticResource TaskFlyoutSpaceXSmall}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Uid="CalendarPage_AllAgendas" x:Name="TxtSideBarDate" Text="全部日程" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"
+                <TextBlock x:Uid="CalendarPage_AllAgendas" x:Name="TxtSideBarDate" Text="全部日程" FontSize="{StaticResource TaskFlyoutFontSubtitle}" FontWeight="Bold" VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis"/>
                 <Button x:Uid="CalendarPage_BtnToggleAccounts" x:Name="TimelineAccountsButton" Grid.Column="1"
-                        Visibility="Collapsed" VerticalAlignment="Center" Width="32" Height="32" Padding="0"
+                        Visibility="Collapsed" VerticalAlignment="Center" Width="{StaticResource TaskFlyoutButtonHeight}" Height="{StaticResource TaskFlyoutButtonHeight}" Padding="0"
                         Background="Transparent" BorderThickness="0" Click="ToggleAccountPane_Click">
-                    <FontIcon Glyph="&#xE716;" FontSize="13"/>
+                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconPeople}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
                 </Button>
-                <Button x:Uid="CalendarPage_BtnCollapseTimeline" x:Name="CollapseTimelinePaneButton" Grid.Column="2" VerticalAlignment="Center" Width="32" Height="32" Padding="0"
+                <Button x:Uid="CalendarPage_BtnCollapseTimeline" x:Name="CollapseTimelinePaneButton" Grid.Column="2" VerticalAlignment="Center" Width="{StaticResource TaskFlyoutButtonHeight}" Height="{StaticResource TaskFlyoutButtonHeight}" Padding="0"
                          Background="Transparent" BorderThickness="0" Click="ToggleTimelinePane_Click">
-                    <FontIcon Glyph="&#xE76C;" FontSize="12"/>
+                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconChevronRight}" FontSize="{StaticResource TaskFlyoutIconSmall}"/>
                 </Button>
-                <Button x:Uid="CalendarPage_BtnAdd" Grid.Column="3" VerticalAlignment="Center" Style="{StaticResource AccentButtonStyle}" Padding="12,4" Click="BtnAddNew_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="4">
-                        <FontIcon Glyph="&#xE710;" FontSize="14"/>
-                        <TextBlock x:Uid="CalendarPage_BtnAddText" Text="新建" FontSize="13"/>
+                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="CalendarPage_BtnAdd" Grid.Column="3" VerticalAlignment="Center" Style="{StaticResource AccentButtonStyle}" Padding="12,4" Click="BtnAddNew_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource TaskFlyoutSpaceXSmall}">
+                        <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconAdd}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
+                        <TextBlock x:Uid="CalendarPage_BtnAddText" Text="新建" FontSize="{StaticResource TaskFlyoutFontSecondary}"/>
                     </StackPanel>
                 </Button>
             </Grid>
@@ -405,7 +405,7 @@
                                 <ColumnDefinition Width="65"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="{x:Bind Subtitle}" FontSize="13" FontWeight="Medium" Opacity="0.6" VerticalAlignment="Top" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Grid.Column="0" Text="{x:Bind Subtitle}" FontSize="{StaticResource TaskFlyoutFontSecondary}" FontWeight="Medium" Opacity="0.6" VerticalAlignment="Top" Margin="0,6,0,0" TextWrapping="Wrap"/>
                             <Border Grid.Column="1" Background="{ThemeResource TaskFlyoutCardBackgroundBrush}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" Padding="12,14"
                                     AutomationProperties.Name="{x:Bind Title}">
                                 <Grid>
@@ -415,11 +415,11 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <Border Grid.Column="0" Width="4" CornerRadius="2" Background="{x:Bind ColorHex, Converter={StaticResource ProviderToBrushConverter}}" Margin="0,0,12,0" VerticalAlignment="Stretch"/>
+                                    <Border Grid.Column="0" Width="4" CornerRadius="2" Background="{x:Bind ColorHex, Converter={StaticResource ProviderToBrushConverter}}" Margin="{StaticResource TaskFlyoutTrailingIconMargin}" VerticalAlignment="Stretch"/>
 
-                                    <FontIcon Grid.Column="1" Glyph="&#xE783;" FontSize="14" Foreground="{ThemeResource SystemAccentColor}" Visibility="{x:Bind IsEvent}" VerticalAlignment="Top" Margin="0,3,12,0"/>
+                                    <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Grid.Column="1" Glyph="{StaticResource AppIconCalendar}" FontSize="{StaticResource TaskFlyoutIconBody}" Foreground="{ThemeResource SystemAccentColor}" Visibility="{x:Bind IsEvent}" VerticalAlignment="Top" Margin="0,3,12,0"/>
 
-                                    <StackPanel Grid.Column="2" Spacing="8">
+                                    <StackPanel Grid.Column="2" Spacing="{StaticResource TaskFlyoutSpaceSmall}">
                                         <TextBlock Text="{x:Bind Title}" Visibility="{x:Bind IsEvent}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" LineHeight="20"/>
                                         <Grid Visibility="{x:Bind IsTask}" Margin="0,0,0,4">
                                             <Grid.ColumnDefinitions>
@@ -432,12 +432,12 @@
                                                Opacity="{x:Bind IsCompleted, Mode=OneWay, Converter={StaticResource TaskCompletedOpacityConverter}}"/>
                                         </Grid>
                                         <StackPanel Orientation="Horizontal" Spacing="6" Visibility="{x:Bind HasLocation, Mode=OneWay}">
-                                            <FontIcon Glyph="&#xE707;" FontSize="12" Opacity="0.5" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{x:Bind Location, Mode=OneWay}" FontSize="13" Opacity="0.7" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                            <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconLocation}" FontSize="{StaticResource TaskFlyoutIconSmall}" Opacity="0.5" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{x:Bind Location, Mode=OneWay}" FontSize="{StaticResource TaskFlyoutFontSecondary}" Opacity="0.7" TextWrapping="Wrap" VerticalAlignment="Center"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Spacing="6" Visibility="{x:Bind HasDescription, Mode=OneWay}">
-                                            <FontIcon Glyph="&#xE946;" FontSize="12" Opacity="0.5" VerticalAlignment="Top" Margin="0,3,0,0"/>
-                                            <TextBlock Text="{x:Bind Description, Mode=OneWay}" FontSize="13" Opacity="0.7" MaxLines="3" TextTrimming="CharacterEllipsis" TextWrapping="Wrap" LineHeight="18"/>
+                                            <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconInfo}" FontSize="{StaticResource TaskFlyoutIconSmall}" Opacity="0.5" VerticalAlignment="Top" Margin="0,3,0,0"/>
+                                            <TextBlock Text="{x:Bind Description, Mode=OneWay}" FontSize="{StaticResource TaskFlyoutFontSecondary}" Opacity="0.7" MaxLines="3" TextTrimming="CharacterEllipsis" TextWrapping="Wrap" LineHeight="18"/>
                                         </StackPanel>
                                     </StackPanel>
                                 </Grid>
@@ -450,7 +450,7 @@
 
         <ContentDialog x:Uid="CalendarDialog" x:Name="EditDialog" Title="编辑日程 / 任务" PrimaryButtonText="保存" SecondaryButtonText="删除" CloseButtonText="取消" PrimaryButtonClick="EditDialog_PrimaryButtonClick" SecondaryButtonClick="EditDialog_SecondaryButtonClick">
             <ScrollViewer x:Name="EditDialogScrollViewer" MaxHeight="560" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto" HorizontalScrollMode="Disabled">
-                <StackPanel Spacing="16" MaxWidth="420" MinWidth="0" HorizontalAlignment="Stretch" Margin="0,12,0,0">
+                <StackPanel Spacing="{StaticResource TaskFlyoutSpaceLarge}" MaxWidth="420" MinWidth="0" HorizontalAlignment="Stretch" Margin="0,12,0,0">
                     <ComboBox x:Uid="CalendarDialog_Provider" x:Name="EditCmbProvider" Header="所属账户" HorizontalAlignment="Stretch" />
                     <StackPanel Orientation="Horizontal" Spacing="24">
                         <RadioButton x:Uid="CalendarDialog_RadioEvent" x:Name="EditRadioEvent" Content="日程" IsChecked="True" Checked="EditRadioType_Changed"/>
@@ -468,11 +468,11 @@
                     <TextBlock x:Name="EditValidationText" Visibility="Collapsed" Foreground="{ThemeResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" />
                     <TextBox x:Uid="CalendarDialog_LocationInput" x:Name="EditTxtLocation" Header="地点 (选填)" PlaceholderText="添加位置信息"/>
                     <TextBox x:Uid="CalendarDialog_DescInput" x:Name="EditTxtDescription" Header="详情备注 (选填)" PlaceholderText="记录详细内容..." AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" MaxHeight="160"/>
-                    <StackPanel Spacing="8">
+                    <StackPanel Spacing="{StaticResource TaskFlyoutSpaceSmall}">
                         <DatePicker x:Uid="CalendarDialog_DateInput" x:Name="EditDatePicker" Header="日期" HorizontalAlignment="Stretch" MonthFormat="{}{month.integer(2)}" DayFormat="{}{day.integer(2)}"/>
                         <CheckBox x:Uid="CalendarDialog_AllDayInput" x:Name="EditChkAllDay" Content="全天事件" HorizontalAlignment="Left" Checked="EditChkAllDay_Changed" Unchecked="EditChkAllDay_Changed"/>
                     </StackPanel>
-                    <StackPanel x:Name="EditTimePanel" Spacing="12">
+                    <StackPanel x:Name="EditTimePanel" Spacing="{StaticResource TaskFlyoutSpaceMedium}">
                         <TimePicker x:Uid="CalendarDialog_StartTimeInput" x:Name="EditStartTimePicker" Header="开始时间" HorizontalAlignment="Stretch"/>
                         <TimePicker x:Uid="CalendarDialog_EndTimeInput" x:Name="EditEndTimePicker" Header="结束时间" HorizontalAlignment="Stretch"/>
                     </StackPanel>

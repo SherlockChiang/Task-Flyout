@@ -1,0 +1,72 @@
+namespace Task_Flyout.Services;
+
+// Codepoints and glyph names are verified against the bundled font, not an online version.
+internal static class AppIcons
+{
+    public const string FontFamily = "ms-appx:///Assets/FluentSystemIcons-Filled.ttf#FluentSystemIcons-Filled";
+    public const string Server = "\uF781"; // ic_fluent_server_20_filled
+    public const string Home = "\uF487"; // ic_fluent_home_20_filled
+    public const string Calendar = "\uE262"; // ic_fluent_calendar_ltr_20_filled
+    public const string Tasks = "\uEC97"; // ic_fluent_task_list_square_ltr_20_filled
+    public const string Mail = "\uF510"; // ic_fluent_mail_20_filled
+    public const string Rss = "\uEA45"; // ic_fluent_rss_20_filled
+    public const string Person = "\uF5C7"; // ic_fluent_person_20_filled
+    public const string Cloud = "\uF2E4"; // ic_fluent_cloud_20_filled
+    public const string People = "\uF5B2"; // ic_fluent_people_20_filled
+    public const string Add = "\uF109"; // ic_fluent_add_20_filled
+    public const string Dismiss = "\uF369"; // ic_fluent_dismiss_20_filled
+    public const string ChevronLeft = "\uF2AA"; // ic_fluent_chevron_left_20_filled
+    public const string ChevronRight = "\uF2B0"; // ic_fluent_chevron_right_20_filled
+    public const string Edit = "\uF3DC"; // ic_fluent_edit_20_filled
+    public const string Delete = "\uF34C"; // ic_fluent_delete_20_filled
+    public const string Location = "\uF502"; // ic_fluent_location_20_filled
+    public const string Info = "\uF4AA"; // ic_fluent_info_20_filled
+    public const string Settings = "\uF6B2"; // ic_fluent_settings_20_filled
+    public const string Sync = "\uF190"; // ic_fluent_arrow_sync_20_filled
+    public const string Pin = "\uF60B"; // ic_fluent_pin_20_filled
+    public const string Unpin = "\uF60D"; // ic_fluent_pin_off_20_filled
+    public const string Back = "\uF15B"; // ic_fluent_arrow_left_20_filled
+    public const string Forward = "\uF181"; // ic_fluent_arrow_right_20_filled
+    public const string Attach = "\uF1A9"; // ic_fluent_attach_20_filled
+    public const string MailRead = "\uF52B"; // ic_fluent_mail_read_20_filled
+    public const string Flag = "\uF40A"; // ic_fluent_flag_20_filled
+    public const string FlagOff = "\uE623"; // ic_fluent_flag_off_20_filled
+    public const string Star = "\uF718"; // ic_fluent_star_20_filled
+    public const string StarOff = "\uF728"; // ic_fluent_star_off_20_filled
+    public const string Archive = "\uF139"; // ic_fluent_archive_20_filled
+    public const string Move = "\uE659"; // ic_fluent_folder_arrow_right_20_filled
+    public const string Save = "\uF689"; // ic_fluent_save_20_filled
+    public const string Download = "\uF150"; // ic_fluent_arrow_download_20_filled
+    public const string Upload = "\uF1A4"; // ic_fluent_arrow_upload_20_filled
+    public const string More = "\uE832"; // ic_fluent_more_horizontal_20_filled
+    public const string Open = "\uF58C"; // ic_fluent_open_20_filled
+    public const string Send = "\uF6A2"; // ic_fluent_send_20_filled
+    public const string Compose = "\uF529"; // ic_fluent_mail_add_20_filled
+    public const string Globe = "\uF45E"; // ic_fluent_globe_20_filled
+    public const string Folder = "\uF41C"; // ic_fluent_folder_20_filled
+    public const string Search = "\uF699"; // ic_fluent_search_20_filled
+    public const string Command = "\uE751"; // ic_fluent_key_command_20_filled
+    public const string Sunny = "\uF8B9"; // ic_fluent_weather_sunny_20_filled
+    public const string PartlyCloudy = "\uF898"; // ic_fluent_weather_partly_cloudy_day_20_filled
+    public const string Cloudy = "\uF886"; // ic_fluent_weather_cloudy_20_filled
+    public const string Fog = "\uF88C"; // ic_fluent_weather_fog_20_filled
+    public const string Showers = "\uF8A1"; // ic_fluent_weather_rain_showers_day_20_filled
+    public const string Rain = "\uF89E"; // ic_fluent_weather_rain_20_filled
+    public const string Snow = "\uF8AA"; // ic_fluent_weather_snow_20_filled
+    public const string Thunderstorm = "\uF8BC"; // ic_fluent_weather_thunderstorm_20_filled
+    public const string Sleet = "\uF8A7"; // ic_fluent_weather_rain_snow_20_filled
+    public const string Temperature = "\uF7A7"; // ic_fluent_temperature_20_filled
+    public const string Humidity = "\uE59C"; // ic_fluent_drop_20_filled
+    public const string Wind = "\uF8B6"; // ic_fluent_weather_squalls_20_filled
+    public const string Visibility = "\uE5FF"; // ic_fluent_eye_20_filled
+    public const string Pressure = "\uF4D1"; // ic_fluent_gauge_20_filled
+    public const string Pollen = "\uE768"; // ic_fluent_leaf_one_20_filled
+    public const string Moon = "\uF895"; // ic_fluent_weather_moon_20_filled
+    public const string CurrentLocation = "\uE86C"; // ic_fluent_my_location_20_filled
+    public const string Checkmark = "\uF294"; // ic_fluent_checkmark_20_filled
+    public const string Reply = "\uF177"; // ic_fluent_arrow_reply_20_filled
+    public const string Window = "\uF8CD"; // ic_fluent_window_20_filled
+    public const string Shield = "\uEAD1"; // ic_fluent_shield_checkmark_20_filled
+    public const string AirQuality = "\uEE41"; // ic_fluent_weather_haze_20_filled
+    public const string Description = "\uE563"; // ic_fluent_document_text_20_filled
+}
