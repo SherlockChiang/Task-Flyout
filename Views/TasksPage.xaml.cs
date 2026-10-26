@@ -13,7 +13,7 @@ using Task_Flyout.Services;
 
 namespace Task_Flyout.Views
 {
-    public sealed partial class TasksPage : Page, ICompactNavigationPage
+    public sealed partial class TasksPage : Page, ICompactNavigationPage, IPageKeyboardCommands
     {
         public SuppressableObservableCollection<AgendaItem> PendingTasks { get; } = new();
         public SuppressableObservableCollection<AgendaItem> CompletedTasks { get; } = new();
@@ -139,6 +139,15 @@ namespace Task_Flyout.Views
 
         private void ReloadTasks()
         {
+            var previous = XamlRoot == null ? null : FocusManager.GetFocusedElement(XamlRoot) as DependencyObject;
+            var focusedTask = KeyboardNavigation.FocusedItem<AgendaItem>(previous, TaskContent);
+            if (focusedTask != null) KeyboardNavigation.RestoreIfLost(TaskContent, previous, () =>
+            {
+                var item = PendingTasks.Concat(CompletedTasks).FirstOrDefault(candidate => IsSameTask(candidate, focusedTask));
+                if (item == null) return TaskSearchBox;
+                var list = item.IsCompleted ? CompletedTasksList : PendingTasksList;
+                return list.ContainerFromItem(item) as UIElement ?? TaskSearchBox;
+            });
             PendingTasks.Clear();
             CompletedTasks.Clear();
 
@@ -324,6 +333,7 @@ namespace Task_Flyout.Views
         {
             var status = TaskMutationStatusPolicy.Describe(state.Phase);
             TaskSummaryText.Text = _loader.GetStringOrDefault(status.ResourceKey) ?? status.FallbackText;
+            AccessibilityFeedback.Announce(TaskSummaryText);
             TaskSummaryText.Foreground = status.IsError
                 ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]
                 : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
@@ -370,6 +380,9 @@ namespace Task_Flyout.Views
         }
 
         private async void AddTaskButton_Click(object sender, RoutedEventArgs e)
+            => await CreateTaskAsync();
+
+        private async Task CreateTaskAsync()
         {
             if (_syncManager == null) return;
             if (await QuickCreateForm.ShowDialogAsync(XamlRoot, DateTime.Today, isTask: true))
@@ -377,6 +390,17 @@ namespace Task_Flyout.Views
                 await SyncTasksAsync(forceRefresh: true, fullRange: true);
                 App.MyFlyoutWindow?.ReloadFilters();
             }
+        }
+
+        async Task<bool> IPageKeyboardCommands.ExecuteKeyboardCommandAsync(PageShortcut command, DependencyObject? focused)
+        {
+            if (command == PageShortcut.New) { await CreateTaskAsync(); return true; }
+            if (command == PageShortcut.Refresh) { await SyncTasksAsync(true, true); return true; }
+            var item = KeyboardNavigation.FocusedItem<AgendaItem>(focused, this)
+                ?? (CompactPaneFocus.HasFocus(TaskDetails) ? TaskDetails.Item : null);
+            if (command != PageShortcut.Edit || item == null) return false;
+            await EditTaskAsync(item);
+            return true;
         }
 
         private async void DeleteTaskButton_Click(object sender, RoutedEventArgs e)

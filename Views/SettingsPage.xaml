@@ -68,6 +68,10 @@
                             <ComboBoxItem x:Uid="Lang_ChineseTraditional" Content="繁體中文" Tag="zh-TW"/>
                             <ComboBoxItem x:Uid="Lang_English" Content="English" Tag="en-US"/>
                         </ComboBox>
+                        <ToggleSwitch x:Name="CharacterShortcutsToggle" x:Uid="Keyboard_CharacterShortcuts" Header="Enable N, E and R shortcuts"
+                                      Toggled="CharacterShortcutsToggle_Toggled" Style="{StaticResource WrappingToggleSwitchStyle}"/>
+                        <TextBlock x:Uid="Keyboard_Help" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Text="Ctrl+1–5: Calendar, Tasks, Weather, Mail, RSS. N: new item; E: edit focused task or event; R: refresh. Character shortcuts work outside input fields."/>
                     </StackPanel>
 
                     <!-- Color Palette Section -->

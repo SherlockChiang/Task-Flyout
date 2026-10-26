@@ -1796,8 +1796,7 @@ namespace Task_Flyout
 
         private void BtnPin_Click(object sender, RoutedEventArgs e)
         {
-            _isPinned = !_isPinned;
-            // E718 = Pin (pinned), E77A = Unpin (unpinned)
+            _isPinned = BtnPin.IsChecked == true;
             PinIcon.Glyph = _isPinned ? AppIcons.Unpin : AppIcons.Pin;
             HideOnLostFocus = !_isPinned;
         }

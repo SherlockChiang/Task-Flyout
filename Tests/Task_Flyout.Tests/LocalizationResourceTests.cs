@@ -79,6 +79,31 @@ public class LocalizationResourceTests
     }
 
     [Fact]
+    public void Icon_only_buttons_have_localized_accessible_names()
+    {
+        string root = FindRepositoryRoot();
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var keys = LoadResourceKeys(Path.Combine(root, "Strings", "en-US", "Resources.resw"));
+        var files = Directory.EnumerateFiles(root, "*.xaml")
+            .Concat(Directory.EnumerateFiles(Path.Combine(root, "Views"), "*.xaml"));
+        foreach (var path in files)
+        {
+            foreach (var button in XDocument.Load(path).Descendants().Where(element =>
+                         element.Name.LocalName is "Button" or "ToggleButton" or "AppBarButton"))
+            {
+                if (!button.Descendants().Any(element => element.Name.LocalName == "FontIcon") ||
+                    button.Descendants().Any(element => element.Name.LocalName == "TextBlock") ||
+                    button.Attribute("Content") != null || button.Attribute("Label") != null) continue;
+                string? name = button.Attribute("AutomationProperties.Name")?.Value;
+                string? uid = button.Attribute(x + "Uid")?.Value;
+                Assert.True(name?.StartsWith("{", StringComparison.Ordinal) == true ||
+                    keys.Contains(uid + ".AutomationProperties.Name"),
+                    $"{Path.GetRelativePath(root, path)}: {button.Attribute(x + "Name")?.Value ?? uid ?? button.Attribute("Click")?.Value} needs a resource-backed accessible name.");
+            }
+        }
+    }
+
+    [Fact]
     public void Visible_chinese_xaml_fallbacks_are_resource_backed()
     {
         string root = FindRepositoryRoot();

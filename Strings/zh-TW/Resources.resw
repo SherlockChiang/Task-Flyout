@@ -2299,4 +2299,31 @@ Widgets 抑制：就緒 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="ContentState_AgendaEmptyHint" xml:space="preserve">
     <value>檢查帳戶的顯示設定，或使用上方「新增」按鈕建立行程。</value>
   </data>
+  <data name="Keyboard_CharacterShortcuts.Header" xml:space="preserve">
+    <value>啟用 N、E、R 單字母快捷鍵</value>
+  </data>
+  <data name="Keyboard_Help.Text" xml:space="preserve">
+    <value>Ctrl+1～5：行事曆、工作、天氣、郵件、RSS。N：新增行程/工作、撰寫郵件或新增訂閱；E：編輯焦點所在的工作或行程；R：重新整理。在輸入框、對話方塊及郵件設定/撰寫介面中暫停快速鍵。可在上方關閉單字母快速鍵。</value>
+  </data>
+  <data name="Keyboard_PreviousPeriod.AutomationProperties.Name" xml:space="preserve">
+    <value>上一個行事曆期間</value>
+  </data>
+  <data name="Keyboard_PreviousPeriod.ToolTipService.ToolTip" xml:space="preserve">
+    <value>上一個行事曆期間</value>
+  </data>
+  <data name="Keyboard_NextPeriod.AutomationProperties.Name" xml:space="preserve">
+    <value>下一個行事曆期間</value>
+  </data>
+  <data name="Keyboard_NextPeriod.ToolTipService.ToolTip" xml:space="preserve">
+    <value>下一個行事曆期間</value>
+  </data>
+  <data name="Keyboard_SelectLocation" xml:space="preserve">
+    <value>選擇 {0}</value>
+  </data>
+  <data name="Keyboard_RenameLocation" xml:space="preserve">
+    <value>{0} 的顯示名稱</value>
+  </data>
+  <data name="Keyboard_RemoveLocation" xml:space="preserve">
+    <value>移除 {0}</value>
+  </data>
 </root>

@@ -11,7 +11,7 @@ using Task_Flyout.Services;
 
 namespace Task_Flyout.Views;
 
-public sealed partial class TodayPage : Page
+public sealed partial class TodayPage : Page, IPageKeyboardCommands
 {
     private readonly ResourceLoader _loader = new();
     private readonly RssService _rss = new();
@@ -180,6 +180,16 @@ public sealed partial class TodayPage : Page
 
     private string Text(string key) => _loader.GetStringOrDefault(key) ?? key;
     private void RefreshButton_Click(object sender, RoutedEventArgs e) => _ = RefreshAsync();
+    async Task<bool> IPageKeyboardCommands.ExecuteKeyboardCommandAsync(PageShortcut command, DependencyObject? focused)
+    {
+        if (command == PageShortcut.Refresh) { await RefreshAsync(); return true; }
+        if (command == PageShortcut.New)
+        {
+            if (await QuickCreateForm.ShowDialogAsync(XamlRoot, DateTime.Today, isTask: true)) await RefreshAsync();
+            return true;
+        }
+        return false;
+    }
     private void NewTaskButton_Click(object sender, RoutedEventArgs e) => App.MyMainWindow?.NavigateToCalendarAndCreate(true);
     private void NewEventButton_Click(object sender, RoutedEventArgs e) => App.MyMainWindow?.NavigateToCalendarAndCreate(false);
     private void ComposeButton_Click(object sender, RoutedEventArgs e) => App.MyMainWindow?.NavigateToMailCompose();

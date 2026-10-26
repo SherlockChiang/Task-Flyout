@@ -22,6 +22,7 @@ namespace Task_Flyout
     public sealed partial class MainWindow : Window
     {
         private ResourceLoader _loader;
+        private bool _keyboardCommandRunning;
         private Func<Task>? _notificationActionRetry;
 
         internal void ShowNotificationActionResult(string message, bool error, Func<Task>? retry)
@@ -613,6 +614,7 @@ namespace Task_Flyout
 
         private void GlobalSearchAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
         {
+            if (HasOpenPopup()) return;
             args.Handled = true;
             if (GlobalSearchOverlay.Visibility == Visibility.Visible)
                 CloseGlobalSearch();
@@ -671,10 +673,10 @@ namespace Task_Flyout
             CancelSearchMeasurements();
             if (!wasVisible) return;
             GlobalSearchResultsList.SelectedItem = null;
-            if (previousFocus is Control control && control.IsEnabled && control.Visibility == Visibility.Visible)
-                control.Focus(FocusState.Programmatic);
+            if (previousFocus is Control control && KeyboardNavigation.IsVisible(control))
+                control.Focus(FocusState.Keyboard);
             else
-                MainNav.Focus(FocusState.Programmatic);
+                MainNav.Focus(FocusState.Keyboard);
             _globalSearchPreviousFocus = null;
         }
 
@@ -1000,6 +1002,69 @@ namespace Task_Flyout
                 GlobalSearchResultsList.Focus(FocusState.Programmatic);
                 e.Handled = true;
             }
+        }
+
+        private bool HasOpenPopup() => RootGrid.XamlRoot == null
+            || VisualTreeHelper.GetOpenPopupsForXamlRoot(RootGrid.XamlRoot).Count > 0;
+
+        private async void RootGrid_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Handled || HasOpenPopup()) return;
+            var focused = FocusManager.GetFocusedElement(RootGrid.XamlRoot) as DependencyObject;
+            bool Down(Windows.System.VirtualKey key) =>
+                (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(key) & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
+            var page = ContentFrame.Content as IPageKeyboardCommands;
+            bool input = KeyboardNavigation.IsInput(focused);
+            var command = KeyboardShortcutPolicy.Resolve((int)e.Key, Down(Windows.System.VirtualKey.Control),
+                Down(Windows.System.VirtualKey.Shift), Down(Windows.System.VirtualKey.Menu),
+                Down(Windows.System.VirtualKey.LeftWindows) || Down(Windows.System.VirtualKey.RightWindows),
+                _keyboardCommandRunning || _globalSearchActive || page?.IsKeyboardCommandBlocked == true,
+                input, ApplicationData.Current.LocalSettings.Values[KeyboardShortcutPolicy.CharacterShortcutsSetting] as bool? ?? true, e.KeyStatus.WasKeyDown);
+            if (command == PageShortcut.None) return;
+            // Character commands belong to the focused page, never the navigation rail.
+            if ((command is PageShortcut.New or PageShortcut.Edit or PageShortcut.Refresh) &&
+                (page == null || ContentFrame.Content is not FrameworkElement owner || !CompactPaneFocus.HasFocus(owner))) return;
+            e.Handled = true;
+            _keyboardCommandRunning = true;
+            try
+            {
+                Type? target = command switch
+                {
+                    PageShortcut.Calendar => typeof(CalendarPage),
+                    PageShortcut.Tasks => typeof(TasksPage),
+                    PageShortcut.Weather => typeof(WeatherPage),
+                    PageShortcut.Mail => typeof(MailPage),
+                    PageShortcut.Rss => typeof(RssPage),
+                    _ => null
+                };
+                if (target != null)
+                {
+                    if (ContentFrame.SourcePageType != target || ContentFrame.Content is WeatherPage { SelectedSection: not WeatherPageSection.Overview })
+                        ContentFrame.Navigate(target);
+                    if (ContentFrame.Content is FrameworkElement destination)
+                    {
+                        void FocusDestination() => DispatcherQueue.TryEnqueue(() =>
+                        {
+                            if (ReferenceEquals(ContentFrame.Content, destination) && !HasOpenPopup())
+                                KeyboardNavigation.FocusFirst(destination);
+                        });
+                        if (destination.IsLoaded) FocusDestination();
+                        else
+                        {
+                            RoutedEventHandler? loaded = null;
+                            loaded = (_, _) => { destination.Loaded -= loaded; FocusDestination(); };
+                            destination.Loaded += loaded;
+                        }
+                    }
+                }
+                else if (page != null) await page.ExecuteKeyboardCommandAsync(command, focused);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Keyboard command failed: {ex.GetType().Name}");
+                ShowNotificationActionResult(GetSafeString("ContentState_ActionFailed", "The action could not finish."), true, null);
+            }
+            finally { _keyboardCommandRunning = false; }
         }
 
         private void RootGrid_KeyDown(object sender, KeyRoutedEventArgs e)

@@ -10,7 +10,7 @@
         <MicaBackdrop Kind="BaseAlt"/>
     </Window.SystemBackdrop>
 
-    <Grid x:Name="RootGrid" KeyDown="RootGrid_KeyDown" SizeChanged="RootGrid_SizeChanged">
+    <Grid x:Name="RootGrid" KeyDown="RootGrid_KeyDown" PreviewKeyDown="RootGrid_PreviewKeyDown" SizeChanged="RootGrid_SizeChanged">
         <Grid.Resources>
             <views:ProviderToBrushConverter x:Key="ColorHexToBrushConverter"/>
             <CollectionViewSource x:Name="GlobalSearchResultsSource" IsSourceGrouped="True"/>
@@ -87,6 +87,7 @@
               Background="#66000000"
               Visibility="Collapsed"
               IsTabStop="False"
+              TabFocusNavigation="Cycle"
               Canvas.ZIndex="100">
             <Border x:Name="GlobalSearchPanel"
                     AutomationProperties.AutomationId="GlobalSearchPanel"

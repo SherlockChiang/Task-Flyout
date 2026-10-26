@@ -37,10 +37,10 @@ internal sealed class CompactPaneFocus
             if (current != null && !ReferenceEquals(current, previous)) return;
             if (_targets.TryGetValue(pane, out var saved) && saved.Element.TryGetTarget(out var target)
                 && ReferenceEquals(saved.DataContext, (target as FrameworkElement)?.DataContext)
-                && IsInside(target, root) && target.Focus(FocusState.Programmatic)) return;
+                && IsInside(target, root) && target.Focus(FocusState.Keyboard)) return;
             var next = fallback();
-            if (next != null && IsInside(next, root) && next.Focus(FocusState.Programmatic)) return;
-            (FocusManager.FindFirstFocusableElement(root) as UIElement)?.Focus(FocusState.Programmatic);
+            if (next != null && IsInside(next, root) && next.Focus(FocusState.Keyboard)) return;
+            (FocusManager.FindFirstFocusableElement(root) as UIElement)?.Focus(FocusState.Keyboard);
         });
     }
 

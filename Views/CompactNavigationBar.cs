@@ -56,5 +56,6 @@ public sealed class CompactNavigationBar : UserControl
             CompactPane.List => "2 / 3 · " + listLabel,
             _ => "3 / 3 · " + Text("Compact_Detail", "Details")
         };
+        AccessibilityFeedback.Announce(_step);
     }
 }

@@ -11,7 +11,7 @@
         </StackPanel>
         <TextBlock x:Name="Reason" TextWrapping="Wrap" FontSize="{StaticResource TaskFlyoutFontSecondary}"
                    AutomationProperties.LiveSetting="Polite"/>
-        <InfoBar x:Name="Error" IsOpen="False" IsClosable="False" Severity="Error"/>
+        <InfoBar x:Name="Error" IsOpen="False" IsClosable="False" Severity="Error" AutomationProperties.LiveSetting="Polite"/>
         <TextBlock x:Name="NextStep" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                    FontSize="{StaticResource TaskFlyoutFontCaption}"/>
         <Button x:Name="ActionButton" MinHeight="{StaticResource TaskFlyoutButtonHeight}"

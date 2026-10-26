@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System;
 using System.Threading.Tasks;
@@ -43,6 +44,12 @@ public sealed partial class ContentState : UserControl
 
     private void Show(string reason, string nextStep, string? actionLabel, Func<Task>? action, bool loading, bool error, bool skeleton)
     {
+        if (action == null && ActionButton.FocusState == FocusState.Keyboard)
+        {
+            var owner = Parent as FrameworkElement;
+            if (owner != null) KeyboardNavigation.RestoreIfLost(owner, ActionButton,
+                () => FocusManager.FindFirstFocusableElement(owner) as UIElement);
+        }
         _actions.Replace();
         _action = action;
         IsLoading = loading;
@@ -61,6 +68,7 @@ public sealed partial class ContentState : UserControl
         ActionButton.IsEnabled = !_actions.IsRunning;
         AutomationProperties.SetName(ActionButton, actionLabel ?? "");
         Visibility = reason.Length > 0 || loading ? Visibility.Visible : Visibility.Collapsed;
+        if (error) AccessibilityFeedback.Announce(Error);
         if (IsLoaded && !error)
         {
             var peer = FrameworkElementAutomationPeer.FromElement(Reason) ?? FrameworkElementAutomationPeer.CreatePeerForElement(Reason);

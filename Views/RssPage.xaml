@@ -230,28 +230,30 @@
                                                        Visibility="{x:Bind HasSummary}"
                                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="{StaticResource TaskFlyoutSpaceXSmall}">
-                                                <Button Width="{StaticResource TaskFlyoutButtonHeight}"
+                                                <ToggleButton IsChecked="{x:Bind IsRead}" UseSystemFocusVisuals="True" Width="{StaticResource TaskFlyoutButtonHeight}"
                                                         Height="{StaticResource TaskFlyoutButtonCompactHeight}"
                                                         Padding="0"
                                                         Background="Transparent"
                                                         BorderThickness="0"
                                                         DataContext="{x:Bind}"
                                                         Click="ToggleArticleRead_Click"
+                                                        Tapped="ArticleAction_Tapped"
                                                         x:Uid="RssPage_ToggleRead"
                                                         AutomationProperties.Name="Toggle read status">
                                                     <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{x:Bind ReadGlyph}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
-                                                </Button>
-                                                <Button Width="{StaticResource TaskFlyoutButtonHeight}"
+                                                </ToggleButton>
+                                                <ToggleButton IsChecked="{x:Bind IsStarred}" UseSystemFocusVisuals="True" Width="{StaticResource TaskFlyoutButtonHeight}"
                                                         Height="{StaticResource TaskFlyoutButtonCompactHeight}"
                                                         Padding="0"
                                                         Background="Transparent"
                                                         BorderThickness="0"
                                                         DataContext="{x:Bind}"
                                                         Click="ToggleArticleStar_Click"
+                                                        Tapped="ArticleAction_Tapped"
                                                         x:Uid="RssPage_ToggleStar"
                                                         AutomationProperties.Name="Toggle starred">
                                                     <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{x:Bind StarGlyph}" FontSize="{StaticResource TaskFlyoutIconBody}"/>
-                                                </Button>
+                                                </ToggleButton>
                                             </StackPanel>
                                         </StackPanel>
                                     </Grid>
@@ -289,7 +291,7 @@
                                 <TextBlock x:Name="ReaderActionStatusText" FontSize="{StaticResource TaskFlyoutFontCaption}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                             </StackPanel>
                             <StackPanel Grid.Column="2" Spacing="{StaticResource TaskFlyoutSpaceXSmall}">
-                            <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="Cross_ReadLater" Content="Save / remove read later" Click="ToggleReadLater_Click"/>
+                            <ToggleButton x:Name="ReadLaterButton" UseSystemFocusVisuals="True" MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="Cross_ReadLater" Content="Save / remove read later" Click="ToggleReadLater_Click"/>
                             <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="QuickCreate_FromSource" Content="Create task" Click="CreateTaskFromArticle_Click"/>
                             <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Uid="RssPage_OpenArticleInBrowserButton" Click="OpenArticleInBrowserButton_Click">
                                 <StackPanel Orientation="Horizontal" Spacing="6">

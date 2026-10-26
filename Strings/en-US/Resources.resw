@@ -2299,4 +2299,31 @@ Widgets suppression: ready {8}; snapshot {9}; notification pending {10}</value><
   <data name="ContentState_AgendaEmptyHint" xml:space="preserve">
     <value>Check visible accounts or create an event using the New button above.</value>
   </data>
+  <data name="Keyboard_CharacterShortcuts.Header" xml:space="preserve">
+    <value>Enable N, E and R shortcuts</value>
+  </data>
+  <data name="Keyboard_Help.Text" xml:space="preserve">
+    <value>Ctrl+1–5: Calendar, Tasks, Weather, Mail, RSS. N: new event/task, compose mail or add a feed; E: edit the focused task or event; R: refresh. Shortcuts pause in inputs, dialogs and Mail setup/compose. Turn off character shortcuts above if needed.</value>
+  </data>
+  <data name="Keyboard_PreviousPeriod.AutomationProperties.Name" xml:space="preserve">
+    <value>Previous calendar period</value>
+  </data>
+  <data name="Keyboard_PreviousPeriod.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Previous calendar period</value>
+  </data>
+  <data name="Keyboard_NextPeriod.AutomationProperties.Name" xml:space="preserve">
+    <value>Next calendar period</value>
+  </data>
+  <data name="Keyboard_NextPeriod.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Next calendar period</value>
+  </data>
+  <data name="Keyboard_SelectLocation" xml:space="preserve">
+    <value>Select {0}</value>
+  </data>
+  <data name="Keyboard_RenameLocation" xml:space="preserve">
+    <value>Name for {0}</value>
+  </data>
+  <data name="Keyboard_RemoveLocation" xml:space="preserve">
+    <value>Remove {0}</value>
+  </data>
 </root>

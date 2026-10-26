@@ -87,7 +87,7 @@ namespace Task_Flyout.Views
         public object ConvertBack(object v, Type t, object p, string l) => throw new NotImplementedException();
     }
 
-    public sealed partial class CalendarPage : Page, ICompactNavigationPage
+    public sealed partial class CalendarPage : Page, ICompactNavigationPage, IPageKeyboardCommands
     {
         private const int MonthCellItemLimit = 3;
         private const double WeekTimelineHeaderHeight = 48;
@@ -415,6 +415,14 @@ namespace Task_Flyout.Views
             if (WeekTimelineCanvas == null || WeekTimeAxisCanvas == null || WeekTimelineHeaderCanvas == null)
                 return;
 
+            var previous = XamlRoot == null ? null : FocusManager.GetFocusedElement(XamlRoot) as DependencyObject;
+            var focusedItem = KeyboardNavigation.FocusedItem<AgendaItem>(previous, WeekTimelineCanvas);
+            // Capture before removing controls so Keyboard focus is still observable.
+            if (focusedItem != null) KeyboardNavigation.RestoreIfLost(WeekTimelineCanvas, previous, () =>
+                WeekTimelineCanvas.Children.OfType<Button>().FirstOrDefault(button =>
+                    button.DataContext is AgendaItem item && item.ProviderKey == focusedItem.ProviderKey
+                    && item.CalendarId == focusedItem.CalendarId && item.Id == focusedItem.Id && item.DateKey == focusedItem.DateKey)
+                ?? (UIElement)BtnMonthYear);
             WeekTimelineCanvas.Children.Clear();
             WeekTimeAxisCanvas.Children.Clear();
             WeekTimelineHeaderCanvas.Children.Clear();
@@ -576,8 +584,14 @@ namespace Task_Flyout.Views
                     ? Visibility.Visible
                     : Visibility.Collapsed
             };
-            var block = new Border
+            var block = new Button
             {
+                UseSystemFocusVisuals = true,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                VerticalContentAlignment = VerticalAlignment.Stretch,
+                BorderThickness = new Thickness(0),
+                MinWidth = 0,
+                MinHeight = 0,
                 Width = Math.Max(16, dayWidth - 8),
                 Height = height,
                 CornerRadius = new CornerRadius(5),
@@ -585,7 +599,7 @@ namespace Task_Flyout.Views
                 Background = background,
                 Opacity = item.IsCompleted ? 0.55 : 0.94,
                 DataContext = item,
-                Child = new StackPanel
+                Content = new StackPanel
                 {
                     Spacing = 1,
                     Children = { title, subtitle }
@@ -594,7 +608,7 @@ namespace Task_Flyout.Views
             string accessibleText = CalendarWeekLayoutPolicy.FormatCompactEventText(item.Title, timeText);
             AutomationProperties.SetName(block, accessibleText);
             ToolTipService.SetToolTip(block, accessibleText);
-            block.Tapped += WeekTimelineEvent_Tapped;
+            block.Click += WeekTimelineEvent_Click;
             Canvas.SetLeft(block, dayIndex * dayWidth + 4);
             Canvas.SetTop(block, top);
             Canvas.SetZIndex(block, 10);
@@ -760,10 +774,9 @@ namespace Task_Flyout.Views
                 BuildWeekTimeline();
         }
 
-        private async void WeekTimelineEvent_Tapped(object sender, TappedRoutedEventArgs e)
+        private async void WeekTimelineEvent_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement { DataContext: AgendaItem item }) return;
-            e.Handled = true;
             await ShowEditDialogAsync(item);
         }
 
@@ -1390,6 +1403,7 @@ namespace Task_Flyout.Views
         {
             if (CalendarStatusText == null) return;
             CalendarStatusText.Text = message;
+            AccessibilityFeedback.Announce(CalendarStatusText);
             CalendarStatusText.Foreground = isError
                 ? new SolidColorBrush(Microsoft.UI.Colors.IndianRed)
                 : (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
@@ -1477,7 +1491,20 @@ namespace Task_Flyout.Views
         private void BtnAddNew_Click(object sender, RoutedEventArgs e)
             => OpenNewDialog(isTask: false);
 
-        public async void OpenNewDialog(bool isTask)
+        async Task<bool> IPageKeyboardCommands.ExecuteKeyboardCommandAsync(PageShortcut command, DependencyObject? focused)
+        {
+            if (command == PageShortcut.New) { await CreateItemAsync(false); return true; }
+            if (command == PageShortcut.Refresh) { await ForceSyncAllDataAsync(); return true; }
+            var item = KeyboardNavigation.FocusedItem<AgendaItem>(focused, this)
+                ?? (CompactPaneFocus.HasFocus(AgendaDetails) ? AgendaDetails.Item : null);
+            if (command != PageShortcut.Edit || item == null) return false;
+            await ShowEditDialogAsync(item, forceEditor: true);
+            return true;
+        }
+
+        public async void OpenNewDialog(bool isTask) => await CreateItemAsync(isTask);
+
+        private async Task CreateItemAsync(bool isTask)
         {
             var date = _viewDate.Year == DateTime.Today.Year && _viewDate.Month == DateTime.Today.Month
                 ? DateTime.Today : new DateTime(_viewDate.Year, _viewDate.Month, 1);

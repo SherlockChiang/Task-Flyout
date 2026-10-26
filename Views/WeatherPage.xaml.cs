@@ -13,7 +13,7 @@ using Windows.Devices.Geolocation;
 
 namespace Task_Flyout.Views
 {
-    public sealed partial class WeatherPage : Page
+    public sealed partial class WeatherPage : Page, IPageKeyboardCommands
     {
         private bool _isInitializing = true;
         private WeatherService _weatherService = null!;
@@ -877,6 +877,8 @@ namespace Task_Flyout.Views
                     Tag = location.Id
                 };
                 select.Click += SavedLocation_Click;
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(select, string.Format(
+                    GetSafeString("Keyboard_SelectLocation", "Select {0}"), location.DisplayLabel));
                 var alias = new TextBox
                 {
                     Text = location.Label,
@@ -885,12 +887,16 @@ namespace Task_Flyout.Views
                     MaxLength = 80
                 };
                 alias.LostFocus += SavedLocationAlias_LostFocus;
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(alias, string.Format(
+                    GetSafeString("Keyboard_RenameLocation", "Name for {0}"), location.DisplayLabel));
                 var remove = new Button
                 {
                     Content = GetSafeString("WeatherPage_RemoveLocation", "Remove"),
                     Tag = location.Id
                 };
                 remove.Click += RemoveSavedLocation_Click;
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(remove, string.Format(
+                    GetSafeString("Keyboard_RemoveLocation", "Remove {0}"), location.DisplayLabel));
                 Grid.SetColumn(alias, 1);
                 Grid.SetColumn(remove, 2);
                 row.Children.Add(select);
@@ -1168,6 +1174,13 @@ namespace Task_Flyout.Views
         private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
             await LoadWeatherDataAsync(forceRefresh: true);
+        }
+
+        async Task<bool> IPageKeyboardCommands.ExecuteKeyboardCommandAsync(PageShortcut command, DependencyObject? focused)
+        {
+            if (command != PageShortcut.Refresh || _section != WeatherPageSection.Overview || !BtnRefresh.IsEnabled) return false;
+            await LoadWeatherDataAsync(true);
+            return true;
         }
 
         private async void UseCurrentLocationButton_Click(object sender, RoutedEventArgs e)

@@ -193,11 +193,11 @@
 
                 <Border Background="{ThemeResource ControlFillColorDefaultBrush}" BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" CornerRadius="{StaticResource TaskFlyoutControlCornerRadius}" VerticalAlignment="Center" Margin="12,0,0,0">
                     <StackPanel Orientation="Horizontal">
-                        <Button Click="BtnPrevMonth_Click" Background="Transparent" BorderThickness="0" Width="{StaticResource TaskFlyoutButtonIconSize}" Height="{StaticResource TaskFlyoutButtonToolbarHeight}" CornerRadius="{StaticResource TaskFlyoutLeadingButtonCornerRadius}">
+                        <Button x:Uid="Keyboard_PreviousPeriod" Click="BtnPrevMonth_Click" Background="Transparent" BorderThickness="0" Width="{StaticResource TaskFlyoutButtonIconSize}" Height="{StaticResource TaskFlyoutButtonToolbarHeight}" CornerRadius="{StaticResource TaskFlyoutLeadingButtonCornerRadius}">
                             <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconChevronLeft}" FontSize="{StaticResource TaskFlyoutIconSmall}"/>
                         </Button>
                         <MenuFlyoutSeparator Margin="0,8" Background="{ThemeResource TaskFlyoutDividerBrush}"/>
-                        <Button Click="BtnNextMonth_Click" Background="Transparent" BorderThickness="0" Width="{StaticResource TaskFlyoutButtonIconSize}" Height="{StaticResource TaskFlyoutButtonToolbarHeight}" CornerRadius="{StaticResource TaskFlyoutTrailingButtonCornerRadius}">
+                        <Button x:Uid="Keyboard_NextPeriod" Click="BtnNextMonth_Click" Background="Transparent" BorderThickness="0" Width="{StaticResource TaskFlyoutButtonIconSize}" Height="{StaticResource TaskFlyoutButtonToolbarHeight}" CornerRadius="{StaticResource TaskFlyoutTrailingButtonCornerRadius}">
                             <FontIcon Style="{StaticResource TaskFlyoutIconStyle}" Glyph="{StaticResource AppIconChevronRight}" FontSize="{StaticResource TaskFlyoutIconSmall}"/>
                         </Button>
                     </StackPanel>
@@ -417,7 +417,7 @@
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
-                                            <CheckBox Grid.Column="0" IsChecked="{x:Bind IsCompleted, Mode=TwoWay}" Click="TaskCheckBox_Click" Tapped="TaskCheckBox_Tapped" Margin="0,-6,8,0" MinWidth="0"/>
+                                            <CheckBox AutomationProperties.Name="{x:Bind Title}" Grid.Column="0" IsChecked="{x:Bind IsCompleted, Mode=TwoWay}" Click="TaskCheckBox_Click" Tapped="TaskCheckBox_Tapped" Margin="0,-6,8,0" MinWidth="0"/>
                                             <TextBlock Grid.Column="1" Text="{x:Bind Title}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" LineHeight="20"
                                                TextDecorations="{x:Bind IsCompleted, Mode=OneWay, Converter={StaticResource BoolToStrikethroughConverter}}"
                                                Opacity="{x:Bind IsCompleted, Mode=OneWay, Converter={StaticResource TaskCompletedOpacityConverter}}"/>

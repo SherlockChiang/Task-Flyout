@@ -22,7 +22,7 @@ using Windows.Storage.Streams;
 
 namespace Task_Flyout.Views
 {
-    public sealed partial class RssPage : Page
+    public sealed partial class RssPage : Page, IPageKeyboardCommands
     {
         private const int PageSize = 20;
 
@@ -375,6 +375,9 @@ namespace Task_Flyout.Views
         }
 
         private async void AddSubscriptionButton_Click(object sender, RoutedEventArgs e)
+            => await AddSubscriptionAsync();
+
+        private async Task AddSubscriptionAsync()
         {
             var urlBox = new TextBox
             {
@@ -466,6 +469,14 @@ namespace Task_Flyout.Views
             };
 
             await dialog.ShowAsync();
+        }
+
+        async Task<bool> IPageKeyboardCommands.ExecuteKeyboardCommandAsync(PageShortcut command, DependencyObject? focused)
+        {
+            if (_isLoading || _isRefreshing) return false;
+            if (command == PageShortcut.New) { await AddSubscriptionAsync(); return true; }
+            if (command == PageShortcut.Refresh) { await RefreshArticlesAsync(); return true; }
+            return false;
         }
 
         private async void ImportOpml_Click(object sender, RoutedEventArgs e)
@@ -1124,6 +1135,7 @@ namespace Task_Flyout.Views
             ArticleList.Visibility = Visibility.Collapsed;
             ArticleReaderPanel.Visibility = Visibility.Visible;
             ReaderTitleText.Text = article.Title;
+            ReadLaterButton.IsChecked = article.IsReadLater;
             ReaderActionStatusText.Text = article.IsReadLater
                 ? _loader.GetStringOrDefault("Cross_ReadLaterSaved") ?? "Saved for later. Click again to undo." : "";
             ReaderMetaText.Text = $"{article.FeedTitle} · {article.PublishedText}";
@@ -1439,18 +1451,32 @@ namespace Task_Flyout.Views
             catch (OperationCanceledException) { }
         }
 
+        private void ArticleAction_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e) => e.Handled = true;
+
         private void ToggleArticleStar_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not Button { DataContext: RssArticle article }) return;
+            if (sender is not Microsoft.UI.Xaml.Controls.Primitives.ToggleButton { DataContext: RssArticle article }) return;
+            RestoreArticleFocus(article.Id, sender as DependencyObject);
             _rssService.SetArticleStarred(article, !article.IsStarred);
             ResetAndLoadCachedArticles();
         }
 
         private void ToggleArticleRead_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not Button { DataContext: RssArticle article }) return;
+            if (sender is not Microsoft.UI.Xaml.Controls.Primitives.ToggleButton { DataContext: RssArticle article }) return;
+            RestoreArticleFocus(article.Id, sender as DependencyObject);
             _rssService.SetArticleRead(article, !article.IsRead);
             ResetAndLoadCachedArticles();
+        }
+
+        private void RestoreArticleFocus(string id, DependencyObject? previous)
+        {
+            KeyboardNavigation.RestoreIfLost(ArticlePane, previous, () =>
+            {
+                if (ArticleList.Visibility != Visibility.Visible) return null;
+                var article = Articles.FirstOrDefault(item => item.Id == id) ?? Articles.FirstOrDefault();
+                return article == null ? ArticleSearchBox : ArticleList.ContainerFromItem(article) as UIElement ?? ArticleSearchBox;
+            });
         }
 
         private void ShowArticleList()
@@ -1488,6 +1514,8 @@ namespace Task_Flyout.Views
                     ?? (_selectedArticle.IsReadLater ? "Saved for later. Click again to undo." : "Removed from read later. Click again to undo.");
             }
             catch { ReaderActionStatusText.Text = _loader.GetStringOrDefault("Cross_ReadLaterFailed") ?? "Could not save the change. Try again."; }
+            ReadLaterButton.IsChecked = _selectedArticle.IsReadLater;
+            AccessibilityFeedback.Announce(ReaderActionStatusText);
         }
 
         private void OpenArticleInBrowserButton_Click(object sender, RoutedEventArgs e)

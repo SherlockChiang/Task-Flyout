@@ -23,7 +23,7 @@ namespace Task_Flyout.Views
 {
     internal sealed record MailAccountSetupRequest(string AccountId);
 
-    public sealed partial class MailPage : Page, ICompactNavigationPage
+    public sealed partial class MailPage : Page, ICompactNavigationPage, IPageKeyboardCommands
     {
         private MailAccountSetupRequest? _setupRequest;
 
@@ -1181,6 +1181,9 @@ namespace Task_Flyout.Views
         }
 
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)
+            => await RefreshMailboxAsync();
+
+        private async Task RefreshMailboxAsync()
         {
             if (_isLoadingMessages || _refreshAccountsTask != null) return;
 
@@ -1201,6 +1204,15 @@ namespace Task_Flyout.Views
         private void AddMailButton_Click(object sender, RoutedEventArgs e)
         {
             ShowAddAccountPanel();
+        }
+
+        bool IPageKeyboardCommands.IsKeyboardCommandBlocked => ComposePanel.Visibility == Visibility.Visible || AddAccountPanel.Visibility == Visibility.Visible;
+
+        async Task<bool> IPageKeyboardCommands.ExecuteKeyboardCommandAsync(PageShortcut command, DependencyObject? focused)
+        {
+            if (command == PageShortcut.New) { await StartComposeAsync(); return true; }
+            if (command == PageShortcut.Refresh) { await RefreshMailboxAsync(); return true; }
+            return false;
         }
 
         private async void RemoveMailButton_Click(object sender, RoutedEventArgs e)

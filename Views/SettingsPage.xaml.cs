@@ -190,6 +190,7 @@ namespace Task_Flyout.Views
             BlockRemoteImagesToggle.IsOn = settings.Values["BlockRemoteImagesByDefault"] as bool? ?? true;
             AllowRssRemoteResourcesToggle.IsOn = settings.Values["AllowRssRemoteResources"] as bool? ?? false;
             ShowSecondsToggle.IsOn = settings.Values["ShowSeconds"] as bool? ?? false;
+            CharacterShortcutsToggle.IsOn = settings.Values[KeyboardShortcutPolicy.CharacterShortcutsSetting] as bool? ?? true;
             AboutVersionText.Text = GetVersionText();
 
             string minuteStr = GetSafeString("TextMinutes", "minutes");
@@ -994,6 +995,11 @@ namespace Task_Flyout.Views
             if (_isInitializing) return;
             ApplicationData.Current.LocalSettings.Values["ShowSeconds"] = ShowSecondsToggle.IsOn;
             App.MyFlyoutWindow?.UpdateClockFormat();
+        }
+
+        private void CharacterShortcutsToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (!_isInitializing) ApplicationData.Current.LocalSettings.Values[KeyboardShortcutPolicy.CharacterShortcutsSetting] = CharacterShortcutsToggle.IsOn;
         }
 
     }
