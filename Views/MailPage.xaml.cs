@@ -78,6 +78,9 @@ namespace Task_Flyout.Views
         private MailPane _compactMailPane => (MailPane)(int)_navigation.Current;
         public bool CanGoBackWithinPage => _layoutMode != ResponsiveLayoutMode.Wide && _navigation.CanGoBack;
         private int _messageLoadVersion;
+        private int _folderStatusVersion;
+        private bool _hasMessageLoadError;
+        private (string Account, string Folder)? _messageContentScope;
         private DateTimeOffset? _lastMessageLoadSucceededAt;
         private Task? _refreshAccountsTask;
         private CancellationTokenSource _pageRequestCts = new();
@@ -152,6 +155,9 @@ namespace Task_Flyout.Views
             _searchCts?.Cancel();
             ScheduleComposeDraft();
             _messageLoadVersion++;
+            _folderStatusVersion++;
+            _hasMessageLoadError = false;
+            _isLoadingMessages = false;
             CleanupRenderedMailContent(clearAllBodies: true);
             _selectedItem = null;
             SetActiveAccount(null);
@@ -182,6 +188,8 @@ namespace Task_Flyout.Views
         {
             if (!string.Equals(_selectedAccount?.Id, account?.Id, StringComparison.Ordinal))
             {
+                _hasMessageLoadError = false;
+                MailLoadState.Clear();
                 _bodyLoadCts?.Cancel();
                 _selectedItem = null;
                 ClearRenderedMailBody();
@@ -325,11 +333,14 @@ namespace Task_Flyout.Views
                 _selectedAccountForRemoval = null;
                 RemoveMailButton.IsEnabled = false;
                 ClearDetail();
+                MailLoadState.Clear();
+                UpdateMailEmptyState();
                 return;
             }
 
             if (autoSelect)
                 await SelectFirstAvailableFolderAsync();
+            UpdateMailEmptyState();
         }
 
         private static string FormatAccountContent(MailAccount account)
@@ -434,10 +445,13 @@ namespace Task_Flyout.Views
             node.Children.Clear();
             node.HasUnrealizedChildren = false;
             var cancellationToken = _pageRequestCts.Token;
+            int statusVersion = ++_folderStatusVersion;
+            FolderLoadState.SetLoading(_loader.GetStringOrDefault("TextLoading") ?? "Loading", hasContent: true);
 
             try
             {
                 var folders = await _mailService.FetchFoldersAsync(account, forceRefresh, cancellationToken);
+                if (cancellationToken.IsCancellationRequested) return;
                 foreach (var folder in folders)
                 {
                     var child = new TreeViewNode
@@ -454,18 +468,33 @@ namespace Task_Flyout.Views
                         PerformanceDiagnostics.MarkOnce(
                             "mail.folders.visible", "mail", "first_folders_visible", source: "ui"));
                 }
+                if (statusVersion == _folderStatusVersion) FolderLoadState.Clear();
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
             catch (AuthorizationInteractionRequiredException) when (account.Kind == MailAccountKind.Outlook || account.UsesOutlookImapOAuth)
             {
+                if (cancellationToken.IsCancellationRequested || statusVersion != _folderStatusVersion) return;
                 node.HasUnrealizedChildren = true;
                 AddAccountPanel.Visibility = Visibility.Visible;
                 AddStatusText.Text = ShowOutlookReconnect(account);
+                FolderLoadState.SetError(AddStatusText.Text, ContentState.Text("ContentState_MailReconnectHint", "Open Mail setup to reconnect this mailbox."),
+                    ContentState.Text("ContentState_MailSetup", "Open Mail setup"), () =>
+                    {
+                        ShowAddAccountPanel();
+                        ShowOutlookReconnect(account);
+                        return Task.CompletedTask;
+                    });
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Load folders failed: {ex.Message}");
+                if (cancellationToken.IsCancellationRequested || statusVersion != _folderStatusVersion) return;
+                node.HasUnrealizedChildren = true;
                 AddStatusText.Text = _loader.GetStringOrDefault("TextLoadFoldersFailed") ?? "Failed to load folders, please try again later.";
+                FolderLoadState.SetError(AddStatusText.Text, ContentState.RetryHint, ContentState.RetryLabel, async () =>
+                {
+                    if (_isPageLoaded && _accountNodes.ContainsKey(node)) await LoadFoldersForNodeAsync(node, forceRefresh: true);
+                });
             }
         }
 
@@ -747,13 +776,21 @@ namespace Task_Flyout.Views
             var loadVersion = ++_messageLoadVersion;
             var account = _selectedAccount;
             var folder = _selectedFolder;
+            if (_messageContentScope != (account.Id, folder.Id))
+            {
+                _messageContentScope = (account.Id, folder.Id);
+                _lastMessageLoadSucceededAt = null;
+                _items.Clear();
+                ClearDetail();
+            }
             _messageLoadCts?.Cancel();
             var requestCts = CancellationTokenSource.CreateLinkedTokenSource(_pageRequestCts.Token);
             _messageLoadCts = requestCts;
 
             _isLoadingMessages = true;
+            _hasMessageLoadError = false;
             AddAccountPanel.Visibility = Visibility.Collapsed;
-            LoadingRing.IsActive = true;
+            MailLoadState.SetLoading(_loader.GetStringOrDefault("TextLoading") ?? "Loading", _items.Count > 0);
             RefreshButton.IsEnabled = false;
             LoadMoreButton.IsEnabled = false;
             UnreadOnlyToggle.IsEnabled = false;
@@ -770,7 +807,7 @@ namespace Task_Flyout.Views
                     forceRefresh: forceRefresh,
                     loadMore: loadMore,
                     cancellationToken: requestCts.Token);
-                if (loadVersion != _messageLoadVersion || !ReferenceEquals(account, _selectedAccount) || !ReferenceEquals(folder, _selectedFolder))
+                if (loadVersion != _messageLoadVersion || requestCts.IsCancellationRequested || !ReferenceEquals(account, _selectedAccount) || !ReferenceEquals(folder, _selectedFolder))
                     return;
                 var messages = window.Items;
                 var previousSelectedId = !string.IsNullOrWhiteSpace(preferredMessageId) ? preferredMessageId : _selectedItem?.Id;
@@ -792,6 +829,7 @@ namespace Task_Flyout.Views
                 }
                 _suppressSearchRefresh = false;
                 _lastMessageLoadSucceededAt = DateTimeOffset.Now;
+                MailLoadState.Clear();
                 SetMessageListStatus($"{account.DisplayTitle} · {string.Format(_loader.GetStringOrDefault("TextNMailItems") ?? "{0} messages", _items.Count)}");
                 ApplyMailSearch();
 
@@ -832,26 +870,41 @@ namespace Task_Flyout.Views
             catch (OperationCanceledException) when (requestCts.IsCancellationRequested) { }
             catch (AuthorizationInteractionRequiredException) when (account.Kind == MailAccountKind.Outlook || account.UsesOutlookImapOAuth)
             {
-                if (loadVersion != _messageLoadVersion || !ReferenceEquals(account, _selectedAccount) || !ReferenceEquals(folder, _selectedFolder))
+                if (loadVersion != _messageLoadVersion || requestCts.IsCancellationRequested || !ReferenceEquals(account, _selectedAccount) || !ReferenceEquals(folder, _selectedFolder))
                     return;
                 AddAccountPanel.Visibility = Visibility.Visible;
                 string status = ShowOutlookReconnect(account);
                 AddStatusText.Text = status;
+                _hasMessageLoadError = true;
                 SetMessageListStatus(status, isError: true);
+                MailLoadState.SetError(status, ContentState.Text("ContentState_MailReconnectHint", "Open Mail setup to reconnect this mailbox."),
+                    ContentState.Text("ContentState_MailSetup", "Open Mail setup"), () =>
+                    {
+                        if (ReferenceEquals(account, _selectedAccount)) { ShowAddAccountPanel(); ShowOutlookReconnect(account); }
+                        return Task.CompletedTask;
+                    });
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Load messages failed: {ex.Message}");
+                if (loadVersion != _messageLoadVersion || requestCts.IsCancellationRequested || !ReferenceEquals(account, _selectedAccount) || !ReferenceEquals(folder, _selectedFolder)) return;
+                _hasMessageLoadError = true;
                 if (loadMore)
                     LoadMoreButton.Visibility = Visibility.Collapsed;
                 SetMessageListStatus(_loader.GetStringOrDefault("TextLoadMailFailed") ?? "Failed to load messages, please try again later.", isError: true);
+                MailLoadState.SetError(MessageListSubtitle.Text, ContentState.RetryHint, ContentState.RetryLabel, async () =>
+                {
+                    if (_isPageLoaded && ReferenceEquals(account, _selectedAccount) && ReferenceEquals(folder, _selectedFolder))
+                        await LoadMessagesAsync(forceRefresh: !loadMore, preferredMessageId: preferredMessageId, selectFirstWhenNoMatch: selectFirstWhenNoMatch, loadMore: loadMore);
+                });
             }
             finally
             {
                 if (loadVersion == _messageLoadVersion)
                 {
                     _isLoadingMessages = false;
-                    LoadingRing.IsActive = false;
+                    if (MailLoadState.IsLoading) MailLoadState.Clear();
+                    UpdateMailEmptyState();
                     RefreshButton.IsEnabled = true;
                     LoadMoreButton.IsEnabled = true;
                     UnreadOnlyToggle.IsEnabled = true;
@@ -1018,6 +1071,25 @@ namespace Task_Flyout.Views
 
             if (!string.IsNullOrWhiteSpace(_searchText) && _selectedAccount != null)
                 SetMessageListStatus($"{_selectedAccount.DisplayTitle} · {string.Format(GetResourceStringOrDefault("TextSearchMatches", "{0} matches of {1} loaded"), _displayedItems.Count, _items.Count)}");
+            UpdateMailEmptyState();
+        }
+
+        private void UpdateMailEmptyState()
+        {
+            if (MailLoadState.IsError || MailLoadState.IsLoading || _isLoadingMessages) return;
+            MailLoadState.Clear();
+            if (_displayedItems.Count > 0) return;
+            if (_selectedFolder == null)
+                MailLoadState.SetEmpty(ContentState.Text("ContentState_SelectMailbox", "Choose an account and folder to read mail."),
+                    ContentState.Text("ContentState_MailSetupHint", "Add a mailbox if you have not connected one yet."),
+                    ContentState.Text("ContentState_MailSetup", "Open Mail setup"), () => { ShowAddAccountPanel(); return Task.CompletedTask; });
+            else if (!string.IsNullOrWhiteSpace(_searchText))
+                MailLoadState.SetEmpty(ContentState.Text("ContentState_NoMatches", "No matching items."), ContentState.FilterHint,
+                    ContentState.Text("ContentState_ClearSearch", "Clear search"), () => { _searchText = ""; MailSearchBox.Text = ""; ApplyMailSearch(); return Task.CompletedTask; });
+            else
+                MailLoadState.SetEmpty(ContentState.Text("ContentState_NoMail", "No messages in this view."),
+                    ContentState.Text("ContentState_MailEmptyHint", "Choose another folder, turn off Unread only, or refresh this folder."),
+                    ContentState.Text("ContentState_Refresh", "Refresh"), () => LoadMessagesAsync(forceRefresh: true));
         }
 
         private async void LoadMoreButton_Click(object sender, RoutedEventArgs e)
@@ -2036,6 +2108,13 @@ namespace Task_Flyout.Views
                 _loader.GetStringOrDefault("TextLastSuccessFormat") ?? "Last success: {0:g}",
                 LocalizationHelper.AppCulture);
             RaiseLiveRegionChanged(MessageListSubtitle);
+            if (isError) MailLoadState.SetError(MessageListSubtitle.Text,
+                ContentState.Text("ContentState_MailActionHint", "Review the message status before trying the action again. Refresh the folder if needed."));
+            else if (!_isLoadingMessages && !_hasMessageLoadError)
+            {
+                MailLoadState.Clear();
+                UpdateMailEmptyState();
+            }
         }
 
         private void SetComposeStatus(string message)

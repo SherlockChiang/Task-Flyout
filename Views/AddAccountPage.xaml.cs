@@ -16,7 +16,7 @@ namespace Task_Flyout.Views
         private bool _isActive;
         private bool _authorizationBusy;
         private readonly HashSet<string> _retrying = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, (StackPanel Root, TextBlock Title, TextBlock Status, Button Retry, Button Reconnect)> _healthRows = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (StackPanel Root, TextBlock Title, ContentState Status, Button Retry, Button Reconnect)> _healthRows = new(StringComparer.Ordinal);
 
         public AddAccountPage()
         {
@@ -148,7 +148,8 @@ namespace Task_Flyout.Views
                 UpdateHealthRow(key, account.DisplayTitle + " · " + account.ProviderName,
                     FormatProviderHealthState(health) + Environment.NewLine + string.Format(
                         _loader.GetStringOrDefault("SyncCenter_TaskChanges") ?? "Pending uploads: {0}; failed changes: {1}. Retry failed edits from their original task view.", counts.Pending, counts.Failed),
-                    account.AccountId, false, health.Kind == ProviderHealthKind.Syncing);
+                    account.AccountId, false, health.Kind == ProviderHealthKind.Syncing,
+                    health.Kind is ProviderHealthKind.Cached or ProviderHealthKind.Failed or ProviderHealthKind.ReconnectRequired, health.Kind == ProviderHealthKind.ReconnectRequired);
             }
 
             var lines = new List<string>();
@@ -177,7 +178,9 @@ namespace Task_Flyout.Views
                 currentKeys.Add(key);
                 UpdateHealthRow(key, account.DisplayTitle + " · " + account.ProviderName,
                     state + Environment.NewLine + FormatSyncObservation(health.LastAttemptUtc, health.LastSuccessUtc, health.Failure),
-                    account.Id, true, !account.IsSetupComplete || health.State == AccountSyncState.Syncing);
+                    account.Id, true, health.State == AccountSyncState.Syncing,
+                    !account.IsSetupComplete || health.State == AccountSyncState.Failed,
+                    !account.IsSetupComplete || health.Failure == SyncFailureKind.Authorization, !account.IsSetupComplete);
             }
             foreach (string key in _healthRows.Keys.Where(key => !currentKeys.Contains(key)).ToList())
             {
@@ -194,6 +197,10 @@ namespace Task_Flyout.Views
             lines.Add(_loader.GetStringOrDefault("SyncCenter_ScopeHint") ?? "Times describe successful refreshes in this session. Mail retry refreshes folders and Inbox; queued mail changes retry automatically. Task counts cover tracked edits in this session.");
             HealthText.Text = string.Join(Environment.NewLine, lines);
             RetrySyncButton.Visibility = mgr.Accounts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (currentKeys.Count == 0)
+                SyncLoadState.SetEmpty(ContentState.Text("ContentState_NoAccounts", "No connected accounts."),
+                    ContentState.Text("ContentState_AccountSetupHint", "Choose a provider below, or open Mail setup to connect a mailbox."));
+            else if (!SyncLoadState.IsError && !SyncLoadState.IsLoading) SyncLoadState.Clear();
         }
 
         private string FormatProviderHealthState(ProviderHealthSnapshot health)
@@ -233,14 +240,14 @@ namespace Task_Flyout.Views
             _ => _loader.GetStringOrDefault("SyncCenter_UnknownFailure") ?? "Sync could not finish. Retry, or reconnect if the problem persists."
         };
 
-        private void UpdateHealthRow(string key, string title, string state, string accountId, bool mail, bool syncing)
+        private void UpdateHealthRow(string key, string title, string state, string accountId, bool mail, bool syncing, bool failed, bool reconnectRequired, bool setupIncomplete = false)
         {
             if (!_healthRows.TryGetValue(key, out var row))
             {
                 var root = new StackPanel { Spacing = 6, Padding = new Thickness(0, 8, 0, 8) };
                 var heading = new TextBlock { FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
-                var status = new TextBlock { FontSize = VisualResources.Number("FontCaption"), TextWrapping = TextWrapping.Wrap };
-                var actions = new StackPanel { Spacing = VisualResources.Number("SpaceSmall"), Orientation = Orientation.Horizontal };
+                var status = new ContentState();
+                var actions = new StackPanel { Spacing = VisualResources.Number("SpaceSmall") };
                 var retry = new Button { Content = _loader.GetStringOrDefault("SyncCenter_RetryAccount") ?? "Retry sync", MinHeight = VisualResources.Number("ButtonHeight") };
                 retry.Click += async (_, _) => await RetryAccountAsync(key, accountId, mail);
                 var reconnect = new Button { Tag = accountId, MinHeight = VisualResources.Number("ButtonHeight") };
@@ -256,8 +263,11 @@ namespace Task_Flyout.Views
                 ConnectedAccountActions.Children.Add(root);
             }
             row.Title.Text = title;
-            row.Status.Text = state;
-            row.Retry.IsEnabled = !syncing && !_retrying.Contains(key) && !_authorizationBusy;
+            if (syncing || _retrying.Contains(key)) row.Status.SetLoading(state, hasContent: true);
+            else if (failed) row.Status.SetError(state, reconnectRequired
+                ? ContentState.Text("ContentState_ReconnectHint", "Reconnect the affected account in Accounts and sync.") : ContentState.RetryHint);
+            else row.Status.SetEmpty(state, "");
+            row.Retry.IsEnabled = !setupIncomplete && !syncing && !_retrying.Contains(key) && !_authorizationBusy;
             row.Reconnect.IsEnabled = !_authorizationBusy && !_retrying.Contains(key);
             string reconnectLabel = _loader.GetStringOrDefault("AddAccount_ReconnectAccount") ?? "Reconnect";
             row.Reconnect.Content = reconnectLabel;
@@ -303,19 +313,25 @@ namespace Task_Flyout.Views
         }
 
         private async void RetrySyncButton_Click(object sender, RoutedEventArgs e)
+            => await RetryAllSyncAsync();
+
+        private async Task RetryAllSyncAsync()
         {
-            if (GetSyncManager() is not { } syncManager) return;
+            if (GetSyncManager() is not { } syncManager || !RetrySyncButton.IsEnabled) return;
             StatusText.Text = "";
             RetrySyncButton.IsEnabled = false;
             AuthProgress.IsActive = true;
+            SyncLoadState.SetLoading(_loader.GetStringOrDefault("TextLoading") ?? "Loading", hasContent: true);
             try
             {
                 await syncManager.GetAllDataAsync(DateTime.Today.AddMonths(-1), DateTime.Today.AddMonths(2), forceRefresh: true);
+                if (!_isActive) return;
                 UpdateChecklist();
+                SyncContentFeedback.ShowResult(SyncLoadState, syncManager, RetryAllSyncAsync);
             }
             catch (Exception ex)
             {
-                if (_isActive) StatusText.Text = FailureText(SyncFailurePolicy.Classify(ex));
+                if (_isActive) SyncLoadState.SetError(FailureText(SyncFailurePolicy.Classify(ex)), ContentState.RetryHint, ContentState.RetryLabel, RetryAllSyncAsync);
             }
             finally
             {

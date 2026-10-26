@@ -22,6 +22,7 @@
             <TextBlock x:Name="PageTitle" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap"/>
             <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="OpenPreferencesButton" x:Uid="SettingsPage_OpenWeather" Content="打开天气与任务栏设置" Click="OpenPreferences_Click" Style="{StaticResource WeatherSettingsButtonStyle}"/>
             <TextBlock x:Name="WeatherStatusText" FontSize="{StaticResource TaskFlyoutFontSecondary}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+            <local:ContentState x:Name="WeatherLoadState"/>
             <StackPanel x:Name="WeatherOverview" Spacing="{StaticResource TaskFlyoutSpacePage}">
 
                 <!-- Current Weather Summary Card (top) -->
@@ -199,7 +200,6 @@
                     </Border>
                 </StackPanel>
 
-                <ProgressRing x:Name="LoadingRing" IsActive="False" HorizontalAlignment="Left" Margin="0,12,0,0"/>
 
             </StackPanel>
 

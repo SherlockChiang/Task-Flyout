@@ -2209,4 +2209,94 @@ Widgets suppression: ready {8}; snapshot {9}; notification pending {10}</value><
   <data name="SettingsPage_OpenWeatherAdvanced.Content" xml:space="preserve"><value>Weather icons and advanced taskbar options</value></data>
   <data name="SettingsPage_Back.Content" xml:space="preserve"><value>Back to settings</value></data>
   <data name="SettingsPage_WeatherAdvancedDescription.Text" xml:space="preserve"><value>Customize weather icons, Windows Widgets and the experimental taskbar mode.</value></data>
+  <data name="ContentState_Retry" xml:space="preserve">
+    <value>Retry</value>
+  </data>
+  <data name="ContentState_RetryHint" xml:space="preserve">
+    <value>Check your connection and retry. You can keep using any content already shown.</value>
+  </data>
+  <data name="ContentState_FilterHint" xml:space="preserve">
+    <value>Try another search or change the selected filters.</value>
+  </data>
+  <data name="ContentState_ActionFailed" xml:space="preserve">
+    <value>The action could not finish.</value>
+  </data>
+  <data name="ContentState_NoTaskAccount" xml:space="preserve">
+    <value>No task account connected.</value>
+  </data>
+  <data name="ContentState_ConnectAccount" xml:space="preserve">
+    <value>Connect an account to load and create items.</value>
+  </data>
+  <data name="ContentState_Accounts" xml:space="preserve">
+    <value>Open accounts and sync</value>
+  </data>
+  <data name="ContentState_NoMatches" xml:space="preserve">
+    <value>No matching items.</value>
+  </data>
+  <data name="ContentState_ClearSearch" xml:space="preserve">
+    <value>Clear search</value>
+  </data>
+  <data name="ContentState_TaskEmptyHint" xml:space="preserve">
+    <value>Completed tasks appear below. Create a task, or check which accounts are visible.</value>
+  </data>
+  <data name="ContentState_SyncIncomplete" xml:space="preserve">
+    <value>Some accounts could not refresh. Any previously loaded items remain available.</value>
+  </data>
+  <data name="ContentState_ReconnectHint" xml:space="preserve">
+    <value>Reconnect the affected account in Accounts and sync.</value>
+  </data>
+  <data name="ContentState_MailReconnectHint" xml:space="preserve">
+    <value>Open Mail setup to reconnect this mailbox.</value>
+  </data>
+  <data name="ContentState_MailSetup" xml:space="preserve">
+    <value>Open Mail setup</value>
+  </data>
+  <data name="ContentState_SelectMailbox" xml:space="preserve">
+    <value>Choose an account and folder to read mail.</value>
+  </data>
+  <data name="ContentState_MailSetupHint" xml:space="preserve">
+    <value>Add a mailbox if you have not connected one yet.</value>
+  </data>
+  <data name="ContentState_NoMail" xml:space="preserve">
+    <value>No messages in this view.</value>
+  </data>
+  <data name="ContentState_MailEmptyHint" xml:space="preserve">
+    <value>Choose another folder, turn off Unread only, or refresh this folder.</value>
+  </data>
+  <data name="ContentState_Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="ContentState_MailActionHint" xml:space="preserve">
+    <value>Review the message status before trying the action again. Refresh the folder if needed.</value>
+  </data>
+  <data name="ContentState_RssSetupHint" xml:space="preserve">
+    <value>Open subscriptions to add a feed or import an OPML file.</value>
+  </data>
+  <data name="ContentState_Subscriptions" xml:space="preserve">
+    <value>Open subscriptions</value>
+  </data>
+  <data name="ContentState_NoArticles" xml:space="preserve">
+    <value>No articles in this view.</value>
+  </data>
+  <data name="ContentState_RssEmptyHint" xml:space="preserve">
+    <value>Change the search or article filter, or refresh the selected feeds.</value>
+  </data>
+  <data name="ContentState_NoWeather" xml:space="preserve">
+    <value>Weather is not configured.</value>
+  </data>
+  <data name="ContentState_WeatherSetupHint" xml:space="preserve">
+    <value>Enable weather and choose a city in weather settings.</value>
+  </data>
+  <data name="ContentState_WeatherSettings" xml:space="preserve">
+    <value>Open weather settings</value>
+  </data>
+  <data name="ContentState_NoAccounts" xml:space="preserve">
+    <value>No connected accounts.</value>
+  </data>
+  <data name="ContentState_AccountSetupHint" xml:space="preserve">
+    <value>Choose a provider below, or open Mail setup to connect a mailbox.</value>
+  </data>
+  <data name="ContentState_AgendaEmptyHint" xml:space="preserve">
+    <value>Check visible accounts or create an event using the New button above.</value>
+  </data>
 </root>

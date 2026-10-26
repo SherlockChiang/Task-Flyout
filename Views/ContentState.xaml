@@ -1,0 +1,22 @@
+<UserControl
+    x:Class="Task_Flyout.Views.ContentState"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Spacing="{StaticResource TaskFlyoutSpaceSmall}">
+        <ProgressBar x:Name="Progress" IsIndeterminate="False" Visibility="Collapsed"/>
+        <StackPanel x:Name="Skeleton" Spacing="{StaticResource TaskFlyoutSpaceSmall}" Visibility="Collapsed"
+                    IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw">
+            <Border Height="16" CornerRadius="{StaticResource TaskFlyoutControlCornerRadius}" Background="{ThemeResource ControlFillColorSecondaryBrush}"/>
+            <Border Height="12" Margin="0,0,48,0" CornerRadius="{StaticResource TaskFlyoutControlCornerRadius}" Background="{ThemeResource ControlFillColorSecondaryBrush}"/>
+        </StackPanel>
+        <TextBlock x:Name="Reason" TextWrapping="Wrap" FontSize="{StaticResource TaskFlyoutFontSecondary}"
+                   AutomationProperties.LiveSetting="Polite"/>
+        <InfoBar x:Name="Error" IsOpen="False" IsClosable="False" Severity="Error"/>
+        <TextBlock x:Name="NextStep" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                   FontSize="{StaticResource TaskFlyoutFontCaption}"/>
+        <Button x:Name="ActionButton" MinHeight="{StaticResource TaskFlyoutButtonHeight}"
+                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Click="ActionButton_Click">
+            <TextBlock x:Name="ActionLabel" TextWrapping="Wrap"/>
+        </Button>
+    </StackPanel>
+</UserControl>

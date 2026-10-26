@@ -2209,4 +2209,94 @@ Widgets 抑制：就緒 {8}；快照 {9}；待通知 {10}</value></data>
   <data name="SettingsPage_OpenWeatherAdvanced.Content" xml:space="preserve"><value>天氣圖示與工作列進階選項</value></data>
   <data name="SettingsPage_Back.Content" xml:space="preserve"><value>返回設定</value></data>
   <data name="SettingsPage_WeatherAdvancedDescription.Text" xml:space="preserve"><value>自訂天氣圖示，以及 Windows Widgets 與實驗性工作列模式。</value></data>
+  <data name="ContentState_Retry" xml:space="preserve">
+    <value>重試</value>
+  </data>
+  <data name="ContentState_RetryHint" xml:space="preserve">
+    <value>檢查網路連線後重試。已顯示的內容仍可繼續使用。</value>
+  </data>
+  <data name="ContentState_FilterHint" xml:space="preserve">
+    <value>嘗試其他搜尋詞或調整篩選條件。</value>
+  </data>
+  <data name="ContentState_ActionFailed" xml:space="preserve">
+    <value>操作未能完成。</value>
+  </data>
+  <data name="ContentState_NoTaskAccount" xml:space="preserve">
+    <value>尚未連接工作帳戶。</value>
+  </data>
+  <data name="ContentState_ConnectAccount" xml:space="preserve">
+    <value>連接帳戶後即可載入和建立項目。</value>
+  </data>
+  <data name="ContentState_Accounts" xml:space="preserve">
+    <value>開啟帳戶與同步</value>
+  </data>
+  <data name="ContentState_NoMatches" xml:space="preserve">
+    <value>沒有符合的項目。</value>
+  </data>
+  <data name="ContentState_ClearSearch" xml:space="preserve">
+    <value>清除搜尋</value>
+  </data>
+  <data name="ContentState_TaskEmptyHint" xml:space="preserve">
+    <value>已完成的工作顯示在下方。可建立工作，或檢查帳戶的顯示設定。</value>
+  </data>
+  <data name="ContentState_SyncIncomplete" xml:space="preserve">
+    <value>部分帳戶未能重新整理。先前載入的項目仍然可用。</value>
+  </data>
+  <data name="ContentState_ReconnectHint" xml:space="preserve">
+    <value>請在「帳戶與同步」中重新連接受影響的帳戶。</value>
+  </data>
+  <data name="ContentState_MailReconnectHint" xml:space="preserve">
+    <value>開啟郵件設定，重新連接此信箱。</value>
+  </data>
+  <data name="ContentState_MailSetup" xml:space="preserve">
+    <value>開啟郵件設定</value>
+  </data>
+  <data name="ContentState_SelectMailbox" xml:space="preserve">
+    <value>選擇帳戶和資料夾以閱讀郵件。</value>
+  </data>
+  <data name="ContentState_MailSetupHint" xml:space="preserve">
+    <value>如果尚未連接信箱，請先新增。</value>
+  </data>
+  <data name="ContentState_NoMail" xml:space="preserve">
+    <value>目前檢視沒有郵件。</value>
+  </data>
+  <data name="ContentState_MailEmptyHint" xml:space="preserve">
+    <value>選擇其他資料夾、關閉「僅未讀」，或重新整理此資料夾。</value>
+  </data>
+  <data name="ContentState_Refresh" xml:space="preserve">
+    <value>重新整理</value>
+  </data>
+  <data name="ContentState_MailActionHint" xml:space="preserve">
+    <value>再次操作前請檢查郵件狀態，必要時重新整理資料夾。</value>
+  </data>
+  <data name="ContentState_RssSetupHint" xml:space="preserve">
+    <value>開啟訂閱，新增訂閱來源或匯入 OPML 檔案。</value>
+  </data>
+  <data name="ContentState_Subscriptions" xml:space="preserve">
+    <value>開啟訂閱</value>
+  </data>
+  <data name="ContentState_NoArticles" xml:space="preserve">
+    <value>目前檢視沒有文章。</value>
+  </data>
+  <data name="ContentState_RssEmptyHint" xml:space="preserve">
+    <value>調整搜尋詞或文章篩選，或重新整理所選訂閱來源。</value>
+  </data>
+  <data name="ContentState_NoWeather" xml:space="preserve">
+    <value>尚未設定天氣。</value>
+  </data>
+  <data name="ContentState_WeatherSetupHint" xml:space="preserve">
+    <value>在天氣設定中啟用天氣並選擇城市。</value>
+  </data>
+  <data name="ContentState_WeatherSettings" xml:space="preserve">
+    <value>開啟天氣設定</value>
+  </data>
+  <data name="ContentState_NoAccounts" xml:space="preserve">
+    <value>尚未連接帳戶。</value>
+  </data>
+  <data name="ContentState_AccountSetupHint" xml:space="preserve">
+    <value>選擇下方的服務提供者，或開啟郵件設定連接信箱。</value>
+  </data>
+  <data name="ContentState_AgendaEmptyHint" xml:space="preserve">
+    <value>檢查帳戶的顯示設定，或使用上方「新增」按鈕建立行程。</value>
+  </data>
 </root>

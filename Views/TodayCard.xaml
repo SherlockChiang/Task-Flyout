@@ -7,11 +7,10 @@
             BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}" BorderThickness="{StaticResource TaskFlyoutSectionBorderThickness}" CornerRadius="{StaticResource TaskFlyoutSectionCornerRadius}" Padding="{StaticResource TaskFlyoutSectionPadding}">
         <StackPanel Spacing="{StaticResource TaskFlyoutSpaceMedium}">
             <TextBlock x:Name="Heading" FontSize="{StaticResource TaskFlyoutFontSubtitle}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-            <ProgressBar x:Name="LoadingBar" IsIndeterminate="False" Visibility="Collapsed"/>
+            <views:ContentState x:Name="LoadState"/>
             <TextBlock x:Name="Summary" FontSize="{StaticResource TaskFlyoutFontHeading}" FontWeight="SemiBold" TextWrapping="Wrap"/>
             <TextBlock x:Name="Detail" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                        AutomationProperties.LiveSetting="Polite"/>
-            <InfoBar x:Name="ErrorBar" IsOpen="False" IsClosable="False" Severity="Error"/>
             <ListView x:Name="Rows" SelectionMode="None" IsItemClickEnabled="True" ItemClick="Rows_ItemClick"
                       HorizontalContentAlignment="Stretch" Visibility="Collapsed">
                 <ListView.ItemTemplate>
@@ -26,8 +25,6 @@
             </ListView>
             <StackPanel Spacing="{StaticResource TaskFlyoutSpaceSmall}">
                 <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="OpenButton" HorizontalAlignment="Stretch" Click="OpenButton_Click"/>
-                <Button MinHeight="{StaticResource TaskFlyoutButtonHeight}" x:Name="RetryButton" x:Uid="TodayCard_Retry" Content="Retry"
-                        HorizontalAlignment="Stretch" Click="RetryButton_Click" Visibility="Collapsed"/>
             </StackPanel>
         </StackPanel>
     </Border>

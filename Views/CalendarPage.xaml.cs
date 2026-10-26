@@ -313,6 +313,7 @@ namespace Task_Flyout.Views
 
             SyncProgress.IsActive = true;
             SetCalendarStatus(_loader.GetStringOrDefault("TextLoading") ?? "Loading");
+            CalendarLoadState.SetLoading(CalendarStatusText.Text, _localCache.DayItems.Count > 0);
 
             try
             {
@@ -363,8 +364,12 @@ namespace Task_Flyout.Views
                 _upcomingCache = BuildVisibleCache(upcomingItems);
                 UpdateSideBar();
 
-                _lastCalendarSyncSucceededAt = DateTimeOffset.Now;
-                SetCalendarStatus(string.Format(_loader.GetStringOrDefault("TextLastSync") ?? "Last sync: {0}", _lastCalendarSyncSucceededAt.Value.LocalDateTime.ToString("g")));
+                if (SyncContentFeedback.ShowResult(CalendarLoadState, _syncManager, () => SyncMonthDataAsync(true)))
+                {
+                    _lastCalendarSyncSucceededAt = DateTimeOffset.Now;
+                    SetCalendarStatus(string.Format(_loader.GetStringOrDefault("TextLastSync") ?? "Last sync: {0}", _lastCalendarSyncSucceededAt.Value.LocalDateTime.ToString("g")));
+                }
+                else SetCalendarStatus(_loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed", isError: true);
             }
             catch (Exception ex)
             {
@@ -376,11 +381,15 @@ namespace Task_Flyout.Views
                     includeLastSuccess: true,
                     _loader.GetStringOrDefault("TextLastSuccessFormat") ?? "Last success: {0:g}",
                     LocalizationHelper.AppCulture), isError: true);
+                CalendarLoadState.SetError(CalendarStatusText.Text, ContentState.RetryHint, ContentState.RetryLabel, () => SyncMonthDataAsync(true));
             }
             finally
             {
                 if (SyncProgress != null && !token.IsCancellationRequested)
+                {
                     SyncProgress.IsActive = false;
+                    if (CalendarLoadState.IsLoading) CalendarLoadState.Clear();
+                }
             }
         }
 
@@ -983,7 +992,15 @@ namespace Task_Flyout.Views
 
             var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
             bool hasAccounts = accountMgr != null && accountMgr.Accounts.Count > 0;
-            NoAccountEmptyState.Visibility = hasAccounts ? Visibility.Collapsed : Visibility.Visible;
+            if (hasAccounts) NoAccountEmptyState.Clear();
+            else
+            {
+                CalendarLoadState.Clear();
+                NoAccountEmptyState.SetEmpty(_loader.GetStringOrDefault("CalendarPage_NoAccountTitle.Text") ?? "No calendar account connected.",
+                    _loader.GetStringOrDefault("CalendarPage_NoAccountSub.Text") ?? "Connect an account to see your agenda.",
+                    _loader.GetStringOrDefault("CalendarPage_AddAccount.Text") ?? "Add account",
+                    () => { App.MyMainWindow?.NavigateToAddAccount(); return Task.CompletedTask; });
+            }
             CalendarGrid.Opacity = hasAccounts ? 1.0 : 0.25;
             CalendarGrid.IsHitTestVisible = hasAccounts;
             WeekTimelineView.Opacity = hasAccounts ? 1.0 : 0.25;
@@ -1145,13 +1162,11 @@ namespace Task_Flyout.Views
 
             if (!hasItems)
             {
-                nextItems.Add(new AgendaItem
-                {
-                    Title = _loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events",
-                    Subtitle = "-",
-                    IsEvent = true
-                });
+                AgendaEmptyState.SetEmpty(_loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events",
+                    ContentState.Text("ContentState_AgendaEmptyHint", "Check visible accounts or create an event using the New button above."));
             }
+            else AgendaEmptyState.Clear();
+            SideBarAgendaList.Visibility = hasItems ? Visibility.Visible : Visibility.Collapsed;
 
             if (SelectedDayItems.Count == nextItems.Count
                 && SelectedDayItems.Zip(nextItems, SideBarItemsEqual).All(equal => equal))
@@ -1334,20 +1349,24 @@ namespace Task_Flyout.Views
         private async Task ForceSyncAllDataAsync()
         {
             if (_syncManager == null || SyncProgress == null) return;
+            _syncCts?.Cancel();
+            _syncCts = new System.Threading.CancellationTokenSource();
+            var token = _syncCts.Token;
 
             SyncProgress.IsActive = true;
             SetCalendarStatus(_loader.GetStringOrDefault("TextLoading") ?? "Loading");
+            CalendarLoadState.SetLoading(CalendarStatusText.Text, _localCache.DayItems.Count > 0);
             try
             {
                 var min = DateTime.Today.AddYears(-1);
                 var max = DateTime.Today.AddYears(3);
-                await _syncManager.GetAllDataAsync(min, max, forceRefresh: true);
-                _lastCalendarSyncSucceededAt = DateTimeOffset.Now;
+                await _syncManager.GetAllDataAsync(min, max, forceRefresh: true, token);
+                if (token.IsCancellationRequested) return;
                 LoadCalendar(_viewDate);
-                SetCalendarStatus(string.Format(_loader.GetStringOrDefault("TextLastSync") ?? "Last sync: {0}", _lastCalendarSyncSucceededAt.Value.LocalDateTime.ToString("g")));
             }
             catch (Exception ex)
             {
+                if (token.IsCancellationRequested) return;
                 System.Diagnostics.Debug.WriteLine($"Force sync error: {ex.Message}");
                 SetCalendarStatus(StatusMessageFormatter.Format(
                     _loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed",
@@ -1355,10 +1374,15 @@ namespace Task_Flyout.Views
                     includeLastSuccess: true,
                     _loader.GetStringOrDefault("TextLastSuccessFormat") ?? "Last success: {0:g}",
                     LocalizationHelper.AppCulture), isError: true);
+                CalendarLoadState.SetError(CalendarStatusText.Text, ContentState.RetryHint, ContentState.RetryLabel, ForceSyncAllDataAsync);
             }
             finally
             {
-                SyncProgress.IsActive = false;
+                if (!token.IsCancellationRequested)
+                {
+                    SyncProgress.IsActive = false;
+                    if (CalendarLoadState.IsLoading) CalendarLoadState.Clear();
+                }
             }
         }
 
@@ -1502,7 +1526,6 @@ namespace Task_Flyout.Views
         private async void SideBarAgendaList_ItemClick(object sender, ItemClickEventArgs e)
         {
             if (e.ClickedItem is not AgendaItem item) return;
-            if (item.Title != null && item.Title.Contains(_loader.GetStringOrDefault("TextNoAgendaTitle") ?? "No upcoming events")) return;
 
             await ShowEditDialogAsync(item);
         }

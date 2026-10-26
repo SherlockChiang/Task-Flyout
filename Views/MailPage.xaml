@@ -67,7 +67,9 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
+                <views:ContentState x:Name="FolderLoadState" Grid.Row="3"/>
 
                 <Border Background="{ThemeResource TaskFlyoutSectionBackgroundBrush}"
                         BorderBrush="{ThemeResource TaskFlyoutSectionBorderBrush}"
@@ -129,8 +131,8 @@
                                             PlaceholderText="Search loaded messages"
                                             TextChanged="MailSearchBox_TextChanged"
                                             AutomationProperties.Name="Search loaded messages"/>
+                            <views:ContentState x:Name="MailLoadState" Margin="0,8,0,0"/>
                         </StackPanel>
-                        <ProgressRing x:Name="LoadingRing" Grid.Column="1" IsActive="False" Width="24" Height="24"/>
                     </Grid>
 
                     <CommandBar Grid.Row="1" x:Name="MailMutationCommandBar" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True">

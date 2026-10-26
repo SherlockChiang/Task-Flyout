@@ -105,6 +105,9 @@ namespace Task_Flyout.Views
         }
 
         private async void RssPage_Loaded(object sender, RoutedEventArgs e)
+            => await InitializeRssAsync();
+
+        private async Task InitializeRssAsync()
         {
             int generation = ++_pageGeneration;
             _pageLifetimeCts?.Cancel();
@@ -129,6 +132,7 @@ namespace Task_Flyout.Views
                 if (generation != _pageGeneration || !IsLoaded) return;
                 LogRssError(ex);
                 ArticleListSubtitle.Text = string.Format(_loader.GetStringOrDefault("TextRssInitFailed") ?? "RSS initialization failed: {0}", UserSafeErrorMessage.FromException(ex));
+                ArticleLoadState.SetError(ArticleListSubtitle.Text, ContentState.RetryHint, ContentState.RetryLabel, InitializeRssAsync);
             }
             finally
             {
@@ -235,6 +239,7 @@ namespace Task_Flyout.Views
         private void ResetAndLoadCachedArticles()
         {
             _articleQueryGeneration++;
+            ArticleLoadState.Clear();
             Articles.Clear();
             _loadedCount = 0;
             _hasMore = true;
@@ -260,13 +265,15 @@ namespace Task_Flyout.Views
             catch (Exception ex)
             {
                 LogRssError(ex);
-                SetArticleListStatus(string.Format(_loader.GetStringOrDefault("TextCacheLoadFailed") ?? "Cache load failed: {0}", UserSafeErrorMessage.FromException(ex)), isError: true);
+                SetArticleListStatus(string.Format(_loader.GetStringOrDefault("TextCacheLoadFailed") ?? "Cache load failed: {0}", UserSafeErrorMessage.FromException(ex)),
+                    isError: true, retry: () => { ResetAndLoadCachedArticles(); return Task.CompletedTask; });
             }
         }
 
         private async Task LoadMoreArticlesAsync(int? pageGeneration = null)
         {
             if (_isLoading || !_hasMore) return;
+            pageGeneration ??= _pageGeneration;
             int queryGeneration = _articleQueryGeneration;
 
             try
@@ -293,15 +300,17 @@ namespace Task_Flyout.Views
             {
                 if (pageGeneration.HasValue && (pageGeneration.Value != _pageGeneration || !IsLoaded))
                     return;
+                if (queryGeneration != _articleQueryGeneration) return;
 
                 LogRssError(ex);
-                SetArticleListStatus(string.Format(_loader.GetStringOrDefault("TextLoadFailed") ?? "Load failed: {0}", UserSafeErrorMessage.FromException(ex)), isError: true);
+                SetArticleListStatus(string.Format(_loader.GetStringOrDefault("TextLoadFailed") ?? "Load failed: {0}", UserSafeErrorMessage.FromException(ex)),
+                    isError: true, retry: () => LoadMoreArticlesAsync(pageGeneration));
             }
             finally
             {
+                _isLoading = false;
                 if (!pageGeneration.HasValue || (pageGeneration.Value == _pageGeneration && IsLoaded))
                     SetLoading(false);
-                _isLoading = false;
             }
         }
 
@@ -312,6 +321,8 @@ namespace Task_Flyout.Views
             if (RefreshButton != null) RefreshButton.IsEnabled = !isLoading;
             if (AddSubscriptionButton != null) AddSubscriptionButton.IsEnabled = !isLoading;
             if (AddFolderButton != null) AddFolderButton.IsEnabled = !isLoading;
+            if (isLoading) ArticleLoadState.SetLoading(_loader.GetStringOrDefault("TextLoading") ?? "Loading", Articles.Count > 0);
+            else if (ArticleLoadState.IsLoading) { ArticleLoadState.Clear(); UpdateArticleEmptyState(); }
         }
 
         private async void RssTree_ItemInvoked(TreeView sender, TreeViewItemInvokedEventArgs args)
@@ -887,10 +898,14 @@ namespace Task_Flyout.Views
         }
 
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)
+            => await RefreshArticlesAsync();
+
+        private async Task RefreshArticlesAsync()
         {
             if (_isRefreshing || _isLoading) return;
             var pageLifetime = _pageLifetimeCts;
             if (pageLifetime == null) return;
+            int queryGeneration = _articleQueryGeneration;
 
             try
             {
@@ -920,10 +935,10 @@ namespace Task_Flyout.Views
                 }
 
                 if (pageLifetime.IsCancellationRequested || !IsLoaded) return;
+                if (queryGeneration != _articleQueryGeneration) return;
                 LoadSubscriptions();
-                ResetAndLoadCachedArticles();
                 _lastArticleLoadSucceededAt = DateTimeOffset.Now;
-                SetArticleListStatus(ArticleListSubtitle.Text);
+                ResetAndLoadCachedArticles();
             }
             catch (OperationCanceledException) when (pageLifetime.IsCancellationRequested)
             {
@@ -935,6 +950,7 @@ namespace Task_Flyout.Views
             }
             catch (Exception ex)
             {
+                if (pageLifetime.IsCancellationRequested || !IsLoaded || queryGeneration != _articleQueryGeneration) return;
                 LogRssError(ex);
                 SetArticleListStatus(FormatRssRefreshError(ex), isError: true);
             }
@@ -1021,7 +1037,7 @@ namespace Task_Flyout.Views
                 UserSafeErrorMessage.FromException(ex));
         }
 
-        private void SetArticleListStatus(string message, bool isError = false)
+        private void SetArticleListStatus(string message, bool isError = false, Func<Task>? retry = null)
         {
             if (ArticleListSubtitle == null) return;
 
@@ -1034,6 +1050,33 @@ namespace Task_Flyout.Views
             var peer = FrameworkElementAutomationPeer.FromElement(ArticleListSubtitle) ??
                        FrameworkElementAutomationPeer.CreatePeerForElement(ArticleListSubtitle);
             peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+            if (isError)
+            {
+                int queryGeneration = _articleQueryGeneration;
+                ArticleLoadState.SetError(ArticleListSubtitle.Text, ContentState.RetryHint, ContentState.RetryLabel, async () =>
+                {
+                    if (IsLoaded && queryGeneration == _articleQueryGeneration) await (retry ?? RefreshArticlesAsync)();
+                });
+            }
+            else { ArticleLoadState.Clear(); UpdateArticleEmptyState(); }
+        }
+
+        private void UpdateArticleEmptyState()
+        {
+            if (Articles.Count > 0 || ArticleLoadState.IsError) return;
+            if (Subscriptions.Count == 0)
+                ArticleLoadState.SetEmpty(_loader.GetStringOrDefault("TextNoSubscriptionsHint") ?? "No subscriptions yet. Add an RSS URL to start reading.",
+                    ContentState.Text("ContentState_RssSetupHint", "Open subscriptions to add a feed or import an OPML file."),
+                    ContentState.Text("ContentState_Subscriptions", "Open subscriptions"), () =>
+                    {
+                        ShowSubscriptionsButton_Click(ShowSubscriptionsButton, new RoutedEventArgs());
+                        AddSubscriptionButton.Focus(FocusState.Programmatic);
+                        return Task.CompletedTask;
+                    });
+            else
+                ArticleLoadState.SetEmpty(ContentState.Text("ContentState_NoArticles", "No articles in this view."),
+                    ContentState.Text("ContentState_RssEmptyHint", "Change the search or article filter, or refresh the selected feeds."),
+                    ContentState.Text("ContentState_Refresh", "Refresh"), RefreshArticlesAsync);
         }
 
         private void AttachArticleScrollViewer()

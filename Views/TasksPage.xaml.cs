@@ -33,6 +33,8 @@ namespace Task_Flyout.Views
         private CancellationTokenSource? _searchCts;
         private string _searchText = "";
         private const int TaskWindowPastDays = 365;
+        private bool _isSyncing;
+        private CancellationTokenSource? _syncRequest;
         private const int TaskWindowFutureDays = 365 * 3;
 
         public TasksPage()
@@ -48,7 +50,7 @@ namespace Task_Flyout.Views
                 _syncManager = app.SyncManager;
 
             Loaded += TasksPage_Loaded;
-            Unloaded += (_, _) => { _searchCts?.Cancel(); _paneFocus.Cancel(); };
+            Unloaded += (_, _) => { _searchCts?.Cancel(); _syncRequest?.Cancel(); _paneFocus.Cancel(); };
         }
 
         private async void TasksPage_Loaded(object sender, RoutedEventArgs e)
@@ -89,25 +91,43 @@ namespace Task_Flyout.Views
 
         private async Task SyncTasksAsync(bool forceRefresh, bool fullRange)
         {
-            if (_syncManager == null || SyncProgress == null) return;
+            if (_syncManager == null || SyncProgress == null || _isSyncing) return;
+            if (!_syncManager.AccountManager.Accounts.Any(account => SyncProviderCapabilityPolicy.ForProvider(account.ProviderName).SupportsTasks))
+            {
+                TaskLoadState.Clear();
+                UpdateTaskEmptyState();
+                return;
+            }
+            _isSyncing = true;
+            using var request = new CancellationTokenSource();
+            _syncRequest = request;
 
             try
             {
                 SetSyncProgress(true);
+                TaskLoadState.SetLoading(_loader.GetStringOrDefault("TextLoading") ?? "Loading", PendingTasks.Count + CompletedTasks.Count > 0);
+                PendingEmptyState.Clear();
                 var min = fullRange ? DateTime.Today.AddYears(-1) : DateTime.Today.AddDays(-30);
                 var max = fullRange ? DateTime.Today.AddYears(3) : DateTime.Today.AddDays(365);
-                await _syncManager.GetAllDataAsync(min, max, forceRefresh);
+                await _syncManager.GetAllDataAsync(min, max, forceRefresh, request.Token);
+                if (request.IsCancellationRequested) return;
                 LoadCache();
                 ReloadTasks();
+                SyncContentFeedback.ShowResult(TaskLoadState, _syncManager, () => SyncTasksAsync(true, fullRange), tasksOnly: true);
             }
             catch (Exception ex)
             {
+                if (request.IsCancellationRequested) return;
                 System.Diagnostics.Debug.WriteLine($"Task sync failed: {ex.Message}");
                 TaskSummaryText.Text = _loader.GetStringOrDefault("TextSyncFailed") ?? "Sync failed. Please try again.";
+                TaskLoadState.SetError(TaskSummaryText.Text, ContentState.RetryHint, ContentState.RetryLabel, () => SyncTasksAsync(true, fullRange));
             }
             finally
             {
                 SetSyncProgress(false);
+                _isSyncing = false;
+                _syncRequest = null;
+                if (!request.IsCancellationRequested) UpdateTaskEmptyState();
             }
         }
 
@@ -164,13 +184,38 @@ namespace Task_Flyout.Views
             if (RetryTaskMutationButton.Visibility != Visibility.Visible)
                 TaskSummaryText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
             PendingTasksList.Visibility = PendingTasks.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
-            PendingEmptyText.Visibility = PendingTasks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            UpdateTaskEmptyState();
             if (_detailItem != null)
             {
                 var current = tasks.FirstOrDefault(item => IsSameTask(item, _detailItem));
                 if (current != null) { _detailItem = current; TaskDetails.Show(current); }
                 else TaskDetails.Clear();
             }
+        }
+
+        private void UpdateTaskEmptyState()
+        {
+            PendingEmptyState.Clear();
+            if (PendingTasks.Count > 0 || _isSyncing || TaskLoadState.IsError) return;
+            bool hasAccounts = _syncManager?.AccountManager.Accounts.Any(account => SyncProviderCapabilityPolicy.ForProvider(account.ProviderName).SupportsTasks) == true;
+            if (!hasAccounts)
+                PendingEmptyState.SetEmpty(ContentState.Text("ContentState_NoTaskAccount", "No task account connected."),
+                    ContentState.Text("ContentState_ConnectAccount", "Connect an account to load and create items."),
+                    ContentState.Text("ContentState_Accounts", "Open accounts and sync"), () => { App.MyMainWindow?.NavigateToAddAccount(); return Task.CompletedTask; });
+            else if (!string.IsNullOrWhiteSpace(_searchText))
+                PendingEmptyState.SetEmpty(ContentState.Text("ContentState_NoMatches", "No matching items."), ContentState.FilterHint,
+                    ContentState.Text("ContentState_ClearSearch", "Clear search"), () => { _searchText = ""; TaskSearchBox.Text = ""; ReloadTasks(); return Task.CompletedTask; });
+            else
+                PendingEmptyState.SetEmpty(_loader.GetStringOrDefault("TasksPage_NoPending.Text") ?? "No pending tasks.",
+                    ContentState.Text("ContentState_TaskEmptyHint", "Completed tasks appear below. Create a task, or check which accounts are visible."),
+                    _loader.GetStringOrDefault("TextAddTask") ?? "Add task", async () =>
+                    {
+                        if (await QuickCreateForm.ShowDialogAsync(XamlRoot, DateTime.Today, isTask: true))
+                        {
+                            await SyncTasksAsync(true, true);
+                            App.MyFlyoutWindow?.ReloadFilters();
+                        }
+                    });
         }
 
         private async void TaskSearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)

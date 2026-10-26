@@ -19,6 +19,7 @@ namespace Task_Flyout.Views
         private WeatherService _weatherService = null!;
         private ResourceLoader _loader;
         private WeatherInfo? _currentWeatherInfo;
+        private (string Source, string Location, double Latitude, double Longitude)? _weatherContentScope;
         private DateTimeOffset? _lastWeatherLoadSucceededAt;
         private bool _isIconPackOperation;
         private CancellationTokenSource? _weatherLoadCts;
@@ -311,6 +312,7 @@ namespace Task_Flyout.Views
             {
                 await LoadWeatherDataAsync();
             }
+            else ShowWeatherSetupState();
         }
 
         #region Current Weather Card
@@ -966,6 +968,10 @@ namespace Task_Flyout.Views
                 CancelWeatherLoad();
                 ForecastPanel.Visibility = Visibility.Collapsed;
                 CurrentWeatherCard.Visibility = Visibility.Collapsed;
+                DailyForecastPanel.Visibility = Visibility.Collapsed;
+                _currentWeatherInfo = null;
+                BtnRefresh.IsEnabled = true;
+                ShowWeatherSetupState();
             }
 
             _ = App.MyFlyoutWindow?.RefreshWeatherAsync(forceRefresh: true);
@@ -1352,16 +1358,29 @@ namespace Task_Flyout.Views
 
         private async Task LoadWeatherDataAsync(bool forceRefresh = false)
         {
-            if (_weatherService == null || string.IsNullOrWhiteSpace(_weatherService.City)) return;
+            if (_weatherService == null || !_weatherService.IsEnabled || string.IsNullOrWhiteSpace(_weatherService.City))
+            {
+                CancelWeatherLoad();
+                ShowWeatherSetupState();
+                return;
+            }
             var cts = ReplaceWeatherLoadCancellation();
             long generation = _weatherLoadGeneration;
+            var scope = (_weatherService.WeatherSource, _weatherService.ActiveLocationId, _weatherService.CityLat, _weatherService.CityLon);
+            if (_weatherContentScope != scope)
+            {
+                _weatherContentScope = scope;
+                _lastWeatherLoadSucceededAt = null;
+                _currentWeatherInfo = null;
+                CurrentWeatherCard.Visibility = Visibility.Collapsed;
+                ForecastPanel.Visibility = Visibility.Collapsed;
+                DailyForecastPanel.Visibility = Visibility.Collapsed;
+            }
 
             try
             {
-                LoadingRing.IsActive = true;
+                WeatherLoadState.SetLoading(GetSafeString("TextLoading", "Loading"), _currentWeatherInfo != null);
                 BtnRefresh.IsEnabled = false;
-                ForecastPanel.Visibility = Visibility.Collapsed;
-                DailyForecastPanel.Visibility = Visibility.Collapsed;
                 SetWeatherStatus(GetSafeString("TextLoading", "Loading"));
 
                 var info = await _weatherService.GetWeatherAsync(forceRefresh, cts.Token);
@@ -1372,7 +1391,6 @@ namespace Task_Flyout.Views
                 // Update current weather card
                 if (info == null)
                 {
-                    UpdateCurrentWeatherCard(null);
                     SetWeatherStatus(GetSafeString("WeatherPage_LoadFailed", "Weather is unavailable. Check network, city, and provider settings."), isError: true);
                     return;
                 }
@@ -1381,6 +1399,8 @@ namespace Task_Flyout.Views
                 SetWeatherStatus(string.Format(GetSafeString("WeatherPage_Updated", "Updated: {0}"), _lastWeatherLoadSucceededAt.Value.LocalDateTime.ToString("g")));
                 UpdateCurrentWeatherCard(info);
                 UpdateDailyForecast(info);
+                WeatherLoadState.Clear();
+                ForecastPanel.Visibility = Visibility.Collapsed;
 
                 if (info.HourlyForecast.Count > 0)
                 {
@@ -1410,6 +1430,7 @@ namespace Task_Flyout.Views
             }
             catch (Exception ex)
             {
+                if (generation != _weatherLoadGeneration || cts.IsCancellationRequested) return;
                 System.Diagnostics.Debug.WriteLine($"Weather refresh failed: {ex.Message}");
                 SetWeatherStatus(GetSafeString("WeatherPage_LoadFailed", "Weather is unavailable. Check network, city, and provider settings."), isError: true);
             }
@@ -1417,7 +1438,7 @@ namespace Task_Flyout.Views
             {
                 if (generation == _weatherLoadGeneration)
                 {
-                    LoadingRing.IsActive = false;
+                    if (WeatherLoadState.IsLoading) WeatherLoadState.Clear();
                     BtnRefresh.IsEnabled = true;
                 }
                 if (ReferenceEquals(_weatherLoadCts, cts))
@@ -1452,6 +1473,25 @@ namespace Task_Flyout.Views
                 isError,
                 _loader.GetStringOrDefault("TextLastSuccessFormat") ?? "Last success: {0:g}",
                 LocalizationHelper.AppCulture);
+            if (isError) WeatherLoadState.SetError(WeatherStatusText.Text, ContentState.RetryHint, ContentState.RetryLabel, () => LoadWeatherDataAsync(true));
+        }
+
+        private void ShowWeatherSetupState()
+        {
+            _currentWeatherInfo = null;
+            _lastWeatherLoadSucceededAt = null;
+            CurrentWeatherCard.Visibility = Visibility.Collapsed;
+            ForecastPanel.Visibility = Visibility.Collapsed;
+            DailyForecastPanel.Visibility = Visibility.Collapsed;
+            WeatherStatusText.Text = "";
+            BtnRefresh.IsEnabled = true;
+            WeatherLoadState.SetEmpty(ContentState.Text("ContentState_NoWeather", "Weather is not configured."),
+                ContentState.Text("ContentState_WeatherSetupHint", "Enable weather and choose a city in weather settings."),
+                ContentState.Text("ContentState_WeatherSettings", "Open weather settings"), () =>
+                {
+                    Frame?.Navigate(typeof(WeatherPage), WeatherPageSection.Preferences);
+                    return Task.CompletedTask;
+                });
         }
 
         #endregion

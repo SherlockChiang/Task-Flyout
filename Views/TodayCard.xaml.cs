@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Task_Flyout.Models;
 
 namespace Task_Flyout.Views;
@@ -22,26 +23,18 @@ public sealed partial class TodayCard : UserControl
         Heading.Text = title;
         OpenButton.Content = openLabel;
         AutomationProperties.SetAutomationId(OpenButton, automationPrefix + "Open");
-        AutomationProperties.SetAutomationId(RetryButton, automationPrefix + "Retry");
+        AutomationProperties.SetAutomationId(LoadState, automationPrefix + "State");
         AutomationProperties.SetAutomationId(Rows, automationPrefix + "Items");
-        AutomationProperties.SetName(LoadingBar, title);
     }
 
     internal void SetLoading(string message)
     {
-        LoadingBar.Visibility = Visibility.Visible;
-        LoadingBar.IsIndeterminate = true;
-        ErrorBar.IsOpen = false;
-        RetryButton.Visibility = Visibility.Collapsed;
-        Summary.Text = "";
-        Detail.Text = message;
-        Rows.ItemsSource = null;
-        Rows.Visibility = Visibility.Collapsed;
+        LoadState.SetLoading(message, !string.IsNullOrEmpty(Summary.Text));
     }
 
     internal void SetResult(string summary, string detail, IReadOnlyList<TodayCardRow>? rows = null)
     {
-        FinishLoading();
+        LoadState.Clear();
         Summary.Text = summary;
         Detail.Text = detail;
         Rows.ItemsSource = rows;
@@ -50,22 +43,10 @@ public sealed partial class TodayCard : UserControl
 
     internal void SetError(string reason, string nextStep)
     {
-        FinishLoading();
-        Summary.Text = "—";
-        Detail.Text = nextStep;
-        ErrorBar.Message = reason;
-        ErrorBar.IsOpen = true;
-        RetryButton.Visibility = Visibility.Visible;
-    }
-
-    private void FinishLoading()
-    {
-        LoadingBar.IsIndeterminate = false;
-        LoadingBar.Visibility = Visibility.Collapsed;
+        LoadState.SetError(reason, nextStep, ContentState.RetryLabel, () => { RetryRequested?.Invoke(); return Task.CompletedTask; });
     }
 
     private void OpenButton_Click(object sender, RoutedEventArgs e) => OpenRequested?.Invoke();
-    private void RetryButton_Click(object sender, RoutedEventArgs e) => RetryRequested?.Invoke();
     private void Rows_ItemClick(object sender, ItemClickEventArgs e)
     {
         if (e.ClickedItem is TodayCardRow row) ItemRequested?.Invoke(row.Item);

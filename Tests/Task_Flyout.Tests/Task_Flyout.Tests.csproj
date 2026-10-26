@@ -33,6 +33,7 @@
        project, which would drag in WinUI/MSIX tooling and the app entry point. -->
   <ItemGroup>
     <Compile Include="../../Services/AccountSyncHealth.cs" Link="Source/AccountSyncHealth.cs" />
+    <Compile Include="../../Services/ContentStateActionGate.cs" Link="Source/ContentStateActionGate.cs" />
     <Compile Include="../../Services/AppIcons.cs" Link="Source/AppIcons.cs" />
     <Compile Include="../../Services/QuickCreatePolicy.cs" Link="Source/QuickCreatePolicy.cs" />
     <Compile Include="../../Services/TaskMailActions.cs" Link="Source/TaskMailActions.cs" />
