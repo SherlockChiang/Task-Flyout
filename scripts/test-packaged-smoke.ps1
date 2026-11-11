@@ -152,7 +152,7 @@ try {
     foreach ($target in @(
         @{ Navigation = "NavTasks"; Page = "TasksToggleAccounts" },
         @{ Navigation = "NavMail"; Page = "MailComposeButton" },
-        @{ Navigation = "NavCalendar"; Page = "CalendarLayoutRoot" }
+        @{ Navigation = "NavCalendar"; Page = "SideBarAgendaList" }
     )) {
         $navigation = Find-AutomationElement -Root $root -AutomationId $target.Navigation
         Assert-NamedElement -Element $navigation -AutomationId $target.Navigation
@@ -166,8 +166,7 @@ try {
     }
     Start-Sleep -Milliseconds 750
     $root = Get-RootElement -Process $process
-    Find-AutomationElement -Root $root -AutomationId "CalendarLayoutRoot" | Out-Null
-    Find-AutomationElement -Root $root -AutomationId "CalendarTimelinePane" | Out-Null
+    Find-AutomationElement -Root $root -AutomationId "SideBarAgendaList" | Out-Null
 
     # Compact layouts replace the calendar toolbar with a step navigator. Older
     # package revisions do not expose that navigator, so keep the shared smoke

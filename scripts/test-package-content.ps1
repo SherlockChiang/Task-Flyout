@@ -14,8 +14,12 @@ $trackedSensitiveFiles = @(
 )
 foreach ($relativePath in $trackedSensitiveFiles) {
     git ls-files --error-unmatch -- $relativePath *> $null
-    if ($LASTEXITCODE -eq 0) {
+    $gitExitCode = $LASTEXITCODE
+    if ($gitExitCode -eq 0) {
         throw "Sensitive build input is tracked by Git: $relativePath"
+    }
+    if ($gitExitCode -ne 1) {
+        throw "Could not inspect Git tracking state for sensitive build input: $relativePath (exit code $gitExitCode)."
     }
 }
 
@@ -36,3 +40,4 @@ if (-not [string]::IsNullOrWhiteSpace($PackageDirectory)) {
 }
 
 Write-Host 'Release input and package content checks passed.' -ForegroundColor Green
+$global:LASTEXITCODE = 0
