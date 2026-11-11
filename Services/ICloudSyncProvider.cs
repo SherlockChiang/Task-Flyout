@@ -20,6 +20,15 @@ namespace Task_Flyout.Services
         private bool _disposed;
 
         public string ProviderName => "iCloud";
+        public string AccountId { get; }
+        public string ProviderKey => AccountIdentityPolicy.CreateProviderKey(ProviderName, AccountId);
+        public string AccountDisplayName { get; }
+
+        public ICloudSyncProvider(string? accountId = null, string? accountDisplayName = null)
+        {
+            AccountId = AccountIdentityPolicy.ResolveAccountId(ProviderName, accountId);
+            AccountDisplayName = accountDisplayName?.Trim() ?? string.Empty;
+        }
 
         public Task ConnectWithCredentialsAsync(
             string accountName,
@@ -126,6 +135,7 @@ namespace Task_Flyout.Services
                                 IsEvent = true,
                                 IsTask = false,
                                 Provider = mapped.Provider,
+                                AccountId = AccountId,
                                 CalendarId = mapped.CalendarId,
                                 CalendarName = mapped.CalendarName,
                                 DateKey = mapped.DateKey,

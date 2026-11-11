@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 
 namespace Task_Flyout.Models
 {
@@ -51,6 +52,12 @@ namespace Task_Flyout.Models
         }
 
         public string Provider { get; set; } = "Local";
+        public string AccountId { get; set; } = "";
+
+        [JsonIgnore]
+        public string ProviderKey
+            => Task_Flyout.Services.AccountIdentityPolicy.CreateProviderKey(Provider, AccountId);
+
         public string CalendarId { get; set; } = "";
         public string CalendarName { get; set; } = "";
         public string DateKey { get; set; } = "";

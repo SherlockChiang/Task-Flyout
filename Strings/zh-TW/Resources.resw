@@ -468,6 +468,27 @@
   <data name="AddAccount_ReconnectICloud" xml:space="preserve">
     <value>重新連結 iCloud 行事曆</value>
   </data>
+  <data name="AddAccount_AddAnotherGoogle" xml:space="preserve">
+    <value>新增另一個 Google 帳戶</value>
+  </data>
+  <data name="AddAccount_ConnectedAccountsTitle.Text" xml:space="preserve">
+    <value>已連結的帳戶</value>
+  </data>
+  <data name="AddAccount_ReconnectAccount" xml:space="preserve">
+    <value>重新連結</value>
+  </data>
+  <data name="AddAccount_ReconnectingAccount" xml:space="preserve">
+    <value>正在重新連結 {0}...</value>
+  </data>
+  <data name="AddAccount_AccountReconnected" xml:space="preserve">
+    <value>已重新連結 {0}</value>
+  </data>
+  <data name="AddAccount_GoogleAlreadyConnected" xml:space="preserve">
+    <value>Google 帳戶 {0} 已連結。</value>
+  </data>
+  <data name="AddAccount_GoogleAccountMismatch" xml:space="preserve">
+    <value>目前登入的是 {1}，但所選帳戶是 {0}。此次登入未關聯，所選帳戶仍處於中斷狀態。</value>
+  </data>
   <data name="AddAccount_ChecklistTitle.Text" xml:space="preserve">
     <value>帳戶健康與離線狀態</value>
   </data>

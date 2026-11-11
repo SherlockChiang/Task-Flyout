@@ -17,6 +17,9 @@ namespace Task_Flyout.Services
     public class MicrosoftSyncProvider : ISyncProvider
     {
         public string ProviderName => "Microsoft";
+        public string AccountId { get; }
+        public string ProviderKey => AccountIdentityPolicy.CreateProviderKey(ProviderName, AccountId);
+        public string AccountDisplayName { get; }
         private ResourceLoader _loader = new ResourceLoader();
         private GraphServiceClient _graphClient = null!;
         private IPublicClientApplication? _msalClient;
@@ -26,6 +29,12 @@ namespace Task_Flyout.Services
         private string _defaultTodoListId = "";
 
         private static readonly string[] AllFeatureScopes = ProviderAuthorizationScopePolicy.MicrosoftAllFeatures;
+
+        public MicrosoftSyncProvider(string? accountId = null, string? accountDisplayName = null)
+        {
+            AccountId = AccountIdentityPolicy.ResolveAccountId(ProviderName, accountId);
+            AccountDisplayName = accountDisplayName?.Trim() ?? string.Empty;
+        }
 
         public GraphServiceClient? GraphClient => _graphClient;
 
@@ -381,6 +390,7 @@ namespace Task_Flyout.Services
                             IsEvent = true,
                             IsTask = false,
                             Provider = mapped.Provider,
+                            AccountId = AccountId,
                             CalendarId = mapped.CalendarId,
                             CalendarName = mapped.CalendarName,
                             DateKey = mapped.DateKey,
@@ -517,6 +527,7 @@ namespace Task_Flyout.Services
                                 IsTask = true,
                                 IsCompleted = mapped.IsCompleted,
                                 Provider = mapped.Provider,
+                                AccountId = AccountId,
                                 CalendarId = mapped.CalendarId,
                                 CalendarName = mapped.CalendarName,
                                 DateKey = mapped.DateKey

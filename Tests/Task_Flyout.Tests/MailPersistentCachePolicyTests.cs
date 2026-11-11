@@ -9,12 +9,14 @@ public class MailPersistentCachePolicyTests
     {
         var cache = new MailPersistentCache
         {
-            Folders = null!, Messages = null!, MessageCursors = null!, MessageHasMore = null!,
+            Folders = null!, FolderFetchedUtcTicks = null!, Messages = null!, MessageFetchedUtcTicks = null!, MessageCursors = null!, MessageHasMore = null!,
             PendingMutations = null!, LastSeenInboxTicks = null!, AccountOrder = null!, FolderOrder = null!
         };
 
         Assert.True(MailPersistentCachePolicy.Normalize(cache, DateTimeOffset.UtcNow, 200));
         Assert.NotNull(cache.Messages);
+        Assert.NotNull(cache.FolderFetchedUtcTicks);
+        Assert.NotNull(cache.MessageFetchedUtcTicks);
         Assert.NotNull(cache.PendingMutations);
         Assert.NotNull(cache.FolderOrder);
     }
@@ -65,6 +67,18 @@ public class MailPersistentCachePolicyTests
     }
 
     [Fact]
+    public void Normalize_can_defer_expired_mutation_removal_for_cache_invalidation()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var cache = new MailPersistentCache();
+        cache.PendingMutations.Add(new PendingMailMutation { CreatedUtcTicks = now.AddDays(-8).UtcTicks });
+
+        MailPersistentCachePolicy.Normalize(cache, now, 200, removeExpiredMutations: false);
+
+        Assert.Single(cache.PendingMutations);
+    }
+
+    [Fact]
     public void Imap_window_requires_uid_validity_on_every_item()
     {
         Assert.False(MailPersistentCachePolicy.CanUseWindow(MailAccountKind.Imap, new[] { new MailItem { ImapUidValidity = null } }));
@@ -79,6 +93,34 @@ public class MailPersistentCachePolicyTests
         cache.Messages["account|folder|False"] = new() { Item("message", 1) };
 
         Assert.False(MailPersistentCachePolicy.Normalize(cache, DateTimeOffset.UtcNow, 200));
+    }
+
+    [Fact]
+    public void Persistent_timestamp_must_be_present_and_within_lifetime()
+    {
+        var now = DateTimeOffset.Parse("2026-09-03T10:00:00Z");
+        var lifetime = TimeSpan.FromMinutes(10);
+
+        Assert.False(MailPersistentCachePolicy.IsFresh(null, now, lifetime));
+        Assert.True(MailPersistentCachePolicy.IsFresh(now.AddMinutes(-9).UtcTicks, now, lifetime));
+        Assert.False(MailPersistentCachePolicy.IsFresh(now.AddMinutes(-10).UtcTicks, now, lifetime));
+        Assert.False(MailPersistentCachePolicy.IsFresh(now.AddMinutes(1).UtcTicks, now, lifetime));
+        Assert.False(MailPersistentCachePolicy.IsFresh(long.MaxValue, now, lifetime));
+    }
+
+    [Fact]
+    public void Normalize_moves_legacy_timestamp_and_removes_orphans()
+    {
+        var cache = new MailPersistentCache();
+        cache.Messages["account|folder|False|25"] = new() { Item("message", 1) };
+        cache.MessageFetchedUtcTicks["account|folder|False|25"] = 20;
+        cache.MessageFetchedUtcTicks["orphan"] = 30;
+
+        Assert.True(MailPersistentCachePolicy.Normalize(cache, DateTimeOffset.UtcNow, 200));
+
+        Assert.Equal(20, cache.MessageFetchedUtcTicks["account|folder|False"]);
+        Assert.False(cache.MessageFetchedUtcTicks.ContainsKey("account|folder|False|25"));
+        Assert.False(cache.MessageFetchedUtcTicks.ContainsKey("orphan"));
     }
 
     private static MailItem Item(string id, int minute, string body = "")

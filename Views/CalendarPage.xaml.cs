@@ -109,6 +109,8 @@ namespace Task_Flyout.Views
         private ResponsiveLayoutMode _layoutMode = ResponsiveLayoutMode.Wide;
         private DateTimeOffset? _lastCalendarSyncSucceededAt;
         private CalendarMonthRange _displayedRange;
+        private readonly VersionedUiRefreshGate _cacheRefreshGate = new();
+        private bool _isPageLoaded;
 
         private void TaskCheckBox_Tapped(object sender, TappedRoutedEventArgs e)
         {
@@ -123,17 +125,64 @@ namespace Task_Flyout.Views
             SetWeekdayHeaders();
             if (Application.Current is App app) _syncManager = app.SyncManager;
             this.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(Global_PointerWheelChanged), handledEventsToo: true);
-            this.Loaded += (s, e) =>
+            this.Loaded += CalendarPage_Loaded;
+            this.Unloaded += CalendarPage_Unloaded;
+        }
+
+        private void CalendarPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            _isPageLoaded = true;
+            if (_syncManager != null)
             {
-                RefreshAccountList();
-                LoadCalendar(_viewDate);
-            };
-            this.Unloaded += (_, _) =>
+                _syncManager.CachePublished -= SyncManager_CachePublished;
+                _syncManager.CachePublished += SyncManager_CachePublished;
+            }
+            RefreshAccountList();
+            LoadCalendar(_viewDate);
+        }
+
+        private void CalendarPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _isPageLoaded = false;
+            if (_syncManager != null)
+                _syncManager.CachePublished -= SyncManager_CachePublished;
+            _syncCts?.Cancel();
+            _syncCts?.Dispose();
+            _syncCts = null;
+        }
+
+        private void SyncManager_CachePublished(object? sender, AgendaCachePublishedEventArgs e)
+        {
+            if (!_cacheRefreshGate.TryQueue(e.Version)) return;
+            if (!DispatcherQueue.TryEnqueue(ApplyPublishedCacheUpdate))
+                _cacheRefreshGate.CancelQueuedDispatch();
+        }
+
+        private void ApplyPublishedCacheUpdate()
+        {
+            if (!_cacheRefreshGate.TryBeginApply(out _) || !_isPageLoaded || CalendarGrid == null)
+                return;
+
+            LoadCache(_displayedRange);
+            if (_viewMode == CalendarViewMode.Year)
             {
-                _syncCts?.Cancel();
-                _syncCts?.Dispose();
-                _syncCts = null;
-            };
+                PopulateYearMonths();
+            }
+            else if (_viewMode == CalendarViewMode.Week)
+            {
+                BuildWeekTimeline();
+            }
+            else
+            {
+                foreach (var cell in DayCells)
+                {
+                    if (_localCache.DayItems.TryGetValue(cell.Date.ToString("yyyy-MM-dd"), out var dayItems))
+                        SetCellItems(cell, dayItems);
+                    else
+                        SetCellItems(cell, Array.Empty<AgendaItem>());
+                }
+            }
+            UpdateSideBar();
         }
 
         private void SetWeekdayHeaders()
@@ -879,7 +928,14 @@ namespace Task_Flyout.Views
 
         private async void BtnRemoveAccount_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not Button btn || btn.Tag is not string providerName) return;
+            if (sender is not Button btn || btn.Tag is not string accountId ||
+                _syncManager?.AccountManager.GetAccountById(accountId) is not ConnectedAccountInfo account)
+            {
+                return;
+            }
+
+            string providerName = account.ProviderName;
+            string accountTitle = account.DisplayTitle;
 
             bool hasSharedAuthorization = ProviderAuthorizationLifecycle.HasSharedAuthorization(providerName);
 
@@ -887,8 +943,8 @@ namespace Task_Flyout.Views
             {
                 Title = _loader.GetStringOrDefault("TextRemoveAccountTitle") ?? "Remove Account",
                 Content = hasSharedAuthorization
-                    ? string.Format(_loader.GetStringOrDefault("TextProviderRemovalContent") ?? "Remove {0} from Calendar and Tasks only, or disconnect it completely from Calendar, Tasks, and Mail?", providerName)
-                    : string.Format(_loader.GetStringOrDefault("TextRemoveAccountContent") ?? "Are you sure you want to remove the {0} account?", providerName),
+                    ? string.Format(_loader.GetStringOrDefault("TextProviderRemovalContent") ?? "Remove {0} from Calendar and Tasks only, or disconnect it completely from Calendar, Tasks, and Mail?", accountTitle)
+                    : string.Format(_loader.GetStringOrDefault("TextRemoveAccountContent") ?? "Are you sure you want to remove the {0} account?", accountTitle),
                 PrimaryButtonText = hasSharedAuthorization
                     ? _loader.GetStringOrDefault("TextRemoveAgendaOnly") ?? "Remove Calendar/Tasks only"
                     : _loader.GetStringOrDefault("TextRemoveAccount") ?? "Remove Account",
@@ -906,11 +962,11 @@ namespace Task_Flyout.Views
             try
             {
                 if ((!hasSharedAuthorization && result == ContentDialogResult.Primary) && App.Current is App app)
-                    await app.DisconnectProviderCompletelyAsync(providerName);
+                    await app.DisconnectProviderCompletelyAsync(providerName, accountId);
                 else if (result == ContentDialogResult.Secondary && App.Current is App app2)
-                    await app2.DisconnectProviderCompletelyAsync(providerName);
+                    await app2.DisconnectProviderCompletelyAsync(providerName, accountId);
                 else if (_syncManager != null)
-                    await _syncManager.RemoveAgendaAccountAsync(providerName);
+                    await _syncManager.RemoveAgendaAccountAsync(providerName, accountId);
             }
             catch (Exception ex)
             {
@@ -977,17 +1033,28 @@ namespace Task_Flyout.Views
                     .ThenBy(i => i.Subtitle);
                 foreach (var item in sortedItems)
                 {
+                    bool isAllDay = IsAllDaySubtitle(item.Subtitle);
+                    string allDayText = _loader.GetStringOrDefault("TextAllDay") ?? "All Day";
+                    string timeText = item.IsEvent
+                        ? CalendarEventTimePolicy.FormatTimeRange(
+                            item.StartDateTime,
+                            item.EndDateTime,
+                            isAllDay,
+                            allDayText,
+                            item.Subtitle)
+                        : item.Subtitle;
                     var displayItem = new AgendaItem
                     {
                         Id = item.Id,
                         Title = item.Title,
-                        Subtitle = $"{itemDate.ToString("M", LocalizationHelper.AppCulture)}\n{(IsAllDaySubtitle(item.Subtitle) ? (_loader.GetStringOrDefault("TextAllDay") ?? "All Day") : item.Subtitle)}",
+                        Subtitle = $"{itemDate.ToString("M", LocalizationHelper.AppCulture)}\n{timeText}",
                         Location = item.Location,
                         Description = item.Description,
                         IsEvent = item.IsEvent,
                         IsTask = item.IsTask,
                         IsCompleted = item.IsCompleted,
                         Provider = item.Provider,
+                        AccountId = item.AccountId,
                         CalendarId = item.CalendarId,
                         CalendarName = item.CalendarName,
                         ColorHex = item.ColorHex,
@@ -1057,6 +1124,7 @@ namespace Task_Flyout.Views
                && left.IsTask == right.IsTask
                && left.IsCompleted == right.IsCompleted
                && left.Provider == right.Provider
+               && left.AccountId == right.AccountId
                && left.CalendarId == right.CalendarId
                && left.CalendarName == right.CalendarName
                && left.ColorHex == right.ColorHex
@@ -1079,10 +1147,10 @@ namespace Task_Flyout.Views
                     item.IsCompleted = newValue;
                     if (_syncManager != null && App.Current is App app)
                     {
-                        var key = $"{item.Provider}|{item.CalendarId}|{item.Id}";
+                        var key = $"{item.ProviderKey}|{item.CalendarId}|{item.Id}";
                         var result = await app.TaskMutations.ExecuteAsync(
                             key,
-                            () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId),
+                            () => _syncManager.UpdateTaskStatusAsync(item.Provider, item.Id, newValue, item.CalendarId, item.AccountId),
                             ShowTaskMutationState);
                         if (result.Phase == TaskMutationPhase.Failed)
                         {
@@ -1235,15 +1303,17 @@ namespace Task_Flyout.Views
 
             if (_itemBeingEdited == null && EditCmbProvider != null)
             {
-                string? selectedProvider = (EditCmbProvider.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+                string? selectedAccountId = (EditCmbProvider.SelectedItem as ComboBoxItem)?.Tag?.ToString();
                 SetupEditProviderComboBox();
                 var previous = EditCmbProvider.Items.OfType<ComboBoxItem>()
-                    .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), selectedProvider, StringComparison.Ordinal));
+                    .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), selectedAccountId, StringComparison.Ordinal));
                 if (previous != null) EditCmbProvider.SelectedItem = previous;
             }
         }
 
-        private void SetupEditProviderComboBox(string? forceSelectProvider = null)
+        private void SetupEditProviderComboBox(
+            string? forceSelectProvider = null,
+            string? forceSelectAccountId = null)
         {
             EditCmbProvider.Items.Clear();
             var accountMgr = (App.Current as App)?.SyncManager?.AccountManager;
@@ -1255,20 +1325,41 @@ namespace Task_Flyout.Views
                     var capabilities = SyncProviderCapabilityPolicy.ForProvider(acct.ProviderName);
                     if (EditRadioTask?.IsChecked == true && !capabilities.SupportsTasks) continue;
                     if (EditRadioEvent?.IsChecked == true && !capabilities.SupportsEvents) continue;
-                    EditCmbProvider.Items.Add(new ComboBoxItem { Content = acct.ProviderName, Tag = acct.ProviderName });
+                    EditCmbProvider.Items.Add(new ComboBoxItem
+                    {
+                        Content = acct.DisplayTitle,
+                        Tag = acct.AccountId,
+                        DataContext = acct
+                    });
                 }
             }
-            if (forceSelectProvider != null && !EditCmbProvider.Items.OfType<ComboBoxItem>().Any(i => i.Tag.ToString() == forceSelectProvider))
-                EditCmbProvider.Items.Add(new ComboBoxItem { Content = forceSelectProvider, Tag = forceSelectProvider });
+
+            ComboBoxItem? forcedItem = null;
+            if (!string.IsNullOrWhiteSpace(forceSelectAccountId))
+            {
+                forcedItem = EditCmbProvider.Items.OfType<ComboBoxItem>().FirstOrDefault(item =>
+                    string.Equals(item.Tag?.ToString(), forceSelectAccountId, StringComparison.OrdinalIgnoreCase));
+            }
+            if (forcedItem == null && !string.IsNullOrWhiteSpace(forceSelectProvider))
+            {
+                forcedItem = EditCmbProvider.Items.OfType<ComboBoxItem>().FirstOrDefault(item =>
+                    item.DataContext is ConnectedAccountInfo account &&
+                    string.Equals(account.ProviderName, forceSelectProvider, StringComparison.OrdinalIgnoreCase));
+            }
+            if (forcedItem == null && !string.IsNullOrWhiteSpace(forceSelectProvider))
+            {
+                forcedItem = new ComboBoxItem
+                {
+                    Content = forceSelectProvider,
+                    Tag = AccountIdentityPolicy.ResolveAccountId(forceSelectProvider, forceSelectAccountId)
+                };
+                EditCmbProvider.Items.Add(forcedItem);
+            }
 
             if (EditCmbProvider.Items.Count > 1)
             {
                 EditCmbProvider.Visibility = Visibility.Visible;
-                if (forceSelectProvider != null)
-                {
-                    var item = EditCmbProvider.Items.OfType<ComboBoxItem>().FirstOrDefault(i => i.Tag.ToString() == forceSelectProvider);
-                    if (item != null) EditCmbProvider.SelectedItem = item;
-                }
+                if (forcedItem != null) EditCmbProvider.SelectedItem = forcedItem;
                 else EditCmbProvider.SelectedIndex = 0;
             }
             else
@@ -1322,7 +1413,7 @@ namespace Task_Flyout.Views
             EditTxtLocation.Text = item.Location;
             EditTxtDescription.Text = item.Description;
 
-            SetupEditProviderComboBox(item.Provider);
+            SetupEditProviderComboBox(item.Provider, item.AccountId);
             EditCmbProvider.IsEnabled = false;
 
             EditRadioEvent.IsChecked = item.IsEvent;
@@ -1334,21 +1425,15 @@ namespace Task_Flyout.Views
 
             if (DateTime.TryParse(item.DateKey, out var d)) EditDatePicker.Date = d;
 
-            var timePart = item.Subtitle?.Split('\n').LastOrDefault()?.Trim();
-            if (timePart == _loader.GetStringOrDefault("TextAllDay") || string.IsNullOrEmpty(timePart))
-            {
-                EditChkAllDay.IsChecked = true;
-                EditStartTimePicker.SelectedTime = null;
-                EditEndTimePicker.SelectedTime = null;
-            }
-            else
-            {
-                EditChkAllDay.IsChecked = false;
-                var times = timePart.Split('-');
-                if (times.Length >= 1 && TimeSpan.TryParse(times[0].Trim(), out var st)) EditStartTimePicker.SelectedTime = st;
-                if (times.Length >= 2 && TimeSpan.TryParse(times[1].Trim(), out var et)) EditEndTimePicker.SelectedTime = et;
-                else if (EditStartTimePicker.SelectedTime.HasValue) EditEndTimePicker.SelectedTime = EditStartTimePicker.SelectedTime.Value.Add(TimeSpan.FromHours(1));
-            }
+            bool isAllDay = IsAllDaySubtitle(item.Subtitle);
+            var editorTime = CalendarEventTimePolicy.CreateEditorState(
+                item.StartDateTime,
+                item.EndDateTime,
+                isAllDay,
+                item.Subtitle);
+            EditChkAllDay.IsChecked = editorTime.IsAllDay;
+            EditStartTimePicker.SelectedTime = editorTime.StartTime;
+            EditEndTimePicker.SelectedTime = editorTime.EndTime;
 
             EditRadioType_Changed(null, null);
         }
@@ -1417,11 +1502,14 @@ namespace Task_Flyout.Views
                 {
                     if (_syncManager != null)
                     {
+                        string? selectedAccountId = (EditCmbProvider.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+                        var selectedAccount = _syncManager.AccountManager.GetAccountById(selectedAccountId);
                         await _syncManager.CreateItemAsync(
                             EditTxtTitle.Text, EditRadioEvent.IsChecked == true, EditChkAllDay.IsChecked == true,
                             EditDatePicker.Date.DateTime, newStartTime ?? TimeSpan.Zero, newEndTime ?? TimeSpan.Zero,
                             EditTxtLocation.Text, GetSelectedRecurrence(),
-                            (EditCmbProvider.SelectedItem as ComboBoxItem)?.Tag.ToString() ?? "Google");
+                            selectedAccount?.ProviderName ?? "Google",
+                            selectedAccountId);
                     }
                 }
                 else if (_syncManager != null && !string.IsNullOrEmpty(_itemBeingEdited.Id))
@@ -1430,7 +1518,7 @@ namespace Task_Flyout.Views
                     await _syncManager.UpdateItemAsync(
                         _itemBeingEdited.Provider, _itemBeingEdited.Id, _itemBeingEdited.IsEvent,
                         EditTxtTitle.Text, EditTxtLocation.Text, EditTxtDescription.Text,
-                         EditDatePicker.Date.DateTime, newStartTime, newEndTime, _itemBeingEdited.CalendarId);
+                         EditDatePicker.Date.DateTime, newStartTime, newEndTime, _itemBeingEdited.CalendarId, _itemBeingEdited.AccountId);
 
                     if (_localCache.DayItems.TryGetValue(_itemBeingEdited.DateKey, out var oldList))
                     {
@@ -1438,12 +1526,21 @@ namespace Task_Flyout.Views
                         if (original != null)
                         {
                             var oldDateKey = original.DateKey;
+                            var updatedTime = SyncEventTimePolicy.Create(
+                                EditDatePicker.Date.DateTime,
+                                newStartTime,
+                                newEndTime);
                             oldList.Remove(original);
                             original.Title = EditTxtTitle.Text;
                             original.Location = EditTxtLocation.Text;
                             original.Description = EditTxtDescription.Text;
                             original.DateKey = newDateKey;
-                            original.Subtitle = newSubtitleText;
+                            if (original.IsEvent)
+                            {
+                                original.Subtitle = newSubtitleText;
+                                original.StartDateTime = updatedTime.Start;
+                                original.EndDateTime = updatedTime.End;
+                            }
                             if (!_localCache.DayItems.ContainsKey(newDateKey)) _localCache.DayItems[newDateKey] = new List<AgendaItem>();
                             _localCache.DayItems[newDateKey].Add(original);
                             await _syncManager.UpsertCachedItemAsync(original, oldDateKey);
@@ -1507,7 +1604,8 @@ namespace Task_Flyout.Views
                         deleteMode.Value,
                         occurrenceDate,
                         itemToDelete.RecurringEventId,
-                        itemToDelete.CalendarId);
+                        itemToDelete.CalendarId,
+                        itemToDelete.AccountId);
                 }
                 catch (Exception ex)
                 {

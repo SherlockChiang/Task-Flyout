@@ -79,12 +79,12 @@
                                                   VerticalAlignment="Center"/>
                                         <TextBlock Grid.Column="1" FontWeight="Bold" FontSize="14"
                                                    VerticalAlignment="Center"
-                                                   Text="{Binding ProviderName}"
+                                                   Text="{Binding DisplayTitle}"
                                                    TextTrimming="CharacterEllipsis"/>
                                         <Button x:Uid="TasksPage_BtnRemoveAccount" Grid.Column="2" Width="40" Height="40" Padding="0"
                                                 Background="Transparent"
                                                 BorderThickness="0"
-                                                Tag="{Binding ProviderName}"
+                                                Tag="{Binding AccountId}"
                                                 Click="BtnRemoveAccount_Click"
                                                 VerticalAlignment="Center">
                                             <FontIcon Glyph="&#xE711;" FontSize="12"

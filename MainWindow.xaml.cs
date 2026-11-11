@@ -349,54 +349,6 @@ namespace Task_Flyout
             ContentFrame.Navigate(typeof(Views.AddAccountPage));
         }
 
-        private async void BtnRemoveAccount_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.Tag is string providerName)
-            {
-                var dialog = new ContentDialog
-                {
-                    Title = GetSafeString("TextRemoveAccountTitle", "Remove Account"),
-                    Content = string.Format(GetSafeString("TextProviderRemovalContent", "Remove {0} from Calendar and Tasks only, or disconnect it completely from Calendar, Tasks, and Mail?"), providerName),
-                    PrimaryButtonText = GetSafeString("TextRemoveAgendaOnly", "Remove Calendar/Tasks only"),
-                    SecondaryButtonText = GetSafeString("TextDisconnectProvider", "Disconnect completely"),
-                    CloseButtonText = GetSafeString("CalendarDialog.CloseButtonText", "Cancel"),
-                    XamlRoot = this.Content.XamlRoot,
-                    DefaultButton = ContentDialogButton.Close
-                };
-
-                var result = await dialog.ShowAsync();
-                if (result is ContentDialogResult.Primary or ContentDialogResult.Secondary)
-                {
-                    try
-                    {
-                        if (App.Current is App app)
-                        {
-                            if (result == ContentDialogResult.Secondary)
-                                await app.DisconnectProviderCompletelyAsync(providerName);
-                            else
-                                await app.SyncManager.RemoveAgendaAccountAsync(providerName);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Account removal failed: {ex.Message}");
-                        var errorDialog = new ContentDialog
-                        {
-                            Title = GetSafeString("TextRemoveAccountFailedTitle", "Account Not Removed"),
-                            Content = GetSafeString("TextDisconnectProviderFailed", "The account change could not be completed. Existing account data was preserved so you can try again."),
-                            CloseButtonText = GetSafeString("CalendarDialog.CloseButtonText", "Close"),
-                            XamlRoot = this.Content.XamlRoot
-                        };
-                        await errorDialog.ShowAsync();
-                        return;
-                    }
-                    _ = RefreshAccountListAsync();
-
-                    if (ContentFrame.Content is CalendarPage page) page.ForceSync();
-                }
-            }
-        }
-
         private void AccountToggle_Toggled(object sender, RoutedEventArgs e)
         {
             var mgr = GetAccountManager();

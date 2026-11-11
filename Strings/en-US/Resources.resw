@@ -468,6 +468,27 @@
   <data name="AddAccount_ReconnectICloud" xml:space="preserve">
     <value>Reconnect iCloud Calendar</value>
   </data>
+  <data name="AddAccount_AddAnotherGoogle" xml:space="preserve">
+    <value>Add another Google account</value>
+  </data>
+  <data name="AddAccount_ConnectedAccountsTitle.Text" xml:space="preserve">
+    <value>Connected accounts</value>
+  </data>
+  <data name="AddAccount_ReconnectAccount" xml:space="preserve">
+    <value>Reconnect</value>
+  </data>
+  <data name="AddAccount_ReconnectingAccount" xml:space="preserve">
+    <value>Reconnecting {0}...</value>
+  </data>
+  <data name="AddAccount_AccountReconnected" xml:space="preserve">
+    <value>Reconnected {0}</value>
+  </data>
+  <data name="AddAccount_GoogleAlreadyConnected" xml:space="preserve">
+    <value>Google account {0} is already connected.</value>
+  </data>
+  <data name="AddAccount_GoogleAccountMismatch" xml:space="preserve">
+    <value>Signed in as {1}, but {0} was selected. The sign-in was not linked and the selected account remains disconnected.</value>
+  </data>
   <data name="AddAccount_ChecklistTitle.Text" xml:space="preserve">
     <value>Account health and offline status</value>
   </data>

@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.Windows.ApplicationModel.Resources;
 using System.Linq;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Task_Flyout.Services;
 using Windows.Storage;
@@ -84,23 +85,119 @@ namespace Task_Flyout
         internal TaskMutationCoordinator TaskMutations { get; } = new();
         internal ComposeDraftCoordinator ComposeDrafts { get; } = new();
 
-        public async Task DisconnectProviderCompletelyAsync(string providerName)
+        public async Task<MailAccount> ConnectNewGoogleAccountAsync(
+            CancellationToken cancellationToken = default)
+        {
+            await EnsureAccountsHydratedAsync();
+            var provider = SyncManager.RegisterGoogleProviderForNewAccount();
+            bool connected = false;
+            try
+            {
+                await provider.ConnectInteractivelyAsync(selectAccount: true, cancellationToken);
+                var account = await MailService.AddGoogleAccountAsync(provider, cancellationToken);
+                connected = true;
+                return account;
+            }
+            finally
+            {
+                if (!connected)
+                {
+                    try { await provider.ClearLocalAuthorizationAsync(); }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Temporary Google authorization cleanup failed: {ex.Message}");
+                    }
+                    SyncManager.UnregisterProvider(provider.ProviderName, provider.AccountId);
+                }
+            }
+        }
+
+        public async Task<MailAccount> ReconnectGoogleAccountAsync(
+            string accountId,
+            CancellationToken cancellationToken = default)
+        {
+            await EnsureAccountsHydratedAsync();
+            string resolvedAccountId = AccountIdentityPolicy.ResolveAccountId("Google", accountId);
+            var agendaAccount = SyncManager.AccountManager.GetAccount("Google", resolvedAccountId);
+            var linkedMailAccount = MailService
+                .GetAccountsForProviderAccount("Google", resolvedAccountId)
+                .FirstOrDefault();
+            if (agendaAccount == null && linkedMailAccount == null)
+                throw new InvalidOperationException("The selected Google account is no longer connected.");
+
+            string? expectedAddress = linkedMailAccount?.Address;
+            if (string.IsNullOrWhiteSpace(expectedAddress) &&
+                agendaAccount?.DisplayName?.Contains('@') == true)
+            {
+                expectedAddress = agendaAccount.DisplayName;
+            }
+
+            var provider = SyncManager.EnsureGoogleProvider(
+                resolvedAccountId,
+                agendaAccount?.DisplayName ?? linkedMailAccount?.Address);
+            try
+            {
+                await provider.ReconnectInteractivelyAsync(expectedAddress, cancellationToken);
+                return await MailService.AddGoogleAccountAsync(
+                    provider,
+                    cancellationToken,
+                    expectedAddress);
+            }
+            catch (GoogleAccountAlreadyConnectedException)
+            {
+                try { await provider.ClearLocalAuthorizationAsync(); }
+                catch (Exception cleanupEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Mismatched Google authorization cleanup failed: {cleanupEx.Message}");
+                }
+                throw;
+            }
+        }
+
+        public async Task DisconnectProviderCompletelyAsync(
+            string providerName,
+            string? accountId)
         {
             providerName = ProviderAuthorizationLifecycle.NormalizeProviderName(providerName);
+            var agendaAccount = SyncManager.AccountManager.GetAccount(providerName, accountId);
+            string? resolvedAccountId = agendaAccount?.AccountId;
+            if (string.IsNullOrWhiteSpace(resolvedAccountId) && !string.IsNullOrWhiteSpace(accountId))
+                resolvedAccountId = AccountIdentityPolicy.ResolveAccountId(providerName, accountId);
+
+            if (string.Equals(providerName, "Google", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(resolvedAccountId))
+            {
+                var linkedMailAccount = MailService
+                    .GetAccountsForProviderAccount(providerName, resolvedAccountId)
+                    .FirstOrDefault();
+                SyncManager.EnsureGoogleProvider(
+                    resolvedAccountId,
+                    agendaAccount?.DisplayName ?? linkedMailAccount?.Address);
+            }
+
             await ProviderAuthorizationLifecycle.DisconnectCompletelyAsync(
-                () => SyncManager.ClearProviderAuthorizationForDisconnectAsync(providerName),
-                () => SyncManager.RemoveAgendaAccountAsync(providerName),
+                () => SyncManager.ClearProviderAuthorizationForDisconnectAsync(providerName, resolvedAccountId),
+                () => SyncManager.RemoveAgendaAccountAsync(providerName, resolvedAccountId),
                 async () =>
                 {
-                    var affectedIds = MailService.GetAccounts()
-                        .Where(account => ProviderAuthorizationLifecycle.NormalizeProviderName(account.ProviderName) == providerName)
+                    var affectedAccounts = string.IsNullOrWhiteSpace(resolvedAccountId)
+                        ? MailService.GetAccounts()
+                            .Where(account => ProviderAuthorizationLifecycle.NormalizeProviderName(account.ProviderName) == providerName)
+                            .ToList()
+                        : MailService.GetAccountsForProviderAccount(providerName, resolvedAccountId).ToList();
+                    var affectedIds = affectedAccounts
                         .Select(account => account.Id)
                         .ToList();
                     foreach (var accountId in affectedIds)
                         await ComposeDrafts.DiscardForAccountAsync(accountId);
-                    MailService.RemoveAccountsForProvider(providerName);
+                    MailService.RemoveAccountsForProvider(providerName, resolvedAccountId);
                 },
                 WebView2RuntimeService.ClearSensitiveBrowsingDataAsync);
+            if (string.Equals(providerName, "Google", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(resolvedAccountId))
+            {
+                SyncManager.UnregisterProvider(providerName, resolvedAccountId);
+            }
             if (MyMainWindow != null)
                 await MyMainWindow.RefreshAccountListAsync();
             MyFlyoutWindow?.ReloadFilters();
@@ -133,7 +230,6 @@ namespace Task_Flyout
                 }
                 catch { }
             };
-            SyncManager.RegisterProvider(new GoogleSyncProvider());
             SyncManager.RegisterProvider(new Services.MicrosoftSyncProvider());
             SyncManager.RegisterProvider(new Services.ICloudSyncProvider());
         }
@@ -173,6 +269,11 @@ namespace Task_Flyout
             _ = SyncManager.WarmCacheAsync();
             QueueBackgroundRefreshStart();
 
+            var trayInteraction = new TrayInteractionCoordinator(
+                EnsureAccountsHydratedAsync,
+                () => EnsureFlyoutWindow().ToggleFlyout(),
+                () => MyFlyoutWindow?.DismissForMainWindowAsync() ?? Task.CompletedTask,
+                () => OpenMainWindowInternal());
             _trayIcon.LeftClickCommand = new RelayCommand(async () =>
             {
                 var openRequest = PerformanceDiagnostics.StartSpan("flyout", "tray_click_to_open_request", "tray");
@@ -182,14 +283,13 @@ namespace Task_Flyout
                     // AccountManager.Load populates an ObservableCollection. Complete
                     // hydration before Flyout construction so its initial filter pass
                     // observes a stable account snapshot.
-                    await EnsureAccountsHydratedAsync();
-                    var flyout = EnsureFlyoutWindow();
-                    flyout.ToggleFlyout();
-                    openRequest.Complete();
+                    bool applied = await trayInteraction.ToggleFlyoutAsync();
+                    openRequest.Complete(applied ? "success" : "superseded");
+                    if (!applied) UpdateEfficiencyMode();
                 }
                 catch (Exception ex)
                 {
-                    openRequest.Complete("failed");
+                    openRequest.Complete("failure");
                     System.Diagnostics.Debug.WriteLine($"Opening tray flyout failed: {ex.Message}");
                     UpdateEfficiencyMode();
                 }
@@ -202,7 +302,21 @@ namespace Task_Flyout
             WeatherService.LocationUpdated += OnWeatherLocationUpdated;
             QueueLocationTrackingResume();
 
-            _trayIcon.DoubleClickCommand = new RelayCommand(() => OpenMainWindowInternal());
+            // H.NotifyIcon suppresses a pending single click on double click.
+            // Also invalidate any single click already awaiting account hydration.
+            _trayIcon.DoubleClickCommand = new RelayCommand(async () =>
+            {
+                try
+                {
+                    EfficiencyModeService.SetEfficiencyMode(false);
+                    await trayInteraction.OpenMainWindowAsync();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Opening main window from tray failed: {ex.Message}");
+                    UpdateEfficiencyMode();
+                }
+            });
 
             if (_trayIcon.ContextFlyout is MenuFlyout menu)
             {
@@ -524,6 +638,8 @@ namespace Task_Flyout
                 try
                 {
                     SyncManager.AccountManager.Load();
+                    MailService.SynchronizeAgendaAccountDisplayNames(SyncManager.AccountManager);
+                    SyncManager.HydrateAccountProviders();
                 }
                 catch (Exception ex)
                 {
