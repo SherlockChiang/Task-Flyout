@@ -176,8 +176,8 @@ try {
         Invoke-AutomationElement -Element $compactBack
         Start-Sleep -Milliseconds 500
         $root = Get-RootElement -Process $process
-        $accountPane = Find-AutomationElement -Root $root -AutomationId "CalendarAccountPane"
-        if ($accountPane.Current.IsOffscreen) {
+        $accountPaneMarker = Find-AutomationElement -Root $root -AutomationId "BtnAddAccount"
+        if ($accountPaneMarker.Current.IsOffscreen) {
             throw "Calendar account pane was not keyboard-invokable in narrow layout."
         }
     }
