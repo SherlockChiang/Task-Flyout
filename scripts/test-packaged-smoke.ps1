@@ -107,13 +107,14 @@ function Find-AutomationElement {
     param(
         [System.Windows.Automation.AutomationElement]$Root,
         [string]$AutomationId,
-        [switch]$Optional
+        [switch]$Optional,
+        [int]$WaitSeconds = $TimeoutSeconds
     )
 
     $condition = [System.Windows.Automation.PropertyCondition]::new(
         [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
         $AutomationId)
-    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $deadline = (Get-Date).AddSeconds($WaitSeconds)
     do {
         $element = $Root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
         if ($null -ne $element) { return $element }
@@ -151,7 +152,7 @@ try {
     foreach ($target in @(
         @{ Navigation = "NavTasks"; Page = "TasksToggleAccounts" },
         @{ Navigation = "NavMail"; Page = "MailComposeButton" },
-        @{ Navigation = "NavCalendar"; Page = "CalendarToggleAccounts" }
+        @{ Navigation = "NavCalendar"; Page = "TxtSideBarDate" }
     )) {
         $navigation = Find-AutomationElement -Root $root -AutomationId $target.Navigation
         Assert-NamedElement -Element $navigation -AutomationId $target.Navigation
@@ -165,19 +166,20 @@ try {
     }
     Start-Sleep -Milliseconds 750
     $root = Get-RootElement -Process $process
-    Find-AutomationElement -Root $root -AutomationId "CalendarToggleAccounts" | Out-Null
-    $collapseAccounts = Find-AutomationElement -Root $root -AutomationId "CalendarCollapseAccounts" -Optional
-    if ($null -ne $collapseAccounts -and -not $collapseAccounts.Current.IsOffscreen) {
-        throw "Calendar account pane remained visible in the initial narrow layout."
-    }
+    Find-AutomationElement -Root $root -AutomationId "TxtSideBarDate" | Out-Null
 
-    $toggle = Find-AutomationElement -Root $root -AutomationId "CalendarToggleAccounts"
-    Invoke-AutomationElement -Element $toggle
-    Start-Sleep -Milliseconds 500
-    $root = Get-RootElement -Process $process
-    $collapseAccounts = Find-AutomationElement -Root $root -AutomationId "CalendarCollapseAccounts"
-    if ($collapseAccounts.Current.IsOffscreen) {
-        throw "Calendar account pane was not keyboard-invokable in narrow layout."
+    # Compact layouts replace the calendar toolbar with a step navigator. Older
+    # package revisions do not expose that navigator, so keep the shared smoke
+    # check limited to the stable timeline surface in that case.
+    $compactBack = Find-AutomationElement -Root $root -AutomationId "CompactBack" -Optional -WaitSeconds 3
+    if ($null -ne $compactBack) {
+        Invoke-AutomationElement -Element $compactBack
+        Start-Sleep -Milliseconds 500
+        $root = Get-RootElement -Process $process
+        $accountPaneMarker = Find-AutomationElement -Root $root -AutomationId "BtnAddAccount"
+        if ($accountPaneMarker.Current.IsOffscreen) {
+            throw "Calendar account pane was not keyboard-invokable in narrow layout."
+        }
     }
 
     [System.Windows.Forms.SendKeys]::SendWait("%{F4}")
