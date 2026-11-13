@@ -26,7 +26,7 @@ Task Flyout 常驻 Windows 11 系统托盘，将日历、任务、邮件、RSS �
 ## 功能
 
 - **日历与任务** — 与 Google、Microsoft、iCloud 日历以及 Google Tasks、Microsoft To Do 双向同步，可在托盘中直接新建、编辑、完成日程与任务。
-- **邮件** — 支持 Gmail、Outlook 及任意 IMAP/SMTP 账户，后台定时抓取，新邮件抵达时弹出原生 Windows 通知。
+- **邮件** — 支持 Gmail、Outlook 及任意 IMAP/SMTP 账户；用户明确连接后，本地定时同步，新邮件抵达时弹出原生 Windows 通知。
 - **RSS 阅读器** — 内置阅读器订阅源，并提供按源的图片与隐私加载控制。
 - **天气** — 由 [Open-Meteo](https://open-meteo.com/) 驱动的天气面板，并可选启用任务栏天气栏；天气设置可在 Web Experience Pack 可用时请求 Windows 原生 Widgets 入口，并在 Explorer 确认原生入口前保留现有 Task Flyout 自绘天气栏。该入口的数据由 Windows 管理，可能轮播股票或新闻公告；Task Flyout 提供受支持的 Widgets 通知设置入口，但不会改写 Web Experience 私有配置。`windhawk/` 下另有一个需独立构建且默认关闭的 Windhawk 伴侣原型，MSIX 不会安装它。
 - **提醒** — 在日程开始前的自定义分钟数弹出通知。

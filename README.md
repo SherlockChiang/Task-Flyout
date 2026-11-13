@@ -29,7 +29,7 @@ see and manage your day without opening a browser.
 ## Features
 
 - **Calendar and tasks** — Two-way calendar sync with Google, Microsoft, and iCloud, plus Google Tasks and Microsoft To Do. Create, edit, and complete events and tasks directly from the tray.
-- **Mail** — Connect Gmail, Outlook, or any IMAP/SMTP account. Background polling raises a native Windows notification when new mail arrives.
+- **Mail** — Connect Gmail, Outlook, or any IMAP/SMTP account. After you explicitly connect an account, local polling raises a native Windows notification when new mail arrives.
 - **RSS reader** — Follow feeds in a built-in reader with per-feed image and privacy controls.
 - **Weather** — A forecast pane powered by [Open-Meteo](https://open-meteo.com/), plus an optional taskbar weather bar. Weather settings can request the Windows-owned Widgets entry when the Web Experience Pack is available; the existing Task Flyout bar remains visible until Explorer confirms the native entry. Windows owns that entry's data and may rotate finance/news announcements; Task Flyout links to the supported Widgets notification controls but does not rewrite private Web Experience settings. A separately built, disabled-by-default Windhawk companion proof of concept lives under `windhawk/`; it is not installed by the MSIX.
 - **Reminders** — Toast notifications a configurable number of minutes before an event starts.
