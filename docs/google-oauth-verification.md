@@ -111,6 +111,30 @@ Required order from the observed console state:
 
 ## Paste-Ready Scope Justification
 
+## Current Console Checkpoint (2026-11-14)
+
+The production `mytaskflyout` Google Auth Platform project was checked again
+after the public disclosure update:
+
+- Branding still shows the previous homepage-ownership finding for
+  `https://sherlockchiang.github.io/Task-Flyout/`, even though the exact
+  Search Console property is already verified.
+- The Branding page contains the expected `Task Flyout` name, support and
+  developer contact, homepage, privacy-policy URL, and authorized domain.
+- The old homepage finding was marked as resolved and a brand re-verification
+  request was submitted. Google recorded the verification task as completed,
+  but Verification Center has not refreshed yet; wait for Google's domain
+  ownership update before retrying `Prepare for verification`.
+- Data Access currently contains exactly Calendar, Tasks, and Gmail Modify.
+  Gmail Readonly and Gmail Send are absent.
+- The sensitive-scope and restricted-scope justifications in this document
+  were entered and saved in Data Access. The YouTube field now contains the
+  English unlisted demonstration video; the unlisted URL is intentionally kept
+  out of the repository.
+
+Do not submit the Data Access verification request until Branding is displayed
+as verified/published and the unlisted video URL has been added.
+
 Task Flyout is a local-first Windows 11 productivity app. Users explicitly
 connect Google to view and manage Google Calendar events, Google Tasks, and Gmail
 inside the app. Calendar access is read/write because the UI creates, edits, and
