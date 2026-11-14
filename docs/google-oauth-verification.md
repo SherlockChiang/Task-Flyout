@@ -128,8 +128,9 @@ after the public disclosure update:
 - Data Access currently contains exactly Calendar, Tasks, and Gmail Modify.
   Gmail Readonly and Gmail Send are absent.
 - The sensitive-scope and restricted-scope justifications in this document
-  were entered and saved in Data Access. The YouTube field remains empty until
-  the English unlisted demonstration video is recorded.
+  were entered and saved in Data Access. The YouTube field now contains the
+  English unlisted demonstration video; the unlisted URL is intentionally kept
+  out of the repository.
 
 Do not submit the Data Access verification request until Branding is displayed
 as verified/published and the unlisted video URL has been added.
